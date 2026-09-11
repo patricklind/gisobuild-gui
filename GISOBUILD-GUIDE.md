@@ -1,10 +1,10 @@
-# Genbrugelig GISO-buildguide til NCS5500
+# Reusable GISO Build Guide for NCS5500
 
-Denne guide bygger et NCS5500 Golden ISO med Docker. Scriptet kontrollerer inputfiler, finder optional RPM'er og SMU'er, frasorterer SMU'er som er markeret `Full` superseded i Cisco-readmefilerne og kører Cisco `gisobuild` i en x86_64-container.
+This guide builds an NCS5500 Golden ISO with Docker. The script validates input files, discovers optional RPMs and SMUs, excludes SMUs marked as `Full` superseded in Cisco README files, and runs Cisco `gisobuild` in an x86_64 container.
 
-## 1. Forbered mappen
+## 1. Prepare the directory
 
-Læg følgende under samme overordnede mappe:
+Place the following files below the same parent directory:
 
 ```text
 NCS5500-iosxr-k9-26.1.2/
@@ -18,35 +18,35 @@ ncs5500-26.1.2.CSCxxxxxxx/
   *.rpm
 ```
 
-SMU-downloads leveres ofte som `.tar`. Pak hver tar-fil ud i sin egen mappe, så både `.txt`-readme og `.rpm` ligger der. Brug kun pakker for præcis samme platform og IOS XR-release som base-ISO'en.
+SMU downloads are often distributed as `.tar` archives. Extract each archive into its own directory so that the `.txt` README and `.rpm` files remain together. Use only packages for the exact same platform and IOS XR release as the base ISO.
 
-## 2. Kontrollér Cisco-advisory og downloadliste
+## 2. Verify the Cisco advisory and download list
 
-Før build:
+Before building:
 
-1. Find den berørte IOS XR-release og platform i advisory-tabellen.
-2. Filtrér Cisco Software Download på den konkrete platform og release.
-3. Download alle SMU'er, som Cisco viser som applicable/recommended.
-4. Behold ældre SMU'er i inputmappen; scriptet frasorterer dem, når en nyere README udtrykkeligt angiver `Supercedes ... Full`.
+1. Find the affected IOS XR release and platform in the advisory table.
+2. Filter Cisco Software Download for the specific platform and release.
+3. Download every SMU Cisco lists as applicable or recommended.
+4. Keep older SMUs in the input directory. The script excludes them when a newer README explicitly marks them as `Supercedes ... Full`.
 
-Automatisk supersedence erstatter ikke en menneskelig applicability-kontrol. Hvis advisory og downloadlisten er uenige, bør Cisco TAC bekræfte pakken før produktion.
+Automated supersedence handling does not replace a manual applicability review. If the advisory and download list disagree, ask Cisco TAC to confirm the package before production use.
 
-## 3. Krav
+## 3. Requirements
 
-- Docker Desktop eller Docker Engine skal køre.
-- Mindst cirka 25 GB ledig diskplads anbefales.
-- Internetadgang til GitHub og Docker Hub første gang.
-- På Apple Silicon anvendes Docker-emulering af Cisco-containerens x86_64-image. Det er normalt, at buildet tager 15-30 minutter.
+- Docker Desktop or Docker Engine must be running.
+- Approximately 25 GB of free disk space is recommended.
+- Internet access to GitHub and Docker Hub is required for the first run.
+- On Apple Silicon, Docker emulates Cisco's x86_64 container image. A build time of 15–30 minutes is normal.
 
-Kontrollér Docker:
+Verify Docker:
 
 ```bash
 docker info
 ```
 
-## 4. Kør buildet
+## 4. Run the build
 
-Fra denne mappe:
+From the project directory:
 
 ```bash
 chmod +x ./build-giso.sh
@@ -56,13 +56,13 @@ chmod +x ./build-giso.sh
   --label SEC_HARDENING_SEP2026
 ```
 
-Standard-output bliver:
+The default output directory is:
 
 ```text
 output_gisobuild_SEC_HARDENING_SEP2026/
 ```
 
-Hvis outputmappen allerede findes, stopper scriptet. Genbyg bevidst med:
+The script stops if the output directory already exists. To rebuild intentionally, run:
 
 ```bash
 ./build-giso.sh \
@@ -71,11 +71,11 @@ Hvis outputmappen allerede findes, stopper scriptet. Genbyg bevidst med:
   --clean
 ```
 
-`--clean` tillades af sikkerhedsgrunde kun for outputmapper med navnet `output_gisobuild_*` ved siden af scriptet.
+For safety, `--clean` may only replace an `output_gisobuild_*` directory located next to the script.
 
-## 5. Godkend buildresultatet
+## 5. Validate the build result
 
-Et vellykket build skal vise:
+A successful build should report:
 
 ```text
 RPM signature check [PASS]
@@ -83,7 +83,7 @@ RPM compatibility check [PASS]
 Golden ISO creation SUCCESS
 ```
 
-Kontrollér output:
+Inspect the output:
 
 ```bash
 ls -lh output_gisobuild_SEC_HARDENING_SEP2026/
@@ -91,28 +91,28 @@ cat output_gisobuild_SEC_HARDENING_SEP2026/checksums.json
 cat output_gisobuild_SEC_HARDENING_SEP2026/rpms_packaged_in_giso.txt
 ```
 
-Gem mindst disse artefakter sammen:
+Keep at least these artifacts together:
 
-- Golden ISO-filen
-- USB boot-pakken (`usb_boot-*.zip`), hvis den blev oprettet
+- The Golden ISO file
+- The USB boot package (`usb_boot-*.zip`), if created
 - `checksums.json`
 - `rpms_packaged_in_giso.txt`
-- hele `logs/`-mappen
+- The complete `logs/` directory
 
-## 6. Overfør til routeren
+## 6. Transfer the image to the router
 
-Brug SFTP eller SCP i binær tilstand. Kontrollér altid checksum efter overførsel:
+Use SFTP or SCP in binary mode. Always verify the checksum after transfer:
 
 ```text
-dir harddisk:/<giso-fil>.iso
-show md5 file /harddisk:/<giso-fil>.iso
+dir harddisk:/<giso-file>.iso
+show md5 file /harddisk:/<giso-file>.iso
 ```
 
-Routerens MD5 skal være identisk med den MD5, scriptet udskriver. Start aldrig installationen ved checksumforskel.
+The router's MD5 must match the MD5 produced by the script. Never begin installation if the checksums differ.
 
-## 7. Installér i et servicevindue
+## 7. Install during a maintenance window
 
-Udfør pre-checks via konsol eller OOB-management:
+Run pre-checks through the console or out-of-band management:
 
 ```text
 show version
@@ -124,13 +124,13 @@ show filesystem
 show alarms brief system active
 ```
 
-Start derefter installationen uden `noprompt`:
+Start the installation without `noprompt`:
 
 ```text
-install replace harddisk:/<giso-fil>.iso
+install replace harddisk:/<giso-file>.iso
 ```
 
-Efter reload kontrolleres software, platform, redundans, alarmer, interfaces og routing. Commit først, når efterkontrollen er godkendt:
+After the reload, verify software, platform, redundancy, alarms, interfaces, and routing. Commit only after all post-checks succeed:
 
 ```text
 show install active summary
@@ -139,9 +139,13 @@ install commit
 show install committed summary
 ```
 
-## Fejlfinding
+## Troubleshooting
 
-- **Checksum mismatch:** Slet routerkopien, overfør igen med SFTP og verificér på ny.
-- **0 RPMs found:** Repository skal indeholde fysiske RPM-filer, ikke symlinks.
-- **Signature/compatibility failure:** Installér ikke. Læs `logs/gisobuild.log-*` og kontrollér platform, release og SMU-afhængigheder.
-- **Docker image not found:** Kontrollér tilgængelige tags på Docker Hub og opdatér kun `--image`, når tagget er kompatibelt med den anvendte gisobuild-version.
+- **Checksum mismatch:** Delete the router copy, transfer it again with SFTP, and verify it again.
+- **0 RPMs found:** The repository must contain physical RPM files, not symlinks.
+- **Signature or compatibility failure:** Do not install the image. Inspect `logs/gisobuild.log-*` and verify the platform, release, and SMU dependencies.
+- **Docker image not found:** Review the available Docker Hub tags. Change `--image` only when the tag is compatible with the installed `gisobuild` version.
+
+## Disclaimer
+
+This tooling is provided without warranty and is used at your own risk. You are responsible for validating Cisco compatibility, checksums, backups, maintenance procedures, and recovery plans. The authors accept no liability for outages, data loss, device failure, or other damage.

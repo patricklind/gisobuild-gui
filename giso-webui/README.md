@@ -1,25 +1,27 @@
 # IOS XR GISO Web UI
 
-Lokal Docker-webgrænseflade til `ios-xr/gisobuild`. UI'et eksponerer fælles, eXR- og LNT-parametre, YAML-mode, live build-log og download af artefakter.
+A local Docker web interface for `ios-xr/gisobuild`. The UI exposes common eXR and LNT options, YAML mode, live build logs, and artifact downloads.
 
 ## Start
 
-Fra `giso-webui`:
+From `giso-webui`:
 
 ```bash
 mkdir -p output
 docker compose up --build -d
 ```
 
-Åbn <http://127.0.0.1:8080>.
+Open <http://127.0.0.1:8080>.
 
-Uploads, output, arkiv og build-arbejdsfiler gemmes i persistente Docker-volumes. GISO-arkivet ligger i `giso-webui_giso-archive`.
+Uploads, output, archives, and build working files are stored in persistent Docker volumes. The GISO archive is stored in `giso-webui_giso-archive`.
 
-Efter et vellykket build kopieres Golden ISO og den eventuelle USB boot-pakke til arkivet og SHA-256-verificeres. Derefter slettes alle uploads, RPM/TAR-kilder, øvrige outputfiler og arbejdsfiler automatisk. Ved manglende ISO eller verifikationsfejl foretages oprydningen ikke.
+After a successful build, the application copies the Golden ISO and optional USB boot package to the archive and verifies each copy with SHA-256. It then removes all uploads, RPM/TAR sources, other build output, and working files. Cleanup does not run when the ISO is missing or archive verification fails.
 
-Knappen **Clean temporary files** fjerner kun ufuldstændige uploaddele og midlertidige build-arbejdsmapper. Uploadede Cisco-filer og færdige images slettes aldrig af oprydningen.
+The **Clean temporary files** button removes only incomplete upload fragments and temporary build directories. It never removes uploaded Cisco files or completed images.
 
-Cisco `.tar`-filer er transportarkiver: UI'et pakker dem ud automatisk og sender kun de fundne `.rpm`-pakker til `--pkglist`. En tar-fil må ikke selv stå i pakkelisten.
+Cisco `.tar` files are transport archives. The UI extracts them automatically and passes only discovered `.rpm` packages to `--pkglist`. Do not add a tar file itself to the package list.
+
+Only one build can run at a time. Archived ISO and USB files are retained for no more than 30 days. If their combined size exceeds 50 GiB, the oldest complete job archives are deleted first. Configure these limits with `ARCHIVE_RETENTION_DAYS` and `MAX_ARCHIVE_BYTES`.
 
 ## Stop
 
@@ -27,16 +29,16 @@ Cisco `.tar`-filer er transportarkiver: UI'et pakker dem ud automatisk og sender
 docker compose down
 ```
 
-## Sikkerhed
+## Security
 
-Appen er kun bundet til localhost. Webcontaineren har adgang til Docker-socket for at kunne starte Cisco GISO-buildcontaineren. Buildcontaineren får kun input (read-only), output, værktøj (read-only) og arbejdsmappe monteret; Docker-socket videregives ikke. Eksponér aldrig porten på et ukontrolleret netværk; Docker-socket-adgang i webcontaineren svarer praktisk til administratoradgang på Docker-værten.
+The application binds only to localhost. The web container can access the Docker socket so that it can start the Cisco GISO build container. The build container receives only read-only input and tool mounts plus dedicated output and working mounts; it never receives the Docker socket.
 
-Webcontainerens eget root-filsystem er read-only, og alle Linux capabilities er fjernet. Kun de deklarerede data-, output-, arkiv- og arbejdsvolumes er skrivbare.
+Never expose this service to an untrusted network. Docker socket access is effectively administrative access to the Docker host.
 
-Standardgrænserne er 8 GiB per upload, 16 MiB per upload-chunk, 16 GiB udpakket tar, 10.000 tar-elementer og 10 MiB buildlog i hukommelsen. Symlinks, hardlinks og stier uden for udpakningsmappen afvises.
+The web container uses a read-only root filesystem and has all Linux capabilities removed. Only the declared data, output, archive, and working volumes are writable.
 
-Kun ét build kan køre ad gangen. Arkiverede ISO- og USB-filer opbevares i højst 30 dage. Hvis deres samlede størrelse overstiger 50 GiB, slettes de ældste komplette jobarkiver først. Grænserne kan konfigureres med `ARCHIVE_RETENTION_DAYS` og `MAX_ARCHIVE_BYTES`.
+Default limits are 8 GiB per upload, 16 MiB per upload chunk, 16 GiB per extracted tar archive, 10,000 tar members, and a 10 MiB in-memory build log. Symlinks, hard links, and paths outside the extraction directory are rejected.
 
-## Ansvarsfraskrivelse
+## Disclaimer
 
-Værktøjet leveres uden garanti og anvendes på eget ansvar. Brugeren er ansvarlig for at kontrollere Cisco-kompatibilitet, checksums, backup og change-procedure. Forfatterne påtager sig intet ansvar for driftsstop, datatab, enhedsfejl eller anden skade.
+This tooling is provided without warranty and is used at your own risk. You are responsible for validating Cisco compatibility, checksums, backups, change procedures, and recovery plans. The authors accept no liability for outages, data loss, device failure, or other damage.
