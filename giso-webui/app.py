@@ -16,19 +16,32 @@ from urllib.parse import urlsplit
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
+
+def validate_image_reference(value: str) -> str:
+    if not value or len(value) > 512 or value.startswith("-") or any(char.isspace() for char in value):
+        raise RuntimeError("GISO_IMAGE must be a valid Docker image reference")
+    return value
+
+
 app = Flask(__name__)
+DOCKER_BIN = os.environ.get("DOCKER_BIN", "/usr/bin/docker")
+if not Path(DOCKER_BIN).is_absolute():
+    raise RuntimeError("DOCKER_BIN must be an absolute path")
 DATA = Path(os.environ.get("DATA_ROOT", "/data")).resolve()
 OUTPUT = Path(os.environ.get("OUTPUT_ROOT", "/output")).resolve()
 TOOL = Path(os.environ.get("TOOL_ROOT", "/tool")).resolve()
 WORK = Path(os.environ.get("WORK_ROOT", "/work")).resolve()
 ARCHIVE = Path(os.environ.get("ARCHIVE_ROOT", "/archive")).resolve()
-IMAGE = os.environ.get("GISO_IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4")
+IMAGE = validate_image_reference(
+    os.environ.get("GISO_IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4")
+)
 jobs: dict[str, dict] = {}
 uploads: dict[str, dict] = {}
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
 job_lock = threading.Lock()
 upload_lock = threading.Lock()
 archive_lock = threading.RLock()
+operation_lock = threading.Lock()
 archive_policy_checked = 0.0
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024**3)))
 MAX_EXTRACTED_BYTES = int(os.environ.get("MAX_EXTRACTED_BYTES", str(16 * 1024**3)))
@@ -38,6 +51,8 @@ MAX_LOG_BYTES = int(os.environ.get("MAX_LOG_BYTES", str(10 * 1024**2)))
 ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
 MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
 ALLOWED_HOSTS = {host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(",")}
+ACTIVE_JOB_STATUSES = {"queued", "running", "cancelling"}
+MIN_FREE_BYTES = 512 * 1024**2
 app.config["MAX_CONTENT_LENGTH"] = MAX_CHUNK_BYTES
 
 if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
@@ -218,7 +233,7 @@ archive_golden_iso_and_cleanup = archive_giso_artifacts_and_cleanup
 def docker_build_running() -> bool:
     try:
         result = subprocess.run(
-            ["docker", "ps", "-q", "--filter", "label=app=giso-webui"],
+            [DOCKER_BIN, "ps", "-q", "--filter", "label=app=giso-webui"],
             check=True, capture_output=True, text=True, timeout=5,
         )
         return bool(result.stdout.strip())
@@ -287,8 +302,10 @@ def append_log(job_id: str, text: str) -> None:
 def child_mount_args() -> list[str]:
     """Share only required storage with the build container, never docker.sock."""
     container = os.environ.get("HOSTNAME", "giso-webui")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", container):
+        raise RuntimeError("Container hostname is invalid")
     result = subprocess.run(
-        ["docker", "inspect", container], check=True, capture_output=True, text=True
+        [DOCKER_BIN, "inspect", container], check=True, capture_output=True, text=True
     )
     info = __import__("json").loads(result.stdout)[0]
     wanted = {"/uploads": "ro", "/output": "rw", "/tool": "ro", "/work": "rw"}
@@ -311,7 +328,7 @@ def child_mount_args() -> list[str]:
 
 def build_command(payload: dict, job_id: str) -> list[str]:
     command = [
-        "docker", "run", "--platform", "linux/amd64", "--rm",
+        DOCKER_BIN, "run", "--platform", "linux/amd64", "--rm",
         "--name", f"giso-build-{job_id}", "--label", "app=giso-webui",
         *child_mount_args(), IMAGE,
         "/tool/src/gisobuild.py",
@@ -368,13 +385,14 @@ def build_command(payload: dict, job_id: str) -> list[str]:
 def run_job(job_id: str, command: list[str]) -> None:
     try:
         append_log(job_id, "$ " + shlex.join(command) + "\n\n")
-        subprocess.run(["docker", "pull", "--platform", "linux/amd64", IMAGE], check=True,
+        subprocess.run([DOCKER_BIN, "pull", "--platform", "linux/amd64", IMAGE], check=True,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, bufsize=1)
         with job_lock:
             jobs[job_id]["container_pid"] = proc.pid
-        assert proc.stdout
+        if proc.stdout is None:
+            raise RuntimeError("Build container output stream is unavailable")
         for line in proc.stdout:
             append_log(job_id, line)
         code = proc.wait()
@@ -388,7 +406,7 @@ def run_job(job_id: str, command: list[str]) -> None:
         if success:
             artifacts = archive_giso_artifacts_and_cleanup(job_id, job_dir)
         with job_lock:
-            if jobs[job_id]["status"] != "cancelled":
+            if jobs[job_id]["status"] not in {"cancelled", "cancelling"}:
                 jobs[job_id].update(status="success" if success else "failed",
                                     exit_code=code, artifacts=artifacts, finished=time.time(),
                                     progress=100 if code == 0 else jobs[job_id].get("progress", 0),
@@ -449,7 +467,8 @@ def validate_host():
 def health():
     docker_ok = False
     try:
-        subprocess.run(["docker", "info"], timeout=5, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([DOCKER_BIN, "info"], timeout=5, check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         docker_ok = True
     except (OSError, subprocess.SubprocessError):
         pass
@@ -488,31 +507,35 @@ def archive_checksums(job_id: str, name: str):
 
 @app.post("/api/cleanup")
 def cleanup():
-    with job_lock:
-        if any(job["status"] in {"queued", "running"} for job in jobs.values()):
-            return jsonify(error="Temporary files cannot be cleaned while a build is running"), 409
-    if docker_build_running():
-        return jsonify(error="Temporary files cannot be cleaned while a Docker build is running"), 409
-    removed_bytes = 0
-    removed_items = 0
-    targets = [DATA / ".parts"]
-    targets.extend(path for path in WORK.iterdir() if path.is_dir()) if WORK.exists() else None
-    for target in targets:
-        if not target.exists():
-            continue
-        for path in target.rglob("*"):
-            if path.is_file():
-                try:
-                    removed_bytes += path.stat().st_size
-                except OSError:
-                    pass
-        if target == DATA / ".parts":
-            for child in list(target.iterdir()):
-                child.unlink(missing_ok=True)
+    with operation_lock:
+        with job_lock:
+            if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
+                return jsonify(error="Temporary files cannot be cleaned while a build is running"), 409
+        with upload_lock:
+            if uploads:
+                return jsonify(error="Temporary files cannot be cleaned while an upload is active"), 409
+        if docker_build_running():
+            return jsonify(error="Temporary files cannot be cleaned while a Docker build is running"), 409
+        removed_bytes = 0
+        removed_items = 0
+        targets = [DATA / ".parts"]
+        targets.extend(path for path in WORK.iterdir() if path.is_dir()) if WORK.exists() else None
+        for target in targets:
+            if not target.exists():
+                continue
+            for path in target.rglob("*"):
+                if path.is_file():
+                    try:
+                        removed_bytes += path.stat().st_size
+                    except OSError:
+                        pass
+            if target == DATA / ".parts":
+                for child in list(target.iterdir()):
+                    child.unlink(missing_ok=True)
+                    removed_items += 1
+            else:
+                shutil.rmtree(target)
                 removed_items += 1
-        else:
-            shutil.rmtree(target)
-            removed_items += 1
     return jsonify(ok=True, removed_bytes=removed_bytes, removed_items=removed_items,
                    message="Temporary files removed. Uploads and completed images were kept.")
 
@@ -528,20 +551,21 @@ def upload_init():
     allowed = (".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".txt")
     if not name or size <= 0 or size > MAX_UPLOAD_BYTES or not name.lower().endswith(allowed):
         return jsonify(error="Unsupported file or invalid size"), 400
-    with job_lock:
-        if any(job["status"] in {"queued", "running"} for job in jobs.values()):
-            return jsonify(error="Wait for the current build to finish before uploading more files"), 409
-    if docker_build_running():
-        return jsonify(error="Wait for the current Docker build to finish before uploading more files"), 409
-    if shutil.disk_usage(DATA).free < size + 512 * 1024**2:
-        return jsonify(error="Not enough free disk space for this upload"), 507
-    upload_id = uuid.uuid4().hex
-    parts = DATA / ".parts"
-    parts.mkdir(parents=True, exist_ok=True)
-    temp = parts / f"{upload_id}.part"
-    temp.touch()
-    with upload_lock:
-        uploads[upload_id] = {"name": name, "size": size, "received": 0, "temp": str(temp)}
+    with operation_lock:
+        with job_lock:
+            if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
+                return jsonify(error="Wait for the current build to finish before uploading more files"), 409
+        if docker_build_running():
+            return jsonify(error="Wait for the current Docker build to finish before uploading more files"), 409
+        if shutil.disk_usage(DATA).free < size + MIN_FREE_BYTES:
+            return jsonify(error="Not enough free disk space for this upload"), 507
+        upload_id = uuid.uuid4().hex
+        parts = DATA / ".parts"
+        parts.mkdir(parents=True, exist_ok=True)
+        temp = parts / f"{upload_id}.part"
+        temp.touch()
+        with upload_lock:
+            uploads[upload_id] = {"name": name, "size": size, "received": 0, "temp": str(temp)}
     return jsonify(id=upload_id)
 
 
@@ -584,13 +608,13 @@ def upload_complete(upload_id: str):
         while target.exists() or (extraction_path(target) and extraction_path(target).exists()):
             target = DATA / f"{Path(item['name']).stem}-{uuid.uuid4().hex[:8]}{Path(item['name']).suffix}"
         Path(item["temp"]).replace(target)
-        uploads.pop(upload_id, None)
     extracted = 0
-    if target.name.lower().endswith((".tar", ".tgz")):
-        destination = extraction_path(target)
-        assert destination is not None
-        destination.mkdir()
-        try:
+    try:
+        if target.name.lower().endswith((".tar", ".tgz")):
+            destination = extraction_path(target)
+            if destination is None:
+                raise ValueError("Unsupported archive type")
+            destination.mkdir()
             with tarfile.open(target, "r:*") as archive:
                 members = archive.getmembers()
                 if len(members) > MAX_TAR_MEMBERS:
@@ -598,6 +622,8 @@ def upload_complete(upload_id: str):
                 expanded_size = sum(member.size for member in members if member.isfile())
                 if expanded_size > MAX_EXTRACTED_BYTES:
                     raise ValueError("Expanded tar archive is too large")
+                if shutil.disk_usage(DATA).free < expanded_size + MIN_FREE_BYTES:
+                    raise ValueError("Not enough free disk space to extract tar archive")
                 for member in members:
                     member_target = (destination / member.name).resolve()
                     if destination.resolve() not in member_target.parents and member_target != destination.resolve():
@@ -606,10 +632,14 @@ def upload_complete(upload_id: str):
                         raise ValueError("Links are not accepted in uploaded tar archives")
                 archive.extractall(destination, members=members, filter="data")
                 extracted = sum(1 for member in members if member.isfile())
-        except (tarfile.TarError, OSError, ValueError) as exc:
+    except (tarfile.TarError, OSError, ValueError) as exc:
+        if target.name.lower().endswith((".tar", ".tgz")):
             shutil.rmtree(destination, ignore_errors=True)
-            target.unlink(missing_ok=True)
-            return jsonify(error=f"Tar archive rejected: {exc}"), 400
+        target.unlink(missing_ok=True)
+        return jsonify(error=f"Tar archive rejected: {exc}"), 400
+    finally:
+        with upload_lock:
+            uploads.pop(upload_id, None)
     return jsonify(path=target.name, size=target.stat().st_size, extracted=extracted)
 
 
@@ -636,30 +666,31 @@ def create_job():
         payload = validate_build_payload(json_object())
     except (TypeError, ValueError) as exc:
         return jsonify(error=str(exc)), 400
-    with upload_lock:
-        if uploads:
-            return jsonify(error="Wait for all uploads to finish before starting the build"), 409
-    if docker_build_running():
-        return jsonify(error="A Docker build is already running"), 409
-    job_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
-    with job_lock:
-        if any(j["status"] in {"queued", "running"} for j in jobs.values()):
-            return jsonify(error="A build is already running"), 409
-        jobs[job_id] = {"id": job_id, "status": "queued", "created": time.time(),
-                        "updated": time.time(), "progress": 1, "phase": "Validating inputs",
-                        "log": "", "artifacts": [], "payload": payload, "command": []}
-    try:
-        command = build_command(payload, job_id)
-    except ValueError as exc:
+    with operation_lock:
+        with upload_lock:
+            if uploads:
+                return jsonify(error="Wait for all uploads to finish before starting the build"), 409
+        if docker_build_running():
+            return jsonify(error="A Docker build is already running"), 409
+        job_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         with job_lock:
-            jobs.pop(job_id, None)
-        return jsonify(error=str(exc)), 400
-    except Exception as exc:  # noqa: BLE001 - setup failures become a stable API error
+            if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
+                return jsonify(error="A build is already running"), 409
+            jobs[job_id] = {"id": job_id, "status": "queued", "created": time.time(),
+                            "updated": time.time(), "progress": 1, "phase": "Validating inputs",
+                            "log": "", "artifacts": [], "payload": payload, "command": []}
+        try:
+            command = build_command(payload, job_id)
+        except ValueError as exc:
+            with job_lock:
+                jobs.pop(job_id, None)
+            return jsonify(error=str(exc)), 400
+        except Exception as exc:  # noqa: BLE001 - setup failures become a stable API error
+            with job_lock:
+                jobs.pop(job_id, None)
+            return jsonify(error=f"Build setup failed: {exc}"), 503
         with job_lock:
-            jobs.pop(job_id, None)
-        return jsonify(error=f"Build setup failed: {exc}"), 503
-    with job_lock:
-        jobs[job_id].update(status="running", progress=3, phase="Preparing build container", command=command)
+            jobs[job_id].update(status="running", progress=3, phase="Preparing build container", command=command)
     threading.Thread(target=run_job, args=(job_id, command), daemon=True).start()
     return jsonify(id=job_id), 202
 
@@ -682,8 +713,15 @@ def cancel_job(job_id: str):
             abort(404)
         if job["status"] not in {"queued", "running"}:
             return jsonify(error="Build is not running"), 409
-    subprocess.run(["docker", "stop", "--time", "10", f"giso-build-{job_id}"],
-                   timeout=20, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        job["status"] = "cancelling"
+    try:
+        subprocess.run([DOCKER_BIN, "stop", "--time", "10", f"giso-build-{job_id}"],
+                       timeout=20, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError) as exc:
+        with job_lock:
+            jobs[job_id]["status"] = "running"
+        append_log(job_id, f"\nUnable to stop the build container: {exc}\n")
+        return jsonify(error="The build container could not be stopped"), 503
     with job_lock:
         jobs[job_id].update(status="cancelled", finished=time.time())
     append_log(job_id, "\nBuild cancelled by user.\n")
@@ -726,4 +764,4 @@ def archive_delete(job_id: str, name: str):
 
 if __name__ == "__main__":
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    app.run(host="0.0.0.0", port=8080, threaded=True)
+    app.run(host="127.0.0.1", port=8080, threaded=True)

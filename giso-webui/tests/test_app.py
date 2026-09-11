@@ -72,6 +72,45 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse((Path(self.temp.name) / "outside.rpm").exists())
         self.assertFalse((self.data / "unsafe.tar").exists())
 
+    def test_tar_extraction_requires_reserved_free_space(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"rpm"
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        free_space = [SimpleNamespace(free=100 * 1024**3),
+                      SimpleNamespace(free=module.MIN_FREE_BYTES)]
+        with patch("app.shutil.disk_usage", side_effect=free_space):
+            response = self.upload("no-space.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("free disk space", response.get_json()["error"])
+        self.assertFalse((self.data / "no-space.tar").exists())
+
+    def test_build_waits_for_tar_extraction_to_finish(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"rpm"
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        upload_id = self.client.post(
+            "/api/uploads/init", json={"name": "package.tar", "size": len(stream.getvalue())}
+        ).get_json()["id"]
+        self.client.put(f"/api/uploads/{upload_id}?offset=0", data=stream.getvalue())
+        build_responses = []
+
+        def attempt_build(*_args, **_kwargs):
+            with module.app.test_client() as client:
+                build_responses.append(client.post("/api/jobs", json={"iso": "base.iso", "pkglist": []}))
+
+        with patch("app.tarfile.TarFile.extractall", side_effect=attempt_build):
+            response = self.client.post(f"/api/uploads/{upload_id}/complete")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(build_responses[0].status_code, 409)
+        self.assertIn("uploads", build_responses[0].get_json()["error"])
+        self.assertNotIn(upload_id, module.uploads)
+
     def test_reupload_does_not_overwrite_existing_extracted_directory(self):
         existing = self.data / "cisco-smu"
         existing.mkdir()
@@ -139,6 +178,31 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.post("/api/jobs", json={"iso": "base.iso", "pkglist": []})
         self.assertEqual(response.status_code, 409)
         self.assertIn("already running", response.get_json()["error"])
+
+    def test_cancelling_job_blocks_new_uploads(self):
+        module.jobs["active"] = {"id": "active", "status": "cancelling", "created": 1}
+        response = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3})
+        self.assertEqual(response.status_code, 409)
+
+    @patch("app.subprocess.run")
+    def test_failed_cancel_restores_running_state(self, run):
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "log": "", "progress": 10, "phase": "Building"}
+        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "stop"], 20)
+        response = self.client.delete("/api/jobs/job")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(module.jobs["job"]["status"], "running")
+        self.assertIn("Unable to stop", module.jobs["job"]["log"])
+
+    def test_cleanup_rejects_active_upload(self):
+        module.uploads["active"] = {"name": "x.rpm", "size": 3, "received": 0}
+        response = self.client.post("/api/cleanup")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("upload", response.get_json()["error"])
+
+    def test_docker_image_reference_cannot_be_an_option(self):
+        with self.assertRaisesRegex(RuntimeError, "Docker image reference"):
+            module.validate_image_reference("--privileged")
 
     def test_log_is_bounded(self):
         module.jobs["job"] = {"log": "", "updated": 0, "progress": 0, "phase": ""}

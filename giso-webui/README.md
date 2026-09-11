@@ -42,7 +42,8 @@ curl --fail http://127.0.0.1:8080/api/health
 
 1. Upload the base ISO and matching RPM, SMU, or configuration files.
 2. Review the discovered packages and select the required build options.
-3. Start the build. Only one build or upload session can be active at a time.
+3. Start the build. Only one build can run, and it starts only after every
+   upload and archive extraction has completed.
 4. Follow the live log until the job succeeds or fails.
 5. Download the Golden ISO, optional USB ZIP, and displayed checksums.
 

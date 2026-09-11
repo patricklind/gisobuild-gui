@@ -41,6 +41,10 @@ are copied into the archive, verified with SHA-256, and exposed for download.
   host headers are rejected.
 - One build at a time matches the host and workload constraints and prevents
   accidental resource contention.
+- Upload creation, build creation, and cleanup transitions are serialized so a
+  build cannot observe a partially extracted archive or race with cleanup.
+- Tar extraction checks both declared expanded size and reserved free space
+  before writing extracted members.
 - Artifacts are verified before source cleanup, preserving diagnostic inputs on
   failure.
 
@@ -97,10 +101,11 @@ mounts, writable capacity, the tool checkout, or archive health.
 is introduced. It should validate required paths and minimum free space without
 performing destructive writes.
 
-### Low: Dependency versions are reproducible but image identity is mutable
+### Low: The Cisco build image identity is mutable
 
-Python packages are pinned, but Docker image tags can be republished and the
-base image is not pinned to a digest in Compose.
+Python packages, the application base image, and the Alpine Docker CLI package
+are pinned. The separately pulled Cisco GISO build image still uses a tag, which
+can resolve to different content if the publisher republishes it.
 
 **Recommendation:** Record and test approved image digests for controlled
 production workflows. Keep Dependabot and `pip-audit` checks for Python updates.

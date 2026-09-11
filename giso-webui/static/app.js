@@ -179,7 +179,7 @@ async function poll() {
   if (!currentJob) return;
   try {
     const job = await api(`/api/jobs/${currentJob}`);
-    const labels = {running:'Building', queued:'Waiting', success:'Complete', failed:'Failed', cancelled:'Stopped'};
+    const labels = {running:'Building', queued:'Waiting', cancelling:'Stopping', success:'Complete', failed:'Failed', cancelled:'Stopped'};
     $('#job-status').textContent = labels[job.status] || job.status;
     $('#job-status').className = `pill ${job.status}`;
     $('#cancel-build').hidden = !['running','queued'].includes(job.status);
@@ -198,14 +198,14 @@ async function poll() {
       const size = document.createElement('small'); size.textContent = `${(artifact.size/1048576).toFixed(1)} MB ↓`;
       link.append(name, size); artifacts.appendChild(link);
     });
-    if (['running','queued'].includes(job.status)) setTimeout(poll, 1500); else { await loadInputs(); await loadArchive(); }
+    if (['running','queued','cancelling'].includes(job.status)) setTimeout(poll, 1500); else { await loadInputs(); await loadArchive(); }
   } catch (error) { $('#friendly-status').textContent = error.message; }
 }
 
 async function restoreJob() {
   try {
     const jobs = await api('/api/jobs');
-    const job = jobs.find(item => ['running','queued'].includes(item.status)) || jobs[0];
+    const job = jobs.find(item => ['running','queued','cancelling'].includes(item.status)) || jobs[0];
     if (job) { currentJob = job.id; poll(); }
   } catch { /* Starts clean if there is no previous job. */ }
 }
