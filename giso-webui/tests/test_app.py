@@ -270,6 +270,8 @@ class GisoWebTests(unittest.TestCase):
         (old_job / "golden.iso").write_bytes(b"iso")
         (old_job / "usb.zip").write_bytes(b"usb")
         old_time = time.time() - 31 * 86400
+        os.utime(old_job / "golden.iso", (old_time, old_time))
+        os.utime(old_job / "usb.zip", (old_time, old_time))
         os.utime(old_job, (old_time, old_time))
         current_job = module.ARCHIVE / "current-job"
         current_job.mkdir()
@@ -281,11 +283,29 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(old_job.exists())
         self.assertTrue(current_job.exists())
 
+    def test_archive_directory_change_does_not_extend_artifact_retention(self):
+        old_job = module.ARCHIVE / "old-job"
+        old_job.mkdir()
+        iso = old_job / "golden.iso"
+        usb = old_job / "usb.zip"
+        iso.write_bytes(b"iso")
+        usb.write_bytes(b"usb")
+        old_time = time.time() - 31 * 86400
+        os.utime(iso, (old_time, old_time))
+        os.utime(usb, (old_time, old_time))
+        os.utime(old_job, None)
+        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
+                patch.object(module, "MAX_ARCHIVE_BYTES", 1024):
+            removed = module.enforce_archive_policy()
+        self.assertEqual(removed, ["old-job"])
+        self.assertFalse(old_job.exists())
+
     def test_archive_quota_removes_oldest_complete_job(self):
         old_job = module.ARCHIVE / "old-job"
         old_job.mkdir()
         (old_job / "golden.iso").write_bytes(b"123456")
         old_time = time.time() - 60
+        os.utime(old_job / "golden.iso", (old_time, old_time))
         os.utime(old_job, (old_time, old_time))
         new_job = module.ARCHIVE / "new-job"
         new_job.mkdir()

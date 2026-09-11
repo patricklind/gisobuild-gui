@@ -1,0 +1,28 @@
+# Generated and local state
+.git/
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+graphify-out/cache/
+
+# Build inputs and outputs can be very large and may contain proprietary images
+.gisobuild-tool/
+.giso-build-staging-*/
+output_gisobuild*/
+giso-webui/uploads/
+giso-webui/output/
+*.iso
+*.rpm
+*.tar
+*.tgz
+*usb_boot*.zip
+
+# Local credentials and editor metadata
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store

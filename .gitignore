@@ -13,6 +13,13 @@ htmlcov/
 .venv/
 venv/
 
+# Graphify transient state (keep the graph and report shareable)
+graphify-out/cache/
+graphify-out/costs*
+graphify-out/manifest*
+graphify-out/needs_update
+graphify-out/.graphify*
+
 # Local Cisco tooling and build staging
 .gisobuild-tool/
 .giso-build-staging-*/

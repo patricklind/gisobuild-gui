@@ -138,6 +138,12 @@ def archive_size(path: Path) -> int:
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
+def archive_timestamp(path: Path) -> float:
+    artifacts = [item for item in path.iterdir()
+                 if item.is_file() and item.suffix.lower() in {".iso", ".zip"}]
+    return max((item.stat().st_mtime for item in artifacts), default=path.stat().st_mtime)
+
+
 def enforce_archive_policy() -> list[str]:
     """Remove expired archive jobs, then oldest jobs until the archive fits its quota."""
     removed: list[str] = []
@@ -147,12 +153,12 @@ def enforce_archive_policy() -> list[str]:
             return removed
         job_dirs = [path for path in ARCHIVE.iterdir() if path.is_dir()]
         for job_dir in job_dirs:
-            if job_dir.stat().st_mtime < cutoff:
+            if archive_timestamp(job_dir) < cutoff:
                 shutil.rmtree(job_dir)
                 removed.append(job_dir.name)
         remaining = sorted(
             (path for path in ARCHIVE.iterdir() if path.is_dir()),
-            key=lambda path: path.stat().st_mtime,
+            key=archive_timestamp,
         )
         total = sum(archive_size(path) for path in remaining)
         while total > MAX_ARCHIVE_BYTES and remaining:
