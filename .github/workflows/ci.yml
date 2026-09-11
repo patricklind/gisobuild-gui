@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: giso-webui/requirements.txt
+      - name: Install test tools
+        run: python -m pip install -r giso-webui/requirements.txt ruff pip-audit
+      - name: Lint Python
+        run: ruff check giso-webui/app.py giso-webui/tests
+      - name: Run tests
+        working-directory: giso-webui
+        run: python -B -m unittest discover -s tests -v
+      - name: Audit Python dependencies
+        run: pip-audit -r giso-webui/requirements.txt
+      - name: Validate shell script
+        run: bash -n build-giso.sh
+      - name: Validate Compose configuration
+        working-directory: giso-webui
+        run: docker compose config -q
+      - name: Build production container
+        working-directory: giso-webui
+        run: docker compose build giso-webui

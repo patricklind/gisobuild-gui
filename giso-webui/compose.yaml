@@ -1,0 +1,41 @@
+services:
+  giso-webui:
+    build: .
+    container_name: giso-webui
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - giso-uploads:/uploads
+      - ../.gisobuild-tool:/tool:ro
+      - giso-output:/output
+      - giso-archive:/archive
+      - giso-work:/work
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      GISO_IMAGE: ciscogisobuild/cisco-xr-gisobuild:2.3.4
+      DATA_ROOT: /uploads
+      OUTPUT_ROOT: /output
+      TOOL_ROOT: /tool
+      WORK_ROOT: /work
+      ARCHIVE_ROOT: /archive
+      MAX_UPLOAD_BYTES: "8589934592"
+      MAX_EXTRACTED_BYTES: "17179869184"
+      MAX_TAR_MEMBERS: "10000"
+      MAX_CHUNK_BYTES: "16777216"
+      MAX_LOG_BYTES: "10485760"
+      ALLOWED_HOSTS: "127.0.0.1,localhost,giso-webui"
+      PYTHONDONTWRITEBYTECODE: "1"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    restart: unless-stopped
+
+volumes:
+  giso-work:
+  giso-uploads:
+  giso-output:
+  giso-archive:

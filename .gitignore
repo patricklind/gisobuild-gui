@@ -1,0 +1,39 @@
+# macOS and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Python tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Local Cisco tooling and build staging
+.gisobuild-tool/
+.giso-build-staging-*/
+output_gisobuild*/
+
+# Persistent Web UI data
+giso-webui/uploads/
+giso-webui/output/
+
+# Cisco images and packages must never be published
+*.iso
+*.rpm
+*.tar
+*.tgz
+*usb_boot*.zip
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx

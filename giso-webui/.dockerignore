@@ -1,0 +1,6 @@
+uploads
+output
+tests
+__pycache__
+*.pyc
+.git

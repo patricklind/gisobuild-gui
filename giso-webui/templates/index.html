@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cisco IOS XR – Golden ISO Builder</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/upload.css">
+  <link rel="stylesheet" href="/static/compact.css">
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">CISCO IOS XR</span><h1>Golden ISO Builder</h1><p>Follow the three steps. Your files are kept throughout the process.</p></div>
+    <div class="header-actions"><button id="cleanup" type="button" class="secondary small">Clean temporary files</button><div id="health" class="pill" role="status">Checking system…</div></div>
+  </header>
+  <main>
+    <section class="workspace">
+      <section class="panel step">
+        <div class="step-heading"><span class="step-number">1</span><div><h2>Select Cisco files</h2><p>Select the base image and the update files downloaded from Cisco.</p></div></div>
+        <div class="upload-zone" id="drop-zone">
+          <input id="file-upload" type="file" multiple hidden accept=".iso,.rpm,.tar,.tgz,.yaml,.yml,.cfg,.ini,.sh,.cms,.txt">
+          <div><b>Drop files here</b><p>or select them from your computer. TAR files are extracted automatically.</p></div>
+          <button type="button" id="choose-files" class="primary upload-button">Select files</button>
+        </div>
+        <div id="upload-list" class="upload-list" aria-live="polite"></div>
+        <div class="safety-note"><b>Your files are safe while building.</b> After a successful build, the verified Golden ISO and USB boot image are archived and all source and temporary files are removed automatically.</div>
+      </section>
+
+      <section class="panel step">
+        <div class="step-heading"><span class="step-number">2</span><div><h2>Check that everything is ready</h2><p>The system automatically finds the ISO and valid RPM updates.</p></div></div>
+        <div class="ready-grid">
+          <div id="iso-check" class="ready-card waiting"><span class="ready-icon">…</span><div><b>Base image</b><p>Not found yet</p></div></div>
+          <div id="rpm-check" class="ready-card waiting"><span class="ready-icon">…</span><div><b>Updates</b><p>Not found yet</p></div></div>
+        </div>
+        <div id="file-library" class="file-library"></div>
+        <button type="button" id="refresh" class="secondary">Check files again</button>
+
+        <form id="build-form">
+          <input name="iso" list="iso-files" hidden required>
+          <input name="label" value="SEC_HARDENING" hidden>
+          <textarea name="pkglist" hidden></textarea>
+          <textarea name="repo" hidden>.</textarea>
+          <details class="advanced">
+            <summary>Expert settings <small>– normally not required</small></summary>
+            <div class="mode"><label><input type="radio" name="mode" value="form" checked> Normal form</label><label><input type="radio" name="mode" value="yaml"> Use YAML</label></div>
+            <div id="form-mode">
+              <div class="grid two"><label>Base ISO<input name="iso_override" list="iso-files"></label><label>Image label<input name="label_override" pattern="[A-Za-z0-9_]+"></label></div>
+              <label>RPM packages<textarea name="pkglist_override" rows="6"></textarea></label>
+              <label>Bridging fixes<textarea name="bridging_fixes" rows="2"></textarea></label>
+              <div class="grid three"><label>XR config<input name="xrconfig" list="all-files"></label><label>ZTP ini<input name="ztp_ini" list="all-files"></label><label>Boot-script<input name="script" list="all-files"></label></div>
+              <div class="grid three"><label>Key request<input name="key_request" list="all-files"></label><label>Ownership vouchers<input name="ownership_vouchers" list="all-files"></label><label>Ownership certificate<input name="ownership_certificate" list="all-files"></label></div>
+              <label>Remove packages (LNT)<textarea name="remove_packages" rows="2"></textarea></label>
+              <label>Supported hardware PIDs only (LNT)<textarea name="only_support_pids" rows="2"></textarea></label>
+              <div class="checks">
+                <label><input type="checkbox" name="create_checksum" checked> Create checksums</label><label><input type="checkbox" name="no_label"> Remove label</label>
+                <label><input type="checkbox" name="x86_only"> x86_64 only</label><label><input type="checkbox" name="migration"> Migration tar</label>
+                <label><input type="checkbox" name="optimize"> Optimize eXR GISO</label><label><input type="checkbox" name="full_iso"> Full ISO (XRv9K)</label>
+                <label><input type="checkbox" name="skip_usb_image"> Skip USB image</label><label><input type="checkbox" name="clear_bridging_fixes"> Clear bridging fixes</label>
+                <label><input type="checkbox" name="verbose_dep_check"> Detailed dependency check</label><label><input type="checkbox" name="debug"> Debug log</label><label><input type="checkbox" name="no_buildinfo"> No build information</label>
+                <label><input type="checkbox" name="clear_key_request"> Clear key request</label><label><input type="checkbox" name="clear_ownership_vouchers"> Clear ownership vouchers</label><label><input type="checkbox" name="clear_ownership_certificate"> Clear ownership certificate</label>
+              </div>
+            </div>
+            <div id="yaml-mode" hidden><label>YAML file<input name="yamlfile" list="yaml-files"></label></div>
+          </details>
+          <button id="start-build" class="primary build-button" type="submit" disabled>Waiting for Cisco files…</button>
+          <p id="error" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <section class="panel step result-step">
+        <div class="step-heading"><span class="step-number">3</span><div><h2>Build and download</h2><p>Follow the progress here. A download link appears when the image is ready.</p></div><span id="job-status" class="pill neutral">Not started</span></div>
+        <div class="progress-panel"><div class="progress-label"><b id="build-phase">Ready to start</b><span id="build-percent">0%</span></div><progress id="build-progress" aria-labelledby="build-phase build-percent" max="100" value="0"></progress><small id="elapsed-time">Elapsed time: 0:00</small></div>
+        <div id="friendly-status" class="friendly-status" role="status" aria-live="polite">Start when both checks in step 2 are green.</div>
+        <button id="cancel-build" class="danger" type="button" hidden>Stop current build</button>
+        <div id="artifacts" class="artifacts" aria-live="polite"></div>
+        <details class="technical-log"><summary>Show technical details</summary><div class="log-head"><h3>Build log</h3><button id="copy-log" type="button" class="secondary small">Copy log</button></div><pre id="log">No build started yet.</pre></details>
+      </section>
+      <section class="panel step archive-step">
+        <div class="step-heading"><span class="step-number">✓</span><div><h2>GISO Archive</h2><p>Every successfully built Golden ISO and USB boot image is stored here permanently.</p></div><div class="archive-actions"><button id="general-guide" type="button" class="secondary small">Upgrade guide</button><button id="refresh-archive" type="button" class="secondary small">Refresh</button></div></div>
+        <div id="archive-list" class="artifacts"><p class="empty">No archived GISO images yet.</p></div>
+      </section>
+    </section>
+    <datalist id="iso-files"></datalist><datalist id="yaml-files"></datalist><datalist id="all-files"></datalist>
+  </main>
+  <dialog id="upgrade-guide">
+    <div class="dialog-head"><div><span class="eyebrow">CISCO IOS XR</span><h2>Golden ISO upgrade guide</h2></div><button id="close-guide" type="button" class="secondary small">Close</button></div>
+    <div class="warning"><b>Use a maintenance window.</b> Confirm console access, redundancy health and a current configuration backup before starting. The router may reload or restart processes.</div>
+    <label>Installation workflow<select id="guide-family"><option value="exr">IOS XR 6.5.2+ (eXR / classic)</option><option value="lnt">IOS XR7 (LNT)</option><option value="legacy">Legacy IOS XR before 6.5.2</option></select></label>
+    <ol class="guide-steps">
+      <li><b>Download and transfer the ISO</b><p>Download the image from this archive, then transfer it with SFTP/SCP to <code>/harddisk:/</code> on the router.</p></li>
+      <li><b>Verify the transferred file</b><p>Compare the router MD5 with the MD5 shown in this archive.</p><pre id="guide-md5">show md5 file /harddisk:/IMAGE.iso</pre></li>
+      <li><b>Run pre-checks</b><pre>show version
+show platform
+show install request
+show install active summary
+dir harddisk:</pre><p>Do not continue while another install transaction is active or the platform is unhealthy.</p></li>
+      <li><b>Start the GISO replacement</b><pre id="guide-install">install replace /harddisk:/IMAGE.iso</pre><pre id="guide-apply" hidden></pre><p id="guide-workflow-note">Read and confirm the router prompt. Keep console access available while the operation runs.</p></li>
+      <li><b>Monitor and verify</b><pre>show install request
+show install history last transaction verbose
+show version
+show platform
+show install active summary</pre></li>
+      <li><b>Commit after validation</b><pre>install commit
+show install committed summary</pre><p>Commit only after routing, MPLS/MPLS-TE and platform health checks are successful.</p></li>
+    </ol>
+    <div class="dialog-actions"><a id="official-guide" href="https://www.cisco.com/c/en/us/td/docs/iosxr/ncs5500/system-setup/26xx/configuration/guide/b-system-setup-cg-ncs5500-26xx.pdf" target="_blank" rel="noopener">Open Cisco installation documentation</a><button id="copy-guide" type="button" class="secondary">Copy commands</button></div>
+  </dialog>
+  <script src="/static/app.js"></script>
+</body>
+</html>
