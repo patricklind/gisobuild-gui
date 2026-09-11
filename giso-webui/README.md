@@ -23,6 +23,8 @@ Cisco `.tar` files are transport archives. The UI extracts them automatically an
 
 Only one build can run at a time. Archived ISO and USB files are retained for no more than 30 days. If their combined size exceeds 50 GiB, the oldest complete job archives are deleted first. Configure these limits with `ARCHIVE_RETENTION_DAYS` and `MAX_ARCHIVE_BYTES`.
 
+For local configuration, copy `.env.example` to `.env` and edit the values before starting Docker Compose. The local `.env` file is excluded from Git.
+
 ## Stop
 
 ```bash
