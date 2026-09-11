@@ -73,3 +73,4 @@ Docker socket. Do not expose port 8080 to an untrusted network. See
 
 No open-source license has been selected yet. Until one is added, copyright law
 reserves all rights to the repository owner.
+# gisobuild-gui
