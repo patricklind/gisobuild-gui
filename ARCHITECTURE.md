@@ -17,12 +17,14 @@ flowchart LR
     W --> V2["Work volume"]
     W --> V3["Output volume"]
     W --> V4["Archive volume"]
+    W --> S["SQLite job-state volume"]
     W -->|"Docker socket"| D["Docker daemon"]
     D --> B["Ephemeral Cisco GISO container"]
     B -->|"read-only"| V1
     B -->|"read-only"| T["gisobuild tool checkout"]
     B -->|"read/write"| V2
     B -->|"read/write"| V3
+    M["Scheduled maintenance container"] --> V4
 ```
 
 The browser uploads files in bounded chunks. Flask validates and stores them in
@@ -62,26 +64,26 @@ job service and use a restricted worker runtime instead of mounting the Docker
 socket in the web process. TLS and role-based authorization alone do not remove
 the socket risk.
 
-### Medium: Active state is process-local
+### Medium: Running builds cannot resume after a web-service restart
 
-Jobs and upload sessions are dictionaries in one Gunicorn process. Restarting
-the container loses progress and cancellation state, and increasing the worker
-count would split state between processes.
+Job history, bounded logs, and final status are persisted in SQLite. A job that
+was active during restart is restored as `interrupted`, but its background log
+stream and completion workflow cannot be reattached automatically. A surviving
+build container is detected and blocks a conflicting new build.
 
 **Recommendation:** Keep one worker for the current local scope. Before adding
-concurrency or high availability, persist jobs in SQLite or PostgreSQL and move
-execution to a durable queue-backed worker. Store the child container ID so a
-restarted service can reconcile running builds.
+concurrency or high availability, move execution ownership to a durable
+queue-backed worker and store enough container metadata to reconcile or reattach
+to running builds after a restart.
 
-### Medium: Cleanup is request-driven
+### Resolved: archive cleanup is independent of web traffic
 
-Retention runs on requests at most hourly and whenever the archive is listed.
-An idle installation can therefore retain expired artifacts beyond 30 calendar
-days until the next request.
+The `archive-maintenance` service applies retention and quota every hour using
+the same locked policy implementation as the web service. Request-time checks
+remain as defense in depth.
 
-**Recommendation:** This is acceptable if “30 days” means removal on next use.
-For strict deletion deadlines, add a host-level scheduled cleanup command or a
-dedicated maintenance container with the archive volume mounted.
+**Tradeoff:** Docker scheduling is interval-based rather than wall-clock based;
+expired data can remain for up to one configured interval beyond its cutoff.
 
 ### Medium: Persistent volumes are a single point of failure
 

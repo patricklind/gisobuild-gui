@@ -211,7 +211,7 @@ async function poll() {
   if (!currentJob) return;
   try {
     const job = await api(`/api/jobs/${currentJob}`);
-    const labels = {running:'Building', queued:'Waiting', cancelling:'Stopping', success:'Complete', failed:'Failed', cancelled:'Stopped'};
+    const labels = {running:'Building', queued:'Waiting', cancelling:'Stopping', interrupted:'Interrupted', success:'Complete', failed:'Failed', cancelled:'Stopped'};
     $('#job-status').textContent = labels[job.status] || job.status;
     $('#job-status').className = `pill ${job.status}`;
     $('#cancel-build').hidden = !['running','queued'].includes(job.status);
@@ -222,7 +222,7 @@ async function poll() {
     $('#build-phase').textContent = job.phase || 'Working';
     const seconds = Math.max(0, Math.floor(((job.finished || Date.now()/1000) - job.created)));
     $('#elapsed-time').textContent = `Elapsed time: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
-    $('#friendly-status').textContent = job.status === 'success' ? 'Your new image is ready. Download it using the green link below.' : job.status === 'failed' ? 'The build could not be completed. Open the technical details to see why.' : job.status === 'cancelled' ? 'The build was stopped. Your uploaded files are still saved.' : 'The build is running. You may leave this page open or return later.';
+    $('#friendly-status').textContent = job.status === 'success' ? 'Your new image is ready. Download it using the green link below.' : job.status === 'failed' ? 'The build could not be completed. Open the technical details to see why.' : job.status === 'interrupted' ? 'The web service restarted before this build completed. Check Docker and the technical log before starting another build.' : job.status === 'cancelled' ? 'The build was stopped. Your uploaded files are still saved.' : 'The build is running. You may leave this page open or return later.';
     const artifacts = $('#artifacts'); artifacts.replaceChildren();
     job.artifacts.forEach(artifact => {
       const link = document.createElement('a'); link.href = artifact.url || `/download/${encodeURIComponent(job.id)}/${artifact.path.split('/').map(encodeURIComponent).join('/')}`;

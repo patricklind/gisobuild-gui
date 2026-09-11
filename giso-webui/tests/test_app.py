@@ -26,8 +26,12 @@ class GisoWebTests(unittest.TestCase):
         module.WORK.mkdir()
         module.ARCHIVE = (Path(self.temp.name) / "archive").resolve()
         module.ARCHIVE.mkdir()
+        module.STATE = (Path(self.temp.name) / "state").resolve()
+        module.JOB_DB = module.STATE / "jobs.sqlite3"
+        module.store_initialized = False
         module.uploads.clear()
         module.jobs.clear()
+        module.job_persisted_at.clear()
         module.archive_policy_checked = 0.0
         self.docker_running = patch("app.docker_build_running", return_value=False)
         self.docker_running.start()
@@ -38,6 +42,7 @@ class GisoWebTests(unittest.TestCase):
     def tearDown(self):
         self.disk_usage.stop()
         self.docker_running.stop()
+        module.store_initialized = False
         self.temp.cleanup()
 
     def upload(self, name, content):
@@ -172,6 +177,42 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn("payload", detail)
         self.assertNotIn("container_pid", detail)
         self.assertNotIn("payload", summary)
+
+    def test_job_history_survives_store_reload(self):
+        module.jobs["saved"] = {"id": "saved", "status": "success", "created": 1,
+                                "updated": 2, "finished": 2, "log": "complete",
+                                "artifacts": [{"path": "golden.iso", "size": 3}],
+                                "command": ["private"], "payload": {"iso": "private.iso"}}
+        module.persist_job("saved")
+        module.jobs.clear()
+        module.store_initialized = False
+        module.initialize_job_store()
+        self.assertEqual(module.jobs["saved"]["status"], "success")
+        self.assertEqual(module.jobs["saved"]["log"], "complete")
+        self.assertNotIn("command", module.jobs["saved"])
+        self.assertNotIn("payload", module.jobs["saved"])
+
+    def test_active_job_is_marked_interrupted_after_restart(self):
+        module.jobs["active"] = {"id": "active", "status": "running", "created": 1,
+                                 "updated": 2, "log": "building", "artifacts": []}
+        module.persist_job("active")
+        module.jobs.clear()
+        module.store_initialized = False
+        module.initialize_job_store()
+        self.assertEqual(module.jobs["active"]["status"], "interrupted")
+        self.assertIn("restarted", module.jobs["active"]["error"])
+
+    def test_job_history_is_bounded(self):
+        with patch.object(module, "MAX_JOB_HISTORY", 2):
+            for index in range(3):
+                job_id = f"job-{index}"
+                module.jobs[job_id] = {"id": job_id, "status": "success", "created": index,
+                                       "updated": index, "log": "", "artifacts": []}
+                module.persist_job(job_id)
+            module.jobs.clear()
+            module.store_initialized = False
+            module.initialize_job_store()
+        self.assertEqual(set(module.jobs), {"job-1", "job-2"})
 
     def test_only_one_build_can_run_at_a_time(self):
         module.jobs["active"] = {"id": "active", "status": "running", "created": 1}

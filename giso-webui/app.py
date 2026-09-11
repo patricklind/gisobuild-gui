@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shlex
 import shutil
+import sqlite3
 import subprocess
 import tarfile
 import threading
@@ -32,22 +34,28 @@ OUTPUT = Path(os.environ.get("OUTPUT_ROOT", "/output")).resolve()
 TOOL = Path(os.environ.get("TOOL_ROOT", "/tool")).resolve()
 WORK = Path(os.environ.get("WORK_ROOT", "/work")).resolve()
 ARCHIVE = Path(os.environ.get("ARCHIVE_ROOT", "/archive")).resolve()
+STATE = Path(os.environ.get("STATE_ROOT", "/state")).resolve()
+JOB_DB = STATE / "jobs.sqlite3"
 IMAGE = validate_image_reference(
     os.environ.get("GISO_IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4")
 )
 jobs: dict[str, dict] = {}
+job_persisted_at: dict[str, float] = {}
 uploads: dict[str, dict] = {}
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
-job_lock = threading.Lock()
+job_lock = threading.RLock()
 upload_lock = threading.Lock()
 archive_lock = threading.RLock()
 operation_lock = threading.Lock()
+store_lock = threading.Lock()
+store_initialized = False
 archive_policy_checked = 0.0
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024**3)))
 MAX_EXTRACTED_BYTES = int(os.environ.get("MAX_EXTRACTED_BYTES", str(16 * 1024**3)))
 MAX_TAR_MEMBERS = int(os.environ.get("MAX_TAR_MEMBERS", "10000"))
 MAX_CHUNK_BYTES = int(os.environ.get("MAX_CHUNK_BYTES", str(16 * 1024**2)))
 MAX_LOG_BYTES = int(os.environ.get("MAX_LOG_BYTES", str(10 * 1024**2)))
+MAX_JOB_HISTORY = int(os.environ.get("MAX_JOB_HISTORY", "100"))
 ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
 MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
 ALLOWED_HOSTS = {host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(",")}
@@ -56,8 +64,95 @@ MIN_FREE_BYTES = 512 * 1024**2
 app.config["MAX_CONTENT_LENGTH"] = MAX_CHUNK_BYTES
 
 if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
-       MAX_LOG_BYTES, ARCHIVE_RETENTION_DAYS, MAX_ARCHIVE_BYTES) <= 0:
+       MAX_LOG_BYTES, MAX_JOB_HISTORY, ARCHIVE_RETENTION_DAYS, MAX_ARCHIVE_BYTES) <= 0:
     raise RuntimeError("Upload, extraction, tar, chunk and log limits must be positive")
+
+PRIVATE_JOB_FIELDS = {"command", "payload", "container_pid"}
+
+
+def public_job(job: dict, *, include_log: bool = True) -> dict:
+    private = PRIVATE_JOB_FIELDS | (set() if include_log else {"log"})
+    return {key: value for key, value in job.items() if key not in private}
+
+
+def initialize_job_store() -> None:
+    """Create the job store and restore safe job history once per process."""
+    global store_initialized
+    with store_lock:
+        if store_initialized:
+            return
+        STATE.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(JOB_DB) as database:
+            database.execute(
+                "CREATE TABLE IF NOT EXISTS jobs "
+                "(id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"
+            )
+            rows = database.execute(
+                "SELECT id, data FROM jobs ORDER BY updated DESC LIMIT ?", (MAX_JOB_HISTORY,)
+            )
+            for job_id, raw_data in rows:
+                try:
+                    restored = json.loads(raw_data)
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                if not isinstance(restored, dict):
+                    continue
+                restored["id"] = job_id
+                if restored.get("status") in ACTIVE_JOB_STATUSES:
+                    restored.update(
+                        status="interrupted",
+                        phase="Interrupted by service restart",
+                        error="The web service restarted before this job completed",
+                        finished=time.time(),
+                    )
+                    database.execute(
+                        "UPDATE jobs SET data = ?, updated = ? WHERE id = ?",
+                        (json.dumps(restored), restored["finished"], job_id),
+                    )
+                with job_lock:
+                    jobs.setdefault(job_id, restored)
+            database.execute(
+                "DELETE FROM jobs WHERE id NOT IN "
+                "(SELECT id FROM jobs ORDER BY updated DESC LIMIT ?)",
+                (MAX_JOB_HISTORY,),
+            )
+        store_initialized = True
+
+
+def persist_job(job_id: str, *, min_interval: float = 0.0) -> None:
+    initialize_job_store()
+    now = time.monotonic()
+    with job_lock:
+        job = jobs.get(job_id)
+        if job is None:
+            return
+        if min_interval and now - job_persisted_at.get(job_id, 0.0) < min_interval:
+            return
+        snapshot = public_job(job)
+        job_persisted_at[job_id] = now
+    updated = float(snapshot.get("updated", time.time()))
+    with store_lock, sqlite3.connect(JOB_DB) as database:
+        database.execute(
+            "INSERT INTO jobs (id, data, updated) VALUES (?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated = excluded.updated",
+            (job_id, json.dumps(snapshot), updated),
+        )
+        database.execute(
+            "DELETE FROM jobs WHERE id NOT IN "
+            "(SELECT id FROM jobs ORDER BY updated DESC LIMIT ?)",
+            (MAX_JOB_HISTORY,),
+        )
+    with job_lock:
+        removable = sorted(
+            (job for job in jobs.values() if job.get("status") not in ACTIVE_JOB_STATUSES),
+            key=lambda item: item.get("updated", 0),
+        )
+        while len(jobs) > MAX_JOB_HISTORY and removable:
+            oldest = removable.pop(0)
+            removed_id = oldest.get("id")
+            if removed_id:
+                jobs.pop(removed_id, None)
+                job_persisted_at.pop(removed_id, None)
 
 LIST_OPTIONS = {
     "repo": "--repo", "bridging_fixes": "--bridging-fixes",
@@ -297,6 +392,7 @@ def append_log(job_id: str, text: str) -> None:
         for marker, progress, phase in milestones:
             if marker in lower and progress > jobs[job_id].get("progress", 0):
                 jobs[job_id].update(progress=progress, phase=phase)
+    persist_job(job_id, min_interval=1.0)
 
 
 def child_mount_args() -> list[str]:
@@ -307,7 +403,7 @@ def child_mount_args() -> list[str]:
     result = subprocess.run(
         [DOCKER_BIN, "inspect", container], check=True, capture_output=True, text=True
     )
-    info = __import__("json").loads(result.stdout)[0]
+    info = json.loads(result.stdout)[0]
     wanted = {"/uploads": "ro", "/output": "rw", "/tool": "ro", "/work": "rw"}
     args: list[str] = []
     found = set()
@@ -411,10 +507,12 @@ def run_job(job_id: str, command: list[str]) -> None:
                                     exit_code=code, artifacts=artifacts, finished=time.time(),
                                     progress=100 if code == 0 else jobs[job_id].get("progress", 0),
                                     phase="Complete" if code == 0 else "Build failed")
+        persist_job(job_id)
     except Exception as exc:  # noqa: BLE001 - background failures must update job state
         append_log(job_id, f"\nERROR: {exc}\n")
         with job_lock:
             jobs[job_id].update(status="failed", error=str(exc), finished=time.time())
+        persist_job(job_id)
 
 
 @app.get("/")
@@ -446,6 +544,7 @@ def request_too_large(_error):
 @app.before_request
 def validate_host():
     global archive_policy_checked
+    initialize_job_store()
     host = request.host.split(":", 1)[0].strip("[]")
     if host not in ALLOWED_HOSTS:
         abort(400)
@@ -655,8 +754,7 @@ def delete_upload(name: str):
 @app.get("/api/jobs")
 def list_jobs():
     with job_lock:
-        private = {"log", "command", "payload", "container_pid"}
-        summary = [{k: v for k, v in job.items() if k not in private} for job in jobs.values()]
+        summary = [public_job(job, include_log=False) for job in jobs.values()]
     return jsonify(sorted(summary, key=lambda x: x["created"], reverse=True))
 
 
@@ -691,6 +789,7 @@ def create_job():
             return jsonify(error=f"Build setup failed: {exc}"), 503
         with job_lock:
             jobs[job_id].update(status="running", progress=3, phase="Preparing build container", command=command)
+        persist_job(job_id)
     threading.Thread(target=run_job, args=(job_id, command), daemon=True).start()
     return jsonify(id=job_id), 202
 
@@ -701,8 +800,7 @@ def get_job(job_id: str):
         job = jobs.get(job_id)
         if not job:
             abort(404)
-        return jsonify({key: value for key, value in job.items()
-                        if key not in {"command", "payload", "container_pid"}})
+        return jsonify(public_job(job))
 
 
 @app.delete("/api/jobs/<job_id>")
@@ -714,6 +812,7 @@ def cancel_job(job_id: str):
         if job["status"] not in {"queued", "running"}:
             return jsonify(error="Build is not running"), 409
         job["status"] = "cancelling"
+    persist_job(job_id)
     try:
         subprocess.run([DOCKER_BIN, "stop", "--time", "10", f"giso-build-{job_id}"],
                        timeout=20, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

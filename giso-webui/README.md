@@ -76,10 +76,12 @@ container with `docker compose up -d --force-recreate`.
 | `MAX_EXTRACTED_BYTES` | `17179869184` | Maximum extracted tar contents (16 GiB) |
 | `MAX_TAR_MEMBERS` | `10000` | Maximum files in an uploaded tar archive |
 | `MAX_LOG_BYTES` | `10485760` | In-memory log limit per build (10 MiB) |
+| `MAX_JOB_HISTORY` | `100` | Maximum completed or interrupted jobs retained in SQLite |
 | `ARCHIVE_RETENTION_DAYS` | `30` | Maximum artifact retention period |
 | `MAX_ARCHIVE_BYTES` | `53687091200` | Combined ISO and USB archive quota (50 GiB) |
+| `ARCHIVE_CLEANUP_INTERVAL_SECONDS` | `3600` | Maintenance interval; minimum 60 seconds |
 
-The `DATA_ROOT`, `OUTPUT_ROOT`, `TOOL_ROOT`, `WORK_ROOT`, and `ARCHIVE_ROOT`
+The `DATA_ROOT`, `OUTPUT_ROOT`, `TOOL_ROOT`, `WORK_ROOT`, `ARCHIVE_ROOT`, and `STATE_ROOT`
 variables are container paths matched to Compose mounts. Change them only when
 you also update the corresponding volume destinations.
 
@@ -90,13 +92,17 @@ archive volume is named `giso-webui_giso-archive` by default. Archives expire
 after 30 days, and the oldest complete job archives are deleted first whenever
 the combined ISO and USB size exceeds 50 GiB.
 
-Retention is checked during application requests, not by a standalone scheduler.
-Back up required artifacts outside Docker volumes before they expire. To inspect
-the volumes:
+The `archive-maintenance` container enforces retention and quota every hour even
+when the UI is idle. Completed job history and bounded logs are stored in SQLite
+in `giso-webui_giso-state`. If the web container restarts during a build, the
+restored job is marked `interrupted`; inspect Docker and the saved log before
+starting another build. Back up required artifacts outside Docker volumes before
+they expire. To inspect the volumes and maintenance logs:
 
 ```bash
 docker volume ls --filter name=giso-webui
 docker compose exec giso-webui df -h /uploads /archive /output /work
+docker compose logs --tail=100 archive-maintenance
 ```
 
 ## Test and verify
@@ -126,8 +132,8 @@ CI because it requires licensed Cisco inputs and substantial compute resources.
   and free-space limits in `.env`.
 - **Host header is rejected:** Keep the service local or add the exact trusted
   hostname to `ALLOWED_HOSTS`; do not use a wildcard.
-- **Status disappeared after restart:** Job tracking is in memory. Check running
-  `giso-build-*` containers and application logs before starting another build.
+- **Build was interrupted by restart:** The job and log remain visible. Check
+  running `giso-build-*` containers and application logs before starting again.
 - **Need a clean reset:** `docker compose down` preserves volumes. Adding `-v`
   permanently deletes uploads and archives and should only be used intentionally.
 

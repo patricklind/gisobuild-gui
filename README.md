@@ -88,10 +88,11 @@ Docker socket. Do not expose port 8080 to an untrusted network. See
 
 - This is a single-host, single-user tool. It intentionally allows only one
   build at a time.
-- Active job and upload state is held in memory. Restarting the web container
-  loses that status, although persistent uploads and archives remain available.
-- Archive expiry is enforced when the application receives requests; it is not
-  an independent scheduled cleanup service.
+- Completed job history and bounded logs are stored in SQLite. A build that was
+  active during a web-service restart is retained as `interrupted` and must be
+  checked before another build is started.
+- A dedicated maintenance container enforces archive expiry and quota every
+  hour, including while the Web UI is idle.
 - A complete Cisco GISO build requires licensed inputs and is therefore not run
   by the public CI workflow.
 

@@ -10,6 +10,7 @@ services:
       - giso-output:/output
       - giso-archive:/archive
       - giso-work:/work
+      - giso-state:/state
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       GISO_IMAGE: "${GISO_IMAGE:-ciscogisobuild/cisco-xr-gisobuild:2.3.4}"
@@ -18,11 +19,13 @@ services:
       TOOL_ROOT: "${TOOL_ROOT:-/tool}"
       WORK_ROOT: "${WORK_ROOT:-/work}"
       ARCHIVE_ROOT: "${ARCHIVE_ROOT:-/archive}"
+      STATE_ROOT: "${STATE_ROOT:-/state}"
       MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-8589934592}"
       MAX_EXTRACTED_BYTES: "${MAX_EXTRACTED_BYTES:-17179869184}"
       MAX_TAR_MEMBERS: "${MAX_TAR_MEMBERS:-10000}"
       MAX_CHUNK_BYTES: "${MAX_CHUNK_BYTES:-16777216}"
       MAX_LOG_BYTES: "${MAX_LOG_BYTES:-10485760}"
+      MAX_JOB_HISTORY: "${MAX_JOB_HISTORY:-100}"
       ARCHIVE_RETENTION_DAYS: "${ARCHIVE_RETENTION_DAYS:-30}"
       MAX_ARCHIVE_BYTES: "${MAX_ARCHIVE_BYTES:-53687091200}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-127.0.0.1,localhost,giso-webui}"
@@ -36,8 +39,32 @@ services:
       - /tmp:size=64m,mode=1777
     restart: unless-stopped
 
+  archive-maintenance:
+    build: .
+    container_name: giso-archive-maintenance
+    command: ["python", "maintenance.py"]
+    volumes:
+      - giso-archive:/archive
+    environment:
+      ARCHIVE_ROOT: "${ARCHIVE_ROOT:-/archive}"
+      ARCHIVE_RETENTION_DAYS: "${ARCHIVE_RETENTION_DAYS:-30}"
+      MAX_ARCHIVE_BYTES: "${MAX_ARCHIVE_BYTES:-53687091200}"
+      ARCHIVE_CLEANUP_INTERVAL_SECONDS: "${ARCHIVE_CLEANUP_INTERVAL_SECONDS:-3600}"
+      PYTHONDONTWRITEBYTECODE: "1"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
 volumes:
   giso-work:
   giso-uploads:
   giso-output:
   giso-archive:
+  giso-state:
