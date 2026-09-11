@@ -42,6 +42,7 @@ git clone https://github.com/patricklind/gisobuild-gui.git
 cd gisobuild-gui
 git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
 cd giso-webui
+cp .env.example .env
 docker compose up --build -d
 ```
 
@@ -55,6 +56,8 @@ archives are removed first.
 
 Detailed web usage is documented in [`giso-webui/README.md`](giso-webui/README.md).
 The CLI workflow is documented in [`GISOBUILD-GUIDE.md`](GISOBUILD-GUIDE.md).
+System boundaries and improvement priorities are documented in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Test and verify
 
@@ -78,6 +81,17 @@ syntax validation, and a production container build for every pull request.
 The service binds only to localhost because the web container has access to the
 Docker socket. Do not expose port 8080 to an untrusted network. See
 [`SECURITY.md`](SECURITY.md) for the deployment boundary and reporting process.
+
+## Operational limitations
+
+- This is a single-host, single-user tool. It intentionally allows only one
+  build at a time.
+- Active job and upload state is held in memory. Restarting the web container
+  loses that status, although persistent uploads and archives remain available.
+- Archive expiry is enforced when the application receives requests; it is not
+  an independent scheduled cleanup service.
+- A complete Cisco GISO build requires licensed inputs and is therefore not run
+  by the public CI workflow.
 
 ## License
 
