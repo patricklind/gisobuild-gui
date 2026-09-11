@@ -124,13 +124,16 @@ function updateGuideWorkflow() {
   if(family==='lnt') {
     install.textContent=`install package replace /harddisk:/${filename}`;
     apply.textContent='show install request\ninstall apply reload'; apply.hidden=false;
-    note.textContent='Use show install request to determine whether reload or restart is required before applying. Keep console access available.';
+    note.textContent='Use show install request and the platform guide to determine whether reload or restart is required. Do not substitute restart merely to avoid a reload.';
   } else if(family==='legacy') {
     install.textContent=`install update source harddisk: ${filename} replace`;
-    note.textContent='Legacy syntax applies only to releases before IOS XR 6.5.2. Validate against the installation guide for the exact source release.';
+    note.textContent='This is only a command pattern. Copy the exact legacy syntax and prerequisites from the installation guide for the source release.';
+  } else if(family==='migration') {
+    install.textContent='Do not use a normal GISO replacement command.';
+    note.textContent='ASR 9000 32-bit to 64-bit migration requires Cisco’s dedicated migration procedure, a compatible migration TAR and potentially an intermediate release. Open the complete guide before continuing.';
   } else {
     install.textContent=`install replace /harddisk:/${filename}`;
-    note.textContent='Read and confirm the router prompt. Keep console access available while the operation runs.';
+    note.textContent='This workflow may apply changes and reload automatically. Confirm the exact command options in the platform and release guide, and avoid noprompt during a supervised change.';
   }
 }
 

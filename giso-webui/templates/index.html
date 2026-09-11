@@ -86,15 +86,18 @@
   </main>
   <dialog id="upgrade-guide">
     <div class="dialog-head"><div><span class="eyebrow">CISCO IOS XR</span><h2>Golden ISO upgrade guide</h2></div><button id="close-guide" type="button" class="secondary small">Close</button></div>
-    <div class="warning"><b>Use a maintenance window.</b> Confirm console access, redundancy health and a current configuration backup before starting. The router may reload or restart processes.</div>
-    <label>Installation workflow<select id="guide-family"><option value="exr">IOS XR 6.5.2+ (eXR / classic)</option><option value="lnt">IOS XR7 (LNT)</option><option value="legacy">Legacy IOS XR before 6.5.2</option></select></label>
+    <div class="warning"><b>Use an approved maintenance window.</b> Verify the exact platform, source release, target release and supported upgrade path in Cisco documentation. Confirm console access, redundancy health, recovery media and a current configuration backup. The router may reload or restart processes.</div>
+    <label>Installation workflow<select id="guide-family"><option value="exr">IOS XR 64-bit / eXR 6.5.2+</option><option value="lnt">IOS XR7 / LNT (staged)</option><option value="legacy">Legacy IOS XR before 6.5.2</option><option value="migration">ASR 9000 32-bit to 64-bit migration</option></select></label>
     <ol class="guide-steps">
       <li><b>Download and transfer the ISO</b><p>Download the image from this archive, then transfer it with SFTP/SCP to <code>/harddisk:/</code> on the router.</p></li>
       <li><b>Verify the transferred file</b><p>Compare the router MD5 with the MD5 shown in this archive.</p><pre id="guide-md5">show md5 file /harddisk:/IMAGE.iso</pre></li>
       <li><b>Run pre-checks</b><pre>show version
 show platform
+show redundancy
 show install request
 show install active summary
+show install committed summary
+show alarms brief system active
 dir harddisk:</pre><p>Do not continue while another install transaction is active or the platform is unhealthy.</p></li>
       <li><b>Start the GISO replacement</b><pre id="guide-install">install replace /harddisk:/IMAGE.iso</pre><pre id="guide-apply" hidden></pre><p id="guide-workflow-note">Read and confirm the router prompt. Keep console access available while the operation runs.</p></li>
       <li><b>Monitor and verify</b><pre>show install request
@@ -103,9 +106,9 @@ show version
 show platform
 show install active summary</pre></li>
       <li><b>Commit after validation</b><pre>install commit
-show install committed summary</pre><p>Commit only after routing, MPLS/MPLS-TE and platform health checks are successful.</p></li>
+show install committed summary</pre><p>Commit only after software, hardware, redundancy, alarms, routing and traffic checks are successful.</p></li>
     </ol>
-    <div class="dialog-actions"><a id="official-guide" href="https://www.cisco.com/c/en/us/td/docs/iosxr/ncs5500/system-setup/26xx/configuration/guide/b-system-setup-cg-ncs5500-26xx.pdf" target="_blank" rel="noopener">Open Cisco installation documentation</a><button id="copy-guide" type="button" class="secondary">Copy commands</button></div>
+    <div class="dialog-actions"><a id="official-guide" href="https://github.com/patricklind/gisobuild-gui/blob/main/GISOBUILD-GUIDE.md" target="_blank" rel="noopener">Open the complete platform-aware guide</a><button id="copy-guide" type="button" class="secondary">Copy commands</button></div>
   </dialog>
   <script src="/static/app.js"></script>
 </body>
