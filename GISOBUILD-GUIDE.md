@@ -292,17 +292,81 @@ the approved change plan.
 
 ## 9. Rollback and recovery
 
-Capture available transactions before the change:
+Rollback is a separate maintenance operation. Do not assume that “abort,”
+“rollback,” and “boot the old ISO” are interchangeable. First identify whether
+the package request is pending, applied but uncommitted, or committed.
+
+Capture the current state and available transactions before the upgrade and
+again before rollback:
 
 ```text
-show install rollback list
+show install request
+show install active summary
+show install committed summary
+show install rollback list-ids
 show install history
 ```
 
-Rollback syntax and whether it causes a restart or reload vary by software
-family. Modern IOS XR7 platforms commonly provide `install package rollback` or
-`install rollback <transaction-id>`, followed by `install apply` and possibly
-`install commit`. Use only the command sequence documented for the exact release.
+### IOS XR7/LNT: pending request
+
+If a package operation has been prepared but not applied, supported releases can
+abort the latest request:
+
+```text
+show install request
+install package abort latest
+```
+
+Some releases also support `all-since-apply`. Confirm the available keywords
+with contextual `?` help. Abort is not a rollback for software already applied.
+
+### IOS XR7/LNT: saved transaction
+
+Inspect a candidate transaction before selecting it:
+
+```text
+show install rollback list-ids
+show install rollback id <TRANSACTION-ID> changes
+install package rollback <TRANSACTION-ID>
+show install request
+install apply reload
+```
+
+The staged `install package rollback` form does not apply the change immediately.
+Use `show install request` and the release-specific guide to determine whether
+`reload` or `restart` is required. Some releases also provide an immediate
+`install rollback <TRANSACTION-ID>` form that applies automatically and may
+reload the router.
+
+After the router returns, perform the complete post-upgrade validation. Commit
+only when the recovered state is healthy:
+
+```text
+install commit
+show install committed summary
+```
+
+### IOS XR 64-bit/eXR
+
+Available rollback points and syntax vary across releases. Common command
+patterns include:
+
+```text
+show install rollback ?
+install rollback to committed
+install rollback to <ROLLBACK-POINT>
+```
+
+Run them only in the mode and form documented for the exact router release.
+Rollback can require a reload of impacted nodes and can restore configuration
+state associated with the selected software set.
+
+### Legacy IOS XR and ASR 9000 migration
+
+Do not adapt IOS XR7 commands. Use the exact rollback, ROMMON, eUSB, migration,
+or disaster-recovery procedure for the source and target architecture. Preserve
+the last-known-good image, configuration, console access, and recovery media.
+Contact Cisco TAC when a supported migration rollback path is not explicit.
 
 If the router cannot boot normally, use the platform's documented USB, PXE,
 ROMMON, or disaster-recovery procedure. A generated USB ZIP is not automatically

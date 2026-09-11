@@ -140,6 +140,32 @@ function updateGuideWorkflow() {
   }
 }
 
+function updateRollbackWorkflow() {
+  const family=$('#rollback-family').value;
+  const inspect=$('#rollback-inspect'), abortStep=$('#rollback-abort-step'), commitStep=$('#rollback-commit-step');
+  const command=$('#rollback-command'), apply=$('#rollback-apply'), note=$('#rollback-note');
+  const copy=$('#copy-rollback-guide');
+  copy.disabled=false; copy.textContent='Copy rollback commands'; apply.hidden=false; abortStep.hidden=false; commitStep.hidden=false;
+  if(family==='lnt') {
+    inspect.textContent='show install request\nshow install rollback list-ids\nshow install rollback id <TRANSACTION-ID> changes\nshow install history last transaction verbose';
+    command.textContent='install package rollback <TRANSACTION-ID>';
+    apply.textContent='show install request\ninstall apply reload';
+    note.textContent='Use show install request and the platform guide to determine whether reload or restart is required. The immediate install rollback form may apply changes automatically on some releases.';
+  } else if(family==='exr') {
+    inspect.textContent='show install rollback ?\nshow install active summary\nshow install committed summary\nshow install history last transaction verbose';
+    abortStep.hidden=true;
+    command.textContent='install rollback to committed\n# or: install rollback to <ROLLBACK-POINT>';
+    apply.hidden=true;
+    note.textContent='These are command patterns. Available rollback points, execution mode and reload behavior vary by platform and release; confirm them with contextual help and Cisco documentation.';
+  } else {
+    inspect.textContent='show version\nshow platform\nshow install active summary\nshow install committed summary';
+    abortStep.hidden=true; commitStep.hidden=true; apply.hidden=true;
+    command.textContent='Do not use a generic rollback command.';
+    note.textContent='Legacy IOS XR and ASR 9000 architecture migrations require the exact Cisco recovery or migration procedure. Use approved recovery media and contact Cisco TAC when the supported path is uncertain.';
+    copy.disabled=true; copy.textContent='Commands require Cisco documentation';
+  }
+}
+
 async function health() {
   try {
     const state = await api('/api/health');
@@ -246,11 +272,18 @@ drop.addEventListener('drop', event => uploadFiles(event.dataTransfer.files));
 $('#refresh').onclick = loadInputs;
 $('#refresh-archive').onclick = loadArchive;
 $('#general-guide').onclick = () => openUpgradeGuide('GOLDEN-ISO.iso');
+$('#rollback-guide-button').onclick = () => { updateRollbackWorkflow(); $('#rollback-guide').showModal(); };
 $('#close-guide').onclick = () => $('#upgrade-guide').close();
+$('#close-rollback-guide').onclick = () => $('#rollback-guide').close();
 $('#guide-family').onchange = updateGuideWorkflow;
+$('#rollback-family').onchange = updateRollbackWorkflow;
 $('#copy-guide').onclick = async () => {
   const commands=[...$('#upgrade-guide').querySelectorAll('pre')].map(pre=>pre.textContent).join('\n\n');
   await navigator.clipboard.writeText(commands); $('#copy-guide').textContent='Copied'; setTimeout(()=>$('#copy-guide').textContent='Copy commands',1200);
+};
+$('#copy-rollback-guide').onclick = async () => {
+  const commands=[...$('#rollback-guide').querySelectorAll('pre:not([hidden])')].map(pre=>pre.textContent).join('\n\n');
+  await navigator.clipboard.writeText(commands); $('#copy-rollback-guide').textContent='Copied'; setTimeout(()=>$('#copy-rollback-guide').textContent='Copy rollback commands',1200);
 };
 $('#cleanup').onclick = async () => {
   if (!confirm('Remove temporary upload fragments and build working files?\n\nUploaded Cisco files and completed images will be kept.')) return;

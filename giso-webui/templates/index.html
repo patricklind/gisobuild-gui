@@ -78,7 +78,7 @@
         <details class="technical-log"><summary>Show technical details</summary><div class="log-head"><h3>Build log</h3><button id="copy-log" type="button" class="secondary small">Copy log</button></div><pre id="log">No build started yet.</pre></details>
       </section>
       <section class="panel step archive-step">
-        <div class="step-heading"><span class="step-number">✓</span><div><h2>GISO Archive</h2><p>Successful Golden ISO and USB boot artifacts are retained for up to 30 days within the shared 50 GiB limit.</p></div><div class="archive-actions"><button id="general-guide" type="button" class="secondary small">Upgrade guide</button><button id="refresh-archive" type="button" class="secondary small">Refresh</button></div></div>
+        <div class="step-heading"><span class="step-number">✓</span><div><h2>GISO Archive</h2><p>Successful Golden ISO and USB boot artifacts are retained for up to 30 days within the shared 50 GiB limit.</p></div><div class="archive-actions"><button id="general-guide" type="button" class="secondary small">Upgrade guide</button><button id="rollback-guide-button" type="button" class="secondary small">Rollback guide</button><button id="refresh-archive" type="button" class="secondary small">Refresh</button></div></div>
         <div id="archive-list" class="artifacts"><p class="empty">No archived GISO images yet.</p></div>
       </section>
     </section>
@@ -109,6 +109,28 @@ show install active summary</pre></li>
 show install committed summary</pre><p>Commit only after software, hardware, redundancy, alarms, routing and traffic checks are successful.</p></li>
     </ol>
     <div class="dialog-actions"><a id="official-guide" href="https://github.com/patricklind/gisobuild-gui/blob/main/GISOBUILD-GUIDE.md" target="_blank" rel="noopener">Open the complete platform-aware guide</a><button id="copy-guide" type="button" class="secondary">Copy commands</button></div>
+  </dialog>
+  <dialog id="rollback-guide">
+    <div class="dialog-head"><div><span class="eyebrow">CISCO IOS XR</span><h2>Software rollback guide</h2></div><button id="close-rollback-guide" type="button" class="secondary small">Close</button></div>
+    <div class="warning"><b>Rollback can reload the router and restore older configuration state.</b> Keep console access available, preserve diagnostic logs and verify the exact rollback syntax for the platform and release before continuing.</div>
+    <label>Rollback workflow<select id="rollback-family"><option value="lnt">IOS XR7 / LNT transaction rollback</option><option value="exr">IOS XR 64-bit / eXR rollback</option><option value="legacy">Legacy IOS XR or ASR 9000 migration recovery</option></select></label>
+    <ol class="guide-steps">
+      <li><b>Inspect state and available rollback points</b><pre id="rollback-inspect">show install request
+show install rollback list-ids
+show install history last transaction verbose</pre><p>Record the current active and committed package sets and inspect the changes for the selected transaction ID.</p></li>
+      <li id="rollback-abort-step"><b>Abort an un-applied package request when appropriate</b><pre id="rollback-abort">install package abort latest</pre><p>Use abort only for a pending package operation supported by the exact release. It is not a substitute for rolling back already applied software.</p></li>
+      <li><b>Stage or start the rollback</b><pre id="rollback-command">show install rollback id &lt;TRANSACTION-ID&gt; changes
+install package rollback &lt;TRANSACTION-ID&gt;</pre><pre id="rollback-apply">show install request
+install apply reload</pre><p id="rollback-note">Use show install request and Cisco documentation to decide whether reload or restart is required.</p></li>
+      <li><b>Validate before committing</b><pre>show version
+show platform
+show redundancy
+show install active summary
+show alarms brief system active</pre><p>Validate routing, forwarding, services and traffic. Commit only after the recovered state is healthy.</p></li>
+      <li id="rollback-commit-step"><b>Commit the validated rollback</b><pre>install commit
+show install committed summary</pre></li>
+    </ol>
+    <div class="dialog-actions"><a href="https://github.com/patricklind/gisobuild-gui/blob/main/GISOBUILD-GUIDE.md#9-rollback-and-recovery" target="_blank" rel="noopener">Open the complete rollback and recovery guide</a><button id="copy-rollback-guide" type="button" class="secondary">Copy rollback commands</button></div>
   </dialog>
   <script src="/static/app.js"></script>
 </body>
