@@ -1,8 +1,10 @@
 import hashlib
 import io
 import json
+import os
 import tarfile
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,6 +28,7 @@ class GisoWebTests(unittest.TestCase):
         module.ARCHIVE.mkdir()
         module.uploads.clear()
         module.jobs.clear()
+        module.archive_policy_checked = 0.0
         self.docker_running = patch("app.docker_build_running", return_value=False)
         self.docker_running.start()
         self.disk_usage = patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=100 * 1024**3))
@@ -130,6 +133,12 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn("payload", detail)
         self.assertNotIn("container_pid", detail)
         self.assertNotIn("payload", summary)
+
+    def test_only_one_build_can_run_at_a_time(self):
+        module.jobs["active"] = {"id": "active", "status": "running", "created": 1}
+        response = self.client.post("/api/jobs", json={"iso": "base.iso", "pkglist": []})
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("already running", response.get_json()["error"])
 
     def test_log_is_bounded(self):
         module.jobs["job"] = {"log": "", "updated": 0, "progress": 0, "phase": ""}
@@ -254,6 +263,48 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.get("/api/archive/usb-job/router-usb_boot.zip/checksums")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["sha256"], hashlib.sha256(content).hexdigest())
+
+    def test_archive_retention_removes_complete_expired_job(self):
+        old_job = module.ARCHIVE / "old-job"
+        old_job.mkdir()
+        (old_job / "golden.iso").write_bytes(b"iso")
+        (old_job / "usb.zip").write_bytes(b"usb")
+        old_time = time.time() - 31 * 86400
+        os.utime(old_job, (old_time, old_time))
+        current_job = module.ARCHIVE / "current-job"
+        current_job.mkdir()
+        (current_job / "golden.iso").write_bytes(b"current")
+        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
+                patch.object(module, "MAX_ARCHIVE_BYTES", 1024):
+            removed = module.enforce_archive_policy()
+        self.assertIn("old-job", removed)
+        self.assertFalse(old_job.exists())
+        self.assertTrue(current_job.exists())
+
+    def test_archive_quota_removes_oldest_complete_job(self):
+        old_job = module.ARCHIVE / "old-job"
+        old_job.mkdir()
+        (old_job / "golden.iso").write_bytes(b"123456")
+        old_time = time.time() - 60
+        os.utime(old_job, (old_time, old_time))
+        new_job = module.ARCHIVE / "new-job"
+        new_job.mkdir()
+        (new_job / "golden.iso").write_bytes(b"abcdef")
+        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
+                patch.object(module, "MAX_ARCHIVE_BYTES", 10):
+            removed = module.enforce_archive_policy()
+        self.assertEqual(removed, ["old-job"])
+        self.assertFalse(old_job.exists())
+        self.assertTrue(new_job.exists())
+
+    def test_oversized_new_archive_is_rejected_without_cleanup(self):
+        job_dir = self.output / "large-job"
+        job_dir.mkdir()
+        (job_dir / "golden.iso").write_bytes(b"large")
+        with patch.object(module, "MAX_ARCHIVE_BYTES", 4), \
+                self.assertRaisesRegex(RuntimeError, "exceed"):
+            module.archive_giso_artifacts_and_cleanup("large-job", job_dir)
+        self.assertTrue(job_dir.exists())
 
     def test_lnt_output_name_without_golden_is_archived(self):
         job_dir = self.output / "lnt-job"

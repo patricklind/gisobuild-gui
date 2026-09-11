@@ -8,6 +8,12 @@ A local Docker-based interface and CLI for building Cisco IOS XR Golden ISO
 > properly licensed IOS XR ISO, RPM, and SMU files. These files are excluded by
 > `.gitignore` and must never be committed.
 
+> [!CAUTION]
+> Use this software at your own risk. It is provided without warranty. You are
+> responsible for validating compatibility, checksums, backups and operational
+> procedures. The authors accept no liability for outages, data loss, device
+> failure or other damage.
+
 ## Components
 
 - `giso-webui/` — Flask web interface for uploads, builds, checksums, downloads,
@@ -43,6 +49,10 @@ Open <http://127.0.0.1:8080> and upload the Cisco base ISO and relevant update
 packages. Successful builds archive both the Golden ISO and, when supported, the
 USB boot ZIP.
 
+Only one build runs at a time. Archived ISO and USB artifacts are retained for
+30 days. If their combined size exceeds 50 GiB, the oldest complete build
+archives are removed first.
+
 Detailed web usage is documented in [`giso-webui/README.md`](giso-webui/README.md).
 The CLI workflow is documented in [`GISOBUILD-GUIDE.md`](GISOBUILD-GUIDE.md).
 
@@ -73,4 +83,3 @@ Docker socket. Do not expose port 8080 to an untrusted network. See
 
 No open-source license has been selected yet. Until one is added, copyright law
 reserves all rights to the repository owner.
-# gisobuild-gui

@@ -23,6 +23,8 @@ services:
       MAX_TAR_MEMBERS: "10000"
       MAX_CHUNK_BYTES: "16777216"
       MAX_LOG_BYTES: "10485760"
+      ARCHIVE_RETENTION_DAYS: "30"
+      MAX_ARCHIVE_BYTES: "53687091200"
       ALLOWED_HOSTS: "127.0.0.1,localhost,giso-webui"
       PYTHONDONTWRITEBYTECODE: "1"
     security_opt:

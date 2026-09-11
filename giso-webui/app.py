@@ -28,15 +28,20 @@ uploads: dict[str, dict] = {}
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
 job_lock = threading.Lock()
 upload_lock = threading.Lock()
+archive_lock = threading.RLock()
+archive_policy_checked = 0.0
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024**3)))
 MAX_EXTRACTED_BYTES = int(os.environ.get("MAX_EXTRACTED_BYTES", str(16 * 1024**3)))
 MAX_TAR_MEMBERS = int(os.environ.get("MAX_TAR_MEMBERS", "10000"))
 MAX_CHUNK_BYTES = int(os.environ.get("MAX_CHUNK_BYTES", str(16 * 1024**2)))
 MAX_LOG_BYTES = int(os.environ.get("MAX_LOG_BYTES", str(10 * 1024**2)))
+ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
+MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
 ALLOWED_HOSTS = {host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(",")}
 app.config["MAX_CONTENT_LENGTH"] = MAX_CHUNK_BYTES
 
-if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES, MAX_LOG_BYTES) <= 0:
+if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
+       MAX_LOG_BYTES, ARCHIVE_RETENTION_DAYS, MAX_ARCHIVE_BYTES) <= 0:
     raise RuntimeError("Upload, extraction, tar, chunk and log limits must be positive")
 
 LIST_OPTIONS = {
@@ -129,6 +134,37 @@ def file_checksums(path: Path) -> dict[str, str]:
     return result
 
 
+def archive_size(path: Path) -> int:
+    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+
+
+def enforce_archive_policy() -> list[str]:
+    """Remove expired archive jobs, then oldest jobs until the archive fits its quota."""
+    removed: list[str] = []
+    cutoff = time.time() - ARCHIVE_RETENTION_DAYS * 86400
+    with archive_lock:
+        if not ARCHIVE.exists():
+            return removed
+        job_dirs = [path for path in ARCHIVE.iterdir() if path.is_dir()]
+        for job_dir in job_dirs:
+            if job_dir.stat().st_mtime < cutoff:
+                shutil.rmtree(job_dir)
+                removed.append(job_dir.name)
+        remaining = sorted(
+            (path for path in ARCHIVE.iterdir() if path.is_dir()),
+            key=lambda path: path.stat().st_mtime,
+        )
+        total = sum(archive_size(path) for path in remaining)
+        while total > MAX_ARCHIVE_BYTES and remaining:
+            oldest = remaining.pop(0)
+            total -= archive_size(oldest)
+            shutil.rmtree(oldest)
+            removed.append(oldest.name)
+        if removed:
+            checksum_cache.clear()
+    return removed
+
+
 def archive_giso_artifacts_and_cleanup(job_id: str, job_dir: Path) -> list[dict]:
     """Archive verified Golden ISO and USB boot files, then remove build inputs/output."""
     iso_candidates = list(job_dir.glob("*.iso"))
@@ -138,22 +174,27 @@ def archive_giso_artifacts_and_cleanup(job_id: str, job_dir: Path) -> list[dict]
         raise RuntimeError("No Golden ISO was produced; source files were kept")
     usb_candidates = [path for path in job_dir.rglob("*.zip") if "usb" in path.name.lower()]
     candidates = iso_candidates + usb_candidates
+    candidate_size = sum(path.stat().st_size for path in candidates)
+    if candidate_size > MAX_ARCHIVE_BYTES:
+        raise RuntimeError("The completed GISO artifacts exceed the archive's total size limit; source files were kept")
     archive_dir = ARCHIVE / job_id
-    archive_dir.mkdir(parents=True, exist_ok=False)
     archived = []
-    try:
-        for source in candidates:
-            if source.is_symlink() or job_dir.resolve() not in source.resolve().parents:
-                raise RuntimeError(f"Unsafe build artifact: {source.name}")
-            destination = archive_dir / source.name
-            shutil.copy2(source, destination)
-            if source.stat().st_size != destination.stat().st_size or file_sha256(source) != file_sha256(destination):
-                raise RuntimeError(f"Archive verification failed for {source.name}")
-            archived.append({"path": source.name, "size": destination.stat().st_size,
-                             "url": f"/archive/{job_id}/{source.name}"})
-    except Exception:
-        shutil.rmtree(archive_dir, ignore_errors=True)
-        raise
+    with archive_lock:
+        archive_dir.mkdir(parents=True, exist_ok=False)
+        try:
+            for source in candidates:
+                if source.is_symlink() or job_dir.resolve() not in source.resolve().parents:
+                    raise RuntimeError(f"Unsafe build artifact: {source.name}")
+                destination = archive_dir / source.name
+                shutil.copy2(source, destination)
+                if source.stat().st_size != destination.stat().st_size or file_sha256(source) != file_sha256(destination):
+                    raise RuntimeError(f"Archive verification failed for {source.name}")
+                archived.append({"path": source.name, "size": destination.stat().st_size,
+                                 "url": f"/archive/{job_id}/{source.name}"})
+            enforce_archive_policy()
+        except Exception:
+            shutil.rmtree(archive_dir, ignore_errors=True)
+            raise
     for child in list(DATA.iterdir()):
         if child.is_dir():
             shutil.rmtree(child)
@@ -380,6 +421,7 @@ def request_too_large(_error):
 
 @app.before_request
 def validate_host():
+    global archive_policy_checked
     host = request.host.split(":", 1)[0].strip("[]")
     if host not in ALLOWED_HOSTS:
         abort(400)
@@ -391,6 +433,10 @@ def validate_host():
             parsed = urlsplit(origin)
             if parsed.scheme not in {"http", "https"} or parsed.netloc != request.host:
                 abort(403)
+    now = time.monotonic()
+    if now - archive_policy_checked >= 3600:
+        enforce_archive_policy()
+        archive_policy_checked = now
 
 
 @app.get("/api/health")
@@ -411,6 +457,7 @@ def inputs():
 
 @app.get("/api/archive")
 def archive_list():
+    enforce_archive_policy()
     items = []
     if ARCHIVE.exists():
         paths = [path for path in ARCHIVE.glob("*/*")

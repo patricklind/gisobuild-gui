@@ -34,3 +34,9 @@ Appen er kun bundet til localhost. Webcontaineren har adgang til Docker-socket f
 Webcontainerens eget root-filsystem er read-only, og alle Linux capabilities er fjernet. Kun de deklarerede data-, output-, arkiv- og arbejdsvolumes er skrivbare.
 
 Standardgrænserne er 8 GiB per upload, 16 MiB per upload-chunk, 16 GiB udpakket tar, 10.000 tar-elementer og 10 MiB buildlog i hukommelsen. Symlinks, hardlinks og stier uden for udpakningsmappen afvises.
+
+Kun ét build kan køre ad gangen. Arkiverede ISO- og USB-filer opbevares i højst 30 dage. Hvis deres samlede størrelse overstiger 50 GiB, slettes de ældste komplette jobarkiver først. Grænserne kan konfigureres med `ARCHIVE_RETENTION_DAYS` og `MAX_ARCHIVE_BYTES`.
+
+## Ansvarsfraskrivelse
+
+Værktøjet leveres uden garanti og anvendes på eget ansvar. Brugeren er ansvarlig for at kontrollere Cisco-kompatibilitet, checksums, backup og change-procedure. Forfatterne påtager sig intet ansvar for driftsstop, datatab, enhedsfejl eller anden skade.

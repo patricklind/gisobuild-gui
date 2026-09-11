@@ -37,3 +37,5 @@ select { width: 100%; margin-top: 5px; border: 2px solid var(--line); border-rad
 .delete-archive:focus-visible,
 a:focus-visible,
 select:focus-visible { outline: 4px solid #72b7f1; outline-offset: 2px; }
+.disclaimer { margin: 0 0 12px; }
+.archive-policy { margin: 0 0 22px; }
