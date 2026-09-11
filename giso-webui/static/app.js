@@ -120,7 +120,9 @@ function updateGuideWorkflow() {
   const filename=$('#upgrade-guide').dataset.filename || 'GOLDEN-ISO.iso';
   const family=$('#guide-family').value;
   const install=$('#guide-install'), apply=$('#guide-apply'), note=$('#guide-workflow-note');
+  const copy=$('#copy-guide');
   apply.hidden=true; apply.textContent='';
+  copy.disabled=false; copy.textContent='Copy commands';
   if(family==='lnt') {
     install.textContent=`install package replace /harddisk:/${filename}`;
     apply.textContent='show install request\ninstall apply reload'; apply.hidden=false;
@@ -131,6 +133,7 @@ function updateGuideWorkflow() {
   } else if(family==='migration') {
     install.textContent='Do not use a normal GISO replacement command.';
     note.textContent='ASR 9000 32-bit to 64-bit migration requires Cisco’s dedicated migration procedure, a compatible migration TAR and potentially an intermediate release. Open the complete guide before continuing.';
+    copy.disabled=true; copy.textContent='Migration commands require Cisco documentation';
   } else {
     install.textContent=`install replace /harddisk:/${filename}`;
     note.textContent='This workflow may apply changes and reload automatically. Confirm the exact command options in the platform and release guide, and avoid noprompt during a supervised change.';
