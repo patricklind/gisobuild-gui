@@ -18,8 +18,10 @@ A local Docker-based interface and CLI for building Cisco IOS XR Golden ISO
 
 - `giso-webui/` — Flask web interface for uploads, builds, checksums, downloads,
   and persistent ISO/USB archives.
-- `build-giso.sh` — reusable command-line workflow for NCS5500 builds.
-- `GISOBUILD-GUIDE.md` — operational build and installation guide.
+- `build-giso.sh` — command-line helper for the documented NCS5500 directory
+  and package naming convention.
+- `GISOBUILD-GUIDE.md` — platform-aware build, upgrade, validation, and rollback
+  guide for Cisco IOS XR families supported by the upstream GISO tool.
 
 The web process starts an isolated Cisco build container. Input and tool mounts
 are read-only; only dedicated output and working volumes are writable. The web

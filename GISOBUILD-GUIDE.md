@@ -1,151 +1,347 @@
-# Reusable GISO Build Guide for NCS5500
+# Cisco IOS XR Golden ISO Build and Upgrade Guide
 
-This guide builds an NCS5500 Golden ISO with Docker. The script validates input files, discovers optional RPMs and SMUs, excludes SMUs marked as `Full` superseded in Cisco README files, and runs Cisco `gisobuild` in an x86_64 container.
+This guide covers the common workflow for building, validating, transferring,
+installing, and rolling back a Golden ISO (GISO) across Cisco IOS XR platforms.
+It is platform-aware: Cisco command syntax, image limits, supported packages,
+and upgrade paths vary by router family and release.
 
-## 1. Prepare the directory
+> [!CAUTION]
+> Never treat an installation command as universal. Before a production change,
+> read the Cisco System Setup and Software Installation Guide and release notes
+> for the exact platform, source release, target release, route processor, and
+> hardware inventory. Confirm uncertain upgrade paths with Cisco TAC.
 
-Place the following files below the same parent directory:
+> [!WARNING]
+> This project does not provide Cisco software. Use only properly licensed files
+> obtained for the exact platform and release. Do not rename a completed GISO.
+
+## 1. Determine the platform and install architecture
+
+Collect this information from the router before downloading or building files:
 
 ```text
-NCS5500-iosxr-k9-26.1.2/
-  ncs5500-mini-x-26.1.2.iso
-  README-NCS5500-iosxr-k9-26.1.2.txt
-  optional-rpms/
-    ...
-
-ncs5500-26.1.2.CSCxxxxxxx/
-  ncs5500-26.1.2.CSCxxxxxxx.txt
-  *.rpm
+show version
+show platform
+show inventory
+show redundancy
+show install active summary
+show install committed summary
+show install request
+show install history last transaction verbose
+show filesystem
+show alarms brief system active
 ```
 
-SMU downloads are often distributed as `.tar` archives. Extract each archive into its own directory so that the `.txt` README and `.rpm` files remain together. Use only packages for the exact same platform and IOS XR release as the base ISO.
+Use the output to identify:
 
-## 2. Verify the Cisco advisory and download list
+- Router family and exact product IDs (PIDs)
+- Current IOS XR release and architecture
+- Active and committed package sets
+- Redundancy state and available disk space
+- Whether an install operation is already pending
+
+The current `ios-xr/gisobuild` project handles eXR/IOS XR 64-bit and LNT/IOS XR7
+images, with some options restricted to one architecture. Examples include
+`--migration` for ASR 9000 migration builds, `--full-iso` for IOS XRv 9000,
+and `--skip-usb-image` or `--remove-packages` for LNT builds.
+
+### Installation command families
+
+| Router software family | Typical workflow | Important note |
+| --- | --- | --- |
+| Modern IOS XR7/LNT | `install package replace`, then `install apply`, then `install commit` | Provides control over when changes are applied; confirm whether `reload` or `restart` is required. |
+| IOS XR 64-bit/eXR 6.5.2 and later | `install replace <absolute-GISO-path>` | The operation can apply or reload automatically depending on platform and release. |
+| Older IOS XR releases | Legacy `install update source ... replace` workflow | Use only the exact syntax in the release-specific Cisco guide. |
+| ASR 9000 32-bit to 64-bit migration | Dedicated migration procedure and migration TAR | This is not a normal GISO replacement. Follow Cisco's ASR 9000 migration guide. |
+
+Cisco 8000, NCS 1010, and newer IOS XR7 documentation may offer both an
+immediate `install replace` workflow and a staged `install package replace`
+workflow. Prefer the staged workflow when the release supports it and operational
+control of the apply/reload point is required.
+
+## 2. Validate the supported upgrade path
 
 Before building:
 
-1. Find the affected IOS XR release and platform in the advisory table.
-2. Filter Cisco Software Download for the specific platform and release.
-3. Download every SMU Cisco lists as applicable or recommended.
-4. Keep older SMUs in the input directory. The script excludes them when a newer README explicitly marks them as `Supercedes ... Full`.
+1. Open the Cisco release notes and installation guide for the target release.
+2. Confirm that a direct upgrade from the source release is supported.
+3. Check for mandatory intermediate releases, ROMMON/BIOS/FPD requirements, and
+   required bridging bug-fix RPMs.
+4. Check platform-specific GISO size and filename limits.
+5. Confirm that every optional package and SMU matches the base ISO platform,
+   release, architecture, and signing requirements.
+6. Review Cisco field notices and open caveats that apply to the hardware.
+7. Record the rollback method and the last known-good committed transaction.
 
-Automated supersedence handling does not replace a manual applicability review. If the advisory and download list disagree, ask Cisco TAC to confirm the package before production use.
+Do not mix RPMs from different platforms or target releases. Do not assume a
+package is applicable merely because the build tool accepts it. For upgrades or
+downgrades that need bridging fixes, include the fixes for the active source
+release as directed by Cisco.
 
-## 3. Requirements
+## 3. Prepare the build inputs
 
-- Docker Desktop or Docker Engine must be running.
-- Approximately 25 GB of free disk space is recommended.
-- Internet access to GitHub and Docker Hub is required for the first run.
-- On Apple Silicon, Docker emulates Cisco's x86_64 container image. A build time of 15–30 minutes is normal.
-
-Verify Docker:
-
-```bash
-docker info
-```
-
-## 4. Run the build
-
-From the project directory:
-
-```bash
-chmod +x ./build-giso.sh
-
-./build-giso.sh \
-  --iso ./NCS5500-iosxr-k9-26.1.2/ncs5500-mini-x-26.1.2.iso \
-  --label SEC_HARDENING_SEP2026
-```
-
-The default output directory is:
+Use a separate directory for each platform and target release:
 
 ```text
-output_gisobuild_SEC_HARDENING_SEP2026/
+inputs/
+  <platform>-<target-release>/
+    <platform>-<base-or-mini-image>.iso
+    README-<platform>-<release>.txt
+    optional-rpms/
+      *.rpm
+    smus/
+      <bug-id>/
+        *.rpm
+        *.txt
+    bridging-fixes/
+      <source-release>/
+        *.rpm
+    config/
+      xr-config.cfg
+      ztp.ini
 ```
 
-The script stops if the output directory already exists. To rebuild intentionally, run:
+SMUs are often delivered in tar archives. The Web UI extracts supported tar
+uploads safely. For manual builds, extract each archive while keeping its RPM
+and Cisco README together. Validate Cisco-provided hashes before using a file.
+
+Configuration embedded in a GISO can be applied during boot or installation.
+The build tool does not prove that the configuration is operationally correct;
+validate it separately and omit it when it is not required.
+
+## 4. Build the GISO
+
+### Recommended: Web UI
+
+Start the local application:
 
 ```bash
-./build-giso.sh \
-  --iso ./NCS5500-iosxr-k9-26.1.2/ncs5500-mini-x-26.1.2.iso \
-  --label SEC_HARDENING_SEP2026 \
+git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
+cd giso-webui
+cp .env.example .env
+docker compose up --build -d
+```
+
+Open <http://127.0.0.1:8080>, upload the base ISO and packages, select only the
+options valid for the detected image architecture, and start the build. The UI
+supports ISO and optional USB artifact archiving, SHA-256 verification, a 30-day
+retention period, and a 50 GiB combined archive quota by default.
+
+### Direct `gisobuild.py` workflow
+
+The upstream tool supports CLI and YAML input. A representative CLI build is:
+
+```bash
+./src/gisobuild.py \
+  --iso /absolute/path/to/base.iso \
+  --repo /absolute/path/to/rpm-repository \
+  --pkglist package-one.rpm package-two.rpm \
+  --label CHANGE_1234 \
+  --out-directory /absolute/path/to/output \
+  --create-checksum \
   --clean
 ```
 
-For safety, `--clean` may only replace an `output_gisobuild_*` directory located next to the script.
+Use `./src/gisobuild.py --help` from the checked-out version before building.
+Do not copy architecture-specific options between platforms without confirming
+support. The upstream `gisobuild_options.yaml` file is the starting template for
+YAML-driven builds.
 
-## 5. Validate the build result
+### Bundled NCS5500 helper
 
-A successful build should report:
-
-```text
-RPM signature check [PASS]
-RPM compatibility check [PASS]
-Golden ISO creation SUCCESS
-```
-
-Inspect the output:
+`build-giso.sh` automates an NCS5500 directory convention and package naming
+pattern. It is not a universal wrapper for all IOS XR platforms.
 
 ```bash
-ls -lh output_gisobuild_SEC_HARDENING_SEP2026/
-cat output_gisobuild_SEC_HARDENING_SEP2026/checksums.json
-cat output_gisobuild_SEC_HARDENING_SEP2026/rpms_packaged_in_giso.txt
+chmod +x ./build-giso.sh
+./build-giso.sh \
+  --iso ./NCS5500-iosxr-k9-<release>/ncs5500-mini-x-<release>.iso \
+  --label CHANGE_1234
 ```
 
-Keep at least these artifacts together:
+Use the Web UI or upstream tool directly for ASR 9000, Cisco 8000, NCS 1000,
+NCS 500/540/560, NCS 5500/5700, IOS XRv 9000, and other supported image families
+unless you have deliberately adapted and tested the helper's discovery rules.
 
-- The Golden ISO file
-- The USB boot package (`usb_boot-*.zip`), if created
-- `checksums.json`
-- `rpms_packaged_in_giso.txt`
-- The complete `logs/` directory
+## 5. Validate the build output
 
-## 6. Transfer the image to the router
+A successful process should complete signature, compatibility, dependency, and
+Golden ISO creation checks. Review the logs even when the command exits cleanly.
 
-Use SFTP or SCP in binary mode. Always verify the checksum after transfer:
+```bash
+find output_gisobuild* -maxdepth 2 -type f -print
+cat output_gisobuild*/checksums.json
+cat output_gisobuild*/rpms_packaged_in_giso.txt
+```
+
+Keep these items in the change record:
+
+- Original GISO filename, size, MD5, and SHA-256
+- Optional USB boot package and checksum
+- Packaged RPM/SMU inventory
+- Complete build logs
+- Source and target release information
+- Build tool commit and container image identifier
+- Change approval, rollback plan, and validation evidence
+
+Do not install when a signature, dependency, compatibility, or checksum check
+fails. Do not rename the generated ISO after validation.
+
+## 6. Prepare the router and change window
+
+Before transfer or installation:
+
+1. Back up the running configuration and operational state.
+2. Verify out-of-band console access and recovery media.
+3. Confirm both route processors and all critical cards are healthy.
+4. Resolve active alarms and pending install operations.
+5. Confirm adequate space in an approved local filesystem such as `harddisk:`.
+6. Confirm the maintenance window allows for package staging, reload, rollback,
+   and post-change observation.
+7. Disable automation that could conflict with reload or configuration changes.
+
+Transfer the GISO with SCP, SFTP, HTTPS, or another method supported by the
+specific platform and release. Use binary transfer and compare the router-side
+checksum with the recorded build checksum:
 
 ```text
-dir harddisk:/<giso-file>.iso
+dir harddisk:
 show md5 file /harddisk:/<giso-file>.iso
 ```
 
-The router's MD5 must match the MD5 produced by the script. Never begin installation if the checksums differ.
+Never proceed if the filename, size, or checksum differs.
 
-## 7. Install during a maintenance window
+## 7. Install the GISO
 
-Run pre-checks through the console or out-of-band management:
+### Option A: staged IOS XR7 workflow
+
+Use this only when the platform and release documentation supports these
+commands. Staging separates package preparation from the disruptive apply step:
+
+```text
+install package replace /harddisk:/<giso-file>.iso
+show install request
+install apply reload
+```
+
+For a small same-release package change, Cisco may permit `install apply restart`
+instead. Use `show install request` and the platform guide to determine the
+required action. Do not substitute `restart` merely to avoid a reload.
+
+After the router returns and validation succeeds:
+
+```text
+install commit
+show install committed summary
+```
+
+### Option B: immediate replace workflow
+
+Many eXR and IOS XR7 releases support:
+
+```text
+install replace /harddisk:/<giso-file>.iso
+```
+
+This workflow can apply changes and trigger a restart or reload as soon as
+package preparation completes. Add `commit`, `reload`, or `noprompt` only when
+the exact platform guide documents the option and the change plan requires it.
+Avoid `noprompt` during manual supervised changes.
+
+### Option C: legacy releases
+
+Some releases before IOS XR 6.5.2 use a form of:
+
+```text
+install update source <absolute-source-path> <giso-name> replace
+```
+
+Syntax and prerequisites differ. Copy the exact command from the release-specific
+Cisco guide instead of adapting a modern example.
+
+### ASR 9000 32-bit to 64-bit migration
+
+Do not use the normal replacement examples. Cisco requires a dedicated migration
+workflow and, for supported releases, a migration TAR built with the ASR 9000
+GISO migration option. Intermediate releases, filename length, image size, and
+hardware restrictions can apply.
+
+## 8. Post-upgrade validation
+
+After the router returns, compare the same checks collected before the change:
 
 ```text
 show version
 show platform
 show redundancy
-show install request
 show install active summary
-show filesystem
-show alarms brief system active
-```
-
-Start the installation without `noprompt`:
-
-```text
-install replace harddisk:/<giso-file>.iso
-```
-
-After the reload, verify software, platform, redundancy, alarms, interfaces, and routing. Commit only after all post-checks succeed:
-
-```text
-show install active summary
-show install history last transaction verbose
-install commit
 show install committed summary
+show install history last transaction verbose
+show alarms brief system active
+show interfaces summary
+show logging last 100
 ```
+
+Also validate platform-specific services, routing adjacencies, forwarding,
+telemetry, timing, optics, licensing, and application traffic. Confirm embedded
+configuration only if the GISO intentionally contained one.
+
+Do not run `install commit` until the target image, packages, hardware, control
+plane, and traffic checks pass. Observe the router for the duration required by
+the approved change plan.
+
+## 9. Rollback and recovery
+
+Capture available transactions before the change:
+
+```text
+show install rollback list
+show install history
+```
+
+Rollback syntax and whether it causes a restart or reload vary by software
+family. Modern IOS XR7 platforms commonly provide `install package rollback` or
+`install rollback <transaction-id>`, followed by `install apply` and possibly
+`install commit`. Use only the command sequence documented for the exact release.
+
+If the router cannot boot normally, use the platform's documented USB, PXE,
+ROMMON, or disaster-recovery procedure. A generated USB ZIP is not automatically
+valid for every router family, route processor, or boot mode.
 
 ## Troubleshooting
 
-- **Checksum mismatch:** Delete the router copy, transfer it again with SFTP, and verify it again.
-- **0 RPMs found:** The repository must contain physical RPM files, not symlinks.
-- **Signature or compatibility failure:** Do not install the image. Inspect `logs/gisobuild.log-*` and verify the platform, release, and SMU dependencies.
-- **Docker image not found:** Review the available Docker Hub tags. Change `--image` only when the tag is compatible with the installed `gisobuild` version.
+- **No packages found:** Confirm RPM files are physical files, match the ISO,
+  and are included in the selected repository or package list.
+- **Dependency or compatibility failure:** Stop. Check bridging fixes, optional
+  base packages, architecture, release alignment, and `gisobuild.log`.
+- **GISO exceeds platform limits:** Remove unnecessary packages only after
+  verifying requirements. ASR 9000 route processors can have specific limits.
+- **USB artifact is absent:** USB output is platform-dependent and may be skipped
+  or unsupported. Use the platform recovery guide.
+- **Install command is rejected:** Re-check whether the router uses the eXR or
+  IOS XR7 package-management command family and consult contextual `?` help.
+- **Reload requirement is unexpected:** Review `show install request`; package
+  differences and restart types determine whether a process restart is enough.
+- **Build succeeds but a package is missing:** Compare
+  `rpms_packaged_in_giso.txt` with the approved package manifest before transfer.
+
+## Official references
+
+- [`ios-xr/gisobuild` source and usage](https://github.com/ios-xr/gisobuild)
+- [Cisco ASR 9000 GISO guide, IOS XR 7.9.x](https://www.cisco.com/c/en/us/td/docs/routers/asr9000/software/asr9k-r7-9/system-setup/configuration/guide/b-system-setup-cg-asr9000-79x/customize-install-using-giso.html)
+- [Cisco ASR 9000 32-bit to 64-bit migration guide](https://www.cisco.com/c/en/us/td/docs/routers/asr9000/migration/guide/b-migration-to-ios-xr-64-bit/m-migration-overview.html)
+- [Cisco 8000 setup and upgrade guide](https://www.cisco.com/c/en/us/td/docs/iosxr/cisco8000/b-setup-and-upgrade-cisco8k.pdf)
+- [Cisco NCS 540 GISO guide, IOS XR 7.7.x](https://www.cisco.com/c/en/us/td/docs/iosxr/ncs5xx/system-setup/77x/b-system-setup-cg-77x-ncs540/build-and-install-golden-iso.html)
+- [Cisco NCS 1010 software upgrade methods](https://www.cisco.com/c/en/us/td/docs/optical/ncs1010/system-setup-install/system-setup-software-install-guide/upgrade-wrapper/upgrade-software.html)
+- [Cisco IOS XRv 9000 GISO guide](https://www.cisco.com/c/en/us/td/docs/routers/virtual-routers/configuration/guide/b-xrv9k-cg/m-golden-iso-xrv9k.html)
+
+Always replace these examples with the documentation for the exact target
+release. Cisco changes supported paths, prerequisites, and command behavior over
+time.
 
 ## Disclaimer
 
-This tooling is provided without warranty and is used at your own risk. You are responsible for validating Cisco compatibility, checksums, backups, maintenance procedures, and recovery plans. The authors accept no liability for outages, data loss, device failure, or other damage.
+This guide and tooling are provided without warranty and are used at your own
+risk. You are responsible for validating Cisco compatibility, licensing,
+checksums, backups, maintenance procedures, rollback, and recovery plans. The
+authors accept no liability for outages, data loss, device failure, or damage.
