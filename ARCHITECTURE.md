@@ -18,6 +18,7 @@ flowchart LR
     W --> V3["Output volume"]
     W --> V4["Archive volume"]
     W --> S["SQLite job-state volume"]
+    W --> P["Platform and option validator"]
     W -->|"Docker socket"| D["Docker daemon"]
     D --> B["Ephemeral Cisco GISO container"]
     B -->|"read-only"| V1
@@ -31,6 +32,23 @@ The browser uploads files in bounded chunks. Flask validates and stores them in
 the upload volume, constructs an argument-vector command, and asks the Docker
 daemon to run an ephemeral Cisco build container. Successful ISO and USB outputs
 are copied into the archive, verified with SHA-256, and exposed for download.
+Before constructing the child-container command, a platform validator rejects
+unsupported family/architecture option combinations. Cisco's tool remains the
+source of truth for the contents and metadata of the actual ISO.
+
+## Data lifecycle
+
+| Data | Location | Lifecycle |
+| --- | --- | --- |
+| Uploads | `giso-uploads` volume | Kept on failure; removed after verified successful archival |
+| Build work | `giso-work` volume | Per-job temporary data; eligible for manual cleanup |
+| Raw output | `giso-output` volume | Moved to the verified archive after success |
+| ISO/USB archive | `giso-archive` volume | 30 days and 50 GiB combined by default |
+| Job history and logs | `giso-state` SQLite volume | Bounded to 100 jobs by default |
+
+Incomplete upload sessions are process-local and expire after 24 hours by
+default. Expiration removes the associated partial file so an abandoned browser
+upload cannot block later builds indefinitely.
 
 ## What is working well
 
