@@ -16,9 +16,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory
-from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
-
 from platform_validation import PLATFORMS, validate_platform_options
+from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
 
 def validate_image_reference(value: str) -> str:
