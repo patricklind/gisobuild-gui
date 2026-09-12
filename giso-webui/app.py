@@ -483,7 +483,7 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             if payload.get(key):
                 command += [option, str(safe_data_path(payload[key]))]
         if payload.get("auto_repo", True) and payload.get("pkglist"):
-            staged_repo = Path("/work") / job_id / "repo"
+            staged_repo = WORK / job_id / "repo"
             staged_repo.mkdir(parents=True, exist_ok=True)
             for package in payload["pkglist"]:
                 if "/" in package:
