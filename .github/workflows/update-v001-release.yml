@@ -1,0 +1,25 @@
+name: Update v0.0.1 release metadata
+
+on:
+  push:
+    branches: [codex/release-v001-standard]
+    paths:
+      - RELEASE_NOTES.md
+      - .github/workflows/update-v001-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release edit v0.0.1
+          --title "v0.0.1 — Architecture Standard"
+          --notes-file RELEASE_NOTES.md
+          --latest
