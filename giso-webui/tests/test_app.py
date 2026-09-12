@@ -272,16 +272,37 @@ class GisoWebTests(unittest.TestCase):
             {"Type": "volume", "Name": "work", "Destination": "/work"},
             {"Type": "bind", "Source": "/var/run/docker.sock", "Destination": "/var/run/docker.sock"},
         ]}])
-        command = module.build_command({"iso": "base.iso", "pkglist": []}, "job")
+        command = module.build_command({"iso": "base.iso", "platform": "asr9k",
+                                        "pkglist": []}, "job")
         self.assertNotIn("/var/run/docker.sock:/var/run/docker.sock", command)
         self.assertIn("/host/uploads:/uploads:ro", command)
 
     @patch("app.child_mount_args", return_value=[])
     def test_exr_xrv9k_options_are_forwarded(self, _mounts):
         (self.data / "base.iso").write_bytes(b"iso")
-        command = module.build_command({"iso": "base.iso", "pkglist": [], "optimize": True, "full_iso": True}, "xrv")
+        command = module.build_command({"iso": "base.iso", "platform": "xrv9k", "pkglist": [],
+                                        "optimize": True, "full_iso": True,
+                                        "skip_usb_image": True}, "xrv")
         self.assertIn("--optimize", command)
         self.assertIn("--full-iso", command)
+
+    def test_platform_matrix_is_exposed(self):
+        response = self.client.get("/api/platforms")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("asr9k", {item["id"] for item in response.get_json()})
+
+    @patch("app.child_mount_args", return_value=[])
+    def test_platform_is_inferred_and_invalid_option_rejected(self, _mounts):
+        (self.data / "ncs5500-mini-x.iso").write_bytes(b"iso")
+        with self.assertRaisesRegex(ValueError, "Full ISO"):
+            module.build_command({"iso": "ncs5500-mini-x.iso", "pkglist": [],
+                                  "full_iso": True}, "invalid")
+
+    @patch("app.child_mount_args", return_value=[])
+    def test_unknown_iso_requires_platform_selection(self, _mounts):
+        (self.data / "base.iso").write_bytes(b"iso")
+        with self.assertRaisesRegex(ValueError, "Select the platform"):
+            module.build_command({"iso": "base.iso", "pkglist": []}, "unknown")
 
     def test_build_progress_follows_real_log_milestones(self):
         module.jobs["job"] = {"log": "", "updated": 0, "progress": 3, "phase": "Preparing"}
@@ -298,7 +319,8 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "two").mkdir()
         (self.data / "one/package.rpm").write_bytes(b"same rpm")
         (self.data / "two/package.rpm").write_bytes(b"same rpm")
-        command = module.build_command({"iso": "base.iso", "pkglist": ["package.rpm"]}, "duplicate")
+        command = module.build_command({"iso": "base.iso", "platform": "asr9k",
+                                        "pkglist": ["package.rpm"]}, "duplicate")
         self.assertIn("package.rpm", command)
 
     @patch("app.child_mount_args", return_value=[])
@@ -309,7 +331,8 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "one/package.rpm").write_bytes(b"first")
         (self.data / "two/package.rpm").write_bytes(b"second")
         with self.assertRaises(ValueError):
-            module.build_command({"iso": "base.iso", "pkglist": ["package.rpm"]}, "conflict")
+            module.build_command({"iso": "base.iso", "platform": "asr9k",
+                                  "pkglist": ["package.rpm"]}, "conflict")
 
     def test_cleanup_keeps_uploads_and_completed_images(self):
         (self.data / "base.iso").write_bytes(b"keep")

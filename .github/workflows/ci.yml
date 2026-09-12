@@ -26,7 +26,7 @@ jobs:
       - name: Install test tools
         run: python -m pip install -r giso-webui/requirements.txt ruff pip-audit
       - name: Lint Python
-        run: ruff check giso-webui/app.py giso-webui/maintenance.py giso-webui/tests
+        run: ruff check giso-webui/app.py giso-webui/maintenance.py giso-webui/platform_validation.py giso-webui/tests staging scripts
       - name: Run tests
         working-directory: giso-webui
         run: python -B -m unittest discover -s tests -v
@@ -37,6 +37,10 @@ jobs:
       - name: Validate Compose configuration
         working-directory: giso-webui
         run: docker compose config -q
+      - name: Rehearse staged upgrade and rollback
+        run: python -B staging/rehearse.py
+      - name: Validate staging Compose configuration
+        run: docker compose -f staging/compose.yaml config -q
       - name: Build production container
         working-directory: giso-webui
         run: docker compose build giso-webui

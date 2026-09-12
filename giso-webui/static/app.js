@@ -64,6 +64,18 @@ async function loadInputs() {
   catch (error) { $('#error').textContent = error.message; }
 }
 
+async function loadPlatforms() {
+  try {
+    const select = $('[name=platform]');
+    const platforms = await api('/api/platforms');
+    platforms.forEach(platform => {
+      const option=document.createElement('option'); option.value=platform.id;
+      option.textContent=`${platform.label} · ${platform.architecture.toUpperCase()}${platform.usb ? ' · USB' : ' · no automatic USB'}`;
+      select.appendChild(option);
+    });
+  } catch (error) { $('#error').textContent=error.message; }
+}
+
 async function loadArchive() {
   try {
     const items = await api('/api/archive');
@@ -188,6 +200,7 @@ $('#build-form').addEventListener('submit', async event => {
   const yamlMode = form.get('mode') === 'yaml';
   const payload = {
     iso: form.get('iso_override') || form.get('iso'),
+    platform: form.get('platform') || '',
     yamlfile: yamlMode ? form.get('yamlfile') : '',
     label: form.get('label_override') || form.get('label'),
     pkglist: lines(form.get('pkglist_override') || form.get('pkglist') || ''),
@@ -297,4 +310,4 @@ $('#copy-log').onclick = () => navigator.clipboard.writeText($('#log').textConte
 $('#cancel-build').onclick = async () => { if (currentJob && confirm('Stop the build? Your uploaded files will be kept.')) { await api(`/api/jobs/${currentJob}`, {method:'DELETE'}); poll(); } };
 $('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; });
 
-health(); loadInputs(); loadArchive(); restoreJob();
+health(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();

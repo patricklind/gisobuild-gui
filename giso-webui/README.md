@@ -19,6 +19,10 @@ and a persistent artifact archive.
   `../.gisobuild-tool`
 - Properly licensed Cisco IOS XR ISO, RPM, and SMU files
 
+The expert form requires a recognizable ISO filename or an explicit platform
+family. It rejects architecture-specific option combinations before starting a
+build and shows whether upstream automatic USB output is expected.
+
 ## Start
 
 From the repository root:

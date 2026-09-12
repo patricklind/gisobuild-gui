@@ -18,6 +18,8 @@ from urllib.parse import urlsplit
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
+from platform_validation import PLATFORMS, validate_platform_options
+
 
 def validate_image_reference(value: str) -> str:
     if not value or len(value) > 512 or value.startswith("-") or any(char.isspace() for char in value):
@@ -198,7 +200,7 @@ def json_object() -> dict:
 
 def validate_build_payload(body: dict) -> dict:
     payload = dict(body)
-    for key in set(PATH_OPTIONS) | {"label"}:
+    for key in set(PATH_OPTIONS) | {"label", "platform"}:
         value = payload.get(key, "")
         if not isinstance(value, str):
             raise TypeError(f"{key} must be a string")
@@ -435,6 +437,8 @@ def build_command(payload: dict, job_id: str) -> list[str]:
         iso = payload.get("iso", "")
         if not iso:
             raise ValueError("Select an ISO, or provide a YAML file")
+        profile = validate_platform_options(payload)
+        payload["platform"] = profile["id"]
         command += ["--iso", str(safe_data_path(iso))]
         for key, option in PATH_OPTIONS.items():
             if key in {"iso", "yamlfile"}:
@@ -577,6 +581,11 @@ def health():
 @app.get("/api/inputs")
 def inputs():
     return jsonify(discover())
+
+
+@app.get("/api/platforms")
+def platforms():
+    return jsonify([{"id": key, **value} for key, value in PLATFORMS.items()])
 
 
 @app.get("/api/archive")

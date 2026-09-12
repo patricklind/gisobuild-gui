@@ -46,7 +46,7 @@
             <summary>Expert settings <small>– normally not required</small></summary>
             <div class="mode"><label><input type="radio" name="mode" value="form" checked> Normal form</label><label><input type="radio" name="mode" value="yaml"> Use YAML</label></div>
             <div id="form-mode">
-              <div class="grid two"><label>Base ISO<input name="iso_override" list="iso-files"></label><label>Image label<input name="label_override" pattern="[A-Za-z0-9_]+"></label></div>
+              <div class="grid three"><label>Base ISO<input name="iso_override" list="iso-files"></label><label>Platform family<select name="platform"><option value="">Detect from ISO filename</option></select></label><label>Image label<input name="label_override" pattern="[A-Za-z0-9_]+"></label></div>
               <label>RPM packages<textarea name="pkglist_override" rows="6"></textarea></label>
               <label>Bridging fixes<textarea name="bridging_fixes" rows="2"></textarea></label>
               <div class="grid three"><label>XR config<input name="xrconfig" list="all-files"></label><label>ZTP ini<input name="ztp_ini" list="all-files"></label><label>Boot-script<input name="script" list="all-files"></label></div>
@@ -84,6 +84,7 @@
     </section>
     <datalist id="iso-files"></datalist><datalist id="yaml-files"></datalist><datalist id="all-files"></datalist>
   </main>
+  <footer class="site-footer"><a href="https://github.com/patricklind/gisobuild-gui" target="_blank" rel="noopener noreferrer">patricklind/gisobuild-gui on GitHub</a></footer>
   <dialog id="upgrade-guide">
     <div class="dialog-head"><div><span class="eyebrow">CISCO IOS XR</span><h2>Golden ISO upgrade guide</h2></div><button id="close-guide" type="button" class="secondary small">Close</button></div>
     <div class="warning"><b>Use an approved maintenance window.</b> Verify the exact platform, source release, target release and supported upgrade path in Cisco documentation. Confirm console access, redundancy health, recovery media and a current configuration backup. The router may reload or restart processes.</div>

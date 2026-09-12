@@ -45,6 +45,12 @@ images, with some options restricted to one architecture. Examples include
 `--migration` for ASR 9000 migration builds, `--full-iso` for IOS XRv 9000,
 and `--skip-usb-image` or `--remove-packages` for LNT builds.
 
+The Web UI validates the eXR families declared by the upstream tool—ASR 9000,
+NCS 1000/1001/1004, NCS 5000/540/5500/560/6000, IOS XR whitebox, and XRv9K—plus
+the metadata-driven IOS XR7 families Cisco 8000/8800, NCS 1010/1014, NCS 540L,
+and NCS 5700. This catches obvious option mistakes; inspect ISO metadata with
+upstream `isols.py --dump-mdata` before using PID filtering.
+
 ### Installation command families
 
 | Router software family | Typical workflow | Important note |

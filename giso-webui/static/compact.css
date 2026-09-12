@@ -39,3 +39,4 @@ a:focus-visible,
 select:focus-visible { outline: 4px solid #72b7f1; outline-offset: 2px; }
 .disclaimer { margin: 0 0 12px; }
 .archive-policy { margin: 0 0 22px; }
+.site-footer{padding:0 22px 36px;text-align:center}.site-footer a{color:var(--blue);font-weight:700}
