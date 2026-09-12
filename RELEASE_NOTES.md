@@ -1,6 +1,6 @@
 # Release notes — v1.0.0
 
-First production-ready release of the Cisco IOS XR Golden ISO web interface.
+Initial versioned release candidate of the Cisco IOS XR Golden ISO web interface.
 
 ## Highlights
 

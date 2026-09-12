@@ -1,0 +1,7 @@
+config:
+  MD013: false # Tables, commands, hashes, and Mermaid labels may exceed 80 columns.
+  MD028: false # GitHub alert blocks are intentionally separated by blank lines.
+globs:
+  - "**/*.md"
+  - "!.gisobuild-tool/**"
+  - "!graphify-out/**"

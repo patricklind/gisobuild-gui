@@ -2,7 +2,8 @@
 
 ## Supported version
 
-Security fixes are applied to the latest commit on `main`.
+Security fixes are applied to the latest commit on `main`. Until versioned
+releases are published, no older commit or image is supported.
 
 ## Reporting a vulnerability
 
@@ -20,3 +21,23 @@ authorization, TLS, and stronger workload isolation.
 
 Cisco software images, RPMs, SMUs, generated Golden ISOs, and USB boot packages
 must not be committed to this repository.
+
+## Sensitive data
+
+Treat Cisco software, embedded router configurations, ownership vouchers, key
+requests, certificates, build logs, customer names, device identifiers, and
+archive checksums as potentially sensitive. Keep `.env` local and never include
+secrets in issues, pull requests, test fixtures, Graphify output, or releases.
+
+## Operational controls
+
+- Keep the default localhost bind and exact `ALLOWED_HOSTS` values.
+- Restrict access to the Docker host and its socket.
+- Store archives and backups only in approved locations; automatic retention is
+  not a secure-erasure guarantee for storage snapshots or external backups.
+- Verify Cisco-provided hashes, generated checksums, and the exact supported
+  upgrade path before a maintenance operation.
+- Review dependency, container, and workflow changes before deployment.
+
+See the [operations runbook](docs/operations.md) for backup, restore, logs, and
+safe failure handling.
