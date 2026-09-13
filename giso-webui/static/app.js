@@ -14,11 +14,68 @@ const api = (url, options = {}) => fetch(url, options).then(async response => {
   return body;
 });
 
+let pendingDialog = null;
+function showAppDialog({title, message, confirmText = 'Continue', cancelText = 'Cancel', danger = false, notice = false}) {
+  const dialog = $('#app-dialog');
+  const confirmButton = $('#app-dialog-confirm');
+  const cancelButton = $('#app-dialog-cancel');
+  const previousFocus = document.activeElement;
+
+  if (dialog.open && pendingDialog) {
+    const previousDialog = pendingDialog;
+    pendingDialog = null;
+    dialog.close('cancel');
+    previousDialog.resolve(false);
+  }
+  $('#app-dialog-eyebrow').textContent = notice ? 'NOTICE' : 'CONFIRM ACTION';
+  $('#app-dialog-title').textContent = title;
+  $('#app-dialog-message').textContent = message;
+  confirmButton.textContent = notice ? 'Close' : confirmText;
+  confirmButton.className = danger ? 'primary dialog-danger' : 'primary';
+  cancelButton.textContent = cancelText;
+  cancelButton.hidden = notice;
+  dialog.returnValue = 'cancel';
+
+  return new Promise(resolve => {
+    pendingDialog = {resolve, previousFocus};
+    dialog.showModal();
+    (danger ? cancelButton : confirmButton).focus();
+  });
+}
+
+function showNotice(title, message) {
+  return showAppDialog({title, message, notice: true});
+}
+
+function showConfirmation(title, message, confirmText, danger = false) {
+  return showAppDialog({title, message, confirmText, danger});
+}
+
+$('#app-dialog-confirm').onclick = () => $('#app-dialog').close('confirm');
+$('#app-dialog-cancel').onclick = () => $('#app-dialog').close('cancel');
+$('#app-dialog').addEventListener('cancel', event => {
+  event.preventDefault();
+  $('#app-dialog').close('cancel');
+});
+$('#app-dialog').addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    $('#app-dialog').close('cancel');
+  }
+});
+$('#app-dialog').addEventListener('close', () => {
+  if (!pendingDialog) return;
+  const {resolve, previousFocus} = pendingDialog;
+  pendingDialog = null;
+  resolve($('#app-dialog').returnValue === 'confirm');
+  if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+});
+
 async function copyText(value, button, resetText) {
   try {
     await navigator.clipboard.writeText(value);
     if (button) { button.textContent = 'Copied'; setTimeout(() => { button.textContent = resetText; }, 1200); }
-  } catch { alert('Clipboard access was denied. Select and copy the text manually.'); }
+  } catch { await showNotice('Could not copy', 'Clipboard access was denied. Select and copy the text manually.'); }
 }
 
 function setReadyCard(selector, ready, text) {
@@ -116,12 +173,12 @@ async function loadArchive() {
           const sums=await api(`/api/archive/${encodeURIComponent(item.job_id)}/${encodeURIComponent(item.name)}/checksums`);
           checksums.replaceChildren(checksumRow('MD5',sums.md5),checksumRow('SHA-256',sums.sha256));
           showChecksums.remove();
-        } catch(error){ showChecksums.disabled=false; showChecksums.textContent='Show MD5 / SHA-256'; alert(error.message); }
+        } catch(error){ showChecksums.disabled=false; showChecksums.textContent='Show MD5 / SHA-256'; await showNotice('Could not calculate checksums', error.message); }
       };
       remove.onclick=async()=>{
-        if(!confirm(`Permanently delete this GISO artifact?\n\n${item.name}\n\nThis cannot be undone.`)) return;
+        if(!await showConfirmation('Delete archived artifact?', `${item.name}\n\nThis permanently deletes the selected GISO artifact and cannot be undone.`, 'Delete artifact', true)) return;
         try { await api(`/api/archive/${encodeURIComponent(item.job_id)}/${encodeURIComponent(item.name)}`,{method:'DELETE'}); await loadArchive(); }
-        catch(error){ alert(error.message); }
+        catch(error){ await showNotice('Could not delete artifact', error.message); }
       };
       const actions=document.createElement('div'); actions.className='archive-actions'; actions.append(guide,showChecksums,remove);
       link.append(name,meta); row.append(link,actions,checksums); list.appendChild(row);
@@ -233,7 +290,7 @@ $('#build-form').addEventListener('submit', async event => {
   event.target.querySelectorAll('input[type=checkbox]').forEach(box => { payload[box.name] = box.checked; });
   const usbText = payload.skip_usb_image ? 'No USB boot image was requested.' : 'A USB boot image is retained when the selected platform produces one.';
   const message = `Start the build with ${payload.pkglist.length} updates?\n\nAfter a successful build, the verified Golden ISO will be kept. ${usbText} Uploaded source files and other build output will be permanently removed.`;
-  if (!confirm(message)) return;
+  if (!await showConfirmation('Start Golden ISO build?', message, 'Start build')) return;
   const button = $('#start-build'); button.disabled = true; button.textContent = 'Starting…';
   try { const result = await api('/api/jobs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }); currentJob = result.id; poll(); }
   catch (error) { $('#error').textContent = error.message; updateBuildAvailability(); }
@@ -340,17 +397,22 @@ $('#copy-rollback-guide').onclick = async () => {
   await copyText(commands, $('#copy-rollback-guide'), 'Copy rollback commands');
 };
 $('#cleanup').onclick = async () => {
-  if (!confirm('Remove all uploaded source files, partial uploads, build working files, and raw output?\n\nCompleted ISO and USB files in the GISO Archive will be kept.')) return;
+  if (!await showConfirmation('Clear workspace files?', 'Remove all uploaded source files, partial uploads, build working files, and raw output?\n\nCompleted ISO and USB files in the GISO Archive will be kept.', 'Clear workspace', true)) return;
   try {
     const result = await api('/api/cleanup', {method:'POST'});
     const mb = (result.removed_bytes / 1048576).toFixed(1);
     const areas = result.removed || {};
-    alert(`Cleanup complete. ${result.removed_items} items (${mb} MB) removed.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
+    await showNotice('Workspace cleanup complete', `${result.removed_items} items (${mb} MB) removed.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
     currentJob = null; pollActivity();
-  } catch (error) { alert(error.message); }
+  } catch (error) { await showNotice('Could not clear workspace', error.message); }
 };
 $('#copy-log').onclick = () => copyText($('#log').textContent, $('#copy-log'), 'Copy log');
-$('#cancel-build').onclick = async () => { if (currentJob && confirm('Stop the build? Your uploaded files will be kept.')) { await api(`/api/jobs/${currentJob}`, {method:'DELETE'}); poll(); } };
+$('#cancel-build').onclick = async () => {
+  if (currentJob && await showConfirmation('Stop current build?', 'The active build will be stopped. Your uploaded source files will be kept.', 'Stop build', true)) {
+    try { await api(`/api/jobs/${currentJob}`, {method:'DELETE'}); poll(); }
+    catch (error) { await showNotice('Could not stop build', error.message); }
+  }
+};
 $('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; });
 
 health(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();

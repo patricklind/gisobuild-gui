@@ -36,6 +36,12 @@ dialog::backdrop { background: #0f172a99; }
 select { width: 100%; min-height: 44px; margin-top: 5px; border: 2px solid var(--line); border-radius: 7px; padding: 9px; background: #fff; color: var(--text); font: inherit; }
 .dialog-actions { align-items: center; border-top: 1px solid var(--line); padding-top: 16px; }
 .dialog-actions a { color: var(--blue); font-weight: 700; }
+.app-dialog { width: min(520px, calc(100vw - 32px)); }
+.app-dialog-message { margin: 0 0 22px; color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }
+.app-dialog-actions { justify-content: flex-end; }
+.dialog-danger { background: var(--red); }
+.dialog-danger:hover { background: #8f1821; }
+.dialog-danger:focus-visible { outline: 4px solid #f3a5aa; outline-offset: 2px; }
 .danger:focus-visible,
 .delete-archive:focus-visible,
 a:focus-visible,
