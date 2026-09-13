@@ -240,7 +240,8 @@ class GisoWebTests(unittest.TestCase):
 
     def test_job_history_survives_store_reload(self):
         module.jobs["saved"] = {"id": "saved", "status": "success", "created": 1,
-                                "updated": 2, "finished": 2, "log": "complete",
+                                "updated": 2, "finished": 2,
+                                "log": "completed /uploads/private.iso",
                                 "artifacts": [{"path": "golden.iso", "size": 3}],
                                 "command": ["private"], "payload": {"iso": "private.iso"}}
         module.persist_job("saved")
@@ -248,7 +249,7 @@ class GisoWebTests(unittest.TestCase):
         module.store_initialized = False
         module.initialize_job_store()
         self.assertEqual(module.jobs["saved"]["status"], "success")
-        self.assertEqual(module.jobs["saved"]["log"], "complete")
+        self.assertEqual(module.jobs["saved"]["log"], "completed [artifact]")
         self.assertNotIn("command", module.jobs["saved"])
         self.assertNotIn("payload", module.jobs["saved"])
 
