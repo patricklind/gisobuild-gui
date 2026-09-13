@@ -589,28 +589,6 @@
       "source_location": "L692"
     },
     {
-      "id": "giso_webui_app_build_command",
-      "label": "build_command()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "file_type": "code",
-      "norm_label": "build_command()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L539"
-    },
-    {
-      "id": "giso_webui_app_child_mount_args",
-      "label": "child_mount_args()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "file_type": "code",
-      "norm_label": "child_mount_args()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L511"
-    },
-    {
       "id": "giso_webui_app_discover",
       "label": "discover()",
       "_callable": true,
@@ -675,17 +653,6 @@
       "norm_label": "file_checksums()",
       "source_file": "giso-webui/app.py",
       "source_location": "L292"
-    },
-    {
-      "id": "giso_webui_app_file_sha256",
-      "label": "file_sha256()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "file_type": "code",
-      "norm_label": "file_sha256()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L284"
     },
     {
       "id": "giso_webui_app_get_job",
@@ -1502,37 +1469,70 @@
       "source_location": "L389"
     },
     {
-      "id": "staging_rehearse_run",
-      "label": "run()",
+      "id": "giso_webui_app_build_command",
+      "label": "build_command()",
       "_callable": true,
       "_origin": "ast",
       "community": 5,
       "file_type": "code",
-      "norm_label": "run()",
-      "source_file": "staging/rehearse.py",
-      "source_location": "L7"
+      "norm_label": "build_command()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L539"
     },
     {
-      "id": "staging_xr_simulator_execute",
-      "label": "execute()",
+      "id": "giso_webui_app_child_mount_args",
+      "label": "child_mount_args()",
       "_callable": true,
       "_origin": "ast",
       "community": 5,
       "file_type": "code",
-      "norm_label": "execute()",
-      "source_file": "staging/xr_simulator.py",
-      "source_location": "L13"
+      "norm_label": "child_mount_args()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L511"
     },
     {
-      "id": "staging_xr_simulator_main",
-      "label": "main()",
+      "id": "giso_webui_app_file_sha256",
+      "label": "file_sha256()",
       "_callable": true,
       "_origin": "ast",
       "community": 5,
       "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "staging/xr_simulator.py",
-      "source_location": "L51"
+      "norm_label": "file_sha256()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L284"
+    },
+    {
+      "id": "giso_webui_platform_validation_infer_platform",
+      "label": "infer_platform()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 5,
+      "file_type": "code",
+      "norm_label": "infer_platform()",
+      "source_file": "giso-webui/platform_validation.py",
+      "source_location": "L44"
+    },
+    {
+      "id": "giso_webui_platform_validation_normalize_platform",
+      "label": "normalize_platform()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 5,
+      "file_type": "code",
+      "norm_label": "normalize_platform()",
+      "source_file": "giso-webui/platform_validation.py",
+      "source_location": "L36"
+    },
+    {
+      "id": "giso_webui_platform_validation_validate_platform_options",
+      "label": "validate_platform_options()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 5,
+      "file_type": "code",
+      "norm_label": "validate_platform_options()",
+      "source_file": "giso-webui/platform_validation.py",
+      "source_location": "L56"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_browser_prompts_use_the_in_app_dialog",
@@ -1554,7 +1554,18 @@
       "file_type": "code",
       "norm_label": ".test_build_container_does_not_mount_entire_project()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L54"
+      "source_location": "L63"
+    },
+    {
+      "id": "giso_webui_tests_test_build_script_buildscripttests_test_cisco_theme_is_loaded_last",
+      "label": ".test_cisco_theme_is_loaded_last()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 6,
+      "file_type": "code",
+      "norm_label": ".test_cisco_theme_is_loaded_last()",
+      "source_file": "giso-webui/tests/test_build_script.py",
+      "source_location": "L21"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_clean_rejects_traversal_outside_standard_output",
@@ -1565,7 +1576,7 @@
       "file_type": "code",
       "norm_label": ".test_clean_rejects_traversal_outside_standard_output()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L21"
+      "source_location": "L30"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_real_iso_runner_rejects_non_local_url",
@@ -1576,40 +1587,40 @@
       "file_type": "code",
       "norm_label": ".test_real_iso_runner_rejects_non_local_url()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L58"
+      "source_location": "L67"
     },
     {
-      "id": "giso_webui_platform_validation_infer_platform",
-      "label": "infer_platform()",
+      "id": "staging_rehearse_run",
+      "label": "run()",
       "_callable": true,
       "_origin": "ast",
-      "community": 8,
+      "community": 7,
       "file_type": "code",
-      "norm_label": "infer_platform()",
-      "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L44"
+      "norm_label": "run()",
+      "source_file": "staging/rehearse.py",
+      "source_location": "L7"
     },
     {
-      "id": "giso_webui_platform_validation_normalize_platform",
-      "label": "normalize_platform()",
+      "id": "staging_xr_simulator_execute",
+      "label": "execute()",
       "_callable": true,
       "_origin": "ast",
-      "community": 8,
+      "community": 7,
       "file_type": "code",
-      "norm_label": "normalize_platform()",
-      "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L36"
+      "norm_label": "execute()",
+      "source_file": "staging/xr_simulator.py",
+      "source_location": "L13"
     },
     {
-      "id": "giso_webui_platform_validation_validate_platform_options",
-      "label": "validate_platform_options()",
+      "id": "staging_xr_simulator_main",
+      "label": "main()",
       "_callable": true,
       "_origin": "ast",
-      "community": 8,
+      "community": 7,
       "file_type": "code",
-      "norm_label": "validate_platform_options()",
-      "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L56"
+      "norm_label": "main()",
+      "source_file": "staging/xr_simulator.py",
+      "source_location": "L51"
     },
     {
       "id": "giso_webui_tests_test_app_gisowebtests_test_chunked_upload_and_safe_tar_extraction",
@@ -1779,16 +1790,6 @@
       "norm_label": "validate a client filename without silently rewriting path components.",
       "source_file": "giso-webui/app.py",
       "source_location": "L428"
-    },
-    {
-      "id": "giso_webui_app_rationale_512",
-      "label": "Share only required storage with the build container, never docker.sock.",
-      "_origin": "ast",
-      "community": 1,
-      "file_type": "rationale",
-      "norm_label": "share only required storage with the build container, never docker.sock.",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L512"
     },
     {
       "id": "scripts_e2e_real_iso_py_path",
@@ -2070,44 +2071,34 @@
       "source_location": ""
     },
     {
-      "id": "staging_rehearse",
-      "label": "rehearse.py",
+      "id": "giso_webui_platform_validation",
+      "label": "platform_validation.py",
       "_origin": "ast",
       "community": 5,
       "file_type": "code",
-      "norm_label": "rehearse.py",
-      "source_file": "staging/rehearse.py",
+      "norm_label": "platform_validation.py",
+      "source_file": "giso-webui/platform_validation.py",
       "source_location": "L1"
     },
     {
-      "id": "staging_xr_simulator",
-      "label": "xr_simulator.py",
+      "id": "giso_webui_app_rationale_512",
+      "label": "Share only required storage with the build container, never docker.sock.",
       "_origin": "ast",
       "community": 5,
-      "file_type": "code",
-      "norm_label": "xr_simulator.py",
-      "source_file": "staging/xr_simulator.py",
+      "file_type": "rationale",
+      "norm_label": "share only required storage with the build container, never docker.sock.",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L512"
+    },
+    {
+      "id": "giso_webui_platform_validation_rationale_1",
+      "label": "Platform-aware validation for Cisco IOS XR GISO build options.",
+      "_origin": "ast",
+      "community": 5,
+      "file_type": "rationale",
+      "norm_label": "platform-aware validation for cisco ios xr giso build options.",
+      "source_file": "giso-webui/platform_validation.py",
       "source_location": "L1"
-    },
-    {
-      "id": "staging_rehearse_rationale_2",
-      "label": "Verify upgrade and rollback state transitions against the XR simulator.",
-      "_origin": "ast",
-      "community": 5,
-      "file_type": "rationale",
-      "norm_label": "verify upgrade and rollback state transitions against the xr simulator.",
-      "source_file": "staging/rehearse.py",
-      "source_location": "L2"
-    },
-    {
-      "id": "staging_xr_simulator_rationale_2",
-      "label": "Non-networked IOS XR transaction simulator for rehearsal only.",
-      "_origin": "ast",
-      "community": 5,
-      "file_type": "rationale",
-      "norm_label": "non-networked ios xr transaction simulator for rehearsal only.",
-      "source_file": "staging/xr_simulator.py",
-      "source_location": "L2"
     },
     {
       "id": "giso_webui_tests_test_build_script",
@@ -2120,10 +2111,50 @@
       "source_location": "L1"
     },
     {
+      "id": "staging_rehearse",
+      "label": "rehearse.py",
+      "_origin": "ast",
+      "community": 7,
+      "file_type": "code",
+      "norm_label": "rehearse.py",
+      "source_file": "staging/rehearse.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "staging_xr_simulator",
+      "label": "xr_simulator.py",
+      "_origin": "ast",
+      "community": 7,
+      "file_type": "code",
+      "norm_label": "xr_simulator.py",
+      "source_file": "staging/xr_simulator.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "staging_rehearse_rationale_2",
+      "label": "Verify upgrade and rollback state transitions against the XR simulator.",
+      "_origin": "ast",
+      "community": 7,
+      "file_type": "rationale",
+      "norm_label": "verify upgrade and rollback state transitions against the xr simulator.",
+      "source_file": "staging/rehearse.py",
+      "source_location": "L2"
+    },
+    {
+      "id": "staging_xr_simulator_rationale_2",
+      "label": "Non-networked IOS XR transaction simulator for rehearsal only.",
+      "_origin": "ast",
+      "community": 7,
+      "file_type": "rationale",
+      "norm_label": "non-networked ios xr transaction simulator for rehearsal only.",
+      "source_file": "staging/xr_simulator.py",
+      "source_location": "L2"
+    },
+    {
       "id": "build_giso",
       "label": "build-giso.sh",
       "_origin": "ast",
-      "community": 7,
+      "community": 8,
       "file_type": "code",
       "metadata": {
         "language": "bash",
@@ -2137,7 +2168,7 @@
       "id": "build_giso_die",
       "label": "die()",
       "_origin": "ast",
-      "community": 7,
+      "community": 8,
       "file_type": "code",
       "metadata": {
         "language": "bash",
@@ -2151,7 +2182,7 @@
       "id": "build_giso_md5_file",
       "label": "md5_file()",
       "_origin": "ast",
-      "community": 7,
+      "community": 8,
       "file_type": "code",
       "metadata": {
         "language": "bash",
@@ -2165,7 +2196,7 @@
       "id": "build_giso_sh__entry",
       "label": "build-giso.sh script",
       "_origin": "ast",
-      "community": 7,
+      "community": 8,
       "file_type": "code",
       "metadata": {
         "language": "bash",
@@ -2179,7 +2210,7 @@
       "id": "build_giso_usage",
       "label": "usage()",
       "_origin": "ast",
-      "community": 7,
+      "community": 8,
       "file_type": "code",
       "metadata": {
         "language": "bash",
@@ -2188,26 +2219,6 @@
       "norm_label": "usage()",
       "source_file": "build-giso.sh",
       "source_location": "L14"
-    },
-    {
-      "id": "giso_webui_platform_validation",
-      "label": "platform_validation.py",
-      "_origin": "ast",
-      "community": 8,
-      "file_type": "code",
-      "norm_label": "platform_validation.py",
-      "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "giso_webui_platform_validation_rationale_1",
-      "label": "Platform-aware validation for Cisco IOS XR GISO build options.",
-      "_origin": "ast",
-      "community": 8,
-      "file_type": "rationale",
-      "norm_label": "platform-aware validation for cisco ios xr giso build options.",
-      "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L1"
     }
   ],
   "links": [
@@ -5908,7 +5919,7 @@
     },
     {
       "source": "giso_webui_tests_test_build_script_buildscripttests",
-      "target": "giso_webui_tests_test_build_script_buildscripttests_test_clean_rejects_traversal_outside_standard_output",
+      "target": "giso_webui_tests_test_build_script_buildscripttests_test_cisco_theme_is_loaded_last",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -5919,13 +5930,24 @@
     },
     {
       "source": "giso_webui_tests_test_build_script_buildscripttests",
+      "target": "giso_webui_tests_test_build_script_buildscripttests_test_clean_rejects_traversal_outside_standard_output",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_build_script.py",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_build_script_buildscripttests",
       "target": "giso_webui_tests_test_build_script_buildscripttests_test_build_container_does_not_mount_entire_project",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L54",
+      "source_location": "L63",
       "weight": 1.0
     },
     {
@@ -5936,7 +5958,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L58",
+      "source_location": "L67",
       "weight": 1.0
     },
     {
@@ -6121,5 +6143,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "c1a30682b498e5d77fbdf54290fbcc17acadf73e"
+  "built_at_commit": "5a0ffca1d026eb4fa9cfc50370f230bee85eae18"
 }

@@ -18,6 +18,15 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn('id="app-dialog"', template)
         self.assertIn('aria-describedby="app-dialog-message"', template)
 
+    def test_cisco_theme_is_loaded_last(self):
+        web_root = Path(__file__).parents[1]
+        template = (web_root / "templates" / "index.html").read_text()
+        theme = (web_root / "static" / "cisco-theme.css").read_text()
+
+        self.assertLess(template.index("compact.css"), template.index("cisco-theme.css"))
+        self.assertIn("--navy: #0d2740", theme)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", theme)
+
     def test_clean_rejects_traversal_outside_standard_output(self):
         bash = shutil.which("bash")
         if not bash:
