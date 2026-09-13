@@ -221,6 +221,32 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.post("/api/cleanup", headers={"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(response.status_code, 403)
 
+    def test_browser_security_headers_are_complete(self):
+        response = self.client.get("/")
+        policy = response.headers["Content-Security-Policy"]
+        self.assertIn("connect-src 'self'", policy)
+        self.assertIn("form-action 'self'", policy)
+        self.assertIn("worker-src 'none'", policy)
+        self.assertEqual(response.headers["Cross-Origin-Opener-Policy"], "same-origin")
+        self.assertEqual(response.headers["X-Permitted-Cross-Domain-Policies"], "none")
+
+    @patch("app.build_command", side_effect=RuntimeError("/secret/internal/path"))
+    def test_build_setup_error_does_not_expose_internal_details(self, _build):
+        response = self.client.post("/api/jobs", json={})
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("/secret", response.get_json()["error"])
+
+    def test_tar_read_error_does_not_expose_internal_details(self):
+        response = self.client.post(
+            "/api/uploads/init", json={"name": "bundle.tar", "size": 3}
+        )
+        upload_id = response.get_json()["id"]
+        self.client.put(f"/api/uploads/{upload_id}?offset=0", data=b"bad")
+        with patch("app.tarfile.open", side_effect=OSError("/secret/internal/path")):
+            response = self.client.post(f"/api/uploads/{upload_id}/complete")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "Tar archive could not be read safely")
+
     def test_build_payload_types_are_validated(self):
         response = self.client.post("/api/jobs", json={"iso": ["base.iso"], "pkglist": []})
         self.assertEqual(response.status_code, 400)
@@ -547,6 +573,7 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.get_json()["ok"])
+        self.assertNotIn("image", response.get_json())
 
     @patch("app.subprocess.run")
     def test_image_pull_timeout_marks_build_failed(self, run):
@@ -612,7 +639,9 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.get("/api/archive/job/golden.iso/checksums")
         self.assertEqual(response.status_code, 200)
         result = response.get_json()
-        self.assertEqual(result["md5"], hashlib.md5(content).hexdigest())
+        self.assertEqual(
+            result["md5"], hashlib.md5(content, usedforsecurity=False).hexdigest()
+        )
         self.assertEqual(result["sha256"], hashlib.sha256(content).hexdigest())
 
 

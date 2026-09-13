@@ -470,7 +470,7 @@ def discover() -> dict:
         if not any(rpm.parent.name.startswith(identifier) for identifier in superseded):
             recommended.append(rpm.name)
     return {"files": sorted(files, key=lambda x: x["path"]), "dirs": sorted(dirs),
-            "image": IMAGE, "recommended": sorted(set(recommended)),
+            "recommended": sorted(set(recommended)),
             "superseded": sorted(superseded)}
 
 
@@ -665,12 +665,18 @@ def activity():
 
 @app.after_request
 def security_headers(response):
-    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        "connect-src 'self'; form-action 'self'; object-src 'none'; base-uri 'none'; "
+        "frame-ancestors 'none'; worker-src 'none'; manifest-src 'none'"
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
     if request.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     request_id = getattr(g, "request_id", uuid.uuid4().hex[:12])
@@ -733,7 +739,7 @@ def health():
         "storage": all(path.is_dir() for path in (DATA, OUTPUT, WORK, ARCHIVE, STATE)),
     }
     ready = all(checks.values())
-    return jsonify(ok=ready, **checks, image=IMAGE), 200 if ready else 503
+    return jsonify(ok=ready, **checks), 200 if ready else 503
 
 
 @app.get("/api/inputs")
@@ -945,11 +951,17 @@ def upload_complete(upload_id: str):
                         raise ValueError("Links are not accepted in uploaded tar archives")
                 archive.extractall(destination, members=members, filter="data")
                 extracted = sum(1 for member in members if member.isfile())
-    except (tarfile.TarError, OSError, ValueError) as exc:
+    except ValueError as exc:
         if target.name.lower().endswith((".tar", ".tgz")):
             shutil.rmtree(destination, ignore_errors=True)
         target.unlink(missing_ok=True)
         return jsonify(error=f"Tar archive rejected: {exc}"), 400
+    except (tarfile.TarError, OSError) as exc:
+        if target.name.lower().endswith((".tar", ".tgz")):
+            shutil.rmtree(destination, ignore_errors=True)
+        target.unlink(missing_ok=True)
+        log_event("upload_archive_failed", error_type=type(exc).__name__, upload_id=upload_id)
+        return jsonify(error="Tar archive could not be read safely"), 400
     finally:
         with upload_lock:
             uploads.pop(upload_id, None)
@@ -1015,7 +1027,8 @@ def create_job():
         except Exception as exc:  # noqa: BLE001 - setup failures become a stable API error
             with job_lock:
                 jobs.pop(job_id, None)
-            return jsonify(error=f"Build setup failed: {exc}"), 503
+            log_event("build_setup_failed", error_type=type(exc).__name__, job_id=job_id)
+            return jsonify(error="Build setup failed; inspect the service log using the request ID"), 503
         with job_lock:
             jobs[job_id].update(status="running", progress=3, phase="Preparing build container", command=command)
         with store_lock, sqlite3.connect(JOB_DB) as database:
