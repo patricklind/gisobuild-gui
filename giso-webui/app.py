@@ -70,6 +70,7 @@ MAX_JOB_HISTORY = int(os.environ.get("MAX_JOB_HISTORY", "100"))
 ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
 MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
 UPLOAD_SESSION_TTL = int(os.environ.get("UPLOAD_SESSION_TTL", str(24 * 60 * 60)))
+GISO_PULL_TIMEOUT_SECONDS = int(os.environ.get("GISO_PULL_TIMEOUT_SECONDS", "600"))
 ALLOWED_HOSTS = {host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(",") if host.strip()}
 ACTIVE_JOB_STATUSES = {"queued", "running", "cancelling"}
 MIN_FREE_BYTES = 512 * 1024**2
@@ -77,7 +78,7 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_CHUNK_BYTES
 
 if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
        MAX_LOG_BYTES, MAX_JOB_HISTORY, ARCHIVE_RETENTION_DAYS, MAX_ARCHIVE_BYTES,
-       UPLOAD_SESSION_TTL) <= 0 or not ALLOWED_HOSTS:
+       UPLOAD_SESSION_TTL, GISO_PULL_TIMEOUT_SECONDS) <= 0 or not ALLOWED_HOSTS:
     raise RuntimeError("Upload, extraction, tar, chunk and log limits must be positive")
 
 PRIVATE_JOB_FIELDS = {"command", "payload", "container_pid"}
@@ -284,7 +285,7 @@ def archive_timestamp(path: Path) -> float:
     return max((item.stat().st_mtime for item in artifacts), default=path.stat().st_mtime)
 
 
-def enforce_archive_policy() -> list[str]:
+def enforce_archive_policy(*, protected_job_id: str | None = None) -> list[str]:
     """Remove expired archive jobs, then oldest jobs until the archive fits its quota."""
     removed: list[str] = []
     cutoff = time.time() - ARCHIVE_RETENTION_DAYS * 86400
@@ -293,6 +294,8 @@ def enforce_archive_policy() -> list[str]:
             return removed
         job_dirs = [path for path in ARCHIVE.iterdir() if path.is_dir()]
         for job_dir in job_dirs:
+            if job_dir.name == protected_job_id:
+                continue
             if archive_timestamp(job_dir) < cutoff:
                 shutil.rmtree(job_dir)
                 removed.append(job_dir.name)
@@ -302,7 +305,10 @@ def enforce_archive_policy() -> list[str]:
         )
         total = sum(archive_size(path) for path in remaining)
         while total > MAX_ARCHIVE_BYTES and remaining:
-            oldest = remaining.pop(0)
+            oldest = next((path for path in remaining if path.name != protected_job_id), None)
+            if oldest is None:
+                break
+            remaining.remove(oldest)
             total -= archive_size(oldest)
             shutil.rmtree(oldest)
             removed.append(oldest.name)
@@ -339,7 +345,9 @@ def archive_giso_artifacts_and_cleanup(job_id: str, job_dir: Path) -> list[dict]
                     raise RuntimeError(f"Archive verification failed for {source.name}")
                 archived.append({"path": source.name, "size": destination.stat().st_size,
                                  "url": f"/archive/{job_id}/{source.name}"})
-            enforce_archive_policy()
+            enforce_archive_policy(protected_job_id=job_id)
+            if not archive_dir.is_dir():
+                raise RuntimeError("The completed GISO archive could not be retained")
         except Exception:
             shutil.rmtree(archive_dir, ignore_errors=True)
             raise
@@ -551,6 +559,7 @@ def run_job(job_id: str, command: list[str]) -> None:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            timeout=GISO_PULL_TIMEOUT_SECONDS,
         )
         if pull.stdout:
             append_log(job_id, pull.stdout)
@@ -668,7 +677,8 @@ def health():
         "tool": (TOOL / "src/gisobuild.py").is_file(),
         "storage": all(path.is_dir() for path in (DATA, OUTPUT, WORK, ARCHIVE, STATE)),
     }
-    return jsonify(ok=all(checks.values()), **checks, image=IMAGE)
+    ready = all(checks.values())
+    return jsonify(ok=ready, **checks, image=IMAGE), 200 if ready else 503
 
 
 @app.get("/api/inputs")

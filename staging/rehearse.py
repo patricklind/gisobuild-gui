@@ -19,6 +19,6 @@ for command in ("show version", "show platform", "show redundancy",
                 "show version", "install commit"):
     run(command)
 
-assert state["version"] == "7.9.2"
-assert state["committed"] == "7.9.2"
+if state["version"] != "7.9.2" or state["committed"] != "7.9.2":
+    raise SystemExit(f"FAILED: rollback did not restore the committed release: {state}")
 print("PASS: full staged upgrade and rollback rehearsal")

@@ -498,6 +498,42 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(old_job.exists())
         self.assertTrue(new_job.exists())
 
+    def test_new_archive_is_protected_when_quota_evicts_existing_job(self):
+        existing_job = module.ARCHIVE / "existing-job"
+        existing_job.mkdir()
+        existing_iso = existing_job / "golden.iso"
+        existing_iso.write_bytes(b"123456")
+        job_dir = self.output / "new-job"
+        job_dir.mkdir()
+        new_iso = job_dir / "new-golden.iso"
+        new_iso.write_bytes(b"abcdef")
+        old_time = time.time() - 31 * 86400
+        os.utime(new_iso, (old_time, old_time))
+        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
+                patch.object(module, "MAX_ARCHIVE_BYTES", 10):
+            artifacts = module.archive_giso_artifacts_and_cleanup("new-job", job_dir)
+        self.assertEqual(artifacts[0]["path"], "new-golden.iso")
+        self.assertTrue((module.ARCHIVE / "new-job/new-golden.iso").exists())
+        self.assertFalse(existing_job.exists())
+
+    @patch("app.subprocess.run")
+    def test_health_returns_service_unavailable_when_dependency_is_down(self, run):
+        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "info"], 5)
+        response = self.client.get("/api/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.get_json()["ok"])
+
+    @patch("app.subprocess.run")
+    def test_image_pull_timeout_marks_build_failed(self, run):
+        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "pull"], 10)
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "log": "", "progress": 3,
+                              "phase": "Preparing", "artifacts": []}
+        with patch.object(module, "GISO_PULL_TIMEOUT_SECONDS", 10):
+            module.run_job("job", [module.DOCKER_BIN, "run"])
+        self.assertEqual(module.jobs["job"]["status"], "failed")
+        self.assertEqual(run.call_args.kwargs["timeout"], 10)
+
     def test_oversized_new_archive_is_rejected_without_cleanup(self):
         job_dir = self.output / "large-job"
         job_dir.mkdir()
