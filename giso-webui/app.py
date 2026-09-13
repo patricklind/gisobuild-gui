@@ -90,6 +90,35 @@ def log_event(event: str, **fields: object) -> None:
     app.logger.info("event=%s%s", event, f" {details}" if details else "")
 
 
+ARTIFACT_TOKEN = re.compile(
+    r"(?<!\w)[^\s\"'=]+?\.(?:iso|rpm|zip|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt)(?!\w)",
+    re.IGNORECASE,
+)
+
+
+def safe_log_text(text: str) -> str:
+    """Remove licensed or sensitive artifact names from operator-visible logs."""
+    return ARTIFACT_TOKEN.sub("[artifact]", text)
+
+
+def append_activity(text: str) -> None:
+    timestamp = time.strftime("%H:%M:%S")
+    entry = f"[{timestamp}] {safe_log_text(text).strip()}"
+    STATE.mkdir(parents=True, exist_ok=True)
+    with store_lock, sqlite3.connect(JOB_DB) as database:
+        database.execute(
+            "CREATE TABLE IF NOT EXISTS activity "
+            "(id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL NOT NULL, text TEXT NOT NULL)"
+        )
+        database.execute(
+            "INSERT INTO activity (created, text) VALUES (?, ?)", (time.time(), entry)
+        )
+        database.execute(
+            "DELETE FROM activity WHERE id NOT IN "
+            "(SELECT id FROM activity ORDER BY id DESC LIMIT 500)"
+        )
+
+
 def public_job(job: dict, *, include_log: bool = True) -> dict:
     private = PRIVATE_JOB_FIELDS | (set() if include_log else {"log"})
     return {key: value for key, value in job.items() if key not in private}
@@ -106,6 +135,10 @@ def initialize_job_store() -> None:
             database.execute(
                 "CREATE TABLE IF NOT EXISTS jobs "
                 "(id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"
+            )
+            database.execute(
+                "CREATE TABLE IF NOT EXISTS activity "
+                "(id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL NOT NULL, text TEXT NOT NULL)"
             )
             rows = database.execute(
                 "SELECT id, data FROM jobs ORDER BY updated DESC LIMIT ?", (MAX_JOB_HISTORY,)
@@ -433,6 +466,7 @@ def discover() -> dict:
 
 
 def append_log(job_id: str, text: str) -> None:
+    text = safe_log_text(text)
     phase_change = None
     with job_lock:
         jobs[job_id]["log"] += text
@@ -459,6 +493,9 @@ def append_log(job_id: str, text: str) -> None:
     if phase_change:
         log_event("build_progress", job_id=job_id, progress=phase_change[0],
                   phase=json.dumps(phase_change[1]))
+    for line in text.splitlines():
+        if line.strip():
+            app.logger.info("event=build_output job_id=%s message=%s", job_id, line)
     persist_job(job_id, min_interval=1.0)
 
 
@@ -606,6 +643,15 @@ def run_job(job_id: str, command: list[str]) -> None:
 @app.get("/")
 def index():
     return render_template("index.html")
+
+
+@app.get("/api/activity")
+def activity():
+    with store_lock, sqlite3.connect(JOB_DB) as database:
+        rows = database.execute(
+            "SELECT text FROM activity ORDER BY id ASC LIMIT 500"
+        ).fetchall()
+    return jsonify(log="\n".join(row[0] for row in rows))
 
 
 @app.after_request
@@ -759,6 +805,10 @@ def cleanup():
             removed_by_area[area] = area_items
         log_event("workspace_cleanup", removed_bytes=removed_bytes,
                   removed_items=removed_items, **removed_by_area)
+        append_activity(
+            f"Workspace cleanup completed: {removed_items} top-level items and "
+            f"{removed_bytes} bytes removed; completed archives were kept."
+        )
     return jsonify(ok=True, removed_bytes=removed_bytes, removed_items=removed_items,
                    removed=removed_by_area,
                    message="Uploads, partial files, build work, and raw output were removed. Archived images were kept.")
@@ -794,6 +844,7 @@ def upload_init():
             uploads[upload_id] = {"name": name, "size": size, "received": 0,
                                   "temp": str(temp), "updated": time.time()}
     log_event("upload_started", bytes=size, upload_id=upload_id)
+    append_activity(f"Upload started: {size} bytes expected.")
     return jsonify(id=upload_id)
 
 
@@ -818,6 +869,15 @@ def upload_chunk(upload_id: str):
             handle.write(chunk)
         item["received"] += len(chunk)
         item["updated"] = time.time()
+        percent = item["received"] * 100 // item["size"]
+        previous = item.get("reported_percent", -10)
+        if percent >= previous + 10 or item["received"] == item["size"]:
+            item["reported_percent"] = percent
+            log_event("upload_progress", percent=percent, received_bytes=item["received"],
+                      total_bytes=item["size"], upload_id=upload_id)
+            append_activity(
+                f"Upload progress: {percent}% ({item['received']} of {item['size']} bytes)."
+            )
         return jsonify(received=item["received"], size=item["size"])
 
 
@@ -832,6 +892,7 @@ def cancel_upload(upload_id: str):
         uploads.pop(upload_id)
     Path(item["temp"]).unlink(missing_ok=True)
     log_event("upload_cancelled", received_bytes=item["received"], upload_id=upload_id)
+    append_activity(f"Upload cancelled after {item['received']} bytes.")
     return jsonify(ok=True)
 
 
@@ -885,6 +946,10 @@ def upload_complete(upload_id: str):
             uploads.pop(upload_id, None)
     log_event("upload_completed", bytes=target.stat().st_size, extracted_files=extracted,
               upload_id=upload_id)
+    if extracted:
+        append_activity(f"Upload completed and archive extracted: {extracted} files ready.")
+    else:
+        append_activity("Upload completed and file is ready.")
     return jsonify(path=target.name, size=target.stat().st_size, extracted=extracted)
 
 
@@ -944,6 +1009,13 @@ def create_job():
             return jsonify(error=f"Build setup failed: {exc}"), 503
         with job_lock:
             jobs[job_id].update(status="running", progress=3, phase="Preparing build container", command=command)
+        with store_lock, sqlite3.connect(JOB_DB) as database:
+            rows = database.execute(
+                "SELECT text FROM activity ORDER BY id DESC LIMIT 50"
+            ).fetchall()
+        recent_activity = "\n".join(row[0] for row in reversed(rows))
+        if recent_activity:
+            append_log(job_id, "Upload and workspace activity:\n" + recent_activity + "\n\n")
         persist_job(job_id)
     threading.Thread(target=run_job, args=(job_id, command), daemon=True).start()
     return jsonify(id=job_id), 202

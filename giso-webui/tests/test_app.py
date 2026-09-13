@@ -64,6 +64,30 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue((self.data / "cisco-smu/smu/package.rpm").is_file())
 
+    def test_upload_progress_is_available_in_activity_log(self):
+        upload_id = self.client.post(
+            "/api/uploads/init", json={"name": "private.iso", "size": 10}
+        ).get_json()["id"]
+        self.client.put(f"/api/uploads/{upload_id}?offset=0", data=b"12345")
+        activity = self.client.get("/api/activity").get_json()["log"]
+        self.assertIn("Upload started: 10 bytes expected", activity)
+        self.assertIn("Upload progress: 50%", activity)
+        self.assertNotIn("private.iso", activity)
+
+    def test_build_output_is_redacted_and_written_to_service_log(self):
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "progress": 0, "phase": "Starting",
+                              "log": "", "artifacts": []}
+        with self.assertLogs(module.app.logger.name, level="INFO") as captured:
+            module.append_log(
+                "job", "Scanning /uploads/private/base.iso and update.rpm\n"
+            )
+        self.assertIn("[artifact]", module.jobs["job"]["log"])
+        self.assertNotIn("base.iso", module.jobs["job"]["log"])
+        service_log = "\n".join(captured.output)
+        self.assertIn("event=build_output", service_log)
+        self.assertNotIn("update.rpm", service_log)
+
     def test_tar_path_traversal_is_rejected(self):
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode="w") as archive:
