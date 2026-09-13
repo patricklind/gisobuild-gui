@@ -27,9 +27,11 @@ docker compose -f giso-webui/compose.yaml exec giso-webui \
   df -h /uploads /output /archive /work /state
 ```
 
-Use `--follow` to watch uploads, request IDs, build phases, failures, and cleanup
-totals in real time. Container event logs intentionally omit Cisco filenames,
-request payloads, configuration content, and raw build output.
+Use `--follow` to watch upload progress, request IDs, build phases, redacted
+build-output lines, failures, and cleanup totals in real time. The Web UI's
+technical-details panel reads the same persistent activity stream for upload,
+extraction, build, and cleanup events. Cisco artifact names are replaced with
+`[artifact]`; request payloads and configuration content are omitted.
 
 The Web UI health check returns HTTP 503 when Docker, required storage mounts,
 or the local `gisobuild` tool entry point is unavailable. Image pulls are

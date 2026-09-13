@@ -2,6 +2,7 @@ let currentJob = null;
 let inputs = { files: [], recommended: [] };
 let packageListEdited = false;
 let pollTimer = null;
+let activityTimer = null;
 const $ = selector => document.querySelector(selector);
 const lines = value => value.split(/\n|,/).map(item => item.trim()).filter(Boolean);
 const api = (url, options = {}) => fetch(url, options).then(async response => {
@@ -240,6 +241,7 @@ $('#build-form').addEventListener('submit', async event => {
 
 async function poll() {
   if (!currentJob) return;
+  clearTimeout(activityTimer);
   clearTimeout(pollTimer);
   try {
     const job = await api(`/api/jobs/${currentJob}`);
@@ -269,16 +271,29 @@ async function poll() {
   }
 }
 
+async function pollActivity() {
+  if (currentJob) return;
+  clearTimeout(activityTimer);
+  try {
+    const activity = await api('/api/activity');
+    $('#log').textContent = activity.log || 'Waiting for upload or build activity…';
+  } catch (error) {
+    $('#log').textContent = `Activity log temporarily unavailable: ${error.message}`;
+  }
+  activityTimer = setTimeout(pollActivity, 1500);
+}
+
 async function restoreJob() {
   try {
     const jobs = await api('/api/jobs');
     const job = jobs.find(item => ['running','queued','cancelling'].includes(item.status)) || jobs[0];
-    if (job) { currentJob = job.id; poll(); }
+    if (job) { currentJob = job.id; poll(); } else { pollActivity(); }
   } catch { /* Starts clean if there is no previous job. */ }
 }
 
 const CHUNK = 16 * 1024 * 1024;
 async function uploadFile(file) {
+  currentJob = null; pollActivity();
   const row = document.createElement('div'); row.className = 'upload-row';
   const name = document.createElement('span'); name.textContent = file.name;
   const progress = document.createElement('progress'); progress.max = 100; progress.value = 0;
@@ -331,6 +346,7 @@ $('#cleanup').onclick = async () => {
     const mb = (result.removed_bytes / 1048576).toFixed(1);
     const areas = result.removed || {};
     alert(`Cleanup complete. ${result.removed_items} items (${mb} MB) removed.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
+    currentJob = null; pollActivity();
   } catch (error) { alert(error.message); }
 };
 $('#copy-log').onclick = () => copyText($('#log').textContent, $('#copy-log'), 'Copy log');

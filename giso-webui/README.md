@@ -120,10 +120,12 @@ Follow operational events while uploading, building, or cleaning:
 docker compose logs --follow --tail=200 giso-webui archive-maintenance
 ```
 
-The Web UI logs request IDs, endpoint names, response status, upload byte
-counts, build phases, completion status, and cleanup totals. Cisco filenames,
-payloads, configuration content, and raw build output are not copied into the
-container log. The full per-job build output remains available in the Web UI.
+The Web UI logs request IDs, endpoint names, response status, upload progress,
+build phases, redacted build-output lines, completion status, and cleanup totals.
+The technical-details panel also shows upload, extraction, build, and cleanup
+activity. This activity is stored in SQLite so every Gunicorn worker sees the
+same stream. Cisco artifact names are replaced with `[artifact]`; payloads and
+configuration content are never copied into either log.
 
 The complete start, upgrade, backup, restore, failure, and decommission
 procedures are in the [operations runbook](../docs/operations.md).
