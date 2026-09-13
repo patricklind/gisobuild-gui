@@ -74,6 +74,7 @@ container with `docker compose up -d --force-recreate`.
 | --- | ---: | --- |
 | `GISO_IMAGE` | `ciscogisobuild/cisco-xr-gisobuild:2.3.4` | Cisco build image |
 | `LOG_LEVEL` | `INFO` | Application event log level written to container stdout/stderr |
+| `GISO_PULL_TIMEOUT_SECONDS` | `600` | Maximum time allowed for pulling the Cisco build image |
 | `WEB_BIND_ADDRESS` | `127.0.0.1` | Host interface exposed by Compose |
 | `WEB_PORT` | `8080` | Host HTTP port |
 | `ALLOWED_HOSTS` | `127.0.0.1,localhost,giso-webui` | Accepted HTTP Host values |

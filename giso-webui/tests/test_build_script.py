@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,6 +44,19 @@ class BuildScriptTests(unittest.TestCase):
     def test_build_container_does_not_mount_entire_project(self):
         script = (Path(__file__).parents[2] / "build-giso.sh").read_text()
         self.assertNotIn('-v "$SCRIPT_DIR:/workspace"', script)
+
+    def test_real_iso_runner_rejects_non_local_url(self):
+        with tempfile.TemporaryDirectory() as temp_name:
+            iso = Path(temp_name) / "base.iso"
+            iso.write_bytes(b"synthetic test marker")
+            script = Path(__file__).parents[2] / "scripts/e2e_real_iso.py"
+            result = subprocess.run(
+                [sys.executable, str(script), str(iso), "--platform", "ncs5500",
+                 "--url", "file:///tmp/fake-api"],
+                capture_output=True, text=True, check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("HTTP(S) origin", result.stderr)
 
 
 if __name__ == "__main__":

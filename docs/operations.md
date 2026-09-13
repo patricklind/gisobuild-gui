@@ -31,6 +31,11 @@ Use `--follow` to watch uploads, request IDs, build phases, failures, and cleanu
 totals in real time. Container event logs intentionally omit Cisco filenames,
 request payloads, configuration content, and raw build output.
 
+The Web UI health check returns HTTP 503 when Docker, required storage mounts,
+or the local `gisobuild` tool entry point is unavailable. Image pulls are
+bounded by `GISO_PULL_TIMEOUT_SECONDS` (600 seconds by default); a timeout marks
+the job failed and preserves uploaded inputs for diagnosis or retry.
+
 The application accepts one build at a time. A separate maintenance service
 removes complete archives older than 30 days and then removes the oldest
 complete archives until combined ISO/USB use is at or below 50 GiB. Both values

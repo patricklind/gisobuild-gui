@@ -112,14 +112,14 @@ There is no backup, replication, or restore verification.
 before expiry. Do not back up licensed Cisco content to locations that violate
 its distribution terms.
 
-### Low: Health checks cover Docker availability only
+### Resolved: container health reflects required local dependencies
 
-The health endpoint confirms access to Docker but does not verify required
-mounts, writable capacity, the tool checkout, or archive health.
+The health endpoint verifies Docker access, the tool entry point, and all
+required storage directories. It returns HTTP 503 when any check fails, so the
+container health check no longer treats a non-ready service as healthy.
 
-**Recommendation:** Add a separate readiness endpoint if unattended operation
-is introduced. It should validate required paths and minimum free space without
-performing destructive writes.
+**Limitation:** It does not perform writes or reserve build capacity. Disk-space
+requirements are checked again when an upload starts and before TAR extraction.
 
 ### Low: The Cisco build image identity is mutable
 

@@ -1,5 +1,8 @@
 body { font-size: 16px; }
-.primary { min-height: 40px; padding: 8px 14px; font-size: 15px; }
+.primary { min-height: 44px; padding: 8px 14px; font-size: 15px; }
+.small { min-height: 44px; }
+.advanced summary, .technical-log summary { display: flex; align-items: center; min-height: 44px; }
+.site-footer a { display: inline-flex; align-items: center; min-height: 44px; }
 .build-button { width: auto; font-size: 16px; margin-top: 18px; }
 .step-heading h2 { font-size: 22px; }
 .upload-zone b { font-size: 17px; }

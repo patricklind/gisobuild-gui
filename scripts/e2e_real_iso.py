@@ -8,12 +8,15 @@ import json
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def request(url: str, *, method: str = "GET", data: bytes | None = None) -> dict | list:
     headers = {"Content-Type": "application/json"} if data and method == "POST" else {}
-    with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers,
-                                                      method=method), timeout=120) as response:
+    # The operator-selected origin is validated to HTTP(S) before any request.
+    with urllib.request.urlopen(  # nosec B310
+        urllib.request.Request(url, data=data, headers=headers, method=method), timeout=120
+    ) as response:
         return json.load(response)
 
 
@@ -26,6 +29,12 @@ args = parser.parse_args()
 if not args.iso.is_file():
     parser.error("ISO does not exist")
 base = args.url.rstrip("/")
+parsed_base = urlsplit(base)
+if (parsed_base.scheme not in {"http", "https"}
+        or not parsed_base.hostname
+        or parsed_base.username or parsed_base.password
+        or parsed_base.path not in {"", "/"} or parsed_base.query or parsed_base.fragment):
+    parser.error("--url must be an HTTP(S) origin without credentials or a path")
 
 
 def upload_path(path: Path) -> None:
