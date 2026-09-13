@@ -151,6 +151,10 @@ def initialize_job_store() -> None:
                 if not isinstance(restored, dict):
                     continue
                 restored["id"] = job_id
+                raw_log = restored.get("log", "")
+                redacted_log = safe_log_text(raw_log) if isinstance(raw_log, str) else ""
+                log_was_redacted = redacted_log != raw_log
+                restored["log"] = redacted_log
                 if restored.get("status") in ACTIVE_JOB_STATUSES:
                     restored.update(
                         status="interrupted",
@@ -161,6 +165,11 @@ def initialize_job_store() -> None:
                     database.execute(
                         "UPDATE jobs SET data = ?, updated = ? WHERE id = ?",
                         (json.dumps(restored), restored["finished"], job_id),
+                    )
+                elif log_was_redacted:
+                    database.execute(
+                        "UPDATE jobs SET data = ? WHERE id = ?",
+                        (json.dumps(restored), job_id),
                     )
                 with job_lock:
                     jobs.setdefault(job_id, restored)
