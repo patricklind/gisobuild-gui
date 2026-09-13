@@ -325,11 +325,12 @@ $('#copy-rollback-guide').onclick = async () => {
   await copyText(commands, $('#copy-rollback-guide'), 'Copy rollback commands');
 };
 $('#cleanup').onclick = async () => {
-  if (!confirm('Remove temporary upload fragments and build working files?\n\nUploaded Cisco files and completed images will be kept.')) return;
+  if (!confirm('Remove all uploaded source files, partial uploads, build working files, and raw output?\n\nCompleted ISO and USB files in the GISO Archive will be kept.')) return;
   try {
     const result = await api('/api/cleanup', {method:'POST'});
     const mb = (result.removed_bytes / 1048576).toFixed(1);
-    alert(`Cleanup complete. ${result.removed_items} temporary items (${mb} MB) removed.\n\nUploads and completed images were kept.`);
+    const areas = result.removed || {};
+    alert(`Cleanup complete. ${result.removed_items} items (${mb} MB) removed.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
   } catch (error) { alert(error.message); }
 };
 $('#copy-log').onclick = () => copyText($('#log').textContent, $('#copy-log'), 'Copy log');

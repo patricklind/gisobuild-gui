@@ -370,18 +370,35 @@ class GisoWebTests(unittest.TestCase):
             module.build_command({"iso": "base.iso", "platform": "asr9k",
                                   "pkglist": ["package.rpm"]}, "conflict")
 
-    def test_cleanup_keeps_uploads_and_completed_images(self):
-        (self.data / "base.iso").write_bytes(b"keep")
-        (self.output / "finished.iso").write_bytes(b"keep")
+    def test_cleanup_removes_workspace_but_keeps_archive(self):
+        (self.data / "base.iso").write_bytes(b"remove")
+        (self.output / "finished.iso").write_bytes(b"remove")
         (self.data / ".parts").mkdir()
         (self.data / ".parts/upload.part").write_bytes(b"remove")
         (module.WORK / "old-job").mkdir()
         (module.WORK / "old-job/temp").write_bytes(b"remove")
-        response = self.client.post("/api/cleanup")
+        archive_dir = module.ARCHIVE / "finished-job"
+        archive_dir.mkdir()
+        archived = archive_dir / "golden.iso"
+        archived.write_bytes(b"keep")
+        with self.assertLogs(module.app.logger.name, level="INFO") as captured:
+            response = self.client.post("/api/cleanup")
         self.assertEqual(response.status_code, 200)
-        self.assertTrue((self.data / "base.iso").exists())
-        self.assertTrue((self.output / "finished.iso").exists())
+        self.assertFalse((self.data / "base.iso").exists())
+        self.assertFalse((self.output / "finished.iso").exists())
         self.assertFalse((module.WORK / "old-job").exists())
+        self.assertTrue(archived.exists())
+        self.assertEqual(response.get_json()["removed"],
+                         {"output": 1, "uploads": 2, "work": 1})
+        self.assertTrue(any("event=workspace_cleanup" in line for line in captured.output))
+
+    def test_request_log_uses_endpoint_and_safe_correlation_id(self):
+        with self.assertLogs(module.app.logger.name, level="INFO") as captured:
+            response = self.client.get("/api/inputs", headers={"X-Request-ID": "request-123"})
+        self.assertEqual(response.headers["X-Request-ID"], "request-123")
+        log = "\n".join(captured.output)
+        self.assertIn("endpoint=inputs", log)
+        self.assertIn("request_id=request-123", log)
 
     def test_success_archive_is_verified_before_sources_are_removed(self):
         (self.data / "source.rpm").write_bytes(b"source")

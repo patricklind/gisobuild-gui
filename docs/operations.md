@@ -27,6 +27,10 @@ docker compose -f giso-webui/compose.yaml exec giso-webui \
   df -h /uploads /output /archive /work /state
 ```
 
+Use `--follow` to watch uploads, request IDs, build phases, failures, and cleanup
+totals in real time. Container event logs intentionally omit Cisco filenames,
+request payloads, configuration content, and raw build output.
+
 The application accepts one build at a time. A separate maintenance service
 removes complete archives older than 30 days and then removes the oldest
 complete archives until combined ISO/USB use is at or below 50 GiB. Both values
@@ -85,6 +89,10 @@ licensed and protected appropriately. Test restore procedures periodically.
 | Upload rejected | Extension, configured limits, and free space | Correct the input or increase a reviewed limit |
 | No USB artifact | Platform matrix and build log | Use the documented platform recovery method |
 | Archive removed | Age and combined archive size | Restore an approved external backup; retention deletion is intentional |
+
+The **Clear workspace files** button deletes all uploads, partial uploads, build
+work, and raw output after confirming that no upload or build is active. It
+preserves the verified GISO Archive and persisted job history.
 
 ## Decommission
 

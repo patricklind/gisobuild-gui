@@ -61,9 +61,9 @@ USB package into the archive and verifies each copy with SHA-256. Only then does
 it remove the build's source and working files. If no ISO is produced or archive
 verification fails, sources are retained for diagnosis.
 
-The **Clean temporary files** action removes incomplete upload fragments and
-temporary work directories. It does not remove completed archives or normal
-uploaded Cisco files.
+The **Clear workspace files** action removes uploaded source files, incomplete
+upload fragments, build work, and raw output. It never removes completed files
+from the GISO Archive. The action is blocked while an upload or build is active.
 
 ## Configuration
 
@@ -73,6 +73,7 @@ container with `docker compose up -d --force-recreate`.
 | Variable | Default | Purpose |
 | --- | ---: | --- |
 | `GISO_IMAGE` | `ciscogisobuild/cisco-xr-gisobuild:2.3.4` | Cisco build image |
+| `LOG_LEVEL` | `INFO` | Application event log level written to container stdout/stderr |
 | `WEB_BIND_ADDRESS` | `127.0.0.1` | Host interface exposed by Compose |
 | `WEB_PORT` | `8080` | Host HTTP port |
 | `ALLOWED_HOSTS` | `127.0.0.1,localhost,giso-webui` | Accepted HTTP Host values |
@@ -111,6 +112,17 @@ docker volume ls --filter name=giso-webui
 docker compose exec giso-webui df -h /uploads /archive /output /work
 docker compose logs --tail=100 archive-maintenance
 ```
+
+Follow operational events while uploading, building, or cleaning:
+
+```bash
+docker compose logs --follow --tail=200 giso-webui archive-maintenance
+```
+
+The Web UI logs request IDs, endpoint names, response status, upload byte
+counts, build phases, completion status, and cleanup totals. Cisco filenames,
+payloads, configuration content, and raw build output are not copied into the
+container log. The full per-job build output remains available in the Web UI.
 
 The complete start, upgrade, backup, restore, failure, and decommission
 procedures are in the [operations runbook](../docs/operations.md).
