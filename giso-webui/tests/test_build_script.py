@@ -8,6 +8,16 @@ from pathlib import Path
 
 
 class BuildScriptTests(unittest.TestCase):
+    def test_browser_prompts_use_the_in_app_dialog(self):
+        web_root = Path(__file__).parents[1]
+        script = (web_root / "static" / "app.js").read_text()
+        template = (web_root / "templates" / "index.html").read_text()
+
+        self.assertNotRegex(script, r"\b(?:alert|confirm)\s*\(")
+        self.assertIn("showAppDialog", script)
+        self.assertIn('id="app-dialog"', template)
+        self.assertIn('aria-describedby="app-dialog-message"', template)
+
     def test_clean_rejects_traversal_outside_standard_output(self):
         bash = shutil.which("bash")
         if not bash:

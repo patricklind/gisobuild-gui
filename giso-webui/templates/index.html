@@ -133,6 +133,16 @@ show install committed summary</pre></li>
     </ol>
     <div class="dialog-actions"><a href="https://github.com/patricklind/gisobuild-gui/blob/main/GISOBUILD-GUIDE.md#9-rollback-and-recovery" target="_blank" rel="noopener">Open the complete rollback and recovery guide</a><button id="copy-rollback-guide" type="button" class="secondary">Copy rollback commands</button></div>
   </dialog>
+  <dialog id="app-dialog" class="app-dialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+    <div class="dialog-head">
+      <div><span id="app-dialog-eyebrow" class="eyebrow">CONFIRM ACTION</span><h2 id="app-dialog-title">Confirm action</h2></div>
+    </div>
+    <p id="app-dialog-message" class="app-dialog-message"></p>
+    <div class="dialog-actions app-dialog-actions">
+      <button id="app-dialog-cancel" type="button" class="secondary">Cancel</button>
+      <button id="app-dialog-confirm" type="button" class="primary">Continue</button>
+    </div>
+  </dialog>
   <script src="/static/app.js"></script>
 </body>
 </html>
