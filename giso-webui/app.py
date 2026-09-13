@@ -15,7 +15,15 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from flask import Flask, abort, jsonify, render_template, request, send_from_directory
+from flask import (
+    Flask,
+    abort,
+    g,
+    jsonify,
+    render_template,
+    request,
+    send_from_directory,
+)
 from platform_validation import PLATFORMS, validate_platform_options
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
@@ -27,6 +35,7 @@ def validate_image_reference(value: str) -> str:
 
 
 app = Flask(__name__)
+app.logger.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
 DOCKER_BIN = os.environ.get("DOCKER_BIN", "/usr/bin/docker")
 if not Path(DOCKER_BIN).is_absolute():
     raise RuntimeError("DOCKER_BIN must be an absolute path")
@@ -72,6 +81,12 @@ if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
     raise RuntimeError("Upload, extraction, tar, chunk and log limits must be positive")
 
 PRIVATE_JOB_FIELDS = {"command", "payload", "container_pid"}
+
+
+def log_event(event: str, **fields: object) -> None:
+    """Write a compact operational event without sensitive filenames or payloads."""
+    details = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
+    app.logger.info("event=%s%s", event, f" {details}" if details else "")
 
 
 def public_job(job: dict, *, include_log: bool = True) -> dict:
@@ -294,6 +309,7 @@ def enforce_archive_policy() -> list[str]:
         if removed:
             with checksum_lock:
                 checksum_cache.clear()
+            log_event("archive_policy_cleanup", removed_jobs=len(removed))
     return removed
 
 
@@ -409,6 +425,7 @@ def discover() -> dict:
 
 
 def append_log(job_id: str, text: str) -> None:
+    phase_change = None
     with job_lock:
         jobs[job_id]["log"] += text
         encoded = jobs[job_id]["log"].encode("utf-8")
@@ -430,6 +447,10 @@ def append_log(job_id: str, text: str) -> None:
         for marker, progress, phase in milestones:
             if marker in lower and progress > jobs[job_id].get("progress", 0):
                 jobs[job_id].update(progress=progress, phase=phase)
+                phase_change = (progress, phase)
+    if phase_change:
+        log_event("build_progress", job_id=job_id, progress=phase_change[0],
+                  phase=json.dumps(phase_change[1]))
     persist_job(job_id, min_interval=1.0)
 
 
@@ -522,8 +543,18 @@ def build_command(payload: dict, job_id: str) -> list[str]:
 def run_job(job_id: str, command: list[str]) -> None:
     try:
         append_log(job_id, "$ " + shlex.join(command) + "\n\n")
-        subprocess.run([DOCKER_BIN, "pull", "--platform", "linux/amd64", IMAGE], check=True,
-                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        log_event("build_started", job_id=job_id)
+        log_event("image_pull_started", job_id=job_id)
+        pull = subprocess.run(
+            [DOCKER_BIN, "pull", "--platform", "linux/amd64", IMAGE],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        if pull.stdout:
+            append_log(job_id, pull.stdout)
+        log_event("image_pull_completed", job_id=job_id)
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, bufsize=1)
         with job_lock:
@@ -552,12 +583,15 @@ def run_job(job_id: str, command: list[str]) -> None:
                                     progress=100 if code == 0 else jobs[job_id].get("progress", 0),
                                     phase="Complete" if code == 0 else "Build failed")
         persist_job(job_id)
+        log_event("build_finished", exit_code=code, job_id=job_id,
+                  status="success" if success else "failed")
     except Exception as exc:  # noqa: BLE001 - background failures must update job state
         append_log(job_id, f"\nERROR: {exc}\n")
         with job_lock:
             jobs[job_id].update(status="failed", error=str(exc), finished=time.time(),
                                 updated=time.time())
         persist_job(job_id)
+        log_event("build_failed", error_type=type(exc).__name__, job_id=job_id)
 
 
 @app.get("/")
@@ -575,6 +609,12 @@ def security_headers(response):
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     if request.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    request_id = getattr(g, "request_id", uuid.uuid4().hex[:12])
+    response.headers["X-Request-ID"] = request_id
+    if request.endpoint not in {"health", "upload_chunk"} or response.status_code >= 400:
+        elapsed_ms = round((time.monotonic() - getattr(g, "request_started", time.monotonic())) * 1000)
+        log_event("http_request", elapsed_ms=elapsed_ms, endpoint=request.endpoint or "unknown",
+                  method=request.method, request_id=request_id, status=response.status_code)
     return response
 
 
@@ -591,6 +631,10 @@ def request_too_large(_error):
 @app.before_request
 def validate_host():
     global archive_policy_checked
+    supplied_request_id = request.headers.get("X-Request-ID", "")
+    g.request_id = (supplied_request_id if re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", supplied_request_id)
+                    else uuid.uuid4().hex[:12])
+    g.request_started = time.monotonic()
     initialize_job_store()
     expire_upload_sessions()
     host = request.host.split(":", 1)[0].strip("[]")
@@ -678,26 +722,36 @@ def cleanup():
             return jsonify(error="Temporary files cannot be cleaned while a Docker build is running"), 409
         removed_bytes = 0
         removed_items = 0
-        targets = [DATA / ".parts"]
-        targets.extend(path for path in WORK.iterdir() if path.is_dir()) if WORK.exists() else None
-        for target in targets:
-            if not target.exists():
+        removed_by_area: dict[str, int] = {}
+        for area, root in (("uploads", DATA), ("work", WORK), ("output", OUTPUT)):
+            area_items = 0
+            if not root.exists():
                 continue
-            for path in target.rglob("*"):
-                if path.is_file():
+            for child in list(root.iterdir()):
+                paths = [child]
+                if child.is_dir() and not child.is_symlink():
+                    paths.extend(child.rglob("*"))
+                for path in paths:
+                    if path.is_file() or path.is_symlink():
+                        try:
+                            removed_bytes += path.lstat().st_size
+                        except OSError:
+                            pass
+                if child.is_dir() and not child.is_symlink():
+                    shutil.rmtree(child)
+                else:
                     try:
-                        removed_bytes += path.stat().st_size
-                    except OSError:
-                        pass
-            if target == DATA / ".parts":
-                for child in list(target.iterdir()):
-                    child.unlink(missing_ok=True)
-                    removed_items += 1
-            else:
-                shutil.rmtree(target)
+                        child.unlink()
+                    except FileNotFoundError:
+                        continue
                 removed_items += 1
+                area_items += 1
+            removed_by_area[area] = area_items
+        log_event("workspace_cleanup", removed_bytes=removed_bytes,
+                  removed_items=removed_items, **removed_by_area)
     return jsonify(ok=True, removed_bytes=removed_bytes, removed_items=removed_items,
-                   message="Temporary files removed. Uploads and completed images were kept.")
+                   removed=removed_by_area,
+                   message="Uploads, partial files, build work, and raw output were removed. Archived images were kept.")
 
 
 @app.post("/api/uploads/init")
@@ -729,6 +783,7 @@ def upload_init():
         with upload_lock:
             uploads[upload_id] = {"name": name, "size": size, "received": 0,
                                   "temp": str(temp), "updated": time.time()}
+    log_event("upload_started", bytes=size, upload_id=upload_id)
     return jsonify(id=upload_id)
 
 
@@ -766,6 +821,7 @@ def cancel_upload(upload_id: str):
             return jsonify(error="Upload is already being completed"), 409
         uploads.pop(upload_id)
     Path(item["temp"]).unlink(missing_ok=True)
+    log_event("upload_cancelled", received_bytes=item["received"], upload_id=upload_id)
     return jsonify(ok=True)
 
 
@@ -817,6 +873,8 @@ def upload_complete(upload_id: str):
     finally:
         with upload_lock:
             uploads.pop(upload_id, None)
+    log_event("upload_completed", bytes=target.stat().st_size, extracted_files=extracted,
+              upload_id=upload_id)
     return jsonify(path=target.name, size=target.stat().st_size, extracted=extracted)
 
 
