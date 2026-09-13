@@ -15,7 +15,7 @@ body { font-size: 16px; }
 @media (max-width: 700px) { .header-actions { width: 100%; justify-content: space-between; } }
 .archive-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .archive-row > a { min-width: 0; }
-.delete-archive { border: 1px solid #d98890; border-radius: 8px; background: #fff3f4; color: var(--red); padding: 6px 11px; cursor: pointer; font-weight: 700; }
+.delete-archive { min-height: 44px; border: 1px solid #d98890; border-radius: 8px; background: #fff3f4; color: var(--red); padding: 6px 11px; cursor: pointer; font-weight: 700; }
 .delete-archive:hover { background: #ffe4e6; }
 @media (max-width: 700px) { .archive-row { grid-template-columns: 1fr; } .delete-archive { justify-self: start; } }
 .archive-actions { display: flex; align-items: center; gap: 7px; }
@@ -33,7 +33,7 @@ dialog::backdrop { background: #0f172a99; }
 .guide-steps p { margin: 4px 0 8px; color: var(--muted); }
 .guide-steps pre { height: auto; max-height: none; margin: 7px 0; padding: 11px; }
 .guide-steps pre[hidden] { display: none; }
-select { width: 100%; margin-top: 5px; border: 2px solid var(--line); border-radius: 7px; padding: 9px; background: #fff; color: var(--text); font: inherit; }
+select { width: 100%; min-height: 44px; margin-top: 5px; border: 2px solid var(--line); border-radius: 7px; padding: 9px; background: #fff; color: var(--text); font: inherit; }
 .dialog-actions { align-items: center; border-top: 1px solid var(--line); padding-top: 16px; }
 .dialog-actions a { color: var(--blue); font-weight: 700; }
 .danger:focus-visible,
