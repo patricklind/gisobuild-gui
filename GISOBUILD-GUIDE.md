@@ -51,6 +51,9 @@ the metadata-driven IOS XR7 families Cisco 8000/8800, NCS 1010/1014, NCS 540L,
 and NCS 5700. This catches obvious option mistakes; inspect ISO metadata with
 upstream `isols.py --dump-mdata` before using PID filtering.
 
+See the maintained [platform matrix](docs/platform-support.md) for the exact UI
+selection keys, option gates, and automatic USB expectations.
+
 ### Installation command families
 
 | Router software family | Typical workflow | Important note |

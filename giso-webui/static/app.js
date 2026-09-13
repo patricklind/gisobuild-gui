@@ -1,13 +1,24 @@
 let currentJob = null;
 let inputs = { files: [], recommended: [] };
 let packageListEdited = false;
+let pollTimer = null;
 const $ = selector => document.querySelector(selector);
 const lines = value => value.split(/\n|,/).map(item => item.trim()).filter(Boolean);
 const api = (url, options = {}) => fetch(url, options).then(async response => {
-  const body = await response.json();
+  const text = await response.text();
+  let body = {};
+  try { body = text ? JSON.parse(text) : {}; }
+  catch { body = {error: text || `HTTP ${response.status}`}; }
   if (!response.ok) throw new Error(body.error || 'An unexpected error occurred');
   return body;
 });
+
+async function copyText(value, button, resetText) {
+  try {
+    await navigator.clipboard.writeText(value);
+    if (button) { button.textContent = 'Copied'; setTimeout(() => { button.textContent = resetText; }, 1200); }
+  } catch { alert('Clipboard access was denied. Select and copy the text manually.'); }
+}
 
 function setReadyCard(selector, ready, text) {
   const card = $(selector);
@@ -32,7 +43,7 @@ function renderInputs(data) {
   $('[name=iso]').value = iso;
   if (!packageListEdited) $('[name=pkglist]').value = data.recommended.join('\n');
   setReadyCard('#iso-check', Boolean(iso), iso ? 'Found and ready' : 'Upload the Cisco base file');
-  setReadyCard('#rpm-check', data.recommended.length > 0, data.recommended.length ? `${data.recommended.length} updates found` : 'Upload at least one SMU file');
+  setReadyCard('#rpm-check', data.recommended.length > 0, data.recommended.length ? `${data.recommended.length} updates found` : 'Optional: add SMU files or another customization');
 
   const library = $('#file-library'); library.replaceChildren();
   if (iso) library.appendChild(fileRow('Base image', iso));
@@ -45,11 +56,16 @@ function renderInputs(data) {
 
 function updateBuildAvailability() {
   const yamlMode = $('[name=mode]:checked').value === 'yaml';
+  const customFiles = ['xrconfig','ztp_ini','script','key_request','ownership_vouchers','ownership_certificate']
+    .some(name => $(`[name=${name}]`).value.trim());
+  const packageUpdates = lines($('[name=pkglist_override]').value || $('[name=pkglist]').value || '').length > 0;
+  const otherChanges = customFiles || packageUpdates || lines($('[name=bridging_fixes]').value).length > 0 ||
+    lines($('[name=remove_packages]').value).length > 0;
   const ready = yamlMode
     ? Boolean($('[name=yamlfile]').value.trim())
-    : Boolean(($('[name=iso_override]').value || $('[name=iso]').value) && inputs.recommended.length);
+    : Boolean(($('[name=iso_override]').value || $('[name=iso]').value) && otherChanges);
   const button = $('#start-build'); button.disabled = !ready;
-  button.textContent = ready ? 'Start build' : `Waiting for ${yamlMode ? 'a YAML file' : 'Cisco files'}…`;
+  button.textContent = ready ? 'Start build' : `Waiting for ${yamlMode ? 'a YAML file' : 'an ISO and a customization'}…`;
 }
 
 function fileRow(label, value) {
@@ -117,7 +133,7 @@ function checksumRow(label, value) {
   const name=document.createElement('b'); name.textContent=label;
   const code=document.createElement('code'); code.textContent=value;
   const copy=document.createElement('button'); copy.type='button'; copy.className='secondary small'; copy.textContent='Copy';
-  copy.onclick=async()=>{await navigator.clipboard.writeText(value); copy.textContent='Copied'; setTimeout(()=>copy.textContent='Copy',1200);};
+  copy.onclick=()=>copyText(value, copy, 'Copy');
   row.append(name,code,copy); return row;
 }
 
@@ -181,8 +197,8 @@ function updateRollbackWorkflow() {
 async function health() {
   try {
     const state = await api('/api/health');
-    $('#health').textContent = state.docker ? '✓ System ready' : 'Docker is not ready';
-    $('#health').className = `pill ${state.docker ? 'ok' : 'bad'}`;
+    $('#health').textContent = state.ok ? '✓ System ready' : 'System is not ready';
+    $('#health').className = `pill ${state.ok ? 'ok' : 'bad'}`;
   } catch { $('#health').textContent = 'System unavailable'; $('#health').className = 'pill bad'; }
 }
 
@@ -193,6 +209,7 @@ document.querySelectorAll('[name=mode]').forEach(radio => radio.addEventListener
 }));
 $('[name=yamlfile]').addEventListener('input', updateBuildAvailability);
 $('[name=iso_override]').addEventListener('input', updateBuildAvailability);
+$('#form-mode').addEventListener('input', updateBuildAvailability);
 
 $('#build-form').addEventListener('submit', async event => {
   event.preventDefault(); $('#error').textContent = '';
@@ -213,15 +230,17 @@ $('#build-form').addEventListener('submit', async event => {
     ownership_certificate: form.get('ownership_certificate') || ''
   };
   event.target.querySelectorAll('input[type=checkbox]').forEach(box => { payload[box.name] = box.checked; });
-  const message = `Start the build with ${payload.pkglist.length} updates?\n\nAfter a successful build, the verified Golden ISO and USB boot image will be kept. Uploaded source files and other build output will be permanently removed.`;
+  const usbText = payload.skip_usb_image ? 'No USB boot image was requested.' : 'A USB boot image is retained when the selected platform produces one.';
+  const message = `Start the build with ${payload.pkglist.length} updates?\n\nAfter a successful build, the verified Golden ISO will be kept. ${usbText} Uploaded source files and other build output will be permanently removed.`;
   if (!confirm(message)) return;
   const button = $('#start-build'); button.disabled = true; button.textContent = 'Starting…';
   try { const result = await api('/api/jobs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }); currentJob = result.id; poll(); }
-  catch (error) { $('#error').textContent = error.message; button.disabled = false; button.textContent = 'Start build'; }
+  catch (error) { $('#error').textContent = error.message; updateBuildAvailability(); }
 });
 
 async function poll() {
   if (!currentJob) return;
+  clearTimeout(pollTimer);
   try {
     const job = await api(`/api/jobs/${currentJob}`);
     const labels = {running:'Building', queued:'Waiting', cancelling:'Stopping', interrupted:'Interrupted', success:'Complete', failed:'Failed', cancelled:'Stopped'};
@@ -243,8 +262,11 @@ async function poll() {
       const size = document.createElement('small'); size.textContent = `${(artifact.size/1048576).toFixed(1)} MB ↓`;
       link.append(name, size); artifacts.appendChild(link);
     });
-    if (['running','queued','cancelling'].includes(job.status)) setTimeout(poll, 1500); else { await loadInputs(); await loadArchive(); }
-  } catch (error) { $('#friendly-status').textContent = error.message; }
+    if (['running','queued','cancelling'].includes(job.status)) pollTimer = setTimeout(poll, 1500); else { await loadInputs(); await loadArchive(); }
+  } catch (error) {
+    $('#friendly-status').textContent = `Status temporarily unavailable: ${error.message}. Retrying…`;
+    pollTimer = setTimeout(poll, 3000);
+  }
 }
 
 async function restoreJob() {
@@ -262,8 +284,9 @@ async function uploadFile(file) {
   const progress = document.createElement('progress'); progress.max = 100; progress.value = 0;
   progress.setAttribute('aria-label', `Upload progress for ${file.name}`);
   const status = document.createElement('small'); status.textContent = 'Starting…'; row.append(name, progress, status); $('#upload-list').appendChild(row);
+  let upload = null;
   try {
-    const upload = await api('/api/uploads/init', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:file.name,size:file.size})});
+    upload = await api('/api/uploads/init', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:file.name,size:file.size})});
     let offset = 0;
     while (offset < file.size) {
       const blob = file.slice(offset, Math.min(offset + CHUNK, file.size));
@@ -273,7 +296,10 @@ async function uploadFile(file) {
     const done = await api(`/api/uploads/${upload.id}/complete`, {method:'POST'});
     row.classList.add('done'); status.textContent = done.extracted ? `Ready – ${done.extracted} files extracted` : 'Ready and saved';
     packageListEdited = false; await loadInputs();
-  } catch (error) { row.classList.add('upload-error'); status.textContent = error.message; }
+  } catch (error) {
+    if (upload) fetch(`/api/uploads/session/${upload.id}`, {method:'DELETE'}).catch(() => {});
+    row.classList.add('upload-error'); status.textContent = error.message;
+  }
 }
 async function uploadFiles(files) { for (const file of files) await uploadFile(file); }
 $('#choose-files').onclick = () => $('#file-upload').click();
@@ -292,21 +318,22 @@ $('#guide-family').onchange = updateGuideWorkflow;
 $('#rollback-family').onchange = updateRollbackWorkflow;
 $('#copy-guide').onclick = async () => {
   const commands=[...$('#upgrade-guide').querySelectorAll('pre')].map(pre=>pre.textContent).join('\n\n');
-  await navigator.clipboard.writeText(commands); $('#copy-guide').textContent='Copied'; setTimeout(()=>$('#copy-guide').textContent='Copy commands',1200);
+  await copyText(commands, $('#copy-guide'), 'Copy commands');
 };
 $('#copy-rollback-guide').onclick = async () => {
   const commands=[...$('#rollback-guide').querySelectorAll('pre:not([hidden])')].map(pre=>pre.textContent).join('\n\n');
-  await navigator.clipboard.writeText(commands); $('#copy-rollback-guide').textContent='Copied'; setTimeout(()=>$('#copy-rollback-guide').textContent='Copy rollback commands',1200);
+  await copyText(commands, $('#copy-rollback-guide'), 'Copy rollback commands');
 };
 $('#cleanup').onclick = async () => {
-  if (!confirm('Remove temporary upload fragments and build working files?\n\nUploaded Cisco files and completed images will be kept.')) return;
+  if (!confirm('Remove all uploaded source files, partial uploads, build working files, and raw output?\n\nCompleted ISO and USB files in the GISO Archive will be kept.')) return;
   try {
     const result = await api('/api/cleanup', {method:'POST'});
     const mb = (result.removed_bytes / 1048576).toFixed(1);
-    alert(`Cleanup complete. ${result.removed_items} temporary items (${mb} MB) removed.\n\nUploads and completed images were kept.`);
+    const areas = result.removed || {};
+    alert(`Cleanup complete. ${result.removed_items} items (${mb} MB) removed.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
   } catch (error) { alert(error.message); }
 };
-$('#copy-log').onclick = () => navigator.clipboard.writeText($('#log').textContent);
+$('#copy-log').onclick = () => copyText($('#log').textContent, $('#copy-log'), 'Copy log');
 $('#cancel-build').onclick = async () => { if (currentJob && confirm('Stop the build? Your uploaded files will be kept.')) { await api(`/api/jobs/${currentJob}`, {method:'DELETE'}); poll(); } };
 $('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; });
 

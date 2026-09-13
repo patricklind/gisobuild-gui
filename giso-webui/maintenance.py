@@ -9,10 +9,13 @@ if INTERVAL_SECONDS < 60:
 
 
 def main() -> None:
+    print(f"Archive maintenance started; interval_seconds={INTERVAL_SECONDS}", flush=True)
     while True:
         removed = enforce_archive_policy()
         if removed:
             print(f"Archive policy removed {len(removed)} expired or over-quota job(s)", flush=True)
+        else:
+            print("Archive policy checked; no files removed", flush=True)
         time.sleep(INTERVAL_SECONDS)
 
 

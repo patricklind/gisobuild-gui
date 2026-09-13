@@ -147,6 +147,42 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.content_type, "application/json")
 
+    def test_upload_size_rejects_boolean_and_fraction(self):
+        for size in (True, 1.5):
+            with self.subTest(size=size):
+                response = self.client.post("/api/uploads/init",
+                                            json={"name": "x.rpm", "size": size})
+                self.assertEqual(response.status_code, 400)
+
+    def test_upload_filename_rejects_paths_and_control_characters(self):
+        for name in ("../x.rpm", "folder/x.rpm", "bad\nx.rpm"):
+            with self.subTest(name=name):
+                response = self.client.post("/api/uploads/init",
+                                            json={"name": name, "size": 3})
+                self.assertEqual(response.status_code, 400)
+
+    def test_upload_session_can_be_cancelled_and_part_is_removed(self):
+        response = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3})
+        upload_id = response.get_json()["id"]
+        part = Path(module.uploads[upload_id]["temp"])
+        self.assertTrue(part.exists())
+        response = self.client.delete(f"/api/uploads/session/{upload_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(upload_id, module.uploads)
+        self.assertFalse(part.exists())
+
+    def test_expired_upload_session_is_removed_before_request(self):
+        parts = self.data / ".parts"
+        parts.mkdir()
+        part = parts / "expired.part"
+        part.write_bytes(b"partial")
+        module.uploads["expired"] = {"name": "x.rpm", "size": 3, "received": 1,
+                                     "temp": str(part), "updated": 0}
+        response = self.client.get("/api/inputs")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("expired", module.uploads)
+        self.assertFalse(part.exists())
+
     def test_oversized_request_returns_json_error(self):
         previous = module.app.config["MAX_CONTENT_LENGTH"]
         module.app.config["MAX_CONTENT_LENGTH"] = 4
@@ -334,18 +370,35 @@ class GisoWebTests(unittest.TestCase):
             module.build_command({"iso": "base.iso", "platform": "asr9k",
                                   "pkglist": ["package.rpm"]}, "conflict")
 
-    def test_cleanup_keeps_uploads_and_completed_images(self):
-        (self.data / "base.iso").write_bytes(b"keep")
-        (self.output / "finished.iso").write_bytes(b"keep")
+    def test_cleanup_removes_workspace_but_keeps_archive(self):
+        (self.data / "base.iso").write_bytes(b"remove")
+        (self.output / "finished.iso").write_bytes(b"remove")
         (self.data / ".parts").mkdir()
         (self.data / ".parts/upload.part").write_bytes(b"remove")
         (module.WORK / "old-job").mkdir()
         (module.WORK / "old-job/temp").write_bytes(b"remove")
-        response = self.client.post("/api/cleanup")
+        archive_dir = module.ARCHIVE / "finished-job"
+        archive_dir.mkdir()
+        archived = archive_dir / "golden.iso"
+        archived.write_bytes(b"keep")
+        with self.assertLogs(module.app.logger.name, level="INFO") as captured:
+            response = self.client.post("/api/cleanup")
         self.assertEqual(response.status_code, 200)
-        self.assertTrue((self.data / "base.iso").exists())
-        self.assertTrue((self.output / "finished.iso").exists())
+        self.assertFalse((self.data / "base.iso").exists())
+        self.assertFalse((self.output / "finished.iso").exists())
         self.assertFalse((module.WORK / "old-job").exists())
+        self.assertTrue(archived.exists())
+        self.assertEqual(response.get_json()["removed"],
+                         {"output": 1, "uploads": 2, "work": 1})
+        self.assertTrue(any("event=workspace_cleanup" in line for line in captured.output))
+
+    def test_request_log_uses_endpoint_and_safe_correlation_id(self):
+        with self.assertLogs(module.app.logger.name, level="INFO") as captured:
+            response = self.client.get("/api/inputs", headers={"X-Request-ID": "request-123"})
+        self.assertEqual(response.headers["X-Request-ID"], "request-123")
+        log = "\n".join(captured.output)
+        self.assertIn("endpoint=inputs", log)
+        self.assertIn("request_id=request-123", log)
 
     def test_success_archive_is_verified_before_sources_are_removed(self):
         (self.data / "source.rpm").write_bytes(b"source")
@@ -461,6 +514,16 @@ class GisoWebTests(unittest.TestCase):
         artifacts = module.archive_golden_iso_and_cleanup("lnt-job", job_dir)
         self.assertEqual(artifacts[0]["path"], "8000-x64-custom.iso")
         self.assertTrue((module.ARCHIVE / "lnt-job/8000-x64-custom.iso").exists())
+
+    def test_nested_golden_output_is_recognized_and_archived(self):
+        job_dir = self.output / "nested-job"
+        nested = job_dir / "results"
+        nested.mkdir(parents=True)
+        (nested / "router-golden.iso").write_bytes(b"nested giso")
+        self.assertEqual([path.name for path in module.giso_artifact_candidates(job_dir)],
+                         ["router-golden.iso"])
+        artifacts = module.archive_giso_artifacts_and_cleanup("nested-job", job_dir)
+        self.assertEqual(artifacts[0]["path"], "router-golden.iso")
 
     def test_archive_iso_can_be_deleted_without_touching_other_files(self):
         archive_dir = module.ARCHIVE / "job"

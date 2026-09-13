@@ -21,7 +21,8 @@ and a persistent artifact archive.
 
 The expert form requires a recognizable ISO filename or an explicit platform
 family. It rejects architecture-specific option combinations before starting a
-build and shows whether upstream automatic USB output is expected.
+build and shows whether upstream automatic USB output is expected. See the
+[platform matrix](../docs/platform-support.md).
 
 ## Start
 
@@ -60,9 +61,9 @@ USB package into the archive and verifies each copy with SHA-256. Only then does
 it remove the build's source and working files. If no ISO is produced or archive
 verification fails, sources are retained for diagnosis.
 
-The **Clean temporary files** action removes incomplete upload fragments and
-temporary work directories. It does not remove completed archives or normal
-uploaded Cisco files.
+The **Clear workspace files** action removes uploaded source files, incomplete
+upload fragments, build work, and raw output. It never removes completed files
+from the GISO Archive. The action is blocked while an upload or build is active.
 
 ## Configuration
 
@@ -72,6 +73,7 @@ container with `docker compose up -d --force-recreate`.
 | Variable | Default | Purpose |
 | --- | ---: | --- |
 | `GISO_IMAGE` | `ciscogisobuild/cisco-xr-gisobuild:2.3.4` | Cisco build image |
+| `LOG_LEVEL` | `INFO` | Application event log level written to container stdout/stderr |
 | `WEB_BIND_ADDRESS` | `127.0.0.1` | Host interface exposed by Compose |
 | `WEB_PORT` | `8080` | Host HTTP port |
 | `ALLOWED_HOSTS` | `127.0.0.1,localhost,giso-webui` | Accepted HTTP Host values |
@@ -81,6 +83,7 @@ container with `docker compose up -d --force-recreate`.
 | `MAX_TAR_MEMBERS` | `10000` | Maximum files in an uploaded tar archive |
 | `MAX_LOG_BYTES` | `10485760` | In-memory log limit per build (10 MiB) |
 | `MAX_JOB_HISTORY` | `100` | Maximum completed or interrupted jobs retained in SQLite |
+| `UPLOAD_SESSION_TTL` | `86400` | Maximum idle time for an incomplete upload (24 hours) |
 | `ARCHIVE_RETENTION_DAYS` | `30` | Maximum artifact retention period |
 | `MAX_ARCHIVE_BYTES` | `53687091200` | Combined ISO and USB archive quota (50 GiB) |
 | `ARCHIVE_CLEANUP_INTERVAL_SECONDS` | `3600` | Maintenance interval; minimum 60 seconds |
@@ -100,14 +103,29 @@ The `archive-maintenance` container enforces retention and quota every hour even
 when the UI is idle. Completed job history and bounded logs are stored in SQLite
 in `giso-webui_giso-state`. If the web container restarts during a build, the
 restored job is marked `interrupted`; inspect Docker and the saved log before
-starting another build. Back up required artifacts outside Docker volumes before
-they expire. To inspect the volumes and maintenance logs:
+starting another build. Abandoned partial uploads expire automatically so they
+cannot block later builds indefinitely. Back up required artifacts outside
+Docker volumes before they expire. To inspect the volumes and maintenance logs:
 
 ```bash
 docker volume ls --filter name=giso-webui
 docker compose exec giso-webui df -h /uploads /archive /output /work
 docker compose logs --tail=100 archive-maintenance
 ```
+
+Follow operational events while uploading, building, or cleaning:
+
+```bash
+docker compose logs --follow --tail=200 giso-webui archive-maintenance
+```
+
+The Web UI logs request IDs, endpoint names, response status, upload byte
+counts, build phases, completion status, and cleanup totals. Cisco filenames,
+payloads, configuration content, and raw build output are not copied into the
+container log. The full per-job build output remains available in the Web UI.
+
+The complete start, upgrade, backup, restore, failure, and decommission
+procedures are in the [operations runbook](../docs/operations.md).
 
 ## Test and verify
 
@@ -121,12 +139,14 @@ docker compose run --rm --no-deps \
 ```
 
 The repository CI also runs Ruff, `pip-audit`, shell syntax validation, Compose
-validation, and a production container build. A real GISO build is not part of
+validation, and an application container build. A real GISO build is not part of
 CI because it requires licensed Cisco inputs and substantial compute resources.
+See [testing and acceptance](../docs/testing.md).
 
 ## Troubleshooting
 
-- **Health check is failing:** Run `docker info`, then inspect
+- **Health check is failing:** Run `docker info`, confirm
+  `.gisobuild-tool/src/gisobuild.py` and the mounted storage exist, then inspect
   `docker compose logs --tail=200 giso-webui`.
 - **Build cannot start:** Confirm `.gisobuild-tool/src/gisobuild.py` exists and
   no container named `giso-build-*` is already running.

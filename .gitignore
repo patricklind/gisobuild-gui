@@ -1,14 +1,26 @@
 # macOS and editor files
 .DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
 # Python tooling
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 .venv/
 venv/
@@ -24,10 +36,20 @@ graphify-out/.graphify*
 .gisobuild-tool/
 .giso-build-staging-*/
 output_gisobuild*/
+*.part
+*.tmp
 
 # Persistent Web UI data
 giso-webui/uploads/
 giso-webui/output/
+giso-webui/archive/
+giso-webui/work/
+giso-webui/state/
+*.sqlite
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.log
 
 # Cisco images and packages must never be published
 *.iso
@@ -35,12 +57,22 @@ giso-webui/output/
 *.tar
 *.tgz
 *usb_boot*.zip
+*.img
+*.qcow2
+*.qcow2.gz
 
 # Local configuration and secrets
 .env
 .env.*
-!.env.example
+*.env
+.envrc
+.direnv/
 *.pem
 *.key
 *.p12
 *.pfx
+*.csr
+*.crt
+*.cer
+*.cms
+!.env.example
