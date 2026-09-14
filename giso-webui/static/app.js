@@ -173,19 +173,62 @@ async function checkCompatibility() {
   button.disabled=true; result.className='compatibility-result'; result.textContent='Checking filenames and upgrade data…';
   try {
     const check=await api('/api/compatibility',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const messages=check.smu.compatible ? [`${check.smu.checked} RPM filenames passed the deterministic checks.`] : [...check.smu.issues];
-    messages.push(...check.smu.package_groups.map(group=>`${group.csc}: ${group.count} component${group.count === 1 ? '' : 's'} (${group.components.join(', ')})`));
-    if (check.upgrade) messages.push(check.upgrade.message,
-      ...check.upgrade.bridge_smus.map(item=>`Required bridge SMU: ${item}`),
-      ...check.upgrade.missing_bridge_smus.map(item=>`Not selected: required bridge SMU ${item}`),
-      ...check.upgrade.caveats.map(item=>`Caveat: ${item}`));
-    messages.push(...check.smu.warnings);
     const good=check.smu.compatible && (!check.upgrade || (check.upgrade.permitted && !check.upgrade.missing_bridge_smus.length));
     const warning=good && check.smu.warnings.length > 0;
     result.className=`compatibility-result ${good ? (warning ? 'warning' : 'good') : 'bad'}`; result.replaceChildren();
-    const list=document.createElement('ul'); messages.forEach(message=>{const item=document.createElement('li');item.textContent=message;list.appendChild(item);});result.appendChild(list);
+    renderCompatibilityResult(result, check, payload);
   } catch(error) { result.className='compatibility-result bad'; result.textContent=error.message; }
   finally { button.disabled=false; }
+}
+
+function compatibilityMetric(icon, label, value, state) {
+  const card=document.createElement('div'); card.className=`compatibility-metric ${state}`;
+  const symbol=document.createElement('span'); symbol.className='compatibility-icon'; symbol.setAttribute('aria-hidden','true'); symbol.textContent=icon;
+  const copy=document.createElement('span'); const strong=document.createElement('b'); strong.textContent=value;
+  const small=document.createElement('small'); small.textContent=label; copy.append(strong,small); card.append(symbol,copy); return card;
+}
+
+function compatibilityList(title, items, state) {
+  if (!items.length) return null;
+  const section=document.createElement('section'); section.className=`compatibility-list ${state}`;
+  const heading=document.createElement('h4'); heading.textContent=title; const list=document.createElement('ul');
+  items.forEach(message=>{const item=document.createElement('li');item.textContent=message;list.appendChild(item);});
+  section.append(heading,list); return section;
+}
+
+function renderCompatibilityResult(result, check, payload) {
+  const summary=document.createElement('div'); summary.className='compatibility-summary';
+  summary.append(
+    compatibilityMetric(check.smu.compatible ? '✓' : '×','Package filename checks',check.smu.compatible ? 'Passed' : 'Blocked',check.smu.compatible ? 'pass' : 'fail'),
+    compatibilityMetric('▦','RPM packages',String(check.smu.checked),'neutral'),
+    compatibilityMetric('◆','CSC groups',String(check.smu.package_groups.length),'neutral'),
+  );
+  if (check.upgrade) summary.append(compatibilityMetric(check.upgrade.permitted ? '✓' : '×','Upgrade path',check.upgrade.permitted ? 'Permitted' : 'Not permitted',check.upgrade.permitted ? 'pass' : 'fail'));
+  result.append(summary);
+
+  if (check.upgrade) {
+    const path=document.createElement('div'); path.className='upgrade-path'; path.setAttribute('aria-label',`Upgrade path from ${payload.source_release} to ${payload.target_release}`);
+    const source=document.createElement('span'); source.append(document.createTextNode('Current ')); const sourceRelease=document.createElement('b'); sourceRelease.textContent=payload.source_release; source.append(sourceRelease);
+    const arrow=document.createElement('span'); arrow.className='path-arrow'; arrow.setAttribute('aria-hidden','true'); arrow.textContent='→';
+    const target=document.createElement('span'); target.append(document.createTextNode('Target ')); const targetRelease=document.createElement('b'); targetRelease.textContent=payload.target_release; target.append(targetRelease);
+    path.append(source,arrow,target); result.append(path);
+  }
+
+  if (check.smu.package_groups.length) {
+    const groups=document.createElement('section'); groups.className='csc-groups'; const heading=document.createElement('h4'); heading.textContent='Packages grouped by Cisco fix'; groups.appendChild(heading);
+    const grid=document.createElement('div'); grid.className='csc-grid';
+    check.smu.package_groups.forEach(group=>{const card=document.createElement('div'); card.className='csc-card'; const title=document.createElement('b'); title.textContent=group.csc; const count=document.createElement('small'); count.textContent=`${group.count} component${group.count === 1 ? '' : 's'}`; const components=document.createElement('p'); components.textContent=group.components.join(' · '); card.append(title,count,components); grid.appendChild(card);});
+    groups.appendChild(grid); result.appendChild(groups);
+  }
+
+  const blockers=[...check.smu.issues];
+  if (check.upgrade && !check.upgrade.permitted) blockers.push(check.upgrade.message);
+  if (check.upgrade) blockers.push(...check.upgrade.missing_bridge_smus.map(item=>`Required bridge SMU is not selected: ${item}`));
+  const cautions=[...check.smu.warnings];
+  if (check.upgrade) cautions.push(...check.upgrade.caveats);
+  const blockerList=compatibilityList('Fix before building',blockers,'fail'); if (blockerList) result.appendChild(blockerList);
+  const cautionList=compatibilityList('Review before building',cautions,'warn'); if (cautionList) result.appendChild(cautionList);
+  if (!blockers.length && !cautions.length) { const ready=document.createElement('p'); ready.className='compatibility-ready'; ready.textContent='No deterministic compatibility problems were found. Cisco gisobuild will perform the final dependency check.'; result.appendChild(ready); }
 }
 
 function updateCompatibilityMode() {
