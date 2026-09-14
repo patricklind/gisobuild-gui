@@ -33,6 +33,7 @@ Core principle:
 ## Major workstreams
 
 - [ ] Complete repository audit
+- [ ] Resolve concrete correctness bugs in `07-BUG-AUDIT-TODO.md`
 - [ ] Canonical package/inventory model
 - [ ] Upstream-driven platform/capability model
 - [ ] ISO metadata inspection
@@ -49,8 +50,28 @@ Core principle:
 - [ ] Comprehensive tests
 - [ ] CI/CD and image publishing
 
+## Immediate bug-fix priority
+
+Before large refactors hide the current failure modes, add regression tests and fix or preserve explicit coverage for:
+
+- [ ] cancellation during builder preparation/pull
+- [ ] cancellation during finalization
+- [ ] successful build must not delete unrelated inputs
+- [ ] multiple ISOs must never silently select the first candidate
+- [ ] RPM CPU architecture must match the selected ISO/build architecture
+- [ ] RPM selection must use exact identity, never glob matching
+- [ ] duplicate basenames must remain distinguishable by identity/checksum
+- [ ] compatibility matrix platform aliases must use one canonical resolver
+- [ ] bridge-SMU presence must use exact package/CSC identity
+- [ ] inventory discovery must tolerate concurrent cleanup/delete
+- [ ] auto-derived target release must not become stale when the ISO changes
+- [ ] Graphify output must be refreshed and freshness checked in CI
+
+See `07-BUG-AUDIT-TODO.md` for detailed scenarios and required regression tests.
+
 ## Suggested implementation order
 
+- [ ] Phase 0 — lock down current bugs with regression tests from `07-BUG-AUDIT-TODO.md`
 - [ ] Phase 1 — tests + package identity model
 - [ ] Phase 2 — inventory + BuildPlan
 - [ ] Phase 3 — metadata-based ISO/RPM detection
@@ -73,3 +94,6 @@ Core principle:
 - [ ] No Docker socket required
 - [ ] No separate gisobuild checkout required
 - [ ] Regression coverage for all bugs fixed
+- [ ] No destructive cleanup outside the active BuildPlan
+- [ ] Build lifecycle transitions are race-safe and cancellable
+- [ ] Graphify output is current for code-changing merges
