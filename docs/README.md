@@ -2,6 +2,11 @@
 
 Use this index to find the right level of guidance.
 
+Start with the [project README](../README.md). Operators should then read the
+[Web UI guide](../giso-webui/README.md) and [operations runbook](operations.md).
+Anyone preparing a router change must also use the
+[GISO upgrade and rollback guide](../GISOBUILD-GUIDE.md).
+
 | Document | Purpose |
 | --- | --- |
 | [Project README](../README.md) | Installation, first build, safety boundary, and project status |
@@ -18,3 +23,6 @@ Use this index to find the right level of guidance.
 The staging simulator never contacts a router. For production changes, use the
 exact Cisco documentation for the platform, source release, target release,
 route processor, installed package set, and supported upgrade path.
+
+Documentation describes application behavior on `main`. For an older deployed
+version, select the matching Git tag before following its instructions.

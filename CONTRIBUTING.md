@@ -28,8 +28,10 @@ docker compose run --rm --no-deps \
   -w /project/giso-webui \
   giso-webui python -B -m unittest discover -s tests -v
 cd ..
-bash -n build-giso.sh
+docker compose -f staging/compose.yaml config -q
+bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
 python3 staging/rehearse.py
+git diff --check
 ```
 
 Never add Cisco-distributed software, generated images, device configuration,
@@ -37,3 +39,14 @@ credentials, build logs, or customer data to commits or test fixtures.
 
 Keep changes focused and add a regression test for every bug fix where practical.
 Use [`docs/testing.md`](docs/testing.md) for the complete validation ladder.
+
+After the checks pass:
+
+```bash
+./scripts/coord.sh done <module>
+git push -u origin codex/<task-name>
+```
+
+Open a pull request and wait for CI. After merge, release the module claim from
+the primary checkout and remove the worktree with
+`./scripts/worktree.sh remove <task-name>`.

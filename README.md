@@ -3,6 +3,9 @@
 A local Docker-based interface and CLI for building Cisco IOS XR Golden ISO
 (GISO) images and USB boot packages with Cisco's `gisobuild` tool.
 
+[Documentation](docs/README.md) · [Operations](docs/operations.md) ·
+[Testing](docs/testing.md) · [Releases](https://github.com/patricklind/gisobuild-gui/releases)
+
 > [!WARNING]
 > This project does not contain or distribute Cisco software. Supply your own
 > properly licensed IOS XR ISO, RPM, and SMU files. These files are excluded by
@@ -42,6 +45,9 @@ dropped.
   at `.gisobuild-tool/`, or permission for `build-giso.sh` to clone it
 - Properly licensed Cisco IOS XR input files
 
+Keep at least 25 GB free beyond the input files. A build temporarily stores the
+upload, extracted packages, working data, and generated output at the same time.
+
 ## Quick start
 
 ```bash
@@ -51,11 +57,19 @@ git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
 cd giso-webui
 cp .env.example .env
 docker compose up --build -d
+docker compose ps
+curl --fail http://127.0.0.1:8080/api/health
 ```
 
 Open <http://127.0.0.1:8080> and upload the Cisco base ISO and relevant update
 packages. Successful builds archive both the Golden ISO and, when supported, the
 USB boot ZIP.
+
+Watch upload and build activity with:
+
+```bash
+docker compose logs --follow --tail=200 giso-webui archive-maintenance
+```
 
 The expert form validates the selected platform family and rejects options from
 the wrong eXR or IOS XR7/LNT workflow. The ISO remains the authority for exact
@@ -129,3 +143,5 @@ Docker socket. Do not expose port 8080 to an untrusted network. See
 
 No open-source license has been selected yet. Until one is added, copyright law
 reserves all rights to the repository owner.
+
+[patricklind/gisobuild-gui](https://github.com/patricklind/gisobuild-gui)

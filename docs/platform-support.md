@@ -38,6 +38,18 @@ result in the build log and the platform recovery guide.
   controls are IOS XR7/LNT options.
 - An unrecognized filename requires an explicit platform selection.
 
+## SMU compatibility checks
+
+Automatic selection includes only RPM filenames that identify the same platform
+and IOS XR release as the base ISO. The validator also rejects mixed processor
+architectures and multiple versions of the same component and CSC. RPMs sharing
+a CSC identifier are displayed as a package group, while overlapping CSC fixes
+for one component are flagged for supersedence review.
+
+These are deterministic pre-checks. They cannot prove dependency closure,
+supersedence, signature validity, or PID support. Cisco `gisobuild`, ISO metadata,
+and an approved Cisco package list remain authoritative.
+
 When using PID filtering, inspect the input ISO with upstream
 `isols.py --dump-mdata`. Removing PID support is one-way and can make a system
 unbootable if required route processors or line cards are omitted.

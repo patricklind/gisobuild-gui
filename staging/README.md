@@ -21,6 +21,12 @@ EOF
 python3 staging/rehearse.py
 ```
 
+A successful automated rehearsal ends with:
+
+```text
+PASS: full staged upgrade and rollback rehearsal
+```
+
 Before production, repeat the runbook in a lab router matching the production
 PID, route processor, source release, target release, ROMMON and package set.
 The validation levels and reporting language are defined in

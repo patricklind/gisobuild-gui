@@ -111,7 +111,9 @@ verification fails, sources are retained for diagnosis.
 
 The **Clear workspace files** action removes uploaded source files, incomplete
 upload fragments, build work, and raw output. It never removes completed files
-from the GISO Archive. The action is blocked while an upload or build is active.
+from the GISO Archive. It also removes stale raw-output links from failed jobs
+in memory and SQLite, then resets the build-result panel. The action is blocked
+while an upload, Cisco download, or build is active.
 
 ## Configuration
 
@@ -214,6 +216,11 @@ See [testing and acceptance](../docs/testing.md).
   hostname to `ALLOWED_HOSTS`; do not use a wildcard.
 - **Build was interrupted by restart:** The job and log remain visible. Check
   running `giso-build-*` containers and application logs before starting again.
+- **Cleanup reports zero items:** The workspace is already empty. Archived ISO
+  and USB files are intentionally managed separately by retention and quota.
+- **Old failed-build links remain:** Recreate the Web UI from the latest image,
+  then run **Clear workspace files** again; the current version clears those
+  references from persisted job history.
 - **Need a clean reset:** `docker compose down` preserves volumes. Adding `-v`
   permanently deletes uploads and archives and should only be used intentionally.
 

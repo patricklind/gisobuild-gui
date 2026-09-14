@@ -2,8 +2,8 @@
 
 ## Supported version
 
-Security fixes are applied to the latest commit on `main`. Until versioned
-releases are published, no older commit or image is supported.
+Security fixes are applied to the latest release and the latest commit on
+`main`. Older releases and unversioned container images are not supported.
 
 ## Reporting a vulnerability
 

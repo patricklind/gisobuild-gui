@@ -48,6 +48,11 @@ The runner uploads the files, waits for the real Cisco build container, requires
 both a Golden ISO and USB ZIP, and prints SHA-256 checksums. Do not commit the
 input files, output files, logs, filenames containing customer data, or secrets.
 
+Record the tool image digest, input ISO release and platform, selected package
+inventory, exit status, artifact sizes, and generated checksums in an approved
+private change record. A passing synthetic test or staging rehearsal must never
+be reported as licensed-ISO acceptance.
+
 ## 4. Matching-hardware validation
 
 Only a lab router matching the production PID, route processor, source release,
@@ -55,3 +60,10 @@ target release, ROMMON/BIOS/FPD state, and package set can validate the actual
 upgrade and rollback. Use an approved maintenance procedure and the
 [GISO guide](../GISOBUILD-GUIDE.md). The staging simulator is a workflow-order
 test and is never hardware acceptance.
+
+## Reporting results
+
+Use one of these exact outcomes for every validation level: **passed**,
+**failed**, or **not run**. Include the command or procedure, timestamp, tested
+commit or image digest, and relevant limitations. Never promote a lower-level
+result to a higher validation level.
