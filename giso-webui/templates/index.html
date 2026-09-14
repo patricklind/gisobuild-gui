@@ -57,6 +57,12 @@
           <div id="iso-check" class="ready-card waiting"><span class="ready-icon">…</span><div><b>Base image</b><p>Not found yet</p></div></div>
           <div id="rpm-check" class="ready-card waiting"><span class="ready-icon">…</span><div><b>Updates</b><p>Not found yet</p></div></div>
         </div>
+        <section id="smu-auto-plan" class="smu-auto-plan" aria-labelledby="smu-auto-plan-title" aria-live="polite">
+          <div class="smu-plan-heading"><div><span class="eyebrow">AUTOMATIC PACKAGE PLAN</span><h3 id="smu-auto-plan-title">Waiting for one base ISO</h3></div><span id="smu-plan-state" class="pill neutral">Waiting</span></div>
+          <p id="smu-plan-message">Upload one base ISO and the Cisco SMU TAR files. The system will select the matching RPM repository automatically.</p>
+          <div id="smu-plan-details" class="smu-plan-details"></div>
+          <button id="refresh-smu-plan" class="secondary small" type="button">Recalculate package set</button>
+        </section>
         <div id="file-library" class="file-library"></div>
         <button type="button" id="refresh" class="secondary">Check files again</button>
 
@@ -78,7 +84,7 @@
                   <label><input type="radio" name="compatibility_mode" value="same-release" checked><span><b>Same-release Golden ISO</b><small>Add SMUs to the release contained in the base ISO.</small></span></label>
                   <label><input type="radio" name="compatibility_mode" value="upgrade"><span><b>Router upgrade</b><small>Also check the current-to-target release path and required bridge SMUs.</small></span></label>
                 </fieldset>
-                <label>Selected RPM packages<textarea name="pkglist_override" rows="6"></textarea><small>One RPM filename per line. Leave empty to use all automatically selected RPMs.</small></label>
+                <details class="manual-package-override"><summary>Override automatic RPM selection</summary><label>Selected RPM packages<textarea name="pkglist_override" rows="6"></textarea><small>Normally leave this empty. One RPM filename per line; a manual list replaces the automatic package plan.</small></label><button id="use-automatic-packages" class="secondary small" type="button">Return to automatic selection</button></details>
                 <div id="upgrade-compatibility-fields" class="upgrade-compatibility-fields" hidden>
                   <p class="field-guidance"><b>Upgrade-path check</b> requires a Cisco compatibility matrix, both releases and the router platform.</p>
                   <div class="grid three compatibility-fields"><label>Cisco upgrade matrix<select name="compatibility_matrix"><option value="">Select an uploaded matrix</option></select><small>Upload a compatibility_matrix JSON in step 1.</small></label><label>Current router release<input name="source_release" inputmode="decimal" placeholder="25.1.2"><small>The release currently active on the router.</small></label><label>Target ISO release<input name="target_release" inputmode="decimal" placeholder="26.1.2"><small>Usually detected from the base ISO filename.</small></label></div>

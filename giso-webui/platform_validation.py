@@ -131,6 +131,48 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
             "package_groups": package_groups}
 
 
+def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
+    """Select every deterministic platform/release match for upstream dependency resolution."""
+    iso_name = Path(iso).name
+    iso_platform = infer_platform(iso_name)
+    release_match = ISO_RELEASE.search(iso_name)
+    iso_release = release_match.group("release") if release_match else ""
+    expected_tag = iso_release.replace(".", "") if iso_release else ""
+    selected: list[str] = []
+    excluded: list[dict[str, str]] = []
+
+    if not iso_platform or not expected_tag:
+        missing = "platform" if not iso_platform else "release"
+        return {"ready": False, "selected": [], "excluded": [], "iso": iso_name,
+                "message": f"The ISO {missing} could not be detected; select it in Expert settings"}
+
+    for package in sorted(set(packages)):
+        name = Path(package).name
+        package_platform = infer_platform(name)
+        rpm_release = RPM_RELEASE.search(name)
+        if package_platform and package_platform != iso_platform:
+            excluded.append({"name": name, "reason": "Different platform"})
+        elif rpm_release and rpm_release.group("release") != expected_tag:
+            excluded.append({"name": name, "reason": "Different IOS XR release"})
+        elif not rpm_release:
+            excluded.append({"name": name, "reason": "Release is missing from filename"})
+        else:
+            selected.append(name)
+
+    return {
+        "ready": True,
+        "selected": selected,
+        "excluded": excluded,
+        "iso": iso_name,
+        "platform": iso_platform,
+        "release": iso_release,
+        "message": (
+            f"Selected {len(selected)} matching RPMs; Cisco gisobuild will resolve dependencies "
+            "and supersedence from the complete matching repository"
+        ),
+    }
+
+
 def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
                          selected_packages: list[str] | None = None) -> dict:
     if not isinstance(matrix, dict) or not isinstance(matrix.get("permitted"), dict):

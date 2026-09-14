@@ -28,6 +28,7 @@ from flask import (
 from platform_validation import (
     PLATFORMS,
     check_upgrade_matrix,
+    recommend_smu_selection,
     validate_platform_options,
     validate_smu_selection,
 )
@@ -400,7 +401,7 @@ def validate_build_payload(body: dict) -> dict:
         if (not isinstance(values, list) or len(values) > 10000
                 or not all(isinstance(value, str) and len(value) <= 4096 for value in values)):
             raise ValueError(f"{key} must be a list of strings")
-    for key in set(BOOL_OPTIONS) | {"auto_repo"}:
+    for key in set(BOOL_OPTIONS) | {"auto_repo", "automatic_smu_selection"}:
         if key in payload and not isinstance(payload[key], bool):
             raise ValueError(f"{key} must be true or false")
     return payload
@@ -575,6 +576,21 @@ def expire_upload_sessions() -> None:
         Path(item["temp"]).unlink(missing_ok=True)
 
 
+def active_rpm_names() -> tuple[list[str], set[str]]:
+    superseded: set[str] = set()
+    pattern = re.compile(r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE)
+    for readme in DATA.rglob("*.txt"):
+        try:
+            superseded.update(pattern.findall(readme.read_text(errors="ignore")))
+        except OSError:
+            pass
+    candidates = [
+        rpm.name for rpm in DATA.rglob("*.rpm")
+        if not any(rpm.parent.name.startswith(identifier) for identifier in superseded)
+    ]
+    return candidates, superseded
+
+
 def discover() -> dict:
     files, dirs = [], []
     ignored = {".parts"}
@@ -587,21 +603,20 @@ def discover() -> dict:
             if name.lower().endswith((".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".json")):
                 path = root_path / name
                 files.append({"path": rel_data(path), "size": path.stat().st_size, "type": path.suffix.lower()})
-    superseded = set()
-    pattern = re.compile(r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE)
-    for readme in DATA.rglob("*.txt"):
-        try:
-            superseded.update(pattern.findall(readme.read_text(errors="ignore")))
-        except OSError:
-            pass
-    recommended = []
-    for rpm in DATA.rglob("*.rpm"):
-        if not any(rpm.parent.name.startswith(identifier) for identifier in superseded):
-            recommended.append(rpm.name)
+    candidates, superseded = active_rpm_names()
+    isos = [item["path"] for item in files if item["type"] == ".iso"]
+    if len(isos) == 1:
+        recommendation = recommend_smu_selection(isos[0], candidates)
+    elif len(isos) > 1:
+        recommendation = {"ready": False, "selected": [], "excluded": [],
+                          "message": "More than one base ISO was found; keep one ISO or select it in Expert settings"}
+    else:
+        recommendation = {"ready": False, "selected": [], "excluded": [],
+                          "message": "Upload one base ISO before SMUs can be selected"}
     matrices = [item["path"] for item in files
                 if item["type"] == ".json" and Path(item["path"]).name.startswith("compatibility_matrix_")]
     return {"files": sorted(files, key=lambda x: x["path"]), "dirs": sorted(dirs),
-            "recommended": sorted(set(recommended)),
+            "recommended": recommendation["selected"], "recommendation": recommendation,
             "superseded": sorted(superseded), "matrices": matrices}
 
 
@@ -680,6 +695,11 @@ def build_command(payload: dict, job_id: str) -> list[str]:
         iso = payload.get("iso", "")
         if not iso:
             raise ValueError("Select an ISO, or provide a YAML file")
+        if payload.get("automatic_smu_selection"):
+            package_plan = recommend_smu_selection(iso, active_rpm_names()[0])
+            if not package_plan["ready"]:
+                raise ValueError(package_plan["message"])
+            payload["pkglist"] = package_plan["selected"]
         profile = validate_platform_options(payload)
         payload["platform"] = profile["id"]
         smu_check = validate_smu_selection(iso, payload.get("pkglist", []))
@@ -884,6 +904,20 @@ def inputs():
 @app.get("/api/platforms")
 def platforms():
     return jsonify([{"id": key, **value} for key, value in PLATFORMS.items()])
+
+
+@app.post("/api/smu/recommendation")
+def smu_recommendation():
+    body = json_object()
+    try:
+        iso = cisco_text(body.get("iso"), "base ISO", maximum=4096)
+        iso_path = safe_data_path(iso)
+        if iso_path.suffix.lower() != ".iso" or not iso_path.is_file():
+            raise ValueError("Select an uploaded base ISO")
+        packages, _ = active_rpm_names()
+        return jsonify(recommend_smu_selection(iso, packages))
+    except (OSError, TypeError, ValueError) as exc:
+        return jsonify(error=str(exc)), 400
 
 
 @app.post("/api/compatibility")

@@ -107,17 +107,54 @@ function renderInputs(data) {
   $('[name=iso]').value = iso;
   const releaseMatch = iso.match(/-(\d+\.\d+\.\d+)(?:[-.]|$)/);
   if (releaseMatch && !$('[name=target_release]').value) $('[name=target_release]').value = releaseMatch[1];
-  if (!packageListEdited) $('[name=pkglist]').value = data.recommended.join('\n');
+  applySmuRecommendation(data.recommendation || {ready:false,selected:[],excluded:[],message:'No automatic package plan is available.'});
   setReadyCard('#iso-check', Boolean(iso), iso ? 'Found and ready' : 'Upload the Cisco base file');
-  setReadyCard('#rpm-check', data.recommended.length > 0, data.recommended.length ? `${data.recommended.length} updates found` : 'Optional: add SMU files or another customization');
+  const plan=data.recommendation || {};
+  const rpmStatus=plan.ready
+    ? `${data.recommended.length} compatible RPM${data.recommended.length === 1 ? '' : 's'} selected${plan.excluded?.length ? ` · ${plan.excluded.length} excluded` : ''}`
+    : plan.message || 'Optional: add SMU files or another customization';
+  setReadyCard('#rpm-check', plan.ready && data.recommended.length > 0, rpmStatus);
 
   const library = $('#file-library'); library.replaceChildren();
   if (iso) library.appendChild(fileRow('Base image', iso));
-  if (data.recommended.length) library.appendChild(fileRow('Updates', `${data.recommended.length} RPM files selected automatically`));
+  if (data.recommended.length) library.appendChild(fileRow('Updates', `${data.recommended.length} compatible RPM files selected automatically`));
   if (!iso && !data.recommended.length) {
     const empty = document.createElement('p'); empty.textContent = 'No Cisco files have been found yet.'; empty.className = 'empty'; library.appendChild(empty);
   }
   updateBuildAvailability();
+}
+
+function applySmuRecommendation(plan) {
+  if (!packageListEdited) $('[name=pkglist]').value=(plan.selected || []).join('\n');
+  const state=$('#smu-plan-state'); const title=$('#smu-auto-plan-title'); const message=$('#smu-plan-message');
+  state.className=`pill ${plan.ready ? 'success' : 'running'}`; state.textContent=plan.ready ? 'Calculated' : 'Needs input';
+  title.textContent=plan.ready ? `${plan.selected.length} matching RPM${plan.selected.length === 1 ? '' : 's'} selected` : 'Automatic selection paused';
+  message.textContent=plan.message;
+  const details=$('#smu-plan-details'); details.replaceChildren();
+  if (plan.ready) {
+    const flow=document.createElement('div'); flow.className='smu-plan-flow';
+    [['Base ISO',plan.iso],['Platform',String(plan.platform || '').toUpperCase()],['IOS XR',plan.release],['Selected',`${plan.selected.length} RPMs`]].forEach(([label,value],index)=>{
+      if (index) { const arrow=document.createElement('span'); arrow.setAttribute('aria-hidden','true'); arrow.textContent='→'; flow.appendChild(arrow); }
+      const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label; const strong=document.createElement('b'); strong.textContent=value; step.append(small,strong); flow.appendChild(step);
+    });
+    details.appendChild(flow);
+  }
+  if (plan.excluded?.length) {
+    const excluded=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`${plan.excluded.length} incompatible RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically`;
+    const list=document.createElement('ul'); plan.excluded.forEach(item=>{const row=document.createElement('li'); row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);}); excluded.append(summary,list); details.appendChild(excluded);
+  }
+  updateBuildAvailability();
+}
+
+async function refreshSmuRecommendation() {
+  const iso=$('[name=iso_override]').value || $('[name=iso]').value;
+  if (!iso) { applySmuRecommendation({ready:false,selected:[],excluded:[],message:'Upload or select one base ISO first.'}); return; }
+  const button=$('#refresh-smu-plan'); button.disabled=true; button.textContent='Calculating…';
+  try {
+    const plan=await api('/api/smu/recommendation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({iso})});
+    applySmuRecommendation(plan);
+  } catch(error) { applySmuRecommendation({ready:false,selected:[],excluded:[],message:error.message}); }
+  finally { button.disabled=false; button.textContent='Recalculate package set'; }
 }
 
 function updateBuildAvailability() {
@@ -369,6 +406,7 @@ $('#build-form').addEventListener('submit', async event => {
     yamlfile: yamlMode ? form.get('yamlfile') : '',
     label: form.get('label_override') || form.get('label'),
     pkglist: lines(form.get('pkglist_override') || form.get('pkglist') || ''),
+    automatic_smu_selection: !packageListEdited,
     repo: lines(form.get('repo') || ''), auto_repo: true,
     bridging_fixes: lines(form.get('bridging_fixes') || ''),
     remove_packages: lines(form.get('remove_packages') || ''),
@@ -578,6 +616,12 @@ $('#cancel-build').onclick = async () => {
   }
 };
 $('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; });
+$('#refresh-smu-plan').onclick=refreshSmuRecommendation;
+$('#use-automatic-packages').onclick=async()=>{
+  $('[name=pkglist_override]').value=''; packageListEdited=false;
+  await refreshSmuRecommendation(); updateBuildAvailability();
+};
+$('[name=iso_override]').addEventListener('change',refreshSmuRecommendation);
 $('#check-compatibility').onclick=checkCompatibility;
 document.querySelectorAll('[name=compatibility_mode]').forEach(control=>control.addEventListener('change', updateCompatibilityMode));
 updateCompatibilityMode();

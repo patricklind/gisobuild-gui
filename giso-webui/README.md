@@ -76,7 +76,9 @@ curl --fail http://127.0.0.1:8080/api/health
 ## Build workflow
 
 1. Upload the base ISO and matching RPM, SMU, or configuration files.
-2. Review the discovered packages and select the required build options.
+2. Review the automatic package plan. The application selects every RPM that
+   matches the single base ISO's platform and release and excludes deterministic
+   mismatches. Manual RPM selection remains under Expert settings.
 3. Start the build. Only one build can run, and it starts only after every
    upload and archive extraction has completed.
 4. Follow the live log until the job succeeds or fails.
@@ -86,8 +88,12 @@ Cisco `.tar` files are transport archives. The UI safely extracts them and
 passes discovered `.rpm` files to `--pkglist`; do not select the tar file itself
 as a package.
 
-The expert SMU check rejects RPM filenames for a different platform or IOS XR
-release and detects multiple fixes that replace the same package component.
+The automatic package plan is recalculated server-side when the build starts,
+so the build does not trust a stale browser selection. The complete matching
+repository is passed to Cisco `gisobuild`, allowing its RPM metadata engine to
+resolve prerequisites, dependency closure, and supersedence. The pre-check
+rejects deterministic filename conflicts such as a different platform, IOS XR
+release, processor architecture, or multiple versions of one component/CSC.
 Upload a Cisco `compatibility_matrix_*.json` file to also check the router's
 source-to-target upgrade path, required bridge SMUs, and published caveats. The
 matrix is an upgrade-path source, not proof that RPM dependencies resolve;

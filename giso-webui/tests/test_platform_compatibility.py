@@ -1,9 +1,32 @@
 import unittest
 
-from platform_validation import check_upgrade_matrix, validate_smu_selection
+from platform_validation import (
+    check_upgrade_matrix,
+    recommend_smu_selection,
+    validate_smu_selection,
+)
 
 
 class PlatformCompatibilityTests(unittest.TestCase):
+    def test_automatic_selection_keeps_matching_repository_and_excludes_mismatches(self):
+        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
+            "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-mpls-te-rsvp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm",
+            "asr9k-bgp-1.0.0.1-r2612.CSCtest00003.x86_64.rpm",
+        ])
+        self.assertTrue(result["ready"])
+        self.assertEqual(len(result["selected"]), 2)
+        self.assertEqual({item["reason"] for item in result["excluded"]},
+                         {"Different IOS XR release", "Different platform"})
+
+    def test_automatic_selection_refuses_to_guess_unknown_iso_release(self):
+        result = recommend_smu_selection("ncs5500-mini-x.iso", [
+            "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+        ])
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["selected"], [])
+
     def test_matching_platform_and_release_are_accepted(self):
         result = validate_smu_selection(
             "ncs5500-mini-x-26.1.2.iso",
