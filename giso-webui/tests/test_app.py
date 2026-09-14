@@ -144,6 +144,67 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("free disk space", response.get_json()["error"])
 
+    def test_cisco_download_is_blocked_during_upload_or_build(self):
+        guid = "A" * 40
+        module.cisco_searches["search"] = {
+            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
+            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
+                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+        }
+        module.uploads["active"] = {"updated": time.time(), "temp": ""}
+        response = self.client.post("/api/cisco/downloads", json={
+            "search_id": "search", "image_guids": [guid],
+        })
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("upload", response.get_json()["error"])
+        module.uploads.clear()
+        module.jobs["active"] = {"status": "running"}
+        response = self.client.post("/api/cisco/downloads", json={
+            "search_id": "search", "image_guids": [guid],
+        })
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("build", response.get_json()["error"])
+
+    def test_cisco_download_rejects_duplicate_file_selection(self):
+        guid = "A" * 40
+        module.cisco_searches["search"] = {
+            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
+            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100}},
+        }
+        response = self.client.post("/api/cisco/downloads", json={
+            "search_id": "search", "image_guids": [guid, guid],
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("unique", response.get_json()["error"])
+
+    @patch("app.cisco_client")
+    def test_failed_multi_file_cisco_download_removes_partial_results(self, client):
+        first = self.data / "first.iso"
+
+        def download(_url, target, **_kwargs):
+            if target.name == "first.iso":
+                target.write_bytes(b"verified")
+                return SimpleNamespace(path=target, size=8, sha256="sha256")
+            raise module.CiscoDownloadError("second file failed")
+
+        client.return_value.download.side_effect = download
+        selected = [
+            {"guid": "A", "name": "first.iso", "size": 8, "md5": "", "sha512": ""},
+            {"guid": "B", "name": "second.iso", "size": 8, "md5": "", "sha512": ""},
+        ]
+        downloads = [
+            {"imageGuid": "A", "url": "https://download.cisco.com/first.iso"},
+            {"imageGuid": "B", "url": "https://download.cisco.com/second.iso"},
+        ]
+        module.cisco_download_jobs["job"] = {
+            "id": "job", "status": "downloading", "created": time.time(),
+            "progress": 0, "files": [], "error": "",
+        }
+        module.run_cisco_download("job", {}, selected, downloads)
+        self.assertEqual(module.cisco_download_jobs["job"]["status"], "failed")
+        self.assertEqual(module.cisco_download_jobs["job"]["files"], [])
+        self.assertFalse(first.exists())
+
     @patch("app.threading.Thread")
     @patch("app.cisco_client")
     def test_cisco_k9_only_flow_does_not_require_eula(self, client, thread):
@@ -196,10 +257,12 @@ class GisoWebTests(unittest.TestCase):
                               "log": "", "artifacts": []}
         with self.assertLogs(module.app.logger.name, level="INFO") as captured:
             module.append_log(
-                "job", "Scanning /uploads/private/base.iso and update.rpm\n"
+                "job", "Scanning /uploads/private/base.iso, update.rpm and "
+                "'/output/private matrix.json'\n"
             )
         self.assertIn("[artifact]", module.jobs["job"]["log"])
         self.assertNotIn("base.iso", module.jobs["job"]["log"])
+        self.assertNotIn("private matrix.json", module.jobs["job"]["log"])
         service_log = "\n".join(captured.output)
         self.assertIn("event=build_output", service_log)
         self.assertNotIn("update.rpm", service_log)
@@ -455,6 +518,11 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("truncated", module.jobs["job"]["log"])
         self.assertLess(len(module.jobs["job"]["log"]), 100)
 
+    def test_quoted_artifact_path_with_spaces_is_fully_redacted(self):
+        redacted = module.safe_log_text("$ docker run --iso '/uploads/customer router.iso'")
+        self.assertEqual(redacted, "$ docker run --iso [artifact]")
+        self.assertNotIn("customer", redacted)
+
     def test_path_traversal_is_rejected(self):
         with self.assertRaises(ValueError):
             module.safe_data_path("../secret.iso")
@@ -526,6 +594,17 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["selected"], [matching])
         self.assertEqual(response.get_json()["excluded"][0]["name"], wrong_release)
+
+    def test_oversized_text_is_not_loaded_as_supersedence_metadata(self):
+        rpm = "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"
+        (self.data / rpm).write_bytes(b"rpm")
+        metadata = self.data / "oversized.txt"
+        with metadata.open("wb") as handle:
+            handle.truncate(module.MAX_SUPERSEDENCE_FILE_BYTES + 1)
+        with patch("pathlib.Path.read_text", side_effect=AssertionError("must not be read")):
+            packages, superseded = module.active_rpm_names()
+        self.assertEqual(packages, [rpm])
+        self.assertEqual(superseded, set())
 
     def test_discover_pauses_automatic_selection_when_multiple_isos_exist(self):
         (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
@@ -620,6 +699,37 @@ class GisoWebTests(unittest.TestCase):
                          {"output": 1, "uploads": 2, "work": 1})
         self.assertTrue(any("event=workspace_cleanup" in line for line in captured.output))
 
+    def test_cleanup_clears_failed_output_links_but_keeps_archive_links(self):
+        failed_id = "failed-job"
+        module.jobs[failed_id] = {
+            "id": failed_id, "status": "failed", "created": 1, "updated": 1,
+            "log": "", "artifacts": [
+                {"path": "logs/gisobuild.log", "size": 3},
+                {"path": "upgrade_matrix/matrix.json", "size": 4,
+                 "url": f"/download/{failed_id}/upgrade_matrix/matrix.json"},
+                {"path": "golden.iso", "size": 5,
+                 "url": f"/archive/{failed_id}/golden.iso"},
+            ],
+        }
+        module.persist_job(failed_id)
+        (self.output / failed_id / "logs").mkdir(parents=True)
+        (self.output / failed_id / "logs/gisobuild.log").write_bytes(b"log")
+
+        response = self.client.post("/api/cleanup")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["cleared_artifacts"], 2)
+        self.assertEqual(module.jobs[failed_id]["artifacts"], [{
+            "path": "golden.iso", "size": 5,
+            "url": f"/archive/{failed_id}/golden.iso",
+        }])
+        with module.sqlite3.connect(module.JOB_DB) as database:
+            stored = json.loads(database.execute(
+                "SELECT data FROM jobs WHERE id = ?", (failed_id,),
+            ).fetchone()[0])
+        self.assertEqual(len(stored["artifacts"]), 1)
+        self.assertTrue(stored["artifacts"][0]["url"].startswith("/archive/"))
+
     def test_request_log_uses_endpoint_and_safe_correlation_id(self):
         with self.assertLogs(module.app.logger.name, level="INFO") as captured:
             response = self.client.get("/api/inputs", headers={"X-Request-ID": "request-123"})
@@ -640,6 +750,39 @@ class GisoWebTests(unittest.TestCase):
         self.assertTrue((module.ARCHIVE / "job/router-goldenk9.iso").exists())
         self.assertFalse((self.data / "source.rpm").exists())
         self.assertFalse(job_dir.exists())
+
+    def test_archive_retention_starts_when_old_source_is_archived(self):
+        job_dir = self.output / "old-source-job"
+        job_dir.mkdir()
+        source = job_dir / "router-golden.iso"
+        source.write_bytes(b"golden image")
+        old_time = time.time() - 31 * 86400
+        os.utime(source, (old_time, old_time))
+
+        module.archive_giso_artifacts_and_cleanup("old-source-job", job_dir)
+
+        archived = module.ARCHIVE / "old-source-job/router-golden.iso"
+        self.assertGreater(archived.stat().st_mtime, time.time() - 60)
+
+    def test_expired_orphan_partial_upload_is_removed_after_restart(self):
+        parts = self.data / ".parts"
+        parts.mkdir()
+        orphan = parts / "orphan.part"
+        orphan.write_bytes(b"partial")
+        old_time = time.time() - module.UPLOAD_SESSION_TTL - 1
+        os.utime(orphan, (old_time, old_time))
+
+        module.expire_upload_sessions()
+
+        self.assertFalse(orphan.exists())
+
+    def test_upload_init_reserves_space_for_concurrent_sessions(self):
+        with patch("app.shutil.disk_usage", return_value=SimpleNamespace(
+                free=module.MIN_FREE_BYTES + 15)):
+            first = self.client.post("/api/uploads/init", json={"name": "one.rpm", "size": 10})
+            second = self.client.post("/api/uploads/init", json={"name": "two.rpm", "size": 10})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 507)
 
     def test_usb_boot_image_is_archived_with_golden_iso(self):
         job_dir = self.output / "usb-job"
@@ -762,6 +905,31 @@ class GisoWebTests(unittest.TestCase):
             module.run_job("job", [module.DOCKER_BIN, "run"])
         self.assertEqual(module.jobs["job"]["status"], "failed")
         self.assertEqual(run.call_args.kwargs["timeout"], 10)
+
+    @patch("app.subprocess.Popen")
+    @patch("app.subprocess.run")
+    def test_zero_exit_without_iso_is_not_reported_complete(self, run, popen):
+        run.return_value = SimpleNamespace(stdout="")
+        popen.return_value = SimpleNamespace(pid=123, stdout=[], wait=lambda: 0)
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "log": "", "progress": 3,
+                              "phase": "Preparing", "artifacts": []}
+        module.run_job("job", [module.DOCKER_BIN, "run"])
+        self.assertEqual(module.jobs["job"]["status"], "failed")
+        self.assertEqual(module.jobs["job"]["phase"], "Build failed")
+        self.assertEqual(module.jobs["job"]["progress"], 3)
+
+    @patch("app.subprocess.run")
+    def test_background_build_error_is_safe_for_job_api(self, run):
+        run.side_effect = RuntimeError("/internal/customer-router.iso")
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "log": "", "progress": 3,
+                              "phase": "Preparing", "artifacts": []}
+        module.run_job("job", [module.DOCKER_BIN, "run"])
+        response = self.client.get("/api/jobs/job")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("internal", response.get_json()["error"])
+        self.assertNotIn("customer-router", response.get_json()["error"])
 
     def test_oversized_new_archive_is_rejected_without_cleanup(self):
         job_dir = self.output / "large-job"

@@ -635,7 +635,13 @@ $('#cleanup').onclick = async () => {
     const result = await api('/api/cleanup', {method:'POST'});
     const mb = (result.removed_bytes / 1048576).toFixed(1);
     const areas = result.removed || {};
-    await showNotice('Workspace cleanup complete', `${result.removed_items} items (${mb} MB) removed.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
+    $('#artifacts').replaceChildren();
+    $('#job-status').textContent = 'Not started'; $('#job-status').className = 'pill neutral';
+    $('#build-progress').value = 0; $('#build-percent').textContent = '0%';
+    $('#build-phase').textContent = 'Ready to start'; $('#elapsed-time').textContent = 'Elapsed time: 0:00';
+    $('#friendly-status').textContent = 'Workspace files and expired diagnostic links were cleared. Archived ISO and USB files are unchanged.';
+    $('#cancel-build').hidden = true;
+    await showNotice('Workspace cleanup complete', `${result.removed_items} items (${mb} MB) removed and ${result.cleared_artifacts || 0} expired download links cleared.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
     currentJob = null; pollActivity();
   } catch (error) { await showNotice('Could not clear workspace', error.message); }
 };

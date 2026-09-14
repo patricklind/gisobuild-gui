@@ -136,6 +136,19 @@ options valid for the detected image architecture, and start the build. The UI
 supports ISO and optional USB artifact archiving, SHA-256 verification, a 30-day
 retention period, and a 50 GiB combined archive quota by default.
 
+The default package mode selects only RPMs whose filename proves the same
+platform and release as the base ISO. Expert settings show CSC package groups,
+component overlap, processor architecture, duplicate versions, and optional
+upgrade-matrix bridge SMUs. These deterministic checks catch obvious bad mixes;
+Cisco `gisobuild` remains authoritative for dependencies and supersedence. Use
+manual package selection only with an approved Cisco package list.
+
+`Clear workspace files` removes uploads, partial uploads, work directories and
+raw failed-build output. It also clears the corresponding persisted diagnostic
+download links from the build view and job history. Verified ISO and USB links
+under the GISO Archive are preserved until retention or quota cleanup removes
+the archive.
+
 ### Direct `gisobuild.py` workflow
 
 The upstream tool supports CLI and YAML input. A representative CLI build is:

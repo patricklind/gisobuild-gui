@@ -14,13 +14,15 @@ class PlatformCompatibilityTests(unittest.TestCase):
             "ncs5500-mpls-te-rsvp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
             "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm",
             "asr9k-bgp-1.0.0.1-r2612.CSCtest00003.x86_64.rpm",
+            "routing-1.0.0.1-r2612.CSCtest00004.x86_64.rpm",
         ])
         self.assertTrue(result["ready"])
         self.assertEqual(len(result["selected"]), 2)
         self.assertEqual(result["package_groups"][0]["count"], 2)
         self.assertIn("keep these RPMs together", result["package_groups"][0]["relationship"])
         self.assertEqual({item["reason"] for item in result["excluded"]},
-                         {"Different IOS XR release", "Different platform"})
+                         {"Different IOS XR release", "Different platform",
+                          "Platform is missing from filename"})
 
     def test_automatic_selection_refuses_to_guess_unknown_iso_release(self):
         result = recommend_smu_selection("ncs5500-mini-x.iso", [

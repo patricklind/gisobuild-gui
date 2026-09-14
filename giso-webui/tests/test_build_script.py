@@ -4,7 +4,17 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from unittest.mock import patch
+
+
+def load_real_iso_runner():
+    path = Path(__file__).parents[2] / "scripts/e2e_real_iso.py"
+    spec = spec_from_file_location("e2e_real_iso", path)
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class BuildScriptTests(unittest.TestCase):
@@ -26,6 +36,13 @@ class BuildScriptTests(unittest.TestCase):
         self.assertLess(template.index("compact.css"), template.index("cisco-theme.css"))
         self.assertIn("--navy: #0d2740", theme)
         self.assertIn("@media (prefers-reduced-motion: reduce)", theme)
+
+    def test_cleanup_resets_failed_artifacts_in_the_ui(self):
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        cleanup_handler = script[script.index("$('#cleanup').onclick"):]
+        self.assertIn("$('#artifacts').replaceChildren()", cleanup_handler)
+        self.assertIn("result.cleared_artifacts", cleanup_handler)
+        self.assertIn("currentJob = null", cleanup_handler)
 
     def test_clean_rejects_traversal_outside_standard_output(self):
         bash = shutil.which("bash")
@@ -63,6 +80,35 @@ class BuildScriptTests(unittest.TestCase):
     def test_build_container_does_not_mount_entire_project(self):
         script = (Path(__file__).parents[2] / "build-giso.sh").read_text()
         self.assertNotIn('-v "$SCRIPT_DIR:/workspace"', script)
+
+    def test_build_script_uses_unique_staging_and_rejects_option_like_images(self):
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("Bash is not installed in the minimal runtime image")
+        script = (Path(__file__).parents[2] / "build-giso.sh").read_text()
+        self.assertIn("mktemp -d", script)
+        result = subprocess.run(
+            [bash, str(Path(__file__).parents[2] / "build-giso.sh"),
+             "--iso", "missing.iso", "--image", "--privileged"],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Docker image must not start with a dash", result.stderr)
+
+    def test_real_iso_upload_uses_server_assigned_path(self):
+        runner = load_real_iso_runner()
+        with tempfile.TemporaryDirectory() as temp_name:
+            source = Path(temp_name) / "base image.iso"
+            source.write_bytes(b"iso")
+            responses = [{"id": "abc"}, {"received": 3}, {"path": "base image-a1b2.iso"}]
+            with patch.object(runner, "request", side_effect=responses) as call:
+                uploaded = runner.upload_path("http://127.0.0.1:8080", source)
+        self.assertEqual(uploaded, "base image-a1b2.iso")
+        self.assertIn("/api/uploads/abc/complete", call.call_args_list[-1].args[0])
+
+    def test_real_iso_runner_url_encodes_archive_names(self):
+        script = (Path(__file__).parents[2] / "scripts/e2e_real_iso.py").read_text()
+        self.assertIn('quote(item["name"], safe="")', script)
 
     def test_real_iso_runner_rejects_non_local_url(self):
         with tempfile.TemporaryDirectory() as temp_name:

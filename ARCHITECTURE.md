@@ -63,6 +63,8 @@ upload cannot block later builds indefinitely.
   accidental resource contention.
 - Upload creation, build creation, and cleanup transitions are serialized so a
   build cannot observe a partially extracted archive or race with cleanup.
+- Manual workspace cleanup removes raw output and clears its persisted download
+  references from failed jobs; verified `/archive/` references are preserved.
 - Tar extraction checks both declared expanded size and reserved free space
   before writing extracted members.
 - Artifacts are verified before source cleanup, preserving diagnostic inputs on
