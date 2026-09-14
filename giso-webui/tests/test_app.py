@@ -512,12 +512,55 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.get_json()["upgrade"]["missing_bridge_smus"],
                          ["bridge-placeholder.rpm"])
 
+    def test_smu_recommendation_api_selects_matching_packages_automatically(self):
+        (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
+        matching = "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"
+        wrong_release = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"
+        (self.data / matching).write_bytes(b"rpm")
+        (self.data / wrong_release).write_bytes(b"rpm")
+
+        response = self.client.post("/api/smu/recommendation", json={
+            "iso": "ncs5500-mini-x-26.1.2.iso",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["selected"], [matching])
+        self.assertEqual(response.get_json()["excluded"][0]["name"], wrong_release)
+
+    def test_discover_pauses_automatic_selection_when_multiple_isos_exist(self):
+        (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
+        (self.data / "ncs5500-mini-x-26.1.3.iso").write_bytes(b"iso")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm").write_bytes(b"rpm")
+
+        response = self.client.get("/api/inputs")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["recommendation"]["ready"])
+        self.assertEqual(response.get_json()["recommended"], [])
+
     @patch("app.child_mount_args", return_value=[])
     def test_platform_is_inferred_and_invalid_option_rejected(self, _mounts):
         (self.data / "ncs5500-mini-x.iso").write_bytes(b"iso")
         with self.assertRaisesRegex(ValueError, "Full ISO"):
             module.build_command({"iso": "ncs5500-mini-x.iso", "pkglist": [],
                                   "full_iso": True}, "invalid")
+
+    @patch("app.child_mount_args", return_value=[])
+    def test_build_recalculates_automatic_smu_selection_server_side(self, _mounts):
+        iso = "ncs5500-mini-x-26.1.2.iso"
+        matching = "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"
+        wrong_release = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"
+        for name in (iso, matching, wrong_release):
+            (self.data / name).write_bytes(b"input")
+
+        command = module.build_command({
+            "iso": iso, "pkglist": [wrong_release], "automatic_smu_selection": True,
+            "auto_repo": True,
+        }, "automatic")
+
+        pkglist_index = command.index("--pkglist")
+        self.assertIn(matching, command[pkglist_index + 1:])
+        self.assertNotIn(wrong_release, command[pkglist_index + 1:])
 
     @patch("app.child_mount_args", return_value=[])
     def test_unknown_iso_requires_platform_selection(self, _mounts):
