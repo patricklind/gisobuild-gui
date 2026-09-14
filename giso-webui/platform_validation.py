@@ -74,7 +74,7 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
     releases: set[str] = set()
     components: dict[str, set[str]] = {}
     variants: dict[tuple[str, str], set[str]] = {}
-    bundles: dict[str, set[str]] = {}
+    bundles: dict[str, dict[str, set[str]]] = {}
     architectures: set[str] = set()
     checked = 0
     for package in packages:
@@ -102,7 +102,9 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
             bug = f"CSC{component.group('bug')}".upper()
             components.setdefault(component_name, set()).add(bug)
             variants.setdefault((component_name, bug), set()).add(component.group("version").lower())
-            bundles.setdefault(bug, set()).add(component_name)
+            bundle = bundles.setdefault(bug, {"components": set(), "files": set()})
+            bundle["components"].add(component_name)
+            bundle["files"].add(name)
         architecture = RPM_ARCHITECTURE.search(name)
         if architecture:
             architectures.add(architecture.group("architecture").lower())
@@ -122,13 +124,26 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
         warnings.append(
             "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs the authoritative dependency check"
         )
-    package_groups = [
-        {"csc": bug, "components": sorted(names), "count": len(names)}
-        for bug, names in sorted(bundles.items())
+    package_groups = []
+    for bug, bundle in sorted(bundles.items()):
+        names = sorted(bundle["components"])
+        package_groups.append({
+            "csc": bug,
+            "components": names,
+            "files": sorted(bundle["files"]),
+            "count": len(names),
+            "relationship": "Multi-component fix; keep these RPMs together" if len(names) > 1
+            else "Single-component fix",
+        })
+    component_conflicts = [
+        {"component": component, "cscs": sorted(bugs),
+         "reason": "More than one fix changes this component; Cisco supersedence decides which remains"}
+        for component, bugs in sorted(components.items()) if len(bugs) > 1
     ]
     return {"compatible": not issues, "iso_release": iso_release, "checked": checked,
             "issues": sorted(set(issues)), "warnings": sorted(set(warnings)),
-            "package_groups": package_groups}
+            "package_groups": package_groups, "component_conflicts": component_conflicts,
+            "architectures": sorted(architectures)}
 
 
 def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
@@ -143,7 +158,8 @@ def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
 
     if not iso_platform or not expected_tag:
         missing = "platform" if not iso_platform else "release"
-        return {"ready": False, "selected": [], "excluded": [], "iso": iso_name,
+        return {"ready": False, "selected": [], "excluded": [], "package_groups": [],
+                "component_conflicts": [], "architectures": [], "iso": iso_name,
                 "message": f"The ISO {missing} could not be detected; select it in Expert settings"}
 
     for package in sorted(set(packages)):
@@ -159,6 +175,7 @@ def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
         else:
             selected.append(name)
 
+    analysis = validate_smu_selection(iso_name, selected)
     return {
         "ready": True,
         "selected": selected,
@@ -166,6 +183,9 @@ def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
         "iso": iso_name,
         "platform": iso_platform,
         "release": iso_release,
+        "package_groups": analysis["package_groups"],
+        "component_conflicts": analysis["component_conflicts"],
+        "architectures": analysis["architectures"],
         "message": (
             f"Selected {len(selected)} matching RPMs; Cisco gisobuild will resolve dependencies "
             "and supersedence from the complete matching repository"

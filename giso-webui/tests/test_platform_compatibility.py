@@ -17,6 +17,8 @@ class PlatformCompatibilityTests(unittest.TestCase):
         ])
         self.assertTrue(result["ready"])
         self.assertEqual(len(result["selected"]), 2)
+        self.assertEqual(result["package_groups"][0]["count"], 2)
+        self.assertIn("keep these RPMs together", result["package_groups"][0]["relationship"])
         self.assertEqual({item["reason"] for item in result["excluded"]},
                          {"Different IOS XR release", "Different platform"})
 
@@ -76,7 +78,24 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertEqual(result["package_groups"], [{
             "csc": "CSCTEST00001", "components": ["ncs5500-bgp", "ncs5500-routing"],
             "count": 2,
+            "files": [
+                "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                "ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+            ],
+            "relationship": "Multi-component fix; keep these RPMs together",
         }])
+
+    def test_overlapping_csc_fixes_are_explained(self):
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            [
+                "ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                "ncs5500-routing-1.0.0.2-r2612.CSCtest00002.x86_64.rpm",
+            ],
+        )
+        self.assertEqual(result["component_conflicts"][0]["component"], "ncs5500-routing")
+        self.assertEqual(result["component_conflicts"][0]["cscs"],
+                         ["CSCTEST00001", "CSCTEST00002"])
 
     def test_mixed_processor_architectures_are_rejected(self):
         result = validate_smu_selection(

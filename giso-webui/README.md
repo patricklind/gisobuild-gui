@@ -94,6 +94,10 @@ repository is passed to Cisco `gisobuild`, allowing its RPM metadata engine to
 resolve prerequisites, dependency closure, and supersedence. The pre-check
 rejects deterministic filename conflicts such as a different platform, IOS XR
 release, processor architecture, or multiple versions of one component/CSC.
+RPMs carrying the same CSC identifier are shown as one package group; a fix
+that changes several components is explicitly marked as a group that should be
+kept together. Overlapping CSC fixes for the same component are highlighted,
+while Cisco `gisobuild` remains authoritative for their supersedence order.
 Upload a Cisco `compatibility_matrix_*.json` file to also check the router's
 source-to-target upgrade path, required bridge SMUs, and published caveats. The
 matrix is an upgrade-path source, not proof that RPM dependencies resolve;
