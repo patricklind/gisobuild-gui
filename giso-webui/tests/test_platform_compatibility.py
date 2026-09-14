@@ -2,12 +2,22 @@ import unittest
 
 from platform_validation import (
     check_upgrade_matrix,
+    infer_platform,
+    normalize_platform,
     recommend_smu_selection,
     validate_smu_selection,
 )
 
 
 class PlatformCompatibilityTests(unittest.TestCase):
+    def test_ncs57c3_inventory_sku_normalizes_to_ncs57(self):
+        self.assertEqual(normalize_platform("NCS-57C3-MODS-SYS"), "ncs57")
+        self.assertEqual(normalize_platform("NCS-57C3-MOD-SYS"), "ncs57")
+
+    def test_ncs57c3_filename_is_inferred_as_ncs57(self):
+        self.assertEqual(infer_platform("NCS-57C3-MODS-SYS-26.1.2.iso"), "ncs57")
+        self.assertEqual(infer_platform("ncs57c3modsys-25.1.2.iso"), "ncs57")
+
     def test_automatic_selection_keeps_matching_repository_and_excludes_mismatches(self):
         result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
             "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",

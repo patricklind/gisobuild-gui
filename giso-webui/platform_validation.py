@@ -24,13 +24,19 @@ PLATFORMS = {
     "8000": {"label": "Cisco 8000 / 8800", "architecture": "lnt", "usb": True},
     "ncs1010": {"label": "NCS 1010/1014", "architecture": "lnt", "usb": True},
     "ncs540l": {"label": "NCS 540L (XR7)", "architecture": "lnt", "usb": True},
-    "ncs57": {"label": "NCS 5700", "architecture": "lnt", "usb": True},
+    "ncs57": {"label": "NCS 5700 / NCS 57C3", "architecture": "lnt", "usb": True},
 }
 
 ALIASES = {
     "asr9000": "asr9k", "asr9k-x64": "asr9k", "ncs5000": "ncs5k",
     "ncs6000": "ncs6k", "ncs5700": "ncs57", "cisco8000": "8000",
     "8800": "8000", "8200": "8000",
+    # NCS 57C3 hardware SKU spellings seen in Cisco inventory and image metadata.
+    # Keep both MODS-SYS and MOD-SYS variants so manual selection and filename
+    # inference normalize to the NCS 5700/LNT family rather than failing closed.
+    "ncs-57c3-mods-sys": "ncs57", "ncs57c3modssys": "ncs57",
+    "ncs-57c3-mod-sys": "ncs57", "ncs57c3modsys": "ncs57",
+    "ncs-57c3": "ncs57", "ncs57c3": "ncs57",
 }
 
 RPM_RELEASE = re.compile(r"-r(?P<release>\d{3,6})(?:\.|-)", re.IGNORECASE)
