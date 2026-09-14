@@ -52,6 +52,21 @@ Mandatory regression coverage for:
 - [ ] CSC group selection mismatch
 - [ ] "No RPM packages uploaded" despite inventory containing compatible RPMs
 - [ ] NCS-57C3 SKU normalization
+- [ ] cancel during builder preparation/pull
+- [ ] cancel during finalization
+- [ ] successful build preserves unrelated workspace inputs
+- [ ] two uploaded ISOs never silently select the first candidate
+- [ ] RPM CPU architecture must match the selected ISO/build architecture
+- [ ] package names containing glob metacharacters cannot select unintended files
+- [ ] duplicate basename + same hash is deterministic and keeps provenance
+- [ ] duplicate basename + different hash is a blocking conflict
+- [ ] upgrade-matrix aliases use the canonical platform resolver
+- [ ] bridge-SMU near-match does not satisfy exact package/CSC presence
+- [ ] discovery remains safe while cleanup/delete runs concurrently
+- [ ] auto-derived target release refreshes when base ISO changes
+- [ ] cached builder behavior is defined when registry access fails during the migration period
+
+See `07-BUG-AUDIT-TODO.md` for the implementation details and failure scenarios behind these tests.
 
 ## Integration test
 
@@ -70,6 +85,8 @@ upload
 
 - [ ] eXR integration
 - [ ] LNT integration
+- [ ] cancellation state-machine integration
+- [ ] multiple-build-inventory isolation integration
 
 ## Browser/DOM tests
 
@@ -83,6 +100,9 @@ upload
 - [ ] successful preflight
 - [ ] Build button enable/disable
 - [ ] unknown platform presentation
+- [ ] multiple ISO ambiguity blocks Build
+- [ ] duplicate RPM basename conflict is visible
+- [ ] ISO switch refreshes auto-derived release
 
 ## Security tests
 
@@ -92,6 +112,7 @@ upload
 - [ ] oversized expansion
 - [ ] duplicate filename conflict
 - [ ] malicious job/artifact path
+- [ ] package glob metacharacters
 - [ ] secret redaction
 
 ## CI pipeline
@@ -107,11 +128,18 @@ Run:
 - [ ] synthetic eXR integration
 - [ ] synthetic LNT integration
 - [ ] SBOM generation
+- [ ] Graphify freshness validation for code-changing PRs
 
 Optional:
 
 - [ ] Trivy image scan
 - [ ] dependency vulnerability scan
+
+## Graphify CI guard
+
+- [ ] Compare Graphify's recorded source revision with the PR/head revision after relevant code changes
+- [ ] Fail or clearly block merge when tracked `graphify-out/` is stale
+- [ ] Verify `.graphifyignore` still excludes Cisco licensed/sensitive inputs and build outputs
 
 ## Merge policy
 
@@ -121,3 +149,4 @@ Package-selection or build-runner changes must not merge unless:
 - [ ] integration tests pass
 - [ ] Docker image builds
 - [ ] regression suite passes
+- [ ] Graphify output is current when the change affects code/architecture
