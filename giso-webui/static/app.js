@@ -96,6 +96,12 @@ function renderInputs(data) {
   const yamlFiles = data.files.filter(file => ['.yaml', '.yml'].includes(file.type));
   addOptions('#yaml-files', yamlFiles);
   addOptions('#all-files', data.files);
+  const matrixSelect = $('[name=compatibility_matrix]');
+  const selectedMatrix = matrixSelect.value;
+  matrixSelect.replaceChildren();
+  const noMatrix = document.createElement('option'); noMatrix.value=''; noMatrix.textContent='No matrix uploaded'; matrixSelect.appendChild(noMatrix);
+  (data.matrices || []).forEach(path => { const option=document.createElement('option'); option.value=path; option.textContent=path; matrixSelect.appendChild(option); });
+  if ([...matrixSelect.options].some(option => option.value === selectedMatrix)) matrixSelect.value=selectedMatrix;
 
   const iso = isoFiles[0]?.path || '';
   $('[name=iso]').value = iso;
@@ -148,6 +154,30 @@ async function loadPlatforms() {
       select.appendChild(option);
     });
   } catch (error) { $('#error').textContent=error.message; }
+}
+
+async function checkCompatibility() {
+  const button=$('#check-compatibility');
+  const result=$('#compatibility-result');
+  const packages=lines($('[name=pkglist_override]').value || $('[name=pkglist]').value || '');
+  const payload={iso:$('[name=iso_override]').value || $('[name=iso]').value,packages,
+    matrix:$('[name=compatibility_matrix]').value,source_release:$('[name=source_release]').value,
+    target_release:$('[name=target_release]').value,platform:$('[name=platform]').value};
+  if (!payload.iso) { result.className='compatibility-result bad'; result.textContent='Select a base ISO first.'; return; }
+  if (payload.matrix && (!payload.source_release || !payload.target_release || !payload.platform)) {
+    result.className='compatibility-result bad'; result.textContent='Select a platform and enter current and target releases to use the matrix.'; return;
+  }
+  button.disabled=true; result.className='compatibility-result'; result.textContent='Checking filenames and upgrade data…';
+  try {
+    const check=await api('/api/compatibility',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const messages=check.smu.compatible ? [`${check.smu.checked} RPM filenames match the base image.`] : [...check.smu.issues];
+    if (check.upgrade) messages.push(check.upgrade.message,...check.upgrade.bridge_smus.map(item=>`Required bridge SMU: ${item}`),...check.upgrade.caveats.map(item=>`Caveat: ${item}`));
+    messages.push(...check.smu.warnings);
+    const good=check.smu.compatible && (!check.upgrade || check.upgrade.permitted);
+    result.className=`compatibility-result ${good ? 'good' : 'bad'}`; result.replaceChildren();
+    const list=document.createElement('ul'); messages.forEach(message=>{const item=document.createElement('li');item.textContent=message;list.appendChild(item);});result.appendChild(list);
+  } catch(error) { result.className='compatibility-result bad'; result.textContent=error.message; }
+  finally { button.disabled=false; }
 }
 
 async function loadArchive() {
@@ -374,6 +404,80 @@ async function uploadFile(file) {
   }
 }
 async function uploadFiles(files) { for (const file of files) await uploadFile(file); }
+
+let ciscoSearchId = null;
+let ciscoDownloadJob = null;
+
+async function pollCiscoDownload() {
+  if (!ciscoDownloadJob) return;
+  try {
+    const job = await api(`/api/cisco/downloads/${encodeURIComponent(ciscoDownloadJob)}`);
+    const labels = {'eula-required':'Cisco agreement required',downloading:'Downloading from Cisco',verifying:'Verifying Cisco checksums',ready:'Cisco files are ready',failed:'Cisco download failed'};
+    $('#cisco-status').textContent = `${labels[job.status] || job.status}${job.progress ? ` · ${job.progress}%` : ''}${job.error ? ` · ${job.error}` : ''}`;
+    if (job.status === 'ready') { ciscoDownloadJob = null; await loadInputs(); return; }
+    if (job.status === 'failed' || job.status === 'eula-required') return;
+    setTimeout(pollCiscoDownload, 1500);
+  } catch (error) { $('#cisco-status').textContent = error.message; }
+}
+
+async function startCiscoDownload(imageGuids) {
+  const job = await api('/api/cisco/downloads', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({search_id:ciscoSearchId,image_guids:imageGuids})});
+  ciscoDownloadJob = job.id;
+  $('#cisco-results-form').hidden = true;
+  if (job.status === 'eula-required') {
+    $('#cisco-agreement').hidden = false;
+    $('#cisco-eula-label').hidden = !job.agreement.eula;
+    $('#cisco-commercial-label').hidden = !job.agreement.k9;
+    $('#cisco-not-government-label').hidden = !job.agreement.k9;
+    $('#cisco-status').textContent = 'Read and confirm the required Cisco agreement below.';
+  } else { pollCiscoDownload(); }
+}
+
+$('#cisco-search-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const submit = event.submitter; submit.disabled = true;
+  const form = new FormData(event.target);
+  $('#cisco-status').textContent = 'Authenticating and searching Cisco…';
+  $('#cisco-results-form').hidden = true;
+  $('#cisco-agreement').hidden = true;
+  try {
+    const result = await api('/api/cisco/search', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:form.get('pid'),current_release:form.get('current_release'),target_release:form.get('target_release')})});
+    ciscoSearchId = result.id;
+    const list = $('#cisco-results'); list.replaceChildren();
+    result.images.forEach(image => {
+      const label = document.createElement('label');
+      const input = document.createElement('input'); input.type='checkbox'; input.name='image_guid'; input.value=image.guid;
+      const text = document.createElement('span'); text.textContent=`${image.name} · ${image.release || 'release not supplied'} · ${(image.size/1048576).toFixed(1)} MB${image.entitlement ? ' · contract required' : ''}`;
+      label.append(input,text); list.appendChild(label);
+    });
+    $('#cisco-results-form').hidden = result.images.length === 0;
+    $('#cisco-status').textContent = result.images.length ? `Found ${result.images.length} files. Select up to five.` : 'Cisco returned no matching files.';
+  } catch (error) { $('#cisco-status').textContent = error.message; }
+  finally { submit.disabled = false; }
+});
+
+$('#cisco-results-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const submit = event.submitter;
+  const selected=[...event.target.querySelectorAll('[name=image_guid]:checked')].map(item=>item.value);
+  if (!selected.length || selected.length > 5) { $('#cisco-status').textContent='Select between one and five files.'; return; }
+  $('#cisco-status').textContent='Requesting authorized download links…';
+  submit.disabled=true;
+  try { await startCiscoDownload(selected); } catch (error) { $('#cisco-status').textContent=error.message; }
+  finally { submit.disabled=false; }
+});
+
+$('#cisco-accept').onclick = async () => {
+  const submit=$('#cisco-accept'); submit.disabled=true;
+  const body={accept_eula:$('#cisco-eula').checked,commercial_or_civil:$('#cisco-commercial').checked,not_government_or_military:$('#cisco-not-government').checked};
+  $('#cisco-status').textContent='Registering the agreement with Cisco…';
+  try {
+    await api(`/api/cisco/downloads/${encodeURIComponent(ciscoDownloadJob)}/accept`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    $('#cisco-agreement').hidden=true; pollCiscoDownload();
+  } catch (error) { $('#cisco-status').textContent=error.message; }
+  finally { submit.disabled=false; }
+};
+
 $('#choose-files').onclick = () => $('#file-upload').click();
 $('#file-upload').onchange = event => uploadFiles(event.target.files);
 const drop = $('#drop-zone');
@@ -414,5 +518,7 @@ $('#cancel-build').onclick = async () => {
   }
 };
 $('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; });
+$('#check-compatibility').onclick=checkCompatibility;
 
+api('/api/cisco/config').then(config => { $('#cisco-download').hidden = !config.enabled; }).catch(() => {});
 health(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();

@@ -15,6 +15,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from cisco_download import CiscoDownloadError, CiscoSoftwareClient, secret_value
 from flask import (
     Flask,
     abort,
@@ -24,7 +25,12 @@ from flask import (
     request,
     send_from_directory,
 )
-from platform_validation import PLATFORMS, validate_platform_options
+from platform_validation import (
+    PLATFORMS,
+    check_upgrade_matrix,
+    validate_platform_options,
+    validate_smu_selection,
+)
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
 
@@ -52,6 +58,9 @@ IMAGE = validate_image_reference(
 jobs: dict[str, dict] = {}
 job_persisted_at: dict[str, float] = {}
 uploads: dict[str, dict] = {}
+cisco_searches: dict[str, dict] = {}
+cisco_download_jobs: dict[str, dict] = {}
+cisco_api_client: CiscoSoftwareClient | None = None
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
 job_lock = threading.RLock()
 upload_lock = threading.Lock()
@@ -59,6 +68,7 @@ archive_lock = threading.RLock()
 checksum_lock = threading.Lock()
 operation_lock = threading.Lock()
 store_lock = threading.Lock()
+cisco_lock = threading.RLock()
 store_initialized = False
 archive_policy_checked = 0.0
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024**3)))
@@ -71,6 +81,7 @@ ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
 MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
 UPLOAD_SESSION_TTL = int(os.environ.get("UPLOAD_SESSION_TTL", str(24 * 60 * 60)))
 GISO_PULL_TIMEOUT_SECONDS = int(os.environ.get("GISO_PULL_TIMEOUT_SECONDS", "600"))
+CISCO_DOWNLOAD_TIMEOUT_SECONDS = int(os.environ.get("CISCO_DOWNLOAD_TIMEOUT_SECONDS", "60"))
 ALLOWED_HOSTS = {host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(",") if host.strip()}
 ACTIVE_JOB_STATUSES = {"queued", "running", "cancelling"}
 MIN_FREE_BYTES = 512 * 1024**2
@@ -82,6 +93,124 @@ if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
     raise RuntimeError("Upload, extraction, tar, chunk and log limits must be positive")
 
 PRIVATE_JOB_FIELDS = {"command", "payload", "container_pid"}
+
+
+def cisco_client() -> CiscoSoftwareClient:
+    global cisco_api_client
+    client_id = secret_value("CISCO_CLIENT_ID")
+    client_secret = secret_value("CISCO_CLIENT_SECRET")
+    allowed = tuple(host.strip() for host in os.environ.get(
+        "CISCO_DOWNLOAD_HOSTS", "cisco.com"
+    ).split(",") if host.strip())
+    with cisco_lock:
+        if (cisco_api_client is None or cisco_api_client.client_id != client_id or
+                cisco_api_client.client_secret != client_secret or
+                cisco_api_client.allowed_hosts != allowed):
+            cisco_api_client = CiscoSoftwareClient(
+                client_id, client_secret, timeout=CISCO_DOWNLOAD_TIMEOUT_SECONDS,
+                allowed_hosts=allowed,
+            )
+        return cisco_api_client
+
+
+def cisco_failure(exc: Exception, status_code: int = 400):
+    status = "authorization-required" if str(exc).startswith(
+        "Cisco authorization failed:"
+    ) else "failed"
+    return jsonify(error=str(exc), status=status), status_code
+
+
+def cisco_download_running() -> bool:
+    with cisco_lock:
+        now = time.time()
+        for job in cisco_download_jobs.values():
+            if now - job["created"] > 3600 and job["status"] in {
+                "authenticating", "downloading", "verifying", "eula-required"
+            }:
+                job.update(status="failed", error="Cisco download session expired")
+        return any(job["status"] in {"authenticating", "downloading", "verifying", "eula-required"}
+                   for job in cisco_download_jobs.values())
+
+
+def cisco_text(value: object, name: str, *, maximum: int = 256) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+        raise ValueError(f"Invalid Cisco {name}")
+    result = value.strip()
+    if any(ord(char) < 32 for char in result):
+        raise ValueError(f"Invalid Cisco {name}")
+    return result
+
+
+def find_cisco_images(value: object, context: dict | None = None) -> list[dict]:
+    """Flatten Cisco's nested product/release response without returning secrets."""
+    context = dict(context or {})
+    found: list[dict] = []
+    if isinstance(value, dict):
+        for key in ("releaseVersion", "version", "mdfId", "pid"):
+            if value.get(key) not in (None, ""):
+                context[key] = value[key]
+        image_name = value.get("imageName", value.get("name"))
+        if value.get("imageGuid") and image_name:
+            try:
+                size = int(value.get("imageSize", value.get("size", 0)))
+            except (TypeError, ValueError):
+                size = 0
+            found.append({
+                "guid": str(value["imageGuid"]), "name": str(image_name),
+                "size": size, "release": str(value.get(
+                    "releaseVersion", context.get("releaseVersion", context.get("version", ""))
+                )),
+                "mdf_id": str(value.get("mdfId", context.get("mdfId", ""))),
+                "md5": str(value.get("md5", value.get("Md5", ""))),
+                "sha512": str(value.get("sha512", "")),
+                "encrypted": str(value.get("encryptionSoftwareIndicator", "N")).upper() == "Y",
+                "entitlement": str(value.get("additionalEntitlement", "N")).upper() == "Y",
+            })
+        for nested in value.values():
+            found.extend(find_cisco_images(nested, context))
+    elif isinstance(value, list):
+        for nested in value:
+            found.extend(find_cisco_images(nested, context))
+    return found
+
+
+def cisco_response_requires(value: object, field: str) -> bool:
+    if isinstance(value, dict):
+        return bool(value.get(field)) or any(
+            cisco_response_requires(nested, field) for nested in value.values()
+        )
+    if isinstance(value, list):
+        return any(cisco_response_requires(nested, field) for nested in value)
+    return False
+
+
+def extract_cisco_archive(path: Path) -> int:
+    if not path.name.lower().endswith((".tar", ".tgz")):
+        return 0
+    destination = extraction_path(path)
+    if destination is None:
+        raise CiscoDownloadError("Unsupported Cisco archive type")
+    try:
+        destination.mkdir()
+        with tarfile.open(path, "r:*") as archive:
+            members = archive.getmembers()
+            if len(members) > MAX_TAR_MEMBERS:
+                raise CiscoDownloadError("Cisco archive contains too many files")
+            expanded_size = sum(member.size for member in members if member.isfile())
+            if expanded_size > MAX_EXTRACTED_BYTES:
+                raise CiscoDownloadError("Cisco archive expands beyond the configured limit")
+            if shutil.disk_usage(DATA).free < expanded_size + MIN_FREE_BYTES:
+                raise CiscoDownloadError("Not enough free disk space to extract the Cisco archive")
+            root = destination.resolve()
+            for member in members:
+                target = (destination / member.name).resolve()
+                if (root not in target.parents and target != root) or member.issym() or member.islnk():
+                    raise CiscoDownloadError("Cisco archive contains an unsafe path or link")
+            archive.extractall(destination, members=members, filter="data")
+            return sum(1 for member in members if member.isfile())
+    except Exception:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise
 
 
 def log_event(event: str, **fields: object) -> None:
@@ -455,7 +584,7 @@ def discover() -> dict:
         if root_path != DATA:
             dirs.append(rel_data(root_path))
         for name in filenames:
-            if name.lower().endswith((".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms")):
+            if name.lower().endswith((".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".json")):
                 path = root_path / name
                 files.append({"path": rel_data(path), "size": path.stat().st_size, "type": path.suffix.lower()})
     superseded = set()
@@ -469,9 +598,11 @@ def discover() -> dict:
     for rpm in DATA.rglob("*.rpm"):
         if not any(rpm.parent.name.startswith(identifier) for identifier in superseded):
             recommended.append(rpm.name)
+    matrices = [item["path"] for item in files
+                if item["type"] == ".json" and Path(item["path"]).name.startswith("compatibility_matrix_")]
     return {"files": sorted(files, key=lambda x: x["path"]), "dirs": sorted(dirs),
             "recommended": sorted(set(recommended)),
-            "superseded": sorted(superseded)}
+            "superseded": sorted(superseded), "matrices": matrices}
 
 
 def append_log(job_id: str, text: str) -> None:
@@ -551,6 +682,9 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             raise ValueError("Select an ISO, or provide a YAML file")
         profile = validate_platform_options(payload)
         payload["platform"] = profile["id"]
+        smu_check = validate_smu_selection(iso, payload.get("pkglist", []))
+        if smu_check["issues"]:
+            raise ValueError("SMU compatibility check failed: " + "; ".join(smu_check["issues"]))
         command += ["--iso", str(safe_data_path(iso))]
         for key, option in PATH_OPTIONS.items():
             if key in {"iso", "yamlfile"}:
@@ -752,6 +886,202 @@ def platforms():
     return jsonify([{"id": key, **value} for key, value in PLATFORMS.items()])
 
 
+@app.post("/api/compatibility")
+def compatibility():
+    body = json_object()
+    try:
+        iso = cisco_text(body.get("iso"), "base ISO", maximum=4096)
+        packages = body.get("packages", [])
+        if (not isinstance(packages, list) or len(packages) > 10000 or
+                not all(isinstance(item, str) and len(item) <= 4096 for item in packages)):
+            raise ValueError("Packages must be a list")
+        result = {"smu": validate_smu_selection(iso, packages), "upgrade": None}
+        matrix_name = body.get("matrix", "")
+        if matrix_name:
+            matrix_path = safe_data_path(cisco_text(matrix_name, "compatibility matrix", maximum=4096))
+            if matrix_path.suffix.lower() != ".json" or matrix_path.stat().st_size > 1024 * 1024:
+                raise ValueError("Compatibility matrix must be a JSON file smaller than 1 MiB")
+            matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+            result["upgrade"] = check_upgrade_matrix(
+                matrix, cisco_text(body.get("source_release"), "source release"),
+                cisco_text(body.get("target_release"), "target release"),
+                cisco_text(body.get("platform"), "platform"),
+            )
+        return jsonify(result)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
+        return jsonify(error=str(exc)), 400
+
+
+@app.get("/api/cisco/config")
+def cisco_config():
+    try:
+        enabled = bool(secret_value("CISCO_CLIENT_ID") and
+                       secret_value("CISCO_CLIENT_SECRET"))
+    except CiscoDownloadError:
+        enabled = False
+    return jsonify(enabled=enabled)
+
+
+@app.post("/api/cisco/search")
+def cisco_search():
+    body = json_object()
+    try:
+        pid = cisco_text(body.get("pid"), "PID")
+        current = cisco_text(body.get("current_release"), "current release")
+        target = cisco_text(body.get("target_release"), "target release")
+        response = cisco_client().search(pid, current, target)
+        images = find_cisco_images(response)
+        transaction_id = cisco_text(response.get("metadataTransId"), "transaction ID", maximum=40)
+    except (ValueError, CiscoDownloadError) as exc:
+        log_event("cisco_search_failed", error_type=type(exc).__name__)
+        return cisco_failure(exc)
+    search_id = uuid.uuid4().hex
+    with cisco_lock:
+        cisco_searches.clear()
+        cisco_searches[search_id] = {"created": time.time(), "pid": pid,
+                                     "transaction_id": transaction_id,
+                                     "images": {item["guid"]: item for item in images}}
+    log_event("cisco_search_completed", images=len(images), search_id=search_id)
+    append_activity(f"Cisco search completed: {len(images)} software files available.")
+    return jsonify(id=search_id, images=images)
+
+
+def run_cisco_download(job_id: str, search: dict, selected: list[dict], downloads: list[dict]) -> None:
+    with cisco_lock:
+        job = cisco_download_jobs[job_id]
+    try:
+        for number, item in enumerate(selected, 1):
+            remote = next((entry for entry in downloads if entry.get("imageGuid") == item["guid"]), None)
+            if not remote or not remote.get("url"):
+                raise CiscoDownloadError("Cisco did not return a download URL")
+            name = upload_name(item["name"])
+            target = DATA / name
+            if target.exists():
+                target = DATA / f"{target.stem}-{uuid.uuid4().hex[:8]}{target.suffix}"
+            def update_progress(written: int, total: int, file_number: int = number) -> None:
+                file_fraction = written / total if total else 0
+                progress = int(((file_number - 1 + file_fraction) / len(selected)) * 100)
+                with cisco_lock:
+                    job.update(status="downloading", progress=min(progress, 99))
+
+            with cisco_lock:
+                job.update(status="downloading", progress=(number - 1) * 100 // len(selected))
+            append_activity(f"Cisco download {number} of {len(selected)} started.")
+            result = cisco_client().download(
+                str(remote["url"]), target, expected_size=item["size"],
+                max_bytes=MAX_UPLOAD_BYTES, cloud_token=str(remote.get("token", "")),
+                expected_md5=item["md5"], expected_sha512=item["sha512"],
+                progress=update_progress,
+            )
+            extracted = extract_cisco_archive(result.path)
+            with cisco_lock:
+                job["files"].append({"name": result.path.name, "size": result.size,
+                                     "sha256": result.sha256, "extracted": extracted})
+                job.update(status="verifying", progress=number * 100 // len(selected))
+        with cisco_lock:
+            job.update(status="ready", progress=100)
+        append_activity(f"Cisco download completed: {len(selected)} files verified and ready.")
+        log_event("cisco_download_completed", files=len(selected), job_id=job_id)
+    except (CiscoDownloadError, OSError, ValueError) as exc:
+        with cisco_lock:
+            job.update(status="failed", error=str(exc))
+        log_event("cisco_download_failed", error_type=type(exc).__name__, job_id=job_id)
+        append_activity("Cisco download failed. Check the Cisco access status and technical details.")
+
+
+@app.post("/api/cisco/downloads")
+def cisco_download_start():
+    body = json_object()
+    with cisco_lock:
+        search = cisco_searches.get(str(body.get("search_id", "")))
+    guids = body.get("image_guids")
+    if not search or time.time() - search["created"] > 3300:
+        return jsonify(error="Cisco search has expired; search again"), 410
+    if not isinstance(guids, list) or not 1 <= len(guids) <= 5 or any(not isinstance(x, str) for x in guids):
+        return jsonify(error="Select between one and five Cisco files"), 400
+    job_id = uuid.uuid4().hex
+    with cisco_lock:
+        if cisco_download_running():
+            return jsonify(error="Wait for the current Cisco download to finish"), 409
+        cisco_download_jobs.clear()
+        cisco_download_jobs[job_id] = {"id": job_id, "status": "authenticating",
+                                       "progress": 0, "files": [], "error": "",
+                                       "created": time.time()}
+    try:
+        selected = [search["images"][guid] for guid in guids]
+        if any(item["size"] <= 0 or item["size"] > MAX_UPLOAD_BYTES for item in selected):
+            raise CiscoDownloadError("A selected Cisco file has an invalid size")
+        if shutil.disk_usage(DATA).free < sum(item["size"] for item in selected) + MIN_FREE_BYTES:
+            raise CiscoDownloadError("Not enough free disk space for the Cisco download")
+        mdf_ids = {item["mdf_id"] for item in selected}
+        if len(mdf_ids) != 1 or not next(iter(mdf_ids)):
+            raise CiscoDownloadError("Selected Cisco files do not share valid product metadata")
+        response = cisco_client().request_download(search["pid"], next(iter(mdf_ids)),
+                                                   search["transaction_id"], guids)
+    except (KeyError, CiscoDownloadError) as exc:
+        with cisco_lock:
+            cisco_download_jobs.pop(job_id, None)
+        return cisco_failure(exc)
+    eula_required = cisco_response_requires(response, "eulaContent")
+    k9_required = cisco_response_requires(response, "k9Content")
+    acceptance_required = eula_required or k9_required
+    downloads = response.get("downloads") or []
+    job = {"id": job_id, "status": "eula-required" if acceptance_required else "downloading",
+           "progress": 0, "files": [], "error": "", "created": time.time()}
+    with cisco_lock:
+        cisco_download_jobs[job_id] = job
+    if acceptance_required:
+        job["pending"] = {"search": search, "selected": selected, "downloads": downloads,
+                          "eula_required": eula_required, "k9_required": k9_required}
+        return jsonify({key: value for key, value in job.items() if key != "pending"} |
+                       {"agreement": {"eula": eula_required, "k9": k9_required}}), 202
+    threading.Thread(target=run_cisco_download, args=(job_id, search, selected, downloads),
+                     daemon=True).start()
+    return jsonify(job), 202
+
+
+@app.post("/api/cisco/downloads/<job_id>/accept")
+def cisco_accept(job_id: str):
+    job = cisco_download_jobs.get(job_id)
+    if not job or job.get("status") != "eula-required" or "pending" not in job:
+        abort(404)
+    body = json_object()
+    pending = job["pending"]
+    if pending["eula_required"] and body.get("accept_eula") is not True:
+        return jsonify(error="The Cisco EULA must be accepted"), 400
+    names = [item["name"] for item in pending["selected"]]
+    try:
+        client = cisco_client()
+        if pending["eula_required"]:
+            client.accept_eula(names)
+        if pending["k9_required"]:
+            for name in names:
+                client.accept_k9(name, commercial_or_civil=body.get("commercial_or_civil") is True,
+                                  not_government_or_military=body.get("not_government_or_military") is True)
+        response = client.request_download(pending["search"]["pid"], pending["selected"][0]["mdf_id"],
+                                           pending["search"]["transaction_id"],
+                                           [item["guid"] for item in pending["selected"]])
+    except CiscoDownloadError as exc:
+        return cisco_failure(exc)
+    if cisco_response_requires(response, "eulaContent") or cisco_response_requires(response, "k9Content"):
+        return jsonify(error="Cisco still requires agreement confirmation"), 409
+    downloads = response.get("downloads") or []
+    job.pop("pending", None)
+    job["status"] = "downloading"
+    threading.Thread(target=run_cisco_download,
+                     args=(job_id, pending["search"], pending["selected"], downloads),
+                     daemon=True).start()
+    return jsonify(job), 202
+
+
+@app.get("/api/cisco/downloads/<job_id>")
+def cisco_download_status(job_id: str):
+    job = cisco_download_jobs.get(job_id)
+    if not job:
+        abort(404)
+    return jsonify({key: value for key, value in job.items() if key != "pending"})
+
+
 @app.get("/api/archive")
 def archive_list():
     enforce_archive_policy()
@@ -783,6 +1113,8 @@ def archive_checksums(job_id: str, name: str):
 @app.post("/api/cleanup")
 def cleanup():
     with operation_lock:
+        if cisco_download_running():
+            return jsonify(error="Temporary files cannot be cleaned during a Cisco download"), 409
         with job_lock:
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
                 return jsonify(error="Temporary files cannot be cleaned while a build is running"), 409
@@ -839,10 +1171,12 @@ def upload_init():
     size = body.get("size")
     if isinstance(size, bool) or not isinstance(size, int):
         return jsonify(error="Upload size must be an integer"), 400
-    allowed = (".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".txt")
+    allowed = (".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".txt", ".json")
     if not name or size <= 0 or size > MAX_UPLOAD_BYTES or not name.lower().endswith(allowed):
         return jsonify(error="Unsupported file or invalid size"), 400
     with operation_lock:
+        if cisco_download_running():
+            return jsonify(error="Wait for the Cisco download to finish before uploading"), 409
         with job_lock:
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
                 return jsonify(error="Wait for the current build to finish before uploading more files"), 409
@@ -1006,6 +1340,8 @@ def create_job():
     except (TypeError, ValueError) as exc:
         return jsonify(error=str(exc)), 400
     with operation_lock:
+        if cisco_download_running():
+            return jsonify(error="Wait for the Cisco download to finish before starting a build"), 409
         with upload_lock:
             if uploads:
                 return jsonify(error="Wait for all uploads to finish before starting the build"), 409

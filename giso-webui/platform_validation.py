@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 # eXR identifiers are synchronized with ios-xr/gisobuild's
 # src/utils/gisoglobals.py. LNT uses metadata-driven validation upstream, so
@@ -32,6 +33,13 @@ ALIASES = {
     "8800": "8000", "8200": "8000",
 }
 
+RPM_RELEASE = re.compile(r"-r(?P<release>\d{3,6})(?:\.|-)", re.IGNORECASE)
+ISO_RELEASE = re.compile(r"-(?P<release>\d+\.\d+\.\d+)(?:[-.]|$)", re.IGNORECASE)
+RPM_COMPONENT = re.compile(
+    r"^(?P<component>[a-z0-9_-]+?)-\d[^/]*?-r\d{3,6}\.CSC(?P<bug>[a-z0-9]+)",
+    re.IGNORECASE,
+)
+
 
 def normalize_platform(value: str) -> str:
     key = re.sub(r"[^a-z0-9-]", "", value.lower())
@@ -51,6 +59,85 @@ def infer_platform(filename: str) -> str | None:
         if alias in name:
             return platform
     return None
+
+
+def validate_smu_selection(iso: str, packages: list[str]) -> dict:
+    """Check deterministic filename compatibility before upstream dependency resolution."""
+    iso_name = Path(iso).name
+    release_match = ISO_RELEASE.search(iso_name)
+    iso_release = release_match.group("release") if release_match else ""
+    expected_tag = iso_release.replace(".", "") if iso_release else ""
+    iso_platform = infer_platform(iso_name)
+    issues: list[str] = []
+    warnings: list[str] = []
+    releases: set[str] = set()
+    components: dict[str, set[str]] = {}
+    checked = 0
+    for package in packages:
+        name = Path(package).name
+        if not name.lower().endswith(".rpm"):
+            continue
+        checked += 1
+        package_platform = infer_platform(name)
+        if iso_platform and package_platform and package_platform != iso_platform:
+            issues.append(
+                f"{name}: platform {PLATFORMS[package_platform]['label']} does not match "
+                f"{PLATFORMS[iso_platform]['label']}"
+            )
+        rpm_release = RPM_RELEASE.search(name)
+        if rpm_release:
+            tag = rpm_release.group("release")
+            releases.add(tag)
+            if expected_tag and tag != expected_tag:
+                issues.append(f"{name}: release r{tag} does not match IOS XR {iso_release}")
+        else:
+            warnings.append(f"{name}: release could not be determined from the filename")
+        component = RPM_COMPONENT.search(name)
+        if component:
+            components.setdefault(component.group("component").lower(), set()).add(
+                component.group("bug").lower()
+            )
+    if len(releases) > 1:
+        issues.append("Selected RPMs contain more than one IOS XR release tag")
+    for component, bugs in components.items():
+        if len(bugs) > 1:
+            issues.append(
+                f"Multiple SMUs replace {component}; select one fix or use Cisco supersedence data"
+            )
+    if checked:
+        warnings.append(
+            "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs the authoritative dependency check"
+        )
+    return {"compatible": not issues, "iso_release": iso_release, "checked": checked,
+            "issues": sorted(set(issues)), "warnings": sorted(set(warnings))}
+
+
+def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str) -> dict:
+    if not isinstance(matrix, dict) or not isinstance(matrix.get("permitted"), dict):
+        raise TypeError("The compatibility matrix has an invalid format")
+    targets = matrix["permitted"].get(source, {})
+    if not isinstance(targets, dict):
+        raise TypeError("The compatibility matrix has an invalid source-release entry")
+    candidates = targets.get(target, [])
+    if not isinstance(candidates, list):
+        raise TypeError("The compatibility matrix has an invalid upgrade entry")
+    normalized = normalize_platform(platform)
+    match = next((item for item in candidates if isinstance(item, dict) and
+                  ALIASES.get(str(item.get("platform", "")).lower(),
+                              str(item.get("platform", "")).lower()) == normalized), None)
+    if not match:
+        return {"permitted": False, "bridge_smus": [], "caveats": [],
+                "message": f"The matrix does not permit {source} to {target} on {PLATFORMS[normalized]['label']}"}
+    bridge_smus = match.get("bridge_smus") or []
+    caveats = match.get("caveats") or []
+    if (not isinstance(bridge_smus, list) or len(bridge_smus) > 100 or
+            not all(isinstance(item, str) and len(item) <= 512 for item in bridge_smus)):
+        raise ValueError("The compatibility matrix contains invalid bridge SMUs")
+    if (not isinstance(caveats, list) or len(caveats) > 100 or
+            not all(isinstance(item, str) and len(item) <= 4096 for item in caveats)):
+        raise ValueError("The compatibility matrix contains invalid caveats")
+    return {"permitted": True, "bridge_smus": bridge_smus, "caveats": caveats,
+            "message": f"The matrix permits {source} to {target} on {PLATFORMS[normalized]['label']}"}
 
 
 def validate_platform_options(payload: dict) -> dict:

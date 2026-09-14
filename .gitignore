@@ -62,6 +62,7 @@ giso-webui/state/
 *.qcow2.gz
 
 # Local configuration and secrets
+giso-webui/secrets/
 .env
 .env.*
 *.env

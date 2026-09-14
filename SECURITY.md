@@ -28,6 +28,9 @@ Treat Cisco software, embedded router configurations, ownership vouchers, key
 requests, certificates, build logs, customer names, device identifiers, and
 archive checksums as potentially sensitive. Keep `.env` local and never include
 secrets in issues, pull requests, test fixtures, Graphify output, or releases.
+Cisco API client secrets, OAuth tokens, session download URLs, EULA/K9 responses,
+and download transaction identifiers must likewise remain server-side and out
+of logs and persisted job history.
 
 ## Operational controls
 
