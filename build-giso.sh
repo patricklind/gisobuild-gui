@@ -49,7 +49,11 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$ISO" ] || { usage; die "--iso is required"; }
+[ -n "$LABEL" ] || die "Label must not be empty"
 case "$LABEL" in *[!A-Za-z0-9_]*) die "Label must contain only letters, numbers and underscore" ;; esac
+case "$DOCKER_IMAGE" in
+  -*|*[[:space:]]*) die "Docker image must not start with a dash or contain whitespace" ;;
+esac
 
 ISO=$(cd "$(dirname "$ISO")" && pwd)/$(basename "$ISO")
 INPUT_ROOT=$(cd "$INPUT_ROOT" && pwd)
@@ -115,9 +119,8 @@ find "$INPUT_ROOT" -type f -name '*.txt' -print | while read -r readme; do
   [ "$actual" = "$expected" ] || die "Checksum mismatch: $rpm"
 done
 
-STAGING="$SCRIPT_DIR/.giso-build-staging-$LABEL"
+STAGING=$(mktemp -d "$SCRIPT_DIR/.giso-build-staging-$LABEL.XXXXXX")
 case "$STAGING" in "$SCRIPT_DIR"/.giso-build-staging-*) ;; *) die "Unsafe staging path" ;; esac
-rm -rf "$STAGING"
 mkdir -p "$STAGING/repo"
 trap 'rm -rf "$STAGING"' EXIT INT TERM
 
@@ -156,7 +159,8 @@ printf '\nPackages selected (%s):\n' "$(wc -l < "$PKGLIST" | tr -d ' ')"
 sed 's/^/  /' "$PKGLIST"
 
 docker pull --platform linux/amd64 "$DOCKER_IMAGE"
-mkdir -p "$OUTPUT_DIR"
+mkdir -p "$(dirname "$OUTPUT_DIR")"
+mkdir "$OUTPUT_DIR"
 
 DOCKER_ARGS=(
   docker run --platform linux/amd64 --rm
@@ -182,7 +186,7 @@ DOCKER_ARGS+=(
 printf '\nStarting Docker GISO build...\n'
 "${DOCKER_ARGS[@]}"
 
-RESULT=$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name '*.iso' -print -quit)
+RESULT=$(find "$OUTPUT_DIR" -type f -name '*.iso' -print -quit)
 [ -n "$RESULT" ] || die "Build finished without an ISO; inspect $OUTPUT_DIR/logs"
 
 printf '\nBuild complete\n'

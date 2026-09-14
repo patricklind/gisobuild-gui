@@ -77,6 +77,8 @@ MAX_EXTRACTED_BYTES = int(os.environ.get("MAX_EXTRACTED_BYTES", str(16 * 1024**3
 MAX_TAR_MEMBERS = int(os.environ.get("MAX_TAR_MEMBERS", "10000"))
 MAX_CHUNK_BYTES = int(os.environ.get("MAX_CHUNK_BYTES", str(16 * 1024**2)))
 MAX_LOG_BYTES = int(os.environ.get("MAX_LOG_BYTES", str(10 * 1024**2)))
+MAX_SUPERSEDENCE_FILE_BYTES = 2 * 1024**2
+MAX_SUPERSEDENCE_TOTAL_BYTES = 16 * 1024**2
 MAX_JOB_HISTORY = int(os.environ.get("MAX_JOB_HISTORY", "100"))
 ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
 MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
@@ -221,7 +223,8 @@ def log_event(event: str, **fields: object) -> None:
 
 
 ARTIFACT_TOKEN = re.compile(
-    r"(?<!\w)[^\s\"'=]+?\.(?:iso|rpm|zip|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt)(?!\w)",
+    r"(?:[\"'][^\"'\r\n]*?\.(?:iso|rpm|zip|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt|json)[\"']|"
+    r"(?<!\w)[^\s\"'=]+?\.(?:iso|rpm|zip|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt|json)(?!\w))",
     re.IGNORECASE,
 )
 
@@ -512,7 +515,9 @@ def archive_giso_artifacts_and_cleanup(job_id: str, job_dir: Path) -> list[dict]
                 destination = archive_dir / source.name
                 if destination.exists():
                     raise RuntimeError(f"Build artifacts share the filename {source.name}")
-                shutil.copy2(source, destination)
+                # The archive retention clock starts when the verified build is archived,
+                # not when an old source file happened to be created.
+                shutil.copyfile(source, destination)
                 if source.stat().st_size != destination.stat().st_size or file_sha256(source) != file_sha256(destination):
                     raise RuntimeError(f"Archive verification failed for {source.name}")
                 archived.append({"path": source.name, "size": destination.stat().st_size,
@@ -574,13 +579,27 @@ def expire_upload_sessions() -> None:
                 expired.append(uploads.pop(upload_id))
     for item in expired:
         Path(item["temp"]).unlink(missing_ok=True)
+    parts = DATA / ".parts"
+    tracked = {Path(item["temp"]).resolve() for item in uploads.values() if item.get("temp")}
+    if parts.is_dir():
+        for partial in parts.glob("*.part"):
+            try:
+                if partial.resolve() not in tracked and partial.stat().st_mtime < cutoff:
+                    partial.unlink()
+            except OSError:
+                pass
 
 
 def active_rpm_names() -> tuple[list[str], set[str]]:
     superseded: set[str] = set()
+    inspected_bytes = 0
     pattern = re.compile(r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE)
     for readme in DATA.rglob("*.txt"):
         try:
+            size = readme.stat().st_size
+            if size > MAX_SUPERSEDENCE_FILE_BYTES or inspected_bytes + size > MAX_SUPERSEDENCE_TOTAL_BYTES:
+                continue
+            inspected_bytes += size
             superseded.update(pattern.findall(readme.read_text(errors="ignore")))
         except OSError:
             pass
@@ -789,16 +808,21 @@ def run_job(job_id: str, command: list[str]) -> None:
                 jobs[job_id].update(status="success" if success else "failed",
                                     exit_code=code, artifacts=artifacts, finished=time.time(),
                                     updated=time.time(),
-                                    progress=100 if code == 0 else jobs[job_id].get("progress", 0),
-                                    phase="Complete" if code == 0 else "Build failed")
+                                    progress=100 if success else jobs[job_id].get("progress", 0),
+                                    phase="Complete" if success else "Build failed")
         persist_job(job_id)
         log_event("build_finished", exit_code=code, job_id=job_id,
                   status="success" if success else "failed")
     except Exception as exc:  # noqa: BLE001 - background failures must update job state
         append_log(job_id, f"\nERROR: {exc}\n")
         with job_lock:
-            jobs[job_id].update(status="failed", error=str(exc), finished=time.time(),
-                                updated=time.time())
+            jobs[job_id].update(
+                status="failed",
+                error="Build failed; review the redacted technical details",
+                phase="Build failed",
+                finished=time.time(),
+                updated=time.time(),
+            )
         persist_job(job_id)
         log_event("build_failed", error_type=type(exc).__name__, job_id=job_id)
 
@@ -984,6 +1008,7 @@ def cisco_search():
 def run_cisco_download(job_id: str, search: dict, selected: list[dict], downloads: list[dict]) -> None:
     with cisco_lock:
         job = cisco_download_jobs[job_id]
+    created_files: list[Path] = []
     try:
         for number, item in enumerate(selected, 1):
             remote = next((entry for entry in downloads if entry.get("imageGuid") == item["guid"]), None)
@@ -1008,6 +1033,7 @@ def run_cisco_download(job_id: str, search: dict, selected: list[dict], download
                 expected_md5=item["md5"], expected_sha512=item["sha512"],
                 progress=update_progress,
             )
+            created_files.append(result.path)
             extracted = extract_cisco_archive(result.path)
             with cisco_lock:
                 job["files"].append({"name": result.path.name, "size": result.size,
@@ -1018,8 +1044,13 @@ def run_cisco_download(job_id: str, search: dict, selected: list[dict], download
         append_activity(f"Cisco download completed: {len(selected)} files verified and ready.")
         log_event("cisco_download_completed", files=len(selected), job_id=job_id)
     except (CiscoDownloadError, OSError, ValueError) as exc:
+        for path in created_files:
+            path.unlink(missing_ok=True)
+            extracted_path = extraction_path(path)
+            if extracted_path:
+                shutil.rmtree(extracted_path, ignore_errors=True)
         with cisco_lock:
-            job.update(status="failed", error=str(exc))
+            job.update(status="failed", error=str(exc), files=[])
         log_event("cisco_download_failed", error_type=type(exc).__name__, job_id=job_id)
         append_activity("Cisco download failed. Check the Cisco access status and technical details.")
 
@@ -1032,16 +1063,27 @@ def cisco_download_start():
     guids = body.get("image_guids")
     if not search or time.time() - search["created"] > 3300:
         return jsonify(error="Cisco search has expired; search again"), 410
-    if not isinstance(guids, list) or not 1 <= len(guids) <= 5 or any(not isinstance(x, str) for x in guids):
-        return jsonify(error="Select between one and five Cisco files"), 400
+    if (not isinstance(guids, list) or not 1 <= len(guids) <= 5 or
+            any(not isinstance(x, str) for x in guids) or len(set(guids)) != len(guids)):
+        return jsonify(error="Select between one and five unique Cisco files"), 400
     job_id = uuid.uuid4().hex
-    with cisco_lock:
-        if cisco_download_running():
-            return jsonify(error="Wait for the current Cisco download to finish"), 409
-        cisco_download_jobs.clear()
-        cisco_download_jobs[job_id] = {"id": job_id, "status": "authenticating",
-                                       "progress": 0, "files": [], "error": "",
-                                       "created": time.time()}
+    with operation_lock:
+        with upload_lock:
+            if uploads:
+                return jsonify(error="Wait for the current upload to finish"), 409
+        with job_lock:
+            if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
+                return jsonify(error="Wait for the current build to finish"), 409
+        if docker_build_running():
+            return jsonify(error="Wait for the current Docker build to finish"), 409
+        with cisco_lock:
+            if cisco_download_running():
+                return jsonify(error="Wait for the current Cisco download to finish"), 409
+            cisco_download_jobs.clear()
+            cisco_download_jobs[job_id] = {
+                "id": job_id, "status": "authenticating", "progress": 0,
+                "files": [], "error": "", "created": time.time(),
+            }
     try:
         selected = [search["images"][guid] for guid in guids]
         if any(item["size"] <= 0 or item["size"] > MAX_UPLOAD_BYTES for item in selected):
@@ -1185,13 +1227,30 @@ def cleanup():
                 removed_items += 1
                 area_items += 1
             removed_by_area[area] = area_items
-        log_event("workspace_cleanup", removed_bytes=removed_bytes,
-                  removed_items=removed_items, **removed_by_area)
+        cleared_artifacts = 0
+        changed_jobs: list[str] = []
+        with job_lock:
+            for job_id, job in jobs.items():
+                artifacts = job.get("artifacts", [])
+                retained = [
+                    artifact for artifact in artifacts
+                    if str(artifact.get("url", "")).startswith("/archive/")
+                ]
+                if len(retained) != len(artifacts):
+                    cleared_artifacts += len(artifacts) - len(retained)
+                    job["artifacts"] = retained
+                    job["updated"] = time.time()
+                    changed_jobs.append(job_id)
+        for job_id in changed_jobs:
+            persist_job(job_id)
+        log_event("workspace_cleanup", cleared_artifacts=cleared_artifacts,
+                  removed_bytes=removed_bytes, removed_items=removed_items, **removed_by_area)
         append_activity(
             f"Workspace cleanup completed: {removed_items} top-level items and "
             f"{removed_bytes} bytes removed; completed archives were kept."
         )
     return jsonify(ok=True, removed_bytes=removed_bytes, removed_items=removed_items,
+                   cleared_artifacts=cleared_artifacts,
                    removed=removed_by_area,
                    message="Uploads, partial files, build work, and raw output were removed. Archived images were kept.")
 
@@ -1217,14 +1276,18 @@ def upload_init():
                 return jsonify(error="Wait for the current build to finish before uploading more files"), 409
         if docker_build_running():
             return jsonify(error="Wait for the current Docker build to finish before uploading more files"), 409
-        if shutil.disk_usage(DATA).free < size + MIN_FREE_BYTES:
-            return jsonify(error="Not enough free disk space for this upload"), 507
-        upload_id = uuid.uuid4().hex
-        parts = DATA / ".parts"
-        parts.mkdir(parents=True, exist_ok=True)
-        temp = parts / f"{upload_id}.part"
-        temp.touch()
         with upload_lock:
+            reserved = sum(
+                max(0, int(item["size"]) - int(item["received"]))
+                for item in uploads.values()
+            )
+            if shutil.disk_usage(DATA).free < reserved + size + MIN_FREE_BYTES:
+                return jsonify(error="Not enough free disk space for this upload"), 507
+            upload_id = uuid.uuid4().hex
+            parts = DATA / ".parts"
+            parts.mkdir(parents=True, exist_ok=True)
+            temp = parts / f"{upload_id}.part"
+            temp.touch()
             uploads[upload_id] = {"name": name, "size": size, "received": 0,
                                   "temp": str(temp), "updated": time.time()}
     log_event("upload_started", bytes=size, upload_id=upload_id)
@@ -1442,8 +1505,9 @@ def cancel_job(job_id: str):
         append_log(job_id, f"\nUnable to stop the build container: {exc}\n")
         return jsonify(error="The build container could not be stopped"), 503
     with job_lock:
-        jobs[job_id].update(status="cancelled", finished=time.time())
+        jobs[job_id].update(status="cancelled", finished=time.time(), updated=time.time())
     append_log(job_id, "\nBuild cancelled by user.\n")
+    persist_job(job_id)
     return jsonify(ok=True)
 
 

@@ -166,7 +166,9 @@ def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
         name = Path(package).name
         package_platform = infer_platform(name)
         rpm_release = RPM_RELEASE.search(name)
-        if package_platform and package_platform != iso_platform:
+        if not package_platform:
+            excluded.append({"name": name, "reason": "Platform is missing from filename"})
+        elif package_platform != iso_platform:
             excluded.append({"name": name, "reason": "Different platform"})
         elif rpm_release and rpm_release.group("release") != expected_tag:
             excluded.append({"name": name, "reason": "Different IOS XR release"})
