@@ -44,6 +44,26 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("result.cleared_artifacts", cleanup_handler)
         self.assertIn("currentJob = null", cleanup_handler)
 
+    def test_manual_package_mode_renders_uploaded_rpms_as_choices(self):
+        web_root = Path(__file__).parents[1]
+        script = (web_root / "static" / "app.js").read_text()
+        template = (web_root / "templates" / "index.html").read_text()
+
+        self.assertIn('id="manual-package-list"', template)
+        self.assertIn("data.files.filter(file=>file.type === '.rpm')", script)
+        self.assertIn("box.type='checkbox'", script)
+        self.assertIn("syncManualPackageValue", script)
+        self.assertNotIn('name="pkglist_override" rows=', template)
+
+    def test_lnt_only_defaults_do_not_block_exr_builds(self):
+        web_root = Path(__file__).parents[1]
+        template = (web_root / "templates" / "index.html").read_text()
+        script = (web_root / "static" / "app.js").read_text()
+
+        self.assertIn('id="lnt-controls"', template)
+        self.assertNotIn('name="verbose_dep_check" checked', template)
+        self.assertIn("profile.architecture !== 'lnt'", script)
+
     def test_clean_rejects_traversal_outside_standard_output(self):
         bash = shutil.which("bash")
         if not bash:

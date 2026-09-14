@@ -1,10 +1,17 @@
 let currentJob = null;
 let inputs = { files: [], recommended: [] };
 let packageListEdited = false;
+let platformProfiles = [];
+let detectedPlatform = '';
 let pollTimer = null;
 let activityTimer = null;
 const $ = selector => document.querySelector(selector);
 const lines = value => value.split(/\n|,/).map(item => item.trim()).filter(Boolean);
+const selectedPackages = () => lines(
+  $('[name=package_selection_mode]:checked').value === 'manual'
+    ? $('[name=pkglist_override]').value
+    : $('[name=pkglist]').value
+);
 const api = (url, options = {}) => fetch(url, options).then(async response => {
   const text = await response.text();
   let body = {};
@@ -110,6 +117,7 @@ function renderInputs(data) {
   applySmuRecommendation(data.recommendation || {ready:false,selected:[],excluded:[],message:'No automatic package plan is available.'});
   setReadyCard('#iso-check', Boolean(iso), iso ? 'Found and ready' : 'Upload the Cisco base file');
   const plan=data.recommendation || {};
+  renderManualPackages(data, plan);
   const rpmStatus=plan.ready
     ? `${data.recommended.length} compatible RPM${data.recommended.length === 1 ? '' : 's'} selected${plan.excluded?.length ? ` · ${plan.excluded.length} excluded` : ''}`
     : plan.message || 'Optional: add SMU files or another customization';
@@ -125,6 +133,7 @@ function renderInputs(data) {
 }
 
 function applySmuRecommendation(plan) {
+  detectedPlatform = plan.platform || '';
   if (!packageListEdited) $('[name=pkglist]').value=(plan.selected || []).join('\n');
   const state=$('#smu-plan-state'); const title=$('#smu-auto-plan-title'); const message=$('#smu-plan-message');
   state.className=`pill ${plan.ready ? 'success' : 'running'}`; state.textContent=plan.ready ? 'Calculated' : 'Needs input';
@@ -156,7 +165,43 @@ function applySmuRecommendation(plan) {
     const excluded=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`${plan.excluded.length} incompatible RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically`;
     const list=document.createElement('ul'); plan.excluded.forEach(item=>{const row=document.createElement('li'); row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);}); excluded.append(summary,list); details.appendChild(excluded);
   }
+  updatePlatformControls();
   updateBuildAvailability();
+}
+
+function selectedManualPackages() {
+  return [...document.querySelectorAll('#manual-package-list input:checked')].map(box => box.value);
+}
+
+function syncManualPackageValue() {
+  $('[name=pkglist_override]').value=selectedManualPackages().join('\n');
+  const count=selectedManualPackages().length;
+  $('#manual-package-summary').textContent=`${count} of ${document.querySelectorAll('#manual-package-list input').length} RPM packages selected.`;
+  updateBuildAvailability();
+}
+
+function renderManualPackages(data, plan) {
+  const list=$('#manual-package-list');
+  const previous=new Set(lines($('[name=pkglist_override]').value));
+  const recommended=new Set(plan.selected || data.recommended || []);
+  const excluded=new Map((plan.excluded || []).map(item=>[item.name,item.reason]));
+  const rpms=data.files.filter(file=>file.type === '.rpm');
+  list.replaceChildren();
+  if (!rpms.length) {
+    const empty=document.createElement('p'); empty.className='manual-package-empty'; empty.textContent='Upload RPM or SMU files to choose packages manually.'; list.appendChild(empty);
+    $('#manual-package-summary').textContent='No RPM packages uploaded.';
+    $('[name=pkglist_override]').value='';
+    return;
+  }
+  rpms.forEach((file,index)=>{
+    const label=document.createElement('label'); label.className=`manual-package-option${excluded.has(file.path) || excluded.has(file.path.split('/').pop()) ? ' incompatible' : ''}`;
+    const box=document.createElement('input'); box.type='checkbox'; box.value=file.path; box.id=`manual-package-${index}`;
+    box.checked=packageListEdited ? previous.has(file.path) : recommended.has(file.path) || recommended.has(file.path.split('/').pop());
+    const copy=document.createElement('span'); const name=document.createElement('b'); name.textContent=file.path;
+    const reason=document.createElement('small'); reason.textContent=excluded.get(file.path) || excluded.get(file.path.split('/').pop()) || 'Matches the automatic platform and release check';
+    copy.append(name,reason); label.append(box,copy); list.appendChild(label);
+  });
+  syncManualPackageValue();
 }
 
 function smuGroupCard(group) {
@@ -184,7 +229,7 @@ function updateBuildAvailability() {
   const yamlMode = $('[name=mode]:checked').value === 'yaml';
   const customFiles = ['xrconfig','ztp_ini','script','key_request','ownership_vouchers','ownership_certificate']
     .some(name => $(`[name=${name}]`).value.trim());
-  const packageUpdates = lines($('[name=pkglist_override]').value || $('[name=pkglist]').value || '').length > 0;
+  const packageUpdates = selectedPackages().length > 0;
   const otherChanges = customFiles || packageUpdates || lines($('[name=bridging_fixes]').value).length > 0 ||
     lines($('[name=remove_packages]').value).length > 0;
   const ready = yamlMode
@@ -209,19 +254,20 @@ async function loadInputs() {
 async function loadPlatforms() {
   try {
     const select = $('[name=platform]');
-    const platforms = await api('/api/platforms');
-    platforms.forEach(platform => {
+    platformProfiles = await api('/api/platforms');
+    platformProfiles.forEach(platform => {
       const option=document.createElement('option'); option.value=platform.id;
       option.textContent=`${platform.label} · ${platform.architecture.toUpperCase()}${platform.usb ? ' · USB' : ' · no automatic USB'}`;
       select.appendChild(option);
     });
+    updatePlatformControls();
   } catch (error) { $('#error').textContent=error.message; }
 }
 
 async function checkCompatibility() {
   const button=$('#check-compatibility');
   const result=$('#compatibility-result');
-  const packages=lines($('[name=pkglist_override]').value || $('[name=pkglist]').value || '');
+  const packages=selectedPackages();
   const upgradeMode=$('[name=compatibility_mode]:checked').value === 'upgrade';
   const payload={iso:$('[name=iso_override]').value || $('[name=iso]').value,packages,
     matrix:upgradeMode ? $('[name=compatibility_matrix]').value : '',source_release:$('[name=source_release]').value,
@@ -303,8 +349,27 @@ function updateCompatibilityMode() {
 function updatePackageSelectionMode() {
   const manual=$('[name=package_selection_mode]:checked').value === 'manual';
   $('#manual-package-override').hidden=!manual;
-  packageListEdited=manual;
-  if (!manual) $('[name=pkglist_override]').value='';
+  if (manual && !packageListEdited) {
+    packageListEdited=true;
+    renderManualPackages(inputs, inputs.recommendation || {});
+  }
+  if (!manual) { packageListEdited=false; $('[name=pkglist_override]').value=''; }
+  updateBuildAvailability();
+}
+
+function updatePlatformControls() {
+  const platform=$('[name=platform]').value || detectedPlatform;
+  const profile=platformProfiles.find(item=>item.id === platform);
+  const controls=$('#lnt-controls');
+  const unavailable=Boolean(profile && profile.architecture !== 'lnt');
+  controls.hidden=unavailable;
+  controls.querySelectorAll('input, textarea').forEach(control=>{
+    control.disabled=unavailable;
+    if (unavailable) control.type === 'checkbox' ? control.checked=false : control.value='';
+  });
+  $('#lnt-controls-help').textContent=profile
+    ? profile.architecture === 'lnt' ? `${profile.label} uses IOS XR7/LNT; these controls are available.` : `${profile.label} uses eXR; LNT-only controls are disabled.`
+    : 'Select a platform or base ISO to determine whether these controls apply.';
   updateBuildAvailability();
 }
 
@@ -436,7 +501,7 @@ $('#build-form').addEventListener('submit', async event => {
     platform: form.get('platform') || '',
     yamlfile: yamlMode ? form.get('yamlfile') : '',
     label: form.get('label_override') || form.get('label'),
-    pkglist: lines(form.get('pkglist_override') || form.get('pkglist') || ''),
+    pkglist: selectedPackages(),
     automatic_smu_selection: $('[name=package_selection_mode]:checked').value === 'automatic',
     repo: lines(form.get('repo') || ''), auto_repo: true,
     bridging_fixes: lines(form.get('bridging_fixes') || ''),
@@ -652,14 +717,15 @@ $('#cancel-build').onclick = async () => {
     catch (error) { await showNotice('Could not stop build', error.message); }
   }
 };
-$('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; $('[name=package_selection_mode][value=manual]').checked=true; updatePackageSelectionMode(); });
+$('#manual-package-list').addEventListener('change', () => { packageListEdited=true; syncManualPackageValue(); });
 document.querySelectorAll('[name=package_selection_mode]').forEach(control=>control.addEventListener('change',updatePackageSelectionMode));
 $('#refresh-smu-plan').onclick=refreshSmuRecommendation;
 $('#use-automatic-packages').onclick=async()=>{
-  $('[name=pkglist_override]').value=''; $('[name=package_selection_mode][value=automatic]').checked=true; updatePackageSelectionMode();
+  packageListEdited=false; $('[name=pkglist_override]').value=''; $('[name=package_selection_mode][value=automatic]').checked=true; updatePackageSelectionMode();
   await refreshSmuRecommendation(); updateBuildAvailability();
 };
 $('[name=iso_override]').addEventListener('change',refreshSmuRecommendation);
+$('[name=platform]').addEventListener('change',updatePlatformControls);
 $('#check-compatibility').onclick=checkCompatibility;
 document.querySelectorAll('[name=compatibility_mode]').forEach(control=>control.addEventListener('change', updateCompatibilityMode));
 updateCompatibilityMode();
