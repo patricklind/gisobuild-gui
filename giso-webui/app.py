@@ -906,6 +906,7 @@ def compatibility():
                 matrix, cisco_text(body.get("source_release"), "source release"),
                 cisco_text(body.get("target_release"), "target release"),
                 cisco_text(body.get("platform"), "platform"),
+                packages,
             )
         return jsonify(result)
     except (OSError, json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
