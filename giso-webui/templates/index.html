@@ -26,6 +26,28 @@
           <button type="button" id="choose-files" class="primary upload-button">Select files</button>
         </div>
         <div id="upload-list" class="upload-list" aria-live="polite"></div>
+        <details id="cisco-download" class="cisco-download" hidden>
+          <summary>Download from Cisco</summary>
+          <p>Uses your organisation's Cisco API access and service contracts. Credentials stay on this server.</p>
+          <form id="cisco-search-form" class="cisco-search-form">
+            <label>Product ID (PID)<input name="pid" required maxlength="256" placeholder="NCS-5501-SE"></label>
+            <label>Current IOS XR release<input name="current_release" required maxlength="256" placeholder="25.1.2"></label>
+            <label>Target release<input name="target_release" required maxlength="256" placeholder="26.1.2"></label>
+            <button class="secondary" type="submit">Search Cisco</button>
+          </form>
+          <div id="cisco-status" class="safety-note" role="status" aria-live="polite">Enter the product and releases to search.</div>
+          <form id="cisco-results-form" hidden>
+            <div id="cisco-results" class="file-library"></div>
+            <button id="cisco-download-selected" class="primary" type="submit">Download selected files</button>
+          </form>
+          <div id="cisco-agreement" hidden>
+            <div class="warning"><b>Cisco agreement required.</b> Confirm these statements only when they are true for your organisation.</div>
+            <label id="cisco-eula-label"><input id="cisco-eula" type="checkbox"> I have read and accept <a href="https://www.cisco.com/c/en/us/about/legal/cloud-and-software/end_user_license_agreement.html" target="_blank" rel="noopener noreferrer">Cisco's End User License Agreement</a> for these files.</label>
+            <label id="cisco-commercial-label"><input id="cisco-commercial" type="checkbox"> The download is for a commercial or civil purpose.</label>
+            <label id="cisco-not-government-label"><input id="cisco-not-government" type="checkbox"> The organisation is not a government, military entity, or defence contractor.</label>
+            <button id="cisco-accept" class="primary" type="button">Accept and continue</button>
+          </div>
+        </details>
         <div class="safety-note"><b>Input retention:</b> Uploaded files remain available during an active build. After a successful build, verified output artifacts are archived and source and temporary files are removed automatically.</div>
       </section>
 
@@ -45,23 +67,14 @@
           <textarea name="repo" hidden>.</textarea>
           <details class="advanced">
             <summary>Expert settings <small>– normally not required</small></summary>
+            <p class="expert-intro">Use these settings only when the standard selection is not enough. Each group explains when it applies.</p>
             <div class="mode"><label><input type="radio" name="mode" value="form" checked> Normal form</label><label><input type="radio" name="mode" value="yaml"> Use YAML</label></div>
             <div id="form-mode">
-              <div class="grid three"><label>Base ISO<input name="iso_override" list="iso-files"></label><label>Platform family<select name="platform"><option value="">Detect from ISO filename</option></select></label><label>Image label<input name="label_override" pattern="[A-Za-z0-9_]+"></label></div>
-              <label>RPM packages<textarea name="pkglist_override" rows="6"></textarea></label>
-              <label>Bridging fixes<textarea name="bridging_fixes" rows="2"></textarea></label>
-              <div class="grid three"><label>XR config<input name="xrconfig" list="all-files"></label><label>ZTP ini<input name="ztp_ini" list="all-files"></label><label>Boot-script<input name="script" list="all-files"></label></div>
-              <div class="grid three"><label>Key request<input name="key_request" list="all-files"></label><label>Ownership vouchers<input name="ownership_vouchers" list="all-files"></label><label>Ownership certificate<input name="ownership_certificate" list="all-files"></label></div>
-              <label>Remove packages (LNT)<textarea name="remove_packages" rows="2"></textarea></label>
-              <label>Supported hardware PIDs only (LNT)<textarea name="only_support_pids" rows="2"></textarea></label>
-              <div class="checks">
-                <label><input type="checkbox" name="create_checksum" checked> Create checksums</label><label><input type="checkbox" name="no_label"> Remove label</label>
-                <label><input type="checkbox" name="x86_only"> x86_64 only</label><label><input type="checkbox" name="migration"> Migration tar</label>
-                <label><input type="checkbox" name="optimize"> Optimize eXR GISO</label><label><input type="checkbox" name="full_iso"> Full ISO (XRv9K)</label>
-                <label><input type="checkbox" name="skip_usb_image"> Skip USB image</label><label><input type="checkbox" name="clear_bridging_fixes"> Clear bridging fixes</label>
-                <label><input type="checkbox" name="verbose_dep_check"> Detailed dependency check</label><label><input type="checkbox" name="debug"> Debug log</label><label><input type="checkbox" name="no_buildinfo"> No build information</label>
-                <label><input type="checkbox" name="clear_key_request"> Clear key request</label><label><input type="checkbox" name="clear_ownership_vouchers"> Clear ownership vouchers</label><label><input type="checkbox" name="clear_ownership_certificate"> Clear ownership certificate</label>
-              </div>
+              <section class="expert-group"><h3>1. Image identity</h3><p>Override automatic detection only if the filename is unusual.</p><div class="grid three"><label>Base ISO<input name="iso_override" list="iso-files"><small>Leave empty to use the detected ISO.</small></label><label>Platform family<select name="platform"><option value="">Detect from ISO filename</option></select><small>Controls which build options are valid.</small></label><label>Image label<input name="label_override" pattern="[A-Za-z0-9_]+"><small>Letters, numbers and underscore only.</small></label></div></section>
+              <section class="expert-group"><h3>2. SMU compatibility</h3><p>Files must target the same platform and IOS XR release. Cisco's dependency check remains authoritative.</p><label>RPM packages<textarea name="pkglist_override" rows="6"></textarea><small>One RPM filename per line. The automatically selected list is used when this field is empty.</small></label><div class="grid three compatibility-fields"><label>Upgrade matrix<select name="compatibility_matrix"><option value="">No matrix uploaded</option></select><small>Optional Cisco compatibility_matrix JSON.</small></label><label>Router's current release<input name="source_release" placeholder="25.1.2"><small>Required only for an upgrade-path check.</small></label><label>Target release<input name="target_release" placeholder="26.1.2"><small>Normally the release in the base ISO.</small></label></div><button id="check-compatibility" class="secondary" type="button">Check SMU compatibility</button><div id="compatibility-result" class="compatibility-result" role="status" aria-live="polite">No compatibility check run yet.</div></section>
+              <details class="expert-group"><summary>Additional files</summary><p>Add these only when your approved build procedure requires them.</p><label>Bridging fixes<textarea name="bridging_fixes" rows="2"></textarea><small>Paths to bridging-fix repositories, one per line.</small></label><div class="grid three"><label>XR config<input name="xrconfig" list="all-files"></label><label>ZTP ini<input name="ztp_ini" list="all-files"></label><label>Boot-script (eXR)<input name="script" list="all-files"></label></div><div class="grid three"><label>Key request<input name="key_request" list="all-files"></label><label>Ownership vouchers<input name="ownership_vouchers" list="all-files"></label><label>Ownership certificate<input name="ownership_certificate" list="all-files"></label></div></details>
+              <details class="expert-group"><summary>IOS XR7 / LNT controls</summary><p>These choices are rejected for eXR images.</p><label>Remove packages (LNT)<textarea name="remove_packages" rows="2"></textarea></label><label>Supported hardware PIDs only (LNT)<textarea name="only_support_pids" rows="2"></textarea></label><div class="checks"><label><input type="checkbox" name="clear_bridging_fixes"> Clear bridging fixes</label><label><input type="checkbox" name="clear_ownership_vouchers"> Clear ownership vouchers</label><label><input type="checkbox" name="clear_ownership_certificate"> Clear ownership certificate</label></div></details>
+              <details class="expert-group"><summary>Build behavior</summary><p>Defaults are suitable for most builds.</p><div class="checks"><label><input type="checkbox" name="create_checksum" checked> Create checksums</label><label><input type="checkbox" name="verbose_dep_check" checked> Detailed dependency check</label><label><input type="checkbox" name="skip_usb_image"> Skip USB image</label><label><input type="checkbox" name="optimize"> Optimize eXR GISO</label><label><input type="checkbox" name="x86_only"> x86_64 only</label><label><input type="checkbox" name="migration"> ASR 9000 migration TAR</label><label><input type="checkbox" name="full_iso"> Full ISO (XRv9K)</label><label><input type="checkbox" name="no_label"> Remove label</label><label><input type="checkbox" name="debug"> Debug log</label><label><input type="checkbox" name="no_buildinfo"> Omit build information</label><label><input type="checkbox" name="clear_key_request"> Clear key request</label></div></details>
             </div>
             <div id="yaml-mode" hidden><label>YAML file<input name="yamlfile" list="yaml-files"></label></div>
           </details>

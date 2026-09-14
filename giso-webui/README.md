@@ -10,6 +10,36 @@ and a persistent artifact archive.
 > effectively administrative access to the Docker host. Keep the default
 > localhost binding and do not deploy this as an untrusted or multi-user service.
 
+## Optional Cisco software download
+
+The **Download from Cisco** panel uses Cisco's Automated Software Distribution
+API. Register an application in Cisco API Console with access to that API, then
+provide its client credentials through `CISCO_CLIENT_ID_FILE` and
+`CISCO_CLIENT_SECRET_FILE` (preferred) or the matching environment variables.
+The application identity must have the required service contracts and software
+download permissions.
+
+Create the ignored secret files before enabling the integration:
+
+```bash
+mkdir -p giso-webui/secrets
+printf '%s' 'YOUR_CLIENT_ID' > giso-webui/secrets/cisco_client_id
+printf '%s' 'YOUR_CLIENT_SECRET' > giso-webui/secrets/cisco_client_secret
+chmod 600 giso-webui/secrets/cisco_client_*
+```
+
+The default Compose mount exposes only this directory at `/run/secrets`. To
+leave Cisco download disabled, keep the two `CISCO_CLIENT_*_FILE` values empty.
+
+OAuth tokens and session download URLs remain server-side. Files are streamed
+into the upload volume, checked against Cisco's size, MD5, and SHA-512 metadata,
+and given a local SHA-256 checksum. Redirects are limited to public HTTPS
+addresses under approved Cisco domains. Manual upload remains available.
+
+EULA and K9 acceptance is sent to Cisco only after confirmation in the UI. Do
+not confirm the commercial/civil and non-government declarations unless they
+are true for the organisation.
+
 ## Requirements
 
 - Docker Desktop or Docker Engine with Compose v2
@@ -56,6 +86,14 @@ Cisco `.tar` files are transport archives. The UI safely extracts them and
 passes discovered `.rpm` files to `--pkglist`; do not select the tar file itself
 as a package.
 
+The expert SMU check rejects RPM filenames for a different platform or IOS XR
+release and detects multiple fixes that replace the same package component.
+Upload a Cisco `compatibility_matrix_*.json` file to also check the router's
+source-to-target upgrade path, required bridge SMUs, and published caveats. The
+matrix is an upgrade-path source, not proof that RPM dependencies resolve;
+Cisco `gisobuild` remains the authoritative dependency check and runs with the
+detailed dependency option enabled by default.
+
 After a successful build, the application copies the Golden ISO and optional
 USB package into the archive and verifies each copy with SHA-256. Only then does
 it remove the build's source and working files. If no ISO is produced or archive
@@ -75,6 +113,11 @@ container with `docker compose up -d --force-recreate`.
 | `GISO_IMAGE` | `ciscogisobuild/cisco-xr-gisobuild:2.3.4` | Cisco build image |
 | `LOG_LEVEL` | `INFO` | Application event log level written to container stdout/stderr |
 | `GISO_PULL_TIMEOUT_SECONDS` | `600` | Maximum time allowed for pulling the Cisco build image |
+| `CISCO_CLIENT_ID_FILE` | `/run/secrets/cisco_client_id` | Container path to the Cisco API client ID secret |
+| `CISCO_CLIENT_SECRET_FILE` | `/run/secrets/cisco_client_secret` | Container path to the Cisco API client secret |
+| `CISCO_SECRETS_DIR` | `./secrets` | Host directory mounted read-only at `/run/secrets` |
+| `CISCO_DOWNLOAD_TIMEOUT_SECONDS` | `60` | Per-request Cisco API and download timeout |
+| `CISCO_DOWNLOAD_HOSTS` | `cisco.com` | Approved Cisco HTTPS download-domain suffixes |
 | `WEB_BIND_ADDRESS` | `127.0.0.1` | Host interface exposed by Compose |
 | `WEB_PORT` | `8080` | Host HTTP port |
 | `ALLOWED_HOSTS` | `127.0.0.1,localhost,giso-webui` | Accepted HTTP Host values |

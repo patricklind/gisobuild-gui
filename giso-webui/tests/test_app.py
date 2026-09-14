@@ -2,6 +2,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import tarfile
 import tempfile
 import time
@@ -30,6 +31,9 @@ class GisoWebTests(unittest.TestCase):
         module.JOB_DB = module.STATE / "jobs.sqlite3"
         module.store_initialized = False
         module.uploads.clear()
+        module.cisco_searches.clear()
+        module.cisco_download_jobs.clear()
+        module.cisco_api_client = None
         module.jobs.clear()
         module.job_persisted_at.clear()
         module.archive_policy_checked = 0.0
@@ -52,6 +56,118 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.put(f"/api/uploads/{upload_id}?offset=0", data=content)
         self.assertEqual(response.status_code, 200)
         return self.client.post(f"/api/uploads/{upload_id}/complete")
+
+    @patch.dict(os.environ, {"CISCO_CLIENT_ID": "id", "CISCO_CLIENT_SECRET": "secret"})
+    def test_cisco_config_only_exposes_availability(self):
+        response = self.client.get("/api/cisco/config")
+        self.assertEqual(response.get_json(), {"enabled": True})
+        self.assertNotIn("secret", response.get_data(as_text=True))
+
+    @patch.dict(os.environ, {"CISCO_CLIENT_ID_FILE": "/missing/client-id",
+                             "CISCO_CLIENT_SECRET_FILE": "/missing/client-secret"})
+    def test_cisco_config_is_disabled_when_secret_files_are_absent(self):
+        response = self.client.get("/api/cisco/config")
+        self.assertEqual(response.get_json(), {"enabled": False})
+
+    @patch("app.cisco_client")
+    def test_cisco_search_returns_safe_normalized_metadata(self, client):
+        client.return_value.search.return_value = {
+            "metadataTransId": "transaction",
+            "metadata": [{"products": [{"mdfId": 42, "releases": [{
+                "version": "26.1.2", "images": [{
+                "imageGuid": "A" * 40, "name": "ncs5500-mini-x-26.1.2.iso",
+                "size": "100", "md5": "b" * 32, "sha512": "c" * 128,
+            }]}],
+            }]}],
+            "access_token": "must-not-leak",
+        }
+        response = self.client.post("/api/cisco/search", json={
+            "pid": "NCS-5501-SE", "current_release": "25.1.2", "target_release": "26.1.2",
+        })
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["images"][0]["mdf_id"], "42")
+        self.assertEqual(body["images"][0]["release"], "26.1.2")
+        self.assertEqual(body["images"][0]["size"], 100)
+        self.assertNotIn("must-not-leak", response.get_data(as_text=True))
+
+    @patch("app.threading.Thread")
+    @patch("app.cisco_client")
+    def test_cisco_download_link_stays_server_side(self, client, thread):
+        guid = "A" * 40
+        module.cisco_searches["search"] = {
+            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
+            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
+                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+        }
+        client.return_value.request_download.return_value = {
+            "downloads": [{"imageGuid": guid, "url": "https://download.cisco.com/private?token=secret"}]
+        }
+        response = self.client.post("/api/cisco/downloads", json={
+            "search_id": "search", "image_guids": [guid],
+        })
+        self.assertEqual(response.status_code, 202)
+        self.assertNotIn("download.cisco.com", response.get_data(as_text=True))
+        self.assertEqual(response.get_json()["status"], "downloading")
+        thread.return_value.start.assert_called_once()
+
+    @patch("app.cisco_client")
+    def test_cisco_download_reports_nested_eula_and_k9_requirements(self, client):
+        guid = "A" * 40
+        module.cisco_searches["search"] = {
+            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
+            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
+                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+        }
+        client.return_value.request_download.return_value = {
+            "response": {"acceptanceForm": {"eulaContent": "terms", "k9Content": "notice"}}
+        }
+        response = self.client.post("/api/cisco/downloads", json={
+            "search_id": "search", "image_guids": [guid],
+        })
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.get_json()["agreement"], {"eula": True, "k9": True})
+        self.assertNotIn("terms", response.get_data(as_text=True))
+
+    @patch("app.shutil.disk_usage")
+    def test_cisco_download_rejects_insufficient_disk_space(self, disk_usage):
+        disk_usage.return_value = shutil._ntuple_diskusage(1000, 999, 1)
+        guid = "A" * 40
+        module.cisco_searches["search"] = {
+            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
+            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
+                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+        }
+        response = self.client.post("/api/cisco/downloads", json={
+            "search_id": "search", "image_guids": [guid],
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("free disk space", response.get_json()["error"])
+
+    @patch("app.threading.Thread")
+    @patch("app.cisco_client")
+    def test_cisco_k9_only_flow_does_not_require_eula(self, client, thread):
+        guid = "A" * 40
+        selected = [{"guid": guid, "name": "image.iso", "size": 100,
+                     "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}]
+        module.cisco_download_jobs["job"] = {
+            "id": "job", "status": "eula-required", "progress": 0, "files": [],
+            "error": "", "created": time.time(), "pending": {
+                "search": {"pid": "NCS-5501-SE", "transaction_id": "transaction"},
+                "selected": selected, "downloads": [], "eula_required": False,
+                "k9_required": True,
+            },
+        }
+        client.return_value.request_download.return_value = {
+            "downloads": [{"imageGuid": guid, "url": "https://download.cisco.com/file.iso"}]
+        }
+        response = self.client.post("/api/cisco/downloads/job/accept", json={
+            "commercial_or_civil": True, "not_government_or_military": True,
+        })
+        self.assertEqual(response.status_code, 202)
+        client.return_value.accept_eula.assert_not_called()
+        client.return_value.accept_k9.assert_called_once()
+        thread.return_value.start.assert_called_once()
 
     def test_chunked_upload_and_safe_tar_extraction(self):
         stream = io.BytesIO()
@@ -377,6 +493,22 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.get("/api/platforms")
         self.assertEqual(response.status_code, 200)
         self.assertIn("asr9k", {item["id"] for item in response.get_json()})
+
+    def test_compatibility_api_checks_smu_and_uploaded_upgrade_matrix(self):
+        matrix = self.data / "compatibility_matrix_test.json"
+        matrix.write_text(json.dumps({"permitted": {"25.1.2": {"26.1.2": [{
+            "platform": "ncs5500", "bridge_smus": ["bridge-placeholder.rpm"],
+            "caveats": [],
+        }]}}}), encoding="utf-8")
+        response = self.client.post("/api/compatibility", json={
+            "iso": "ncs5500-mini-x-26.1.2.iso",
+            "packages": ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"],
+            "matrix": matrix.name, "source_release": "25.1.2",
+            "target_release": "26.1.2", "platform": "ncs5500",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["smu"]["compatible"])
+        self.assertTrue(response.get_json()["upgrade"]["permitted"])
 
     @patch("app.child_mount_args", return_value=[])
     def test_platform_is_inferred_and_invalid_option_rejected(self, _mounts):

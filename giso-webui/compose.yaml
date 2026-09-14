@@ -6,6 +6,7 @@ services:
       - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:8080"
     volumes:
       - giso-uploads:/uploads
+      - "${CISCO_SECRETS_DIR:-./secrets}:/run/secrets:ro"
       - ../.gisobuild-tool:/tool:ro
       - giso-output:/output
       - giso-archive:/archive
@@ -30,6 +31,12 @@ services:
       MAX_ARCHIVE_BYTES: "${MAX_ARCHIVE_BYTES:-53687091200}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       GISO_PULL_TIMEOUT_SECONDS: "${GISO_PULL_TIMEOUT_SECONDS:-600}"
+      CISCO_CLIENT_ID: "${CISCO_CLIENT_ID:-}"
+      CISCO_CLIENT_SECRET: "${CISCO_CLIENT_SECRET:-}"
+      CISCO_CLIENT_ID_FILE: "${CISCO_CLIENT_ID_FILE:-}"
+      CISCO_CLIENT_SECRET_FILE: "${CISCO_CLIENT_SECRET_FILE:-}"
+      CISCO_DOWNLOAD_TIMEOUT_SECONDS: "${CISCO_DOWNLOAD_TIMEOUT_SECONDS:-60}"
+      CISCO_DOWNLOAD_HOSTS: "${CISCO_DOWNLOAD_HOSTS:-cisco.com}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-127.0.0.1,localhost,giso-webui}"
       PYTHONDONTWRITEBYTECODE: "1"
     security_opt:
