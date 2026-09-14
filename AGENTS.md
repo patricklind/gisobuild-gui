@@ -4,6 +4,24 @@ Every Codex session reads this file automatically. Follow this protocol before
 changing code. Multiple agents may work in this repository at the same time;
 these rules keep their branches and ownership boundaries explicit.
 
+## Mandatory project roadmap and Graphify — read before doing anything
+
+Read `AI-INSTRUCTIONS.md` first, then read `docs/todo/00-MASTER-TODO.md` and every
+relevant file under `docs/todo/` before planning, editing, reviewing, or proposing
+architecture changes.
+
+For non-trivial code changes, inspect and use Graphify before editing to understand
+affected modules, callers/callees, dependencies, and architectural relationships.
+Refresh tracked `graphify-out/` after relevant code changes and review the graph
+diff for unexpected impact. If Graphify cannot be run, say so explicitly instead
+of pretending it was refreshed.
+
+The TODO files are living project state. Codex must update the relevant TODO
+files in the same branch/PR whenever implementation status, architecture,
+security findings, tests, defects, or follow-up work changes. Mark `[x]` only
+when implementation and appropriate verification are complete. A code change
+that leaves `docs/todo/` or relevant Graphify state stale is not complete.
+
 ## Parallel work — do this first
 
 Before editing anything:
@@ -39,12 +57,15 @@ See [parallel work](docs/parallel-work.md) and
   unless the user explicitly authorizes the exact device and operation.
 - The Web UI controls Docker through `/var/run/docker.sock`. Keep it bound to
   localhost, preserve host/origin checks, and do not weaken container isolation
-  without an explicit security review.
+  without an explicit security review. The roadmap intentionally targets removal
+  of this dependency; until that migration is implemented and verified, preserve
+  the current security boundary.
 - Preserve the single-build lock, SQLite job history, 30-day archive retention,
   and 50 GiB combined ISO/USB quota unless the task explicitly changes them.
 - Shared files are conflict magnets: `README.md`, `ARCHITECTURE.md`,
-  `GISOBUILD-GUIDE.md`, `.github/workflows/`, and `graphify-out/`. Claim the
-  relevant shared module and update them only when necessary.
+  `GISOBUILD-GUIDE.md`, `.github/workflows/`, `graphify-out/`, `AI-INSTRUCTIONS.md`,
+  and `docs/todo/`. Claim the relevant shared module and update them only when
+  necessary.
 - One module has one owner at a time. Never edit the same file from two
   worktrees.
 - Do not create a version tag or GitHub Release until CI is green. Never publish
@@ -65,6 +86,9 @@ This repository provides a local Flask Web UI and shell helper around Cisco's
 - Architecture: `ARCHITECTURE.md`
 - Build, upgrade, and rollback guidance: `GISOBUILD-GUIDE.md`
 - Security boundary: `SECURITY.md`
+- AI workflow rules: `AI-INSTRUCTIONS.md`
+- Shared implementation roadmap: `docs/todo/`
+- Tracked code graph: `graphify-out/`
 
 ## Required verification
 
@@ -83,8 +107,11 @@ git diff --check
 
 Run Ruff, dependency auditing, Actionlint, Hadolint, and the security checks
 defined in CI when their inputs change. Refresh tracked Graphify outputs after
-code changes, but never allow Cisco input or generated GISO artifacts into the
-graph.
+code changes, review the Graphify diff for unexpected dependency changes, and
+never allow Cisco input or generated GISO artifacts into the graph.
+
+Before finishing, update every affected file under `docs/todo/` and mark only
+fully implemented and appropriately verified work as complete.
 
 ## Gotchas
 
