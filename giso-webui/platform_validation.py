@@ -36,9 +36,10 @@ ALIASES = {
 RPM_RELEASE = re.compile(r"-r(?P<release>\d{3,6})(?:\.|-)", re.IGNORECASE)
 ISO_RELEASE = re.compile(r"-(?P<release>\d+\.\d+\.\d+)(?:[-.]|$)", re.IGNORECASE)
 RPM_COMPONENT = re.compile(
-    r"^(?P<component>[a-z0-9_-]+?)-\d[^/]*?-r\d{3,6}\.CSC(?P<bug>[a-z0-9]+)",
+    r"^(?P<component>[a-z0-9_-]+?)-(?P<version>\d[^/]*?)-r\d{3,6}\.CSC(?P<bug>[a-z0-9]+)",
     re.IGNORECASE,
 )
+RPM_ARCHITECTURE = re.compile(r"\.(?P<architecture>x86_64|aarch64|arm64)\.rpm$", re.IGNORECASE)
 
 
 def normalize_platform(value: str) -> str:
@@ -72,6 +73,9 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
     warnings: list[str] = []
     releases: set[str] = set()
     components: dict[str, set[str]] = {}
+    variants: dict[tuple[str, str], set[str]] = {}
+    bundles: dict[str, set[str]] = {}
+    architectures: set[str] = set()
     checked = 0
     for package in packages:
         name = Path(package).name
@@ -94,25 +98,41 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
             warnings.append(f"{name}: release could not be determined from the filename")
         component = RPM_COMPONENT.search(name)
         if component:
-            components.setdefault(component.group("component").lower(), set()).add(
-                component.group("bug").lower()
-            )
+            component_name = component.group("component").lower()
+            bug = f"CSC{component.group('bug')}".upper()
+            components.setdefault(component_name, set()).add(bug)
+            variants.setdefault((component_name, bug), set()).add(component.group("version").lower())
+            bundles.setdefault(bug, set()).add(component_name)
+        architecture = RPM_ARCHITECTURE.search(name)
+        if architecture:
+            architectures.add(architecture.group("architecture").lower())
     if len(releases) > 1:
         issues.append("Selected RPMs contain more than one IOS XR release tag")
+    if len(architectures) > 1:
+        issues.append("Selected RPMs contain more than one processor architecture")
+    for (component, bug), versions in variants.items():
+        if len(versions) > 1:
+            issues.append(f"Multiple versions of {component} for {bug} are selected; keep one RPM")
     for component, bugs in components.items():
         if len(bugs) > 1:
-            issues.append(
-                f"Multiple SMUs replace {component}; select one fix or use Cisco supersedence data"
+            warnings.append(
+                f"{component} is changed by {', '.join(sorted(bugs))}; Cisco supersedence data is required to choose between them"
             )
     if checked:
         warnings.append(
             "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs the authoritative dependency check"
         )
+    package_groups = [
+        {"csc": bug, "components": sorted(names), "count": len(names)}
+        for bug, names in sorted(bundles.items())
+    ]
     return {"compatible": not issues, "iso_release": iso_release, "checked": checked,
-            "issues": sorted(set(issues)), "warnings": sorted(set(warnings))}
+            "issues": sorted(set(issues)), "warnings": sorted(set(warnings)),
+            "package_groups": package_groups}
 
 
-def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str) -> dict:
+def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
+                         selected_packages: list[str] | None = None) -> dict:
     if not isinstance(matrix, dict) or not isinstance(matrix.get("permitted"), dict):
         raise TypeError("The compatibility matrix has an invalid format")
     targets = matrix["permitted"].get(source, {})
@@ -126,7 +146,7 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str) 
                   ALIASES.get(str(item.get("platform", "")).lower(),
                               str(item.get("platform", "")).lower()) == normalized), None)
     if not match:
-        return {"permitted": False, "bridge_smus": [], "caveats": [],
+        return {"permitted": False, "bridge_smus": [], "missing_bridge_smus": [], "caveats": [],
                 "message": f"The matrix does not permit {source} to {target} on {PLATFORMS[normalized]['label']}"}
     bridge_smus = match.get("bridge_smus") or []
     caveats = match.get("caveats") or []
@@ -136,7 +156,15 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str) 
     if (not isinstance(caveats, list) or len(caveats) > 100 or
             not all(isinstance(item, str) and len(item) <= 4096 for item in caveats)):
         raise ValueError("The compatibility matrix contains invalid caveats")
-    return {"permitted": True, "bridge_smus": bridge_smus, "caveats": caveats,
+    selected_text = " ".join(Path(item).name for item in (selected_packages or [])).lower()
+    missing_bridge_smus = [
+        item for item in bridge_smus
+        if Path(item).name.lower() not in selected_text
+        and not any(token.lower() in selected_text
+                    for token in re.findall(r"CSC[a-z0-9]+", item, re.IGNORECASE))
+    ]
+    return {"permitted": True, "bridge_smus": bridge_smus,
+            "missing_bridge_smus": missing_bridge_smus, "caveats": caveats,
             "message": f"The matrix permits {source} to {target} on {PLATFORMS[normalized]['label']}"}
 
 

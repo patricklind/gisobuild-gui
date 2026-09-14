@@ -105,6 +105,8 @@ function renderInputs(data) {
 
   const iso = isoFiles[0]?.path || '';
   $('[name=iso]').value = iso;
+  const releaseMatch = iso.match(/-(\d+\.\d+\.\d+)(?:[-.]|$)/);
+  if (releaseMatch && !$('[name=target_release]').value) $('[name=target_release]').value = releaseMatch[1];
   if (!packageListEdited) $('[name=pkglist]').value = data.recommended.join('\n');
   setReadyCard('#iso-check', Boolean(iso), iso ? 'Found and ready' : 'Upload the Cisco base file');
   setReadyCard('#rpm-check', data.recommended.length > 0, data.recommended.length ? `${data.recommended.length} updates found` : 'Optional: add SMU files or another customization');
@@ -160,24 +162,39 @@ async function checkCompatibility() {
   const button=$('#check-compatibility');
   const result=$('#compatibility-result');
   const packages=lines($('[name=pkglist_override]').value || $('[name=pkglist]').value || '');
+  const upgradeMode=$('[name=compatibility_mode]:checked').value === 'upgrade';
   const payload={iso:$('[name=iso_override]').value || $('[name=iso]').value,packages,
-    matrix:$('[name=compatibility_matrix]').value,source_release:$('[name=source_release]').value,
+    matrix:upgradeMode ? $('[name=compatibility_matrix]').value : '',source_release:$('[name=source_release]').value,
     target_release:$('[name=target_release]').value,platform:$('[name=platform]').value};
   if (!payload.iso) { result.className='compatibility-result bad'; result.textContent='Select a base ISO first.'; return; }
-  if (payload.matrix && (!payload.source_release || !payload.target_release || !payload.platform)) {
-    result.className='compatibility-result bad'; result.textContent='Select a platform and enter current and target releases to use the matrix.'; return;
+  if (upgradeMode && (!payload.matrix || !payload.source_release || !payload.target_release || !payload.platform)) {
+    result.className='compatibility-result bad'; result.textContent='For a router upgrade, select a matrix and platform and enter both releases.'; return;
   }
   button.disabled=true; result.className='compatibility-result'; result.textContent='Checking filenames and upgrade data…';
   try {
     const check=await api('/api/compatibility',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const messages=check.smu.compatible ? [`${check.smu.checked} RPM filenames match the base image.`] : [...check.smu.issues];
-    if (check.upgrade) messages.push(check.upgrade.message,...check.upgrade.bridge_smus.map(item=>`Required bridge SMU: ${item}`),...check.upgrade.caveats.map(item=>`Caveat: ${item}`));
+    const messages=check.smu.compatible ? [`${check.smu.checked} RPM filenames passed the deterministic checks.`] : [...check.smu.issues];
+    messages.push(...check.smu.package_groups.map(group=>`${group.csc}: ${group.count} component${group.count === 1 ? '' : 's'} (${group.components.join(', ')})`));
+    if (check.upgrade) messages.push(check.upgrade.message,
+      ...check.upgrade.bridge_smus.map(item=>`Required bridge SMU: ${item}`),
+      ...check.upgrade.missing_bridge_smus.map(item=>`Not selected: required bridge SMU ${item}`),
+      ...check.upgrade.caveats.map(item=>`Caveat: ${item}`));
     messages.push(...check.smu.warnings);
-    const good=check.smu.compatible && (!check.upgrade || check.upgrade.permitted);
-    result.className=`compatibility-result ${good ? 'good' : 'bad'}`; result.replaceChildren();
+    const good=check.smu.compatible && (!check.upgrade || (check.upgrade.permitted && !check.upgrade.missing_bridge_smus.length));
+    const warning=good && check.smu.warnings.length > 0;
+    result.className=`compatibility-result ${good ? (warning ? 'warning' : 'good') : 'bad'}`; result.replaceChildren();
     const list=document.createElement('ul'); messages.forEach(message=>{const item=document.createElement('li');item.textContent=message;list.appendChild(item);});result.appendChild(list);
   } catch(error) { result.className='compatibility-result bad'; result.textContent=error.message; }
   finally { button.disabled=false; }
+}
+
+function updateCompatibilityMode() {
+  const upgrade=$('[name=compatibility_mode]:checked').value === 'upgrade';
+  $('#upgrade-compatibility-fields').hidden=!upgrade;
+  $('#compatibility-result').className='compatibility-result';
+  $('#compatibility-result').textContent=upgrade
+    ? 'Select the matrix, releases and platform, then run the check.'
+    : 'Ready to check the selected RPMs against the base ISO.';
 }
 
 async function loadArchive() {
@@ -519,6 +536,8 @@ $('#cancel-build').onclick = async () => {
 };
 $('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; });
 $('#check-compatibility').onclick=checkCompatibility;
+document.querySelectorAll('[name=compatibility_mode]').forEach(control=>control.addEventListener('change', updateCompatibilityMode));
+updateCompatibilityMode();
 
 api('/api/cisco/config').then(config => { $('#cisco-download').hidden = !config.enabled; }).catch(() => {});
 health(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();

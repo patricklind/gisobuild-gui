@@ -509,6 +509,8 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()["smu"]["compatible"])
         self.assertTrue(response.get_json()["upgrade"]["permitted"])
+        self.assertEqual(response.get_json()["upgrade"]["missing_bridge_smus"],
+                         ["bridge-placeholder.rpm"])
 
     @patch("app.child_mount_args", return_value=[])
     def test_platform_is_inferred_and_invalid_option_rejected(self, _mounts):

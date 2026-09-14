@@ -1,15 +1,15 @@
-# Graph Report - gisobuild-cisco-download  (2026-09-14)
+# Graph Report - gisobuild-smu-compat-ui  (2026-09-14)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 286 nodes · 545 edges · 18 communities (10 shown, 5 thin omitted)
+- 290 nodes · 552 edges · 18 communities (10 shown, 5 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1e3e4796`
+- Built from commit: `3b0b5e60`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -36,11 +36,11 @@
 3. `CiscoSoftwareClient` - 19 edges
 4. `log_event()` - 14 edges
 5. `CiscoDownloadTests` - 13 edges
-6. `api()` - 12 edges
-7. `create_job()` - 11 edges
-8. `enforce_archive_policy()` - 10 edges
-9. `cisco_search()` - 10 edges
-10. `run_cisco_download()` - 10 edges
+6. `validate_smu_selection()` - 13 edges
+7. `api()` - 12 edges
+8. `create_job()` - 11 edges
+9. `enforce_archive_policy()` - 10 edges
+10. `cisco_search()` - 10 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `cisco_accept()` --uses--> `CiscoDownloadError`  [INFERRED]
@@ -68,7 +68,7 @@ Cohesion: 0.13
 Nodes (31): after_request, Exception, append_activity(), cancel_upload(), cisco_accept(), cisco_client(), cisco_download_running(), cisco_download_start() (+23 more)
 
 ### Community 3 - "app.js"
-Cohesion: 0.16
+Cohesion: 0.15
 Nodes (27): api(), checkCompatibility(), checksumRow(), copyText(), drop, fileRow(), health(), inputs (+19 more)
 
 ### Community 4 - "CiscoDownloadError"
@@ -76,7 +76,7 @@ Cohesion: 0.16
 Nodes (9): CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect, Path, Cisco Automated Software Distribution client with strict download controls., Safe error suitable for returning to the local UI., Read a secret from NAME_FILE first, then NAME, without logging either. (+1 more)
 
 ### Community 7 - "validate_smu_selection"
-Cohesion: 0.25
+Cohesion: 0.21
 Nodes (8): check_upgrade_matrix(), infer_platform(), normalize_platform(), Platform-aware validation for Cisco IOS XR GISO build options., Check deterministic filename compatibility before upstream dependency…, validate_platform_options(), validate_smu_selection(), PlatformCompatibilityTests
 
 ### Community 9 - "rehearse.py"
@@ -101,7 +101,7 @@ Nodes (3): worktree.sh script, usage(), validate()
 
 ## Knowledge Gaps
 - **2 isolated node(s):** `drop`, `inputs`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 94 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 95 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -110,7 +110,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `app.py`, `log_event`, `CiscoDownloadTests`?**
   _High betweenness centrality (0.062) - this node is a cross-community bridge._
 - **Why does `GisoWebTests` connect `GisoWebTests` to `.test_build_waits_for_tar_extraction_to_finish`, `.upload`, `patch`, `dict`?**
-  _High betweenness centrality (0.062) - this node is a cross-community bridge._
+  _High betweenness centrality (0.060) - this node is a cross-community bridge._
 - **Why does `CiscoDownloadTests` connect `CiscoDownloadTests` to `CiscoDownloadError`?**
   _High betweenness centrality (0.048) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `CiscoDownloadError` (e.g. with `cisco_accept()` and `cisco_config()`) actually correct?**
