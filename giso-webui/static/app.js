@@ -138,12 +138,35 @@ function applySmuRecommendation(plan) {
       const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label; const strong=document.createElement('b'); strong.textContent=value; step.append(small,strong); flow.appendChild(step);
     });
     details.appendChild(flow);
+    if (plan.package_groups?.length) {
+      const groups=document.createElement('section'); groups.className='smu-groups';
+      const heading=document.createElement('h4'); heading.textContent='SMU packages that belong together'; groups.appendChild(heading);
+      const grid=document.createElement('div'); grid.className='csc-grid';
+      plan.package_groups.forEach(group=>grid.appendChild(smuGroupCard(group)));
+      groups.appendChild(grid); details.appendChild(groups);
+    }
+    if (plan.component_conflicts?.length) {
+      const conflicts=document.createElement('div'); conflicts.className='smu-relationship-warning';
+      const heading=document.createElement('b'); heading.textContent='Overlapping fixes detected'; conflicts.appendChild(heading);
+      plan.component_conflicts.forEach(item=>{const row=document.createElement('p'); row.textContent=`${item.component}: ${item.cscs.join(' + ')}. ${item.reason}`; conflicts.appendChild(row);});
+      details.appendChild(conflicts);
+    }
   }
   if (plan.excluded?.length) {
     const excluded=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`${plan.excluded.length} incompatible RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically`;
     const list=document.createElement('ul'); plan.excluded.forEach(item=>{const row=document.createElement('li'); row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);}); excluded.append(summary,list); details.appendChild(excluded);
   }
   updateBuildAvailability();
+}
+
+function smuGroupCard(group) {
+  const card=document.createElement('article'); card.className=`csc-card ${group.count > 1 ? 'linked' : ''}`;
+  const title=document.createElement('b'); title.textContent=group.csc;
+  const status=document.createElement('small'); status.textContent=group.relationship;
+  const components=document.createElement('p'); components.textContent=group.components.join(' · ');
+  const files=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`Show ${group.files.length} RPM filename${group.files.length === 1 ? '' : 's'}`;
+  const list=document.createElement('ul'); group.files.forEach(name=>{const item=document.createElement('li'); item.textContent=name; list.appendChild(item);}); files.append(summary,list);
+  card.append(title,status,components,files); return card;
 }
 
 async function refreshSmuRecommendation() {
@@ -254,7 +277,7 @@ function renderCompatibilityResult(result, check, payload) {
   if (check.smu.package_groups.length) {
     const groups=document.createElement('section'); groups.className='csc-groups'; const heading=document.createElement('h4'); heading.textContent='Packages grouped by Cisco fix'; groups.appendChild(heading);
     const grid=document.createElement('div'); grid.className='csc-grid';
-    check.smu.package_groups.forEach(group=>{const card=document.createElement('div'); card.className='csc-card'; const title=document.createElement('b'); title.textContent=group.csc; const count=document.createElement('small'); count.textContent=`${group.count} component${group.count === 1 ? '' : 's'}`; const components=document.createElement('p'); components.textContent=group.components.join(' · '); card.append(title,count,components); grid.appendChild(card);});
+    check.smu.package_groups.forEach(group=>grid.appendChild(smuGroupCard(group)));
     groups.appendChild(grid); result.appendChild(groups);
   }
 
@@ -275,6 +298,14 @@ function updateCompatibilityMode() {
   $('#compatibility-result').textContent=upgrade
     ? 'Select the matrix, releases and platform, then run the check.'
     : 'Ready to check the selected RPMs against the base ISO.';
+}
+
+function updatePackageSelectionMode() {
+  const manual=$('[name=package_selection_mode]:checked').value === 'manual';
+  $('#manual-package-override').hidden=!manual;
+  packageListEdited=manual;
+  if (!manual) $('[name=pkglist_override]').value='';
+  updateBuildAvailability();
 }
 
 async function loadArchive() {
@@ -406,7 +437,7 @@ $('#build-form').addEventListener('submit', async event => {
     yamlfile: yamlMode ? form.get('yamlfile') : '',
     label: form.get('label_override') || form.get('label'),
     pkglist: lines(form.get('pkglist_override') || form.get('pkglist') || ''),
-    automatic_smu_selection: !packageListEdited,
+    automatic_smu_selection: $('[name=package_selection_mode]:checked').value === 'automatic',
     repo: lines(form.get('repo') || ''), auto_repo: true,
     bridging_fixes: lines(form.get('bridging_fixes') || ''),
     remove_packages: lines(form.get('remove_packages') || ''),
@@ -615,16 +646,18 @@ $('#cancel-build').onclick = async () => {
     catch (error) { await showNotice('Could not stop build', error.message); }
   }
 };
-$('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; });
+$('[name=pkglist_override]').addEventListener('input', () => { packageListEdited = true; $('[name=package_selection_mode][value=manual]').checked=true; updatePackageSelectionMode(); });
+document.querySelectorAll('[name=package_selection_mode]').forEach(control=>control.addEventListener('change',updatePackageSelectionMode));
 $('#refresh-smu-plan').onclick=refreshSmuRecommendation;
 $('#use-automatic-packages').onclick=async()=>{
-  $('[name=pkglist_override]').value=''; packageListEdited=false;
+  $('[name=pkglist_override]').value=''; $('[name=package_selection_mode][value=automatic]').checked=true; updatePackageSelectionMode();
   await refreshSmuRecommendation(); updateBuildAvailability();
 };
 $('[name=iso_override]').addEventListener('change',refreshSmuRecommendation);
 $('#check-compatibility').onclick=checkCompatibility;
 document.querySelectorAll('[name=compatibility_mode]').forEach(control=>control.addEventListener('change', updateCompatibilityMode));
 updateCompatibilityMode();
+updatePackageSelectionMode();
 
 api('/api/cisco/config').then(config => { $('#cisco-download').hidden = !config.enabled; }).catch(() => {});
 health(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();
