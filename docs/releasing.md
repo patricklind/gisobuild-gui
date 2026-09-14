@@ -1,5 +1,10 @@
 # Release process
 
+Published versions are listed on the
+[GitHub Releases page](https://github.com/patricklind/gisobuild-gui/releases).
+The current documentation follows `main`; use the matching Git tag when
+operating an older release.
+
 The **Release** workflow can create both the version tag and GitHub Release from
 the GitHub Actions page. It runs the complete CI workflow first, creates an
 annotated semantic-version tag, builds `linux/amd64` and `linux/arm64`
@@ -27,6 +32,12 @@ outside the application image and must never be attached to a release.
 7. Wait for the Release workflow to succeed.
 8. Verify the GitHub Release, GHCR version tag, `latest` tag, SBOM, provenance,
    and image pull on a clean host.
+
+```bash
+docker pull ghcr.io/patricklind/gisobuild-gui:vX.Y.Z
+docker image inspect ghcr.io/patricklind/gisobuild-gui:vX.Y.Z \
+  --format '{{json .RepoDigests}}'
+```
 
 Do not move or reuse a published tag. Correct a failed release with a new patch
 version after fixing the cause.

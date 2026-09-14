@@ -1,4 +1,8 @@
-# Architecture Review
+# System architecture
+
+This document records the deployed design, trust boundaries, data lifecycle,
+known risks, and deliberate scaling limits. It is not evidence that a licensed
+Cisco build or router change succeeded.
 
 ## Scope and requirements
 

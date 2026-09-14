@@ -99,7 +99,9 @@ licensed and protected appropriately. Test restore procedures periodically.
 
 The **Clear workspace files** button deletes all uploads, partial uploads, build
 work, and raw output after confirming that no upload or build is active. It
-preserves the verified GISO Archive and persisted job history.
+preserves the verified GISO Archive and persisted job history, but removes stale
+raw-output download references from failed jobs. The confirmation reports both
+deleted top-level items and cleared links.
 
 ## Decommission
 

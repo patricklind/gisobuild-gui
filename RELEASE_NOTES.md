@@ -1,30 +1,32 @@
-# Release notes — v1.0.0
+# Release notes
 
-Initial versioned release candidate of the Cisco IOS XR Golden ISO web interface.
+Published releases and generated change logs are available on the
+[GitHub Releases page](https://github.com/patricklind/gisobuild-gui/releases).
+The latest published version is
+[v0.0.5](https://github.com/patricklind/gisobuild-gui/releases/tag/v0.0.5).
 
-## Highlights
+## Unreleased
 
-- Builds and archives Golden ISO and supported USB boot artifacts.
-- Validates platform-specific eXR and IOS XR7/LNT build options before execution.
-- Provides safe upgrade and rollback documentation plus an isolated staging rehearsal.
-- Persists job history in SQLite and records interrupted jobs after service restart.
-- Deletes archives after 30 days and enforces a combined 50 GiB limit.
-- Publishes a multi-architecture container image to GitHub Container Registry.
+- Clears raw failed-build output and its stale download links from memory,
+  SQLite job history, and the build-result panel.
+- Groups matching SMU RPMs by CSC identifier and explains platform, release,
+  architecture, duplicate-version, overlap, and upgrade-matrix findings.
+- Adds guided Expert settings with automatic package selection as the default.
+- Preserves ISO and supported USB boot artifacts only after verified archival.
+- Hardens interrupted uploads, multi-file Cisco downloads, archive timestamps,
+  log redaction, CLI staging, and the licensed-ISO acceptance runner.
 
-## Safety
+## Validation status
 
-The project does not include Cisco software and cannot validate a hardware
-upgrade path. Use properly licensed images and Cisco documentation for the exact
-platform and release. Test on equivalent lab hardware before production use.
+Static checks, Docker unit tests, Compose validation, and the isolated staging
+upgrade/rollback rehearsal run in CI. Licensed-ISO and matching-router tests are
+separate acceptance levels because Cisco software and hardware are unavailable
+to public CI. Do not describe simulated or synthetic results as real GISO or
+hardware validation.
 
-## Acceptance evidence
+## Release safety
 
-A real NCS5500 25.1.2 build with 12 matching optional RPMs completed using
-`ciscogisobuild/cisco-xr-gisobuild:2.3.4`:
-
-- Golden ISO SHA-256: `95f3860b538c689ded4021d13679eb5f04177dc7ba9838f0034d6baae65410e7`
-- USB boot ZIP SHA-256: `e4f24b053b38118b7de664155a6a71f2a6726746849f6cdf864c61c54510e0cc`
-
-The isolated staging rehearsal also completed the pre-check, staged upgrade,
-commit, rollback, recovery, and recommit sequence. It does not claim hardware
-validation; that final step requires a matching lab router.
+Releases contain only this application's source, documentation, and container
+image. Cisco ISO, RPM, SMU, USB, configuration, certificate, key-request, and
+ownership-voucher artifacts must never be committed, logged, graphed, or
+attached to a release.

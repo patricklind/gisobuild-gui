@@ -1,5 +1,8 @@
 # Cisco IOS XR Golden ISO Build and Upgrade Guide
 
+[Project setup](README.md) · [Platform matrix](docs/platform-support.md) ·
+[Testing levels](docs/testing.md) · [Operations](docs/operations.md)
+
 This guide covers the common workflow for building, validating, transferring,
 installing, and rolling back a Golden ISO (GISO) across Cisco IOS XR platforms.
 It is platform-aware: Cisco command syntax, image limits, supported packages,
