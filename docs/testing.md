@@ -4,6 +4,13 @@ The project uses four distinct validation levels. Report them separately.
 
 ## 1. Static and unit verification
 
+Run the `giso-webui` unit tests only inside the built container image (the
+`docker run ... giso-webui-giso-webui python -B -m unittest ...` line below).
+Never invoke `python -m unittest` or `pytest` directly against the host Python
+interpreter for this module — the host has neither the pinned dependency
+versions nor OS tools such as `isoinfo` that the image provides, so a host run
+is not equivalent to CI.
+
 ```bash
 docker compose -f giso-webui/compose.yaml config -q
 docker compose -f staging/compose.yaml config -q

@@ -81,7 +81,26 @@ RPM_COMPONENT = re.compile(
     r"^(?P<component>[a-z0-9_-]+?)-(?P<version>\d[^/]*?)-r\d{3,6}\.CSC(?P<bug>[a-z0-9]+)",
     re.IGNORECASE,
 )
-RPM_ARCHITECTURE = re.compile(r"\.(?P<architecture>x86_64|aarch64|arm64)\.rpm$", re.IGNORECASE)
+RPM_ARCHITECTURE = re.compile(
+    r"\.(?P<architecture>x86_64|aarch64|arm64|corei7_64)\.rpm$", re.IGNORECASE
+)
+
+# eXR RPMs identify the processor family the same way upstream does in
+# src/exrmod/gisobuild_exr_engine.py (x86_64 vs "arm", the latter also seen as
+# "corei7_64" in the x86_64 family and various variant tokens in the arm
+# family). LNT RPMs use the plain x86_64/aarch64/arm64 rpm suffix. Normalize
+# both through one resolver so a mismatch is detected regardless of which
+# naming scheme produced the token, mirroring how normalize_platform() is the
+# single resolver for platform aliases.
+ARCH_ALIASES = {
+    "x86_64": "x86_64", "amd64": "x86_64", "corei7_64": "x86_64",
+    "aarch64": "aarch64", "arm64": "aarch64", "arm": "aarch64",
+}
+
+
+def normalize_architecture(token: str) -> str | None:
+    """Return the canonical processor family for a filename/metadata token."""
+    return ARCH_ALIASES.get(token.strip().lower()) if token else None
 
 
 def capabilities_for_platform(platform: str) -> dict[str, bool]:
@@ -128,8 +147,17 @@ def infer_platform(filename: str) -> str | None:
     return None
 
 
-def validate_smu_selection(iso: str, packages: list[str]) -> dict:
-    """Check deterministic filename compatibility before upstream dependency resolution."""
+def validate_smu_selection(
+    iso: str, packages: list[str], iso_architectures: frozenset[str] | None = None
+) -> dict:
+    """Check deterministic filename compatibility before upstream dependency resolution.
+
+    ``iso_architectures`` is the set of canonical processor families detected
+    directly from the base ISO's own contents (see ``inspect_iso_architecture``
+    in app.py); pass None or an empty set when detection was not run or was
+    inconclusive so an upstream-valid image is never blocked on that basis
+    alone.
+    """
     iso_name = Path(iso).name
     release_match = ISO_RELEASE.search(iso_name)
     iso_release = release_match.group("release") if release_match else ""
@@ -173,11 +201,18 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
             bundle["files"].add(name)
         architecture = RPM_ARCHITECTURE.search(name)
         if architecture:
-            architectures.add(architecture.group("architecture").lower())
+            canonical_architecture = normalize_architecture(architecture.group("architecture"))
+            if canonical_architecture:
+                architectures.add(canonical_architecture)
     if len(releases) > 1:
         issues.append("Selected RPMs contain more than one IOS XR release tag")
     if len(architectures) > 1:
         issues.append("Selected RPMs contain more than one processor architecture")
+    if iso_architectures and architectures and not architectures & iso_architectures:
+        issues.append(
+            f"Selected RPMs use processor architecture {', '.join(sorted(architectures))}, "
+            f"but the base ISO supports {', '.join(sorted(iso_architectures))}"
+        )
     for (component, bug), versions in variants.items():
         if len(versions) > 1:
             issues.append(f"Multiple versions of {component} for {bug} are selected; keep one RPM")
@@ -209,10 +244,13 @@ def validate_smu_selection(iso: str, packages: list[str]) -> dict:
     return {"compatible": not issues, "iso_release": iso_release, "checked": checked,
             "issues": sorted(set(issues)), "warnings": sorted(set(warnings)),
             "package_groups": package_groups, "component_conflicts": component_conflicts,
-            "architectures": sorted(architectures)}
+            "architectures": sorted(architectures),
+            "iso_architectures": sorted(iso_architectures) if iso_architectures else []}
 
 
-def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
+def recommend_smu_selection(
+    iso: str, packages: list[str], iso_architectures: frozenset[str] | None = None
+) -> dict:
     """Select every deterministic platform/release match for upstream dependency resolution."""
     iso_name = Path(iso).name
     iso_platform = infer_platform(iso_name)
@@ -225,13 +263,19 @@ def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
     if not iso_platform or not expected_tag:
         missing = "platform" if not iso_platform else "release"
         return {"ready": False, "selected": [], "excluded": [], "package_groups": [],
-                "component_conflicts": [], "architectures": [], "iso": iso_name,
+                "component_conflicts": [], "architectures": [], "iso_architectures": [],
+                "iso": iso_name,
                 "message": f"The ISO {missing} could not be detected; select it in Expert settings"}
 
     for package in sorted(set(packages)):
         name = Path(package).name
         package_platform = infer_platform(name)
         rpm_release = RPM_RELEASE.search(name)
+        rpm_architecture = RPM_ARCHITECTURE.search(name)
+        package_architecture = (
+            normalize_architecture(rpm_architecture.group("architecture"))
+            if rpm_architecture else None
+        )
         if not package_platform:
             excluded.append({"name": name, "reason": "Platform is missing from filename"})
         elif package_platform != iso_platform:
@@ -240,10 +284,13 @@ def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
             excluded.append({"name": name, "reason": "Different IOS XR release"})
         elif not rpm_release:
             excluded.append({"name": name, "reason": "Release is missing from filename"})
+        elif (iso_architectures and package_architecture
+              and package_architecture not in iso_architectures):
+            excluded.append({"name": name, "reason": "Processor architecture does not match the base ISO"})
         else:
             selected.append(name)
 
-    analysis = validate_smu_selection(iso_name, selected)
+    analysis = validate_smu_selection(iso_name, selected, iso_architectures=iso_architectures)
     return {
         "ready": True,
         "selected": selected,
@@ -254,6 +301,7 @@ def recommend_smu_selection(iso: str, packages: list[str]) -> dict:
         "package_groups": analysis["package_groups"],
         "component_conflicts": analysis["component_conflicts"],
         "architectures": analysis["architectures"],
+        "iso_architectures": analysis["iso_architectures"],
         "message": (
             f"Selected {len(selected)} matching RPMs; Cisco gisobuild will resolve dependencies "
             "and supersedence from the complete matching repository"

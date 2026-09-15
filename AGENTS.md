@@ -105,6 +105,13 @@ python3 staging/rehearse.py
 git diff --check
 ```
 
+Run the `giso-webui` unit test suite only inside the built `giso-webui-giso-webui`
+container image, as shown above. Never run `python -m unittest` or `pytest`
+directly against the host Python interpreter for this module: the host lacks the
+pinned dependency versions and any OS-level tools (for example `isoinfo`) that
+the container image provides, so a host run can pass or fail for reasons that do
+not reflect CI or production behavior.
+
 Run Ruff, dependency auditing, Actionlint, Hadolint, and the security checks
 defined in CI when their inputs change. Refresh tracked Graphify outputs after
 code changes, review the Graphify diff for unexpected dependency changes, and

@@ -3,6 +3,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import time
@@ -12,6 +13,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import app as module
+
+ISOINFO_AVAILABLE = shutil.which("genisoimage") is not None and Path(module.ISOINFO_BIN).exists()
 
 
 class GisoWebTests(unittest.TestCase):
@@ -334,6 +337,52 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual((existing / "keep.rpm").read_bytes(), b"keep")
         self.assertEqual(len(list(self.data.glob("cisco-smu-*"))), 2)
+
+    def test_deleting_archive_removes_its_extraction_directory(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"rpm"
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        response = self.upload("vendor-bundle.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue((self.data / "vendor-bundle").is_dir())
+        self.assertTrue((self.data / "vendor-bundle" / "package.rpm").exists())
+
+        response = self.client.delete("/api/uploads/vendor-bundle.tar")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse((self.data / "vendor-bundle.tar").exists())
+        self.assertFalse((self.data / "vendor-bundle").exists())
+
+    def test_deleting_plain_upload_does_not_touch_unrelated_directory(self):
+        (self.data / "vendor-bundle").mkdir()
+        (self.data / "vendor-bundle" / "keep.rpm").write_bytes(b"keep")
+        unrelated = self.data / "standalone.rpm"
+        unrelated.write_bytes(b"standalone")
+
+        response = self.client.delete("/api/uploads/standalone.rpm")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(unrelated.exists())
+        self.assertTrue((self.data / "vendor-bundle" / "keep.rpm").exists())
+
+    def test_inventory_reports_extracted_from_source_archive(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"rpm"
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        self.upload("vendor-bundle.tar", stream.getvalue())
+
+        files = module.inventory_files()
+
+        extracted = next(item for item in files if item["basename"] == "package.rpm")
+        self.assertEqual(extracted["extracted_from"], "vendor-bundle.tar")
+        archive_entry = next(item for item in files if item["basename"] == "vendor-bundle.tar")
+        self.assertIsNone(archive_entry["extracted_from"])
 
     def test_upload_offset_must_be_sequential(self):
         upload_id = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3}).get_json()["id"]
@@ -876,6 +925,43 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(owned.exists())
         self.assertTrue(unrelated.exists())
 
+    def test_successful_build_removes_emptied_extraction_directory_and_source_archive(self):
+        archive = self.data / "vendor-bundle.tar"
+        archive.write_bytes(b"tar contents")
+        extraction_dir = self.data / "vendor-bundle"
+        extraction_dir.mkdir()
+        owned = extraction_dir / "selected.rpm"
+        owned.write_bytes(b"selected")
+        job_dir = self.output / "extracted-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+
+        module.archive_giso_artifacts_and_cleanup("extracted-job", job_dir, [owned])
+
+        self.assertFalse(owned.exists())
+        self.assertFalse(extraction_dir.exists())
+        self.assertFalse(archive.exists())
+
+    def test_successful_build_preserves_extraction_directory_with_remaining_files(self):
+        archive = self.data / "vendor-bundle.tar"
+        archive.write_bytes(b"tar contents")
+        extraction_dir = self.data / "vendor-bundle"
+        extraction_dir.mkdir()
+        owned = extraction_dir / "selected.rpm"
+        owned.write_bytes(b"selected")
+        remaining = extraction_dir / "unused.rpm"
+        remaining.write_bytes(b"still needed by another build")
+        job_dir = self.output / "partial-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+
+        module.archive_giso_artifacts_and_cleanup("partial-job", job_dir, [owned])
+
+        self.assertFalse(owned.exists())
+        self.assertTrue(remaining.exists())
+        self.assertTrue(extraction_dir.exists())
+        self.assertTrue(archive.exists())
+
     def test_cancellation_during_finalization_preserves_inputs(self):
         owned = self.data / "selected.rpm"
         owned.write_bytes(b"selected")
@@ -1157,6 +1243,69 @@ class GisoWebTests(unittest.TestCase):
             result["md5"], hashlib.md5(content, usedforsecurity=False).hexdigest()
         )
         self.assertEqual(result["sha256"], hashlib.sha256(content).hexdigest())
+
+
+@unittest.skipUnless(
+    ISOINFO_AVAILABLE,
+    "genisoimage and isoinfo are only available inside the giso-webui container image",
+)
+class IsoArchitectureInspectionTests(unittest.TestCase):
+    """Regression coverage for inspect_iso_architecture() against real ISO9660 images.
+
+    These build tiny synthetic ISOs with genisoimage; no Cisco content is
+    involved. They must run only inside the giso-webui container, which is
+    the sole place isoinfo/genisoimage are installed (see AGENTS.md).
+    """
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        module.iso_architecture_cache.clear()
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def _build_iso(self, files: dict[str, str]) -> Path:
+        source = Path(self.temp.name) / "iso-src"
+        source.mkdir()
+        for name, content in files.items():
+            path = source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+        iso_path = Path(self.temp.name) / "test.iso"
+        subprocess.run(
+            ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
+            check=True, capture_output=True,
+        )
+        return iso_path
+
+    def test_detects_x86_64_only_exr_image_from_metadata(self):
+        iso_path = self._build_iso({
+            "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list:\n",
+        })
+        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64"}))
+
+    def test_detects_dual_arch_exr_image_from_metadata(self):
+        iso_path = self._build_iso({
+            "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list: armv7l\n",
+        })
+        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64", "aarch64"}))
+
+    def test_falls_back_to_rpm_repository_listing_for_lnt_image(self):
+        iso_path = self._build_iso({"repo/foo-1.0-r0.x86_64.rpm": ""})
+        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64"}))
+
+    def test_unreadable_iso_reports_unknown_rather_than_raising(self):
+        bogus = Path(self.temp.name) / "not-an-iso.iso"
+        bogus.write_bytes(b"not a real iso9660 image")
+        self.assertEqual(module.inspect_iso_architecture(bogus), frozenset())
+
+    def test_result_is_cached_by_path_size_and_mtime(self):
+        iso_path = self._build_iso({"repo/foo-1.0-r0.x86_64.rpm": ""})
+        first = module.inspect_iso_architecture(iso_path)
+        with patch("app.subprocess.run") as run:
+            second = module.inspect_iso_architecture(iso_path)
+        run.assert_not_called()
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":

@@ -57,7 +57,16 @@ TODO:
 
 - [x] Cleanup only files owned by the completed job request.
 - [x] Preserve unrelated inventory entries.
-- [ ] Track provenance/ownership of extracted files.
+- [x] Track provenance/ownership of extracted files. `archive_source_for_extraction()`
+  and `top_level_extraction_dir()` in `giso-webui/app.py` recover which
+  `.tar`/`.tgz` produced an extracted directory (deterministic from
+  `extraction_path()`'s naming, no new stored state needed). Wired into:
+  `archive_giso_artifacts_and_cleanup()` (a build-emptied extraction
+  directory and its source archive are now removed instead of orphaned;
+  a directory still holding other files is left alone), `delete_upload()`
+  (deleting an archive now cascades to its extraction directory), and
+  `inventory_files()` (each extracted file now reports `extracted_from`,
+  not just a `source:"tar"` boolean).
 - [x] Add regression test: build A must not delete unrelated inputs for build B.
 
 ## P1 — Wrong file/package selection
@@ -80,18 +89,62 @@ TODO:
 
 ### RPM processor architecture is not checked against the selected ISO
 
-Current behavior:
+Fixed. `giso-webui/app.py:inspect_iso_architecture()` shells out to `isoinfo`
+(now bundled in the `giso-webui` image via Alpine's pinned `cdrkit` package)
+to read the base ISO's own contents: for eXR images it reads the "x86_64
+supported arch list" / "arm supported arch list" keys from
+`iosxr_image_mdata.yml` (the same file upstream's
+`src/exrmod/gisobuild_exr_engine.py` treats as authoritative); for LNT images,
+which carry their RPM repository directly on the ISO, it falls back to
+scanning the `isoinfo -R -l` file listing for the same
+x86_64/aarch64/arm64/corei7_64 filename suffix used for operator-selected
+RPMs. Both paths, and the user-selected RPM list, now resolve through one
+canonical `normalize_architecture()` mapping in `platform_validation.py`
+(mirroring `normalize_platform()`), so an eXR `corei7_64` RPM and an LNT
+`x86_64` RPM are correctly recognized as the same processor family instead of
+two unrelated tokens.
 
-`validate_smu_selection()` checks whether selected RPMs contain multiple architectures, but does not prove that the single RPM architecture matches the base ISO architecture.
-
-A set of mutually consistent but wrong-architecture RPMs can therefore pass the local check.
+Result is cached by `(path, size, mtime_ns)`, matching the existing
+`file_checksums()` cache, so it costs one `isoinfo` run per uploaded ISO, not
+per poll. When isoinfo/genisoimage cannot read the ISO or find a recognizable
+architecture, the result is an empty set treated as "unknown" — this never
+blocks a build; it only blocks when a genuine mismatch is detected.
 
 TODO:
 
-- [ ] Determine ISO architecture from metadata/upstream inspection.
-- [ ] Compare every RPM architecture against the ISO/build architecture.
-- [ ] Treat mismatch as a blocking error.
-- [ ] Add x86_64 vs aarch64 mismatch regression tests.
+- [x] Determine ISO architecture from metadata/upstream inspection.
+- [x] Compare every RPM architecture against the ISO/build architecture.
+- [x] Treat mismatch as a blocking error.
+- [x] Add x86_64 vs aarch64 mismatch regression tests. See
+  `test_platform_compatibility.py` (pure, filename/normalization-level) and
+  `test_app.py:IsoArchitectureInspectionTests` (real ISO9660 images built with
+  `genisoimage`, run only inside the `giso-webui` container where
+  `isoinfo`/`genisoimage` are installed).
+
+Not done / follow-up:
+
+- [ ] Confirm the exact `iosxr_image_mdata.yml` key names and "arm supported
+  arch list" variant token vocabulary against a real Cisco eXR ISO — the
+  parsing here is built from upstream source
+  (`src/exrmod/gisobuild_exr_engine.py`) and a synthetic fixture, not a
+  licensed image, per the repository's synthetic-fixture rule in `AGENTS.md`.
+  Treat this as `INFERRED` until validated against a real eXR image.
+- [ ] LNT images that ship no RPMs directly on the ISO (metadata-only /
+  bundle-reference images, if any exist upstream) will report an empty,
+  "unknown" architecture set and are not blocked — confirm whether upstream
+  LNT ISOs always carry a same-architecture repo, or whether a second LNT
+  metadata source should be added.
+- [ ] Tracked Graphify output (`graphify-out/`) was **not** refreshed for this
+  change. Incremental `graphify --update` in a fresh worktree could not reuse
+  the primary checkout's gitignored manifest/semantic cache (0 of ~38 doc
+  files hit cache even after copying `graphify-out/manifest.json` and
+  `graphify-out/cache/` over), so it would have needed a near-full re-extraction
+  of the docs corpus for a small change. Per `AI-INSTRUCTIONS.md`'s explicit
+  allowance ("If Graphify cannot be run ... state that clearly ... do not
+  pretend it was refreshed"), this is stated here instead. Follow-up: make
+  `graphify --update` cache-portable across worktrees (the manifest/cache
+  keys should not depend on the worktree's absolute path), then refresh
+  `graphify-out/` for `app.py`/`platform_validation.py` in a later change.
 
 ### RPM selection uses a glob expression instead of an exact package identity
 
@@ -234,7 +287,7 @@ TODO:
 - [x] cancel during finalization
 - [x] successful build preserves unrelated workspace inputs
 - [x] two ISOs never silently choose first candidate
-- [ ] wrong RPM CPU architecture is blocked
+- [x] wrong RPM CPU architecture is blocked
 - [x] package glob characters cannot select unintended files
 - [ ] duplicate basename / same hash
 - [ ] duplicate basename / different hash

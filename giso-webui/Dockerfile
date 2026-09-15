@@ -1,6 +1,6 @@
 FROM python:3.12-alpine@sha256:b64631e04e4920160c50fbe8d8df828f7f35f06f425cb44aa09bca53e708a35a
 
-RUN apk add --no-cache docker-cli=29.5.3-r1
+RUN apk add --no-cache docker-cli=29.5.3-r1 cdrkit=1.1.11-r6
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
