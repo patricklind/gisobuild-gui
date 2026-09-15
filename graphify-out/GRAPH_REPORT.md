@@ -1,17 +1,17 @@
-# Graph Report - gisobuild-roadmap-platform  (2026-09-15)
+# Graph Report - gisobuild-phase0-revive  (2026-09-15)
 
 ## Corpus Check
-- 46 files · ~37,806 words
+- 46 files · ~38,362 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 8, .css 4, .example 1)
 
 ## Summary
-- 598 nodes · 931 edges · 45 communities (30 shown, 8 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 22 edges (avg confidence: 0.88)
+- 613 nodes · 958 edges · 46 communities (30 shown, 8 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c0b38ebb`
+- Built from commit: `ec5e6fef`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -36,7 +36,7 @@
 - build-giso.sh
 - Testing and acceptance
 - Release notes
-- CONTRIBUTING.md
+- Contributing
 - Platform support and validation
 - coord.sh script
 - worktree.sh
@@ -56,7 +56,7 @@
 - copilot-instructions.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `GisoWebTests` - 84 edges
+1. `GisoWebTests` - 89 edges
 2. `CiscoDownloadError` - 21 edges
 3. `CiscoSoftwareClient` - 19 edges
 4. `PlatformCompatibilityTests` - 16 edges
@@ -68,6 +68,8 @@
 10. `CiscoDownloadTests` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `cisco_config()` --uses--> `CiscoDownloadError`  [INFERRED]
+  giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_search()` --uses--> `CiscoDownloadError`  [INFERRED]
   giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_download_start()` --uses--> `CiscoDownloadError`  [INFERRED]
@@ -76,21 +78,19 @@
   giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_client()` --calls--> `CiscoSoftwareClient`  [EXTRACTED]
   giso-webui/app.py → giso-webui/cisco_download.py
-- `cisco_client()` --calls--> `secret_value()`  [EXTRACTED]
-  giso-webui/app.py → giso-webui/cisco_download.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (45 total, 8 thin omitted)
+## Communities (46 total, 8 thin omitted)
 
 ### Community 0 - "app.py"
-Cohesion: 0.06
-Nodes (86): after_request, before_request, delete, errorhandler, Exception, get, active_rpm_names(), activity() (+78 more)
+Cohesion: 0.05
+Nodes (95): after_request, before_request, delete, errorhandler, Exception, get, active_rpm_names(), activity() (+87 more)
 
 ### Community 2 - "CiscoDownloadError"
 Cohesion: 0.07
-Nodes (11): cisco_config(), CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect, Path, Cisco Automated Software Distribution client with strict download controls., Safe error suitable for returning to the local UI. (+3 more)
+Nodes (11): CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect, Path, RuntimeError, Cisco Automated Software Distribution client with strict download controls., Safe error suitable for returning to the local UI. (+3 more)
 
 ### Community 3 - "app.js"
 Cohesion: 0.11
@@ -148,8 +148,8 @@ Nodes (6): 1. Static and unit verification, 2. Container smoke test, 3. Licensed
 Cohesion: 0.40
 Nodes (4): Release notes, Release safety, Unreleased, Validation status
 
-### Community 21 - "CONTRIBUTING.md"
-Cohesion: 0.50
+### Community 21 - "Contributing"
+Cohesion: 0.67
 Nodes (3): Contributing, Coordination and branches, Local verification
 
 ### Community 22 - "Platform support and validation"
@@ -206,23 +206,23 @@ Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 
 ## Knowledge Gaps
 - **183 isolated node(s):** `inputs`, `platformProfiles`, `drop`, `GitHub Copilot repository instructions`, `Mandatory project roadmap and Graphify — read before doing anything` (+178 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 311 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 319 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `GisoWebTests` connect `GisoWebTests` to `app.py`, `patch`, `.upload`, `dict`, `.test_build_waits_for_tar_extraction_to_finish`, `.test_failed_multi_file_cisco_download_removes_partial_results`?**
-  _High betweenness centrality (0.091) - this node is a cross-community bridge._
-- **Why does `CiscoDownloadError` connect `CiscoDownloadError` to `app.py`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+- **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `.test_run_job_honors_cancellation_during_image_pull`, `.upload`, `dict`, `.test_build_waits_for_tar_extraction_to_finish`, `.test_failed_multi_file_cisco_download_removes_partial_results`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `app.py`?**
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Why does `Cisco IOS XR Golden ISO Build and Upgrade Guide` connect `Cisco IOS XR Golden ISO Build and Upgrade Guide` to `docs/README.md`?**
+  _High betweenness centrality (0.013) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `CiscoDownloadError` (e.g. with `cisco_accept()` and `cisco_config()`) actually correct?**
   _`CiscoDownloadError` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inputs`, `platformProfiles`, `drop` to the rest of the system?**
   _183 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `app.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.05742821473158552 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05280875236692615 - nodes in this community are weakly interconnected._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
-  _Cohesion score 0.037037037037037035 - nodes in this community are weakly interconnected._
-- **Should `CiscoDownloadError` be split into smaller, more focused modules?**
-  _Cohesion score 0.07312925170068027 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03508771929824561 - nodes in this community are weakly interconnected._

@@ -59,12 +59,12 @@ platforms can be discovered without the local presentation list.
 
 Before large refactors hide the current failure modes, add regression tests and fix or preserve explicit coverage for:
 
-- [ ] cancellation during builder preparation/pull
-- [ ] cancellation during finalization
-- [ ] successful build must not delete unrelated inputs
+- [x] cancellation during builder preparation/pull
+- [x] cancellation during finalization
+- [x] successful build must not delete unrelated inputs
 - [ ] multiple ISOs must never silently select the first candidate
 - [ ] RPM CPU architecture must match the selected ISO/build architecture
-- [ ] RPM selection must use exact identity, never glob matching
+- [x] RPM selection must use exact identity, never glob matching
 - [ ] duplicate basenames must remain distinguishable by identity/checksum
 - [ ] compatibility matrix platform aliases must use one canonical resolver
 - [ ] bridge-SMU presence must use exact package/CSC identity

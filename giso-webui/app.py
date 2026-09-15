@@ -58,6 +58,7 @@ IMAGE = validate_image_reference(
     os.environ.get("GISO_IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4")
 )
 jobs: dict[str, dict] = {}
+job_processes: dict[str, subprocess.Popen] = {}
 job_persisted_at: dict[str, float] = {}
 uploads: dict[str, dict] = {}
 cisco_searches: dict[str, dict] = {}
@@ -87,7 +88,7 @@ UPLOAD_SESSION_TTL = int(os.environ.get("UPLOAD_SESSION_TTL", str(24 * 60 * 60))
 GISO_PULL_TIMEOUT_SECONDS = int(os.environ.get("GISO_PULL_TIMEOUT_SECONDS", "600"))
 CISCO_DOWNLOAD_TIMEOUT_SECONDS = int(os.environ.get("CISCO_DOWNLOAD_TIMEOUT_SECONDS", "60"))
 ALLOWED_HOSTS = {host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(",") if host.strip()}
-ACTIVE_JOB_STATUSES = {"queued", "running", "cancelling"}
+ACTIVE_JOB_STATUSES = {"queued", "running", "finalizing", "committing", "cancelling"}
 MIN_FREE_BYTES = 512 * 1024**2
 app.config["MAX_CONTENT_LENGTH"] = MAX_CHUNK_BYTES
 
@@ -96,7 +97,13 @@ if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
        UPLOAD_SESSION_TTL, GISO_PULL_TIMEOUT_SECONDS) <= 0 or not ALLOWED_HOSTS:
     raise RuntimeError("Upload, extraction, tar, chunk and log limits must be positive")
 
-PRIVATE_JOB_FIELDS = {"command", "payload", "container_pid"}
+PRIVATE_JOB_FIELDS = {
+    "command", "payload", "container_pid", "cleanup_paths", "process_phase",
+}
+
+
+class BuildCancelled(RuntimeError):
+    """Stop a build lifecycle without converting cancellation into failure."""
 
 
 def cisco_client() -> CiscoSoftwareClient:
@@ -495,7 +502,12 @@ def enforce_archive_policy(*, protected_job_id: str | None = None) -> list[str]:
     return removed
 
 
-def archive_giso_artifacts_and_cleanup(job_id: str, job_dir: Path) -> list[dict]:
+def archive_giso_artifacts_and_cleanup(
+    job_id: str,
+    job_dir: Path,
+    cleanup_paths: list[Path] | None = None,
+    before_cleanup=None,
+) -> list[dict]:
     """Archive verified Golden ISO and USB boot files, then remove build inputs/output."""
     candidates = giso_artifact_candidates(job_dir)
     iso_candidates = [path for path in candidates if path.suffix.lower() == ".iso"]
@@ -526,14 +538,19 @@ def archive_giso_artifacts_and_cleanup(job_id: str, job_dir: Path) -> list[dict]
             enforce_archive_policy(protected_job_id=job_id)
             if not archive_dir.is_dir():
                 raise RuntimeError("The completed GISO archive could not be retained")
+            if before_cleanup is not None:
+                before_cleanup()
         except Exception:
             shutil.rmtree(archive_dir, ignore_errors=True)
             raise
-    for child in list(DATA.iterdir()):
-        if child.is_dir():
-            shutil.rmtree(child)
+    for child in cleanup_paths or []:
+        resolved = child.resolve()
+        if DATA not in resolved.parents or not resolved.exists():
+            continue
+        if resolved.is_dir():
+            shutil.rmtree(resolved)
         else:
-            child.unlink()
+            resolved.unlink()
     shutil.rmtree(WORK / job_id, ignore_errors=True)
     shutil.rmtree(job_dir, ignore_errors=True)
     return archived
@@ -737,7 +754,9 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             for package in payload["pkglist"]:
                 if "/" in package:
                     raise ValueError(f"RPM package must be a filename: {package!r}")
-                matches = list(DATA.rglob(package))
+                if Path(package).name != package or glob_metacharacters(package):
+                    raise ValueError(f"RPM package must be an exact filename: {package!r}")
+                matches = [path for path in DATA.rglob("*.rpm") if path.name == package]
                 if package.lower().endswith(".rpm") and not matches:
                     raise ValueError(f"RPM {package!r} was not found")
                 if package.lower().endswith(".rpm") and len(matches) > 1:
@@ -768,31 +787,87 @@ def build_command(payload: dict, job_id: str) -> list[str]:
     return command
 
 
+def glob_metacharacters(value: str) -> bool:
+    return any(character in value for character in "*?[]")
+
+
+def build_cleanup_paths(payload: dict) -> list[Path]:
+    """Resolve only inputs explicitly owned by this build request."""
+    paths: set[Path] = set()
+    for key in PATH_OPTIONS:
+        value = payload.get(key)
+        if value:
+            paths.add(safe_data_path(value))
+    for key in ("repo", "bridging_fixes"):
+        for value in payload.get(key) or []:
+            paths.add(safe_data_path(value))
+    for package in payload.get("pkglist") or []:
+        if Path(package).name != package or glob_metacharacters(package):
+            raise ValueError(f"RPM package must be an exact filename: {package!r}")
+        matches = [path for path in DATA.rglob("*.rpm") if path.name == package]
+        paths.update(matches)
+    return sorted(paths, key=str)
+
+
+def cancellation_requested(job_id: str) -> bool:
+    with job_lock:
+        return jobs[job_id]["status"] in {"cancelling", "cancelled"}
+
+
+def prepare_destructive_finalization(job_id: str) -> None:
+    """Commit the final state transition before any owned input is removed."""
+    with job_lock:
+        if jobs[job_id]["status"] in {"cancelling", "cancelled"}:
+            raise BuildCancelled("Build cancelled before finalization")
+        jobs[job_id]["status"] = "committing"
+
+
 def run_job(job_id: str, command: list[str]) -> None:
     try:
         append_log(job_id, "$ " + shlex.join(command) + "\n\n")
         log_event("build_started", job_id=job_id)
         log_event("image_pull_started", job_id=job_id)
-        pull = subprocess.run(
+        pull = subprocess.Popen(
             [DOCKER_BIN, "pull", "--platform", "linux/amd64", IMAGE],
-            check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            timeout=GISO_PULL_TIMEOUT_SECONDS,
+            start_new_session=True,
         )
-        if pull.stdout:
-            append_log(job_id, pull.stdout)
+        with job_lock:
+            job_processes[job_id] = pull
+            jobs[job_id]["process_phase"] = "pulling"
+        try:
+            pull_output, _ = pull.communicate(timeout=GISO_PULL_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            pull.terminate()
+            pull.wait(timeout=20)
+            raise
+        finally:
+            with job_lock:
+                job_processes.pop(job_id, None)
+        if cancellation_requested(job_id):
+            raise BuildCancelled("Build cancelled during image preparation")
+        if pull.returncode:
+            raise subprocess.CalledProcessError(pull.returncode, pull.args, output=pull_output)
+        if pull_output:
+            append_log(job_id, pull_output)
         log_event("image_pull_completed", job_id=job_id)
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, bufsize=1)
+                                text=True, bufsize=1, start_new_session=True)
         with job_lock:
+            job_processes[job_id] = proc
+            jobs[job_id]["process_phase"] = "building"
             jobs[job_id]["container_pid"] = proc.pid
         if proc.stdout is None:
             raise RuntimeError("Build container output stream is unavailable")
         for line in proc.stdout:
             append_log(job_id, line)
         code = proc.wait()
+        with job_lock:
+            job_processes.pop(job_id, None)
+        if cancellation_requested(job_id):
+            raise BuildCancelled("Build cancelled")
         artifacts = []
         job_dir = OUTPUT / job_id
         if job_dir.exists():
@@ -803,7 +878,12 @@ def run_job(job_id: str, command: list[str]) -> None:
             path.suffix.lower() == ".iso" for path in giso_artifact_candidates(job_dir)
         )
         if success:
-            artifacts = archive_giso_artifacts_and_cleanup(job_id, job_dir)
+            with job_lock:
+                jobs[job_id]["status"] = "finalizing"
+                cleanup_paths = [Path(path) for path in jobs[job_id].get("cleanup_paths", [])]
+            artifacts = archive_giso_artifacts_and_cleanup(
+                job_id, job_dir, cleanup_paths, lambda: prepare_destructive_finalization(job_id)
+            )
         with job_lock:
             if jobs[job_id]["status"] not in {"cancelled", "cancelling"}:
                 jobs[job_id].update(status="success" if success else "failed",
@@ -814,16 +894,28 @@ def run_job(job_id: str, command: list[str]) -> None:
         persist_job(job_id)
         log_event("build_finished", exit_code=code, job_id=job_id,
                   status="success" if success else "failed")
+    except BuildCancelled:
+        with job_lock:
+            job_processes.pop(job_id, None)
+            jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
+                                updated=time.time())
+        persist_job(job_id)
+        log_event("build_cancelled", job_id=job_id)
     except Exception as exc:  # noqa: BLE001 - background failures must update job state
         append_log(job_id, f"\nERROR: {exc}\n")
         with job_lock:
-            jobs[job_id].update(
-                status="failed",
-                error="Build failed; review the redacted technical details",
-                phase="Build failed",
-                finished=time.time(),
-                updated=time.time(),
-            )
+            job_processes.pop(job_id, None)
+            if jobs[job_id]["status"] in {"cancelling", "cancelled"}:
+                jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
+                                    updated=time.time())
+            else:
+                jobs[job_id].update(
+                    status="failed",
+                    error="Build failed; review the redacted technical details",
+                    phase="Build failed",
+                    finished=time.time(),
+                    updated=time.time(),
+                )
         persist_job(job_id)
         log_event("build_failed", error_type=type(exc).__name__, job_id=job_id)
 
@@ -1455,6 +1547,7 @@ def create_job():
                             "log": "", "artifacts": [], "payload": payload, "command": []}
         try:
             command = build_command(payload, job_id)
+            cleanup_paths = build_cleanup_paths(payload)
         except ValueError as exc:
             with job_lock:
                 jobs.pop(job_id, None)
@@ -1465,7 +1558,9 @@ def create_job():
             log_event("build_setup_failed", error_type=type(exc).__name__, job_id=job_id)
             return jsonify(error="Build setup failed; inspect the service log using the request ID"), 503
         with job_lock:
-            jobs[job_id].update(status="running", progress=3, phase="Preparing build container", command=command)
+            jobs[job_id].update(status="running", progress=3, phase="Preparing build container",
+                                command=command,
+                                cleanup_paths=[str(path) for path in cleanup_paths])
         with store_lock, sqlite3.connect(JOB_DB) as database:
             rows = database.execute(
                 "SELECT text FROM activity ORDER BY id DESC LIMIT 50"
@@ -1493,10 +1588,30 @@ def cancel_job(job_id: str):
         job = jobs.get(job_id)
         if not job:
             abort(404)
-        if job["status"] not in {"queued", "running"}:
+        if job["status"] not in {"queued", "running", "finalizing"}:
             return jsonify(error="Build is not running"), 409
+        previous_status = job["status"]
         job["status"] = "cancelling"
+        process = job_processes.get(job_id)
+        process_phase = job.get("process_phase")
     persist_job(job_id)
+    process_was_running = process is not None and process.poll() is None
+    if process_was_running:
+        process.terminate()
+        try:
+            process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+    if previous_status == "finalizing":
+        return jsonify(ok=True)
+    if process_phase == "pulling" or not process_was_running:
+        with job_lock:
+            jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
+                                updated=time.time())
+        append_log(job_id, "\nBuild cancelled by user.\n")
+        persist_job(job_id)
+        return jsonify(ok=True)
     try:
         subprocess.run([DOCKER_BIN, "stop", "--time", "10", f"giso-build-{job_id}"],
                        timeout=20, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
