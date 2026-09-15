@@ -9,7 +9,7 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import app as module
 
@@ -35,6 +35,7 @@ class GisoWebTests(unittest.TestCase):
         module.cisco_download_jobs.clear()
         module.cisco_api_client = None
         module.jobs.clear()
+        module.job_processes.clear()
         module.job_persisted_at.clear()
         module.archive_policy_checked = 0.0
         self.docker_running = patch("app.docker_build_running", return_value=False)
@@ -491,15 +492,35 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3})
         self.assertEqual(response.status_code, 409)
 
-    @patch("app.subprocess.run")
-    def test_failed_cancel_restores_running_state(self, run):
+    def test_cancel_during_pull_terminates_tracked_process(self):
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 10, "phase": "Building"}
-        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "stop"], 20)
+                              "updated": 1, "log": "", "progress": 3,
+                              "phase": "Preparing", "process_phase": "pulling"}
+        process = MagicMock()
+        process.poll.return_value = None
+        module.job_processes["job"] = process
         response = self.client.delete("/api/jobs/job")
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(module.jobs["job"]["status"], "running")
-        self.assertIn("Unable to stop", module.jobs["job"]["log"])
+        self.assertEqual(response.status_code, 200)
+        process.terminate.assert_called_once_with()
+        process.wait.assert_called_once_with(timeout=20)
+        self.assertEqual(module.jobs["job"]["status"], "cancelled")
+
+    @patch("app.subprocess.run")
+    def test_cancel_running_build_stops_container_after_client_process(self, run):
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "log": "", "progress": 50,
+                              "phase": "Building", "process_phase": "building"}
+        process = MagicMock()
+        process.poll.return_value = None
+        module.job_processes["job"] = process
+
+        response = self.client.delete("/api/jobs/job")
+
+        self.assertEqual(response.status_code, 200)
+        process.terminate.assert_called_once_with()
+        run.assert_called_once()
+        self.assertIn("giso-build-job", run.call_args.args[0])
+        self.assertEqual(module.jobs["job"]["status"], "cancelled")
 
     def test_cleanup_rejects_active_upload(self):
         module.uploads["active"] = {"name": "x.rpm", "size": 3, "received": 0}
@@ -677,6 +698,15 @@ class GisoWebTests(unittest.TestCase):
             module.build_command({"iso": "base.iso", "platform": "asr9k",
                                   "pkglist": ["package.rpm"]}, "conflict")
 
+    @patch("app.child_mount_args", return_value=[])
+    def test_package_glob_characters_cannot_select_unintended_files(self, _mounts):
+        (self.data / "base.iso").write_bytes(b"iso")
+        (self.data / "package-one.rpm").write_bytes(b"rpm")
+
+        with self.assertRaisesRegex(ValueError, "exact filename"):
+            module.build_command({"iso": "base.iso", "platform": "asr9k",
+                                  "pkglist": ["package-*.rpm"]}, "glob")
+
     def test_cleanup_removes_workspace_but_keeps_archive(self):
         (self.data / "base.iso").write_bytes(b"remove")
         (self.output / "finished.iso").write_bytes(b"remove")
@@ -745,11 +775,44 @@ class GisoWebTests(unittest.TestCase):
         (job_dir / "router-goldenk9.iso").write_bytes(b"golden image")
         (job_dir / "checksums.json").write_bytes(b"remove")
         (module.WORK / "job").mkdir()
-        artifacts = module.archive_golden_iso_and_cleanup("job", job_dir)
+        artifacts = module.archive_golden_iso_and_cleanup(
+            "job", job_dir, [self.data / "source.rpm"]
+        )
         self.assertEqual(len(artifacts), 1)
         self.assertTrue((module.ARCHIVE / "job/router-goldenk9.iso").exists())
         self.assertFalse((self.data / "source.rpm").exists())
         self.assertFalse(job_dir.exists())
+
+    def test_successful_build_preserves_inputs_not_owned_by_job(self):
+        owned = self.data / "selected.rpm"
+        unrelated = self.data / "future-build.iso"
+        owned.write_bytes(b"selected")
+        unrelated.write_bytes(b"keep")
+        job_dir = self.output / "scoped-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+
+        module.archive_giso_artifacts_and_cleanup("scoped-job", job_dir, [owned])
+
+        self.assertFalse(owned.exists())
+        self.assertTrue(unrelated.exists())
+
+    def test_cancellation_during_finalization_preserves_inputs(self):
+        owned = self.data / "selected.rpm"
+        owned.write_bytes(b"selected")
+        job_dir = self.output / "cancel-finalize"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+
+        with self.assertRaises(module.BuildCancelled):
+            module.archive_giso_artifacts_and_cleanup(
+                "cancel-finalize", job_dir, [owned],
+                lambda: (_ for _ in ()).throw(module.BuildCancelled("cancelled")),
+            )
+
+        self.assertTrue(owned.exists())
+        self.assertTrue(job_dir.exists())
+        self.assertFalse((module.ARCHIVE / "cancel-finalize").exists())
 
     def test_archive_retention_starts_when_old_source_is_archived(self):
         job_dir = self.output / "old-source-job"
@@ -895,22 +958,49 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(response.get_json()["ok"])
         self.assertNotIn("image", response.get_json())
 
-    @patch("app.subprocess.run")
-    def test_image_pull_timeout_marks_build_failed(self, run):
-        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "pull"], 10)
+    @patch("app.subprocess.Popen")
+    def test_image_pull_timeout_marks_build_failed(self, popen):
+        pull = MagicMock()
+        pull.communicate.side_effect = module.subprocess.TimeoutExpired(
+            [module.DOCKER_BIN, "pull"], 10
+        )
+        popen.return_value = pull
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
                               "updated": 1, "log": "", "progress": 3,
                               "phase": "Preparing", "artifacts": []}
         with patch.object(module, "GISO_PULL_TIMEOUT_SECONDS", 10):
             module.run_job("job", [module.DOCKER_BIN, "run"])
         self.assertEqual(module.jobs["job"]["status"], "failed")
-        self.assertEqual(run.call_args.kwargs["timeout"], 10)
+        pull.terminate.assert_called_once_with()
+        pull.wait.assert_called_once_with(timeout=20)
 
     @patch("app.subprocess.Popen")
-    @patch("app.subprocess.run")
-    def test_zero_exit_without_iso_is_not_reported_complete(self, run, popen):
-        run.return_value = SimpleNamespace(stdout="")
-        popen.return_value = SimpleNamespace(pid=123, stdout=[], wait=lambda: 0)
+    def test_run_job_honors_cancellation_during_image_pull(self, popen):
+        pull = MagicMock()
+        pull.returncode = -15
+        pull.args = [module.DOCKER_BIN, "pull"]
+
+        def complete_pull(**_kwargs):
+            module.jobs["job"]["status"] = "cancelling"
+            return "", None
+
+        pull.communicate.side_effect = complete_pull
+        popen.return_value = pull
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "log": "", "progress": 3,
+                              "phase": "Preparing", "artifacts": []}
+
+        module.run_job("job", [module.DOCKER_BIN, "run"])
+
+        self.assertEqual(module.jobs["job"]["status"], "cancelled")
+        self.assertNotIn("error", module.jobs["job"])
+
+    @patch("app.subprocess.Popen")
+    def test_zero_exit_without_iso_is_not_reported_complete(self, popen):
+        pull = MagicMock(returncode=0, args=[module.DOCKER_BIN, "pull"])
+        pull.communicate.return_value = ("", None)
+        build = SimpleNamespace(pid=123, stdout=[], wait=lambda: 0)
+        popen.side_effect = [pull, build]
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
                               "updated": 1, "log": "", "progress": 3,
                               "phase": "Preparing", "artifacts": []}
@@ -919,9 +1009,9 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(module.jobs["job"]["phase"], "Build failed")
         self.assertEqual(module.jobs["job"]["progress"], 3)
 
-    @patch("app.subprocess.run")
-    def test_background_build_error_is_safe_for_job_api(self, run):
-        run.side_effect = RuntimeError("/internal/customer-router.iso")
+    @patch("app.subprocess.Popen")
+    def test_background_build_error_is_safe_for_job_api(self, popen):
+        popen.side_effect = RuntimeError("/internal/customer-router.iso")
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
                               "updated": 1, "log": "", "progress": 3,
                               "phase": "Preparing", "artifacts": []}

@@ -15,9 +15,9 @@ Current behavior:
 
 TODO:
 
-- [ ] Make cancellation work during every phase, including image preparation/pull.
-- [ ] Track the actual process/process-group or runner task, not only a future container name.
-- [ ] Add regression test: cancel while builder preparation is still running.
+- [x] Make cancellation work during every phase, including image preparation/pull.
+- [x] Track the actual process/process-group or runner task, not only a future container name.
+- [x] Add regression test: cancel while builder preparation is still running.
 
 ### Cancelled build may still archive output and delete inputs
 
@@ -36,9 +36,9 @@ Race:
 
 TODO:
 
-- [ ] Check cancellation state before verification, archive and destructive cleanup.
-- [ ] Make finalization idempotent and state-machine driven.
-- [ ] Add regression test for cancellation during finalization.
+- [x] Check cancellation state before verification, archive and destructive cleanup.
+- [ ] Make finalization idempotent and state-machine driven. (State transitions are explicit; archive replay/idempotency remains.)
+- [x] Add regression test for cancellation during finalization.
 
 ### Successful build deletes unrelated files from the entire upload workspace
 
@@ -55,10 +55,10 @@ This can remove files that were present in the workspace but were not part of th
 
 TODO:
 
-- [ ] Cleanup only files owned by the completed BuildPlan/job.
-- [ ] Preserve unrelated inventory entries.
+- [x] Cleanup only files owned by the completed job request.
+- [x] Preserve unrelated inventory entries.
 - [ ] Track provenance/ownership of extracted files.
-- [ ] Add regression test: build A must not delete unrelated inputs for build B.
+- [x] Add regression test: build A must not delete unrelated inputs for build B.
 
 ## P1 — Wrong file/package selection
 
@@ -103,10 +103,10 @@ Current behavior:
 
 TODO:
 
-- [ ] Never use user/package identifiers as glob patterns.
+- [x] Never use user/package identifiers as glob patterns.
 - [ ] Resolve packages through the canonical inventory ID/checksum model.
-- [ ] Until the canonical model exists, require a strict RPM basename and exact basename lookup.
-- [ ] Add regression tests for glob metacharacters.
+- [x] Until the canonical model exists, require a strict RPM basename and exact basename lookup.
+- [x] Add regression tests for glob metacharacters.
 
 ### Manual package UI collapses duplicate RPM basenames before the operator can inspect them
 
@@ -230,12 +230,12 @@ TODO:
 
 ## Required regression-test additions
 
-- [ ] cancel during builder preparation/pull
-- [ ] cancel during finalization
-- [ ] successful build preserves unrelated workspace inputs
+- [x] cancel during builder preparation/pull
+- [x] cancel during finalization
+- [x] successful build preserves unrelated workspace inputs
 - [ ] two ISOs never silently choose first candidate
 - [ ] wrong RPM CPU architecture is blocked
-- [ ] package glob characters cannot select unintended files
+- [x] package glob characters cannot select unintended files
 - [ ] duplicate basename / same hash
 - [ ] duplicate basename / different hash
 - [ ] upgrade matrix aliases normalize through one resolver
