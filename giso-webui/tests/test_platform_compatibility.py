@@ -1,15 +1,38 @@
 import unittest
 
 from platform_validation import (
+    capabilities_for_platform,
     check_upgrade_matrix,
     infer_platform,
     normalize_platform,
     recommend_smu_selection,
+    validate_platform_options,
     validate_smu_selection,
 )
 
 
 class PlatformCompatibilityTests(unittest.TestCase):
+    def test_capabilities_follow_upstream_exr_and_lnt_option_maps(self):
+        exr = capabilities_for_platform("ncs5500")
+        lnt = capabilities_for_platform("ncs57")
+        self.assertTrue(exr["optimize"])
+        self.assertFalse(exr["remove_packages"])
+        self.assertFalse(exr["key_request"])
+        self.assertTrue(lnt["remove_packages"])
+        self.assertTrue(lnt["key_request"])
+        self.assertFalse(lnt["optimize"])
+
+    def test_platform_specific_capabilities_are_narrow(self):
+        self.assertTrue(capabilities_for_platform("asr9k")["migration"])
+        self.assertFalse(capabilities_for_platform("ncs5500")["migration"])
+        self.assertTrue(capabilities_for_platform("xrv9k")["full_iso"])
+
+    def test_adapter_rejects_capability_not_supported_by_engine(self):
+        with self.assertRaisesRegex(ValueError, "remove_packages not supported"):
+            validate_platform_options({
+                "iso": "ncs5500-mini-x-26.1.2.iso", "remove_packages": ["optional-pkg"]
+            })
+
     def test_ncs57c3_inventory_sku_normalizes_to_ncs57(self):
         self.assertEqual(normalize_platform("NCS-57C3-MODS-SYS"), "ncs57")
         self.assertEqual(normalize_platform("NCS-57C3-MOD-SYS"), "ncs57")

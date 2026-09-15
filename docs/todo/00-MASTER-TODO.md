@@ -50,6 +50,11 @@ Core principle:
 - [ ] Comprehensive tests
 - [ ] CI/CD and image publishing
 
+Current capability progress: the API, expert UI, and server adapter share one
+tested eXR/LNT capability map derived from upstream CLI maps. The workstream
+remains open until upstream source is pinned/bundled and unknown upstream-valid
+platforms can be discovered without the local presentation list.
+
 ## Immediate bug-fix priority
 
 Before large refactors hide the current failure modes, add regression tests and fix or preserve explicit coverage for:

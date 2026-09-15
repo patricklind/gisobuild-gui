@@ -561,6 +561,10 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.get("/api/platforms")
         self.assertEqual(response.status_code, 200)
         self.assertIn("asr9k", {item["id"] for item in response.get_json()})
+        ncs5500 = next(item for item in response.get_json() if item["id"] == "ncs5500")
+        self.assertEqual(ncs5500["engine"], "exr")
+        self.assertTrue(ncs5500["capabilities"]["optimize"])
+        self.assertFalse(ncs5500["capabilities"]["remove_packages"])
 
     def test_compatibility_api_checks_smu_and_uploaded_upgrade_matrix(self):
         matrix = self.data / "compatibility_matrix_test.json"

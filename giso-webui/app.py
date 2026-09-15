@@ -28,6 +28,7 @@ from flask import (
 from platform_validation import (
     PLATFORMS,
     check_upgrade_matrix,
+    platform_profile,
     recommend_smu_selection,
     validate_platform_options,
     validate_smu_selection,
@@ -927,7 +928,7 @@ def inputs():
 
 @app.get("/api/platforms")
 def platforms():
-    return jsonify([{"id": key, **value} for key, value in PLATFORMS.items()])
+    return jsonify([platform_profile(key) for key in PLATFORMS])
 
 
 @app.post("/api/smu/recommendation")
