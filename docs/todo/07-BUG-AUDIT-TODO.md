@@ -223,10 +223,10 @@ This means AI agents can be instructed to use Graphify while receiving an outdat
 
 TODO:
 
-- [ ] Refresh Graphify output after the current changes.
-- [ ] Add a CI check comparing Graphify's recorded source revision with `HEAD` for code-changing PRs.
-- [ ] Fail or clearly warn when `graphify-out/` is stale.
-- [ ] Keep `.graphifyignore` protections for Cisco licensed/sensitive artifacts.
+- [x] Refresh Graphify output after the current changes.
+- [x] Add a CI check that regenerates from the tracked `HEAD` tree and structurally compares the graph; commit metadata is excluded because generating it changes the commit.
+- [x] Fail when `graphify-out/graph.json` is stale.
+- [x] Keep and validate `.graphifyignore` protections for Cisco licensed/sensitive artifacts.
 
 ## Required regression-test additions
 
@@ -242,4 +242,4 @@ TODO:
 - [x] bridge-SMU near-match does not count as exact presence
 - [x] discovery vs cleanup race
 - [x] target release refreshes when ISO changes
-- [ ] Graphify freshness check
+- [x] Graphify freshness check
