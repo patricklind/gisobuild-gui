@@ -104,7 +104,7 @@ Current behavior:
 TODO:
 
 - [x] Never use user/package identifiers as glob patterns.
-- [ ] Resolve packages through the canonical inventory ID/checksum model.
+- [x] Resolve packages through the canonical inventory ID/checksum model.
 - [x] Until the canonical model exists, require a strict RPM basename and exact basename lookup.
 - [x] Add regression tests for glob metacharacters.
 
@@ -122,10 +122,10 @@ If two archives contain an RPM with the same basename, the later entry overwrite
 
 TODO:
 
-- [ ] Represent RPMs by stable inventory ID, not basename.
-- [ ] Show duplicate basename conflicts explicitly in the UI.
-- [ ] Same name + same hash may be deduplicated with provenance retained.
-- [ ] Same name + different hash must be a hard conflict.
+- [x] Represent RPMs by stable inventory ID, not basename.
+- [x] Show duplicate basename conflicts explicitly in the UI.
+- [x] Same name + same hash is deduplicated with provenance retained.
+- [x] Same name + different hash is a hard conflict until the unwanted copy is removed.
 - [ ] Add DOM regression tests for both duplicate cases.
 
 ## P1/P2 — Platform and compatibility validation

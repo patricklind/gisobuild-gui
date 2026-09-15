@@ -11,8 +11,8 @@ Cover:
 - [ ] filename fallback detection
 - [ ] RPM metadata parsing
 - [ ] CSC grouping
-- [ ] duplicate checksums
-- [ ] same filename/different content
+- [x] duplicate checksums
+- [x] same filename/different content
 - [ ] release mismatch
 - [ ] architecture mismatch
 - [ ] incomplete CSC
@@ -58,8 +58,8 @@ Mandatory regression coverage for:
 - [ ] two uploaded ISOs never silently select the first candidate
 - [ ] RPM CPU architecture must match the selected ISO/build architecture
 - [x] package names containing glob metacharacters cannot select unintended files
-- [ ] duplicate basename + same hash is deterministic and keeps provenance
-- [ ] duplicate basename + different hash is a blocking conflict
+- [x] duplicate basename + same hash is deterministic and keeps provenance
+- [x] duplicate basename + different hash is a blocking conflict
 - [x] upgrade-matrix aliases use the canonical platform resolver
 - [x] bridge-SMU near-match does not satisfy exact package/CSC presence
 - [x] discovery remains safe while cleanup/delete runs concurrently
@@ -110,7 +110,7 @@ upload
 - [ ] symlink archive member
 - [ ] absolute path
 - [ ] oversized expansion
-- [ ] duplicate filename conflict
+- [x] duplicate filename conflict
 - [ ] malicious job/artifact path
 - [x] package glob metacharacters
 - [ ] secret redaction

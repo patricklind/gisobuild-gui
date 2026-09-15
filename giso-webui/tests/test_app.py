@@ -657,6 +657,42 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn("disappearing.rpm", {item["path"] for item in response.get_json()["files"]})
         self.assertEqual(response.get_json()["recommended"], [])
 
+    def test_inventory_exposes_stable_identity_without_absolute_path(self):
+        rpm = self.data / "package.rpm"
+        rpm.write_bytes(b"rpm content")
+
+        first = self.client.get("/api/inputs").get_json()["files"][0]
+        second = self.client.get("/api/inputs").get_json()["files"][0]
+
+        self.assertEqual(first["id"], second["id"])
+        self.assertEqual(first["sha256"], hashlib.sha256(b"rpm content").hexdigest())
+        self.assertEqual(first["relative_path"], "package.rpm")
+        self.assertEqual(first["lifecycle"], "READY")
+        self.assertNotIn("absolute_path", first)
+        self.assertNotIn(str(self.data), json.dumps(first))
+
+    def test_identical_duplicate_inventory_keeps_provenance(self):
+        for directory in ("one", "two"):
+            (self.data / directory).mkdir()
+            (self.data / directory / "package.rpm").write_bytes(b"same")
+
+        rpms = self.client.get("/api/inputs").get_json()["files"]
+
+        self.assertEqual(len(rpms), 2)
+        self.assertEqual(len({item["id"] for item in rpms}), 2)
+        self.assertEqual({item["duplicate_kind"] for item in rpms}, {"identical"})
+        self.assertEqual(rpms[0]["provenance"], ["one/package.rpm", "two/package.rpm"])
+
+    def test_different_duplicate_inventory_is_a_visible_conflict(self):
+        for directory, content in (("one", b"first"), ("two", b"second")):
+            (self.data / directory).mkdir()
+            (self.data / directory / "package.rpm").write_bytes(content)
+
+        rpms = self.client.get("/api/inputs").get_json()["files"]
+
+        self.assertEqual({item["duplicate_kind"] for item in rpms}, {"conflict"})
+        self.assertEqual(len({item["sha256"] for item in rpms}), 2)
+
     @patch("app.child_mount_args", return_value=[])
     def test_platform_is_inferred_and_invalid_option_rejected(self, _mounts):
         (self.data / "ncs5500-mini-x.iso").write_bytes(b"iso")
@@ -716,6 +752,30 @@ class GisoWebTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.build_command({"iso": "base.iso", "platform": "asr9k",
                                   "pkglist": ["package.rpm"]}, "conflict")
+
+    @patch("app.child_mount_args", return_value=[])
+    def test_inventory_id_selects_exact_rpm(self, _mounts):
+        (self.data / "base.iso").write_bytes(b"iso")
+        (self.data / "one").mkdir()
+        (self.data / "two").mkdir()
+        first = self.data / "one/package.rpm"
+        second = self.data / "two/package.rpm"
+        first.write_bytes(b"first")
+        second.write_bytes(b"second")
+        selected = next(item for item in module.inventory_files()
+                        if item["relative_path"] == "two/package.rpm")
+
+        module.build_command({"iso": "base.iso", "platform": "asr9k",
+                              "pkglist": [selected["id"]]}, "identity")
+
+        self.assertEqual((module.WORK / "identity/repo/package.rpm").read_bytes(), b"second")
+
+    def test_manual_package_ui_uses_ids_and_renders_duplicate_conflicts(self):
+        source = (Path(module.__file__).parent / "static/manual-packages.js").read_text()
+        self.assertIn("box.value = file.id", source)
+        self.assertIn("same filename but different content", source)
+        self.assertIn("identical copies deduplicated", source)
+        self.assertNotIn("new Map(rpms.map(file => [basename(file.path), file]))", source)
 
     @patch("app.child_mount_args", return_value=[])
     def test_package_glob_characters_cannot_select_unintended_files(self, _mounts):

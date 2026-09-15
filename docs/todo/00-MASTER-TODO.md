@@ -65,7 +65,7 @@ Before large refactors hide the current failure modes, add regression tests and 
 - [x] multiple ISOs must never silently select the first candidate
 - [ ] RPM CPU architecture must match the selected ISO/build architecture
 - [x] RPM selection must use exact identity, never glob matching
-- [ ] duplicate basenames must remain distinguishable by identity/checksum
+- [x] duplicate basenames must remain distinguishable by identity/checksum
 - [x] compatibility matrix platform aliases must use one canonical resolver
 - [x] bridge-SMU presence must use exact package/CSC identity
 - [x] inventory discovery must tolerate concurrent cleanup/delete

@@ -443,9 +443,103 @@ def file_checksums(path: Path) -> dict[str, str]:
                 md5.update(chunk)
                 sha256.update(chunk)
         result = {"md5": md5.hexdigest(), "sha256": sha256.hexdigest()}
-        checksum_cache.clear()
+        if len(checksum_cache) >= 4096:
+            checksum_cache.pop(next(iter(checksum_cache)))
         checksum_cache[key] = result
         return result
+
+
+def inventory_id(relative_path: str, sha256: str) -> str:
+    """Return an opaque, stable identity without exposing an absolute path."""
+    identity = hashlib.sha256(f"{relative_path}\0{sha256}".encode()).hexdigest()
+    return f"file_{identity[:24]}"
+
+
+def inventory_files() -> list[dict]:
+    """Build the canonical, browser-safe inventory for supported input files."""
+    supported = {".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg",
+                 ".ini", ".sh", ".cms", ".json"}
+    physical: list[dict] = []
+    for root, names, filenames in os.walk(DATA):
+        names[:] = [name for name in names
+                    if name != ".parts" and not name.startswith("output_gisobuild")]
+        root_path = Path(root)
+        for name in filenames:
+            path = root_path / name
+            suffix = path.suffix.lower()
+            if suffix not in supported:
+                continue
+            try:
+                relative_path = rel_data(path)
+                stat = path.stat()
+                sha256 = file_checksums(path)["sha256"]
+            except OSError:
+                continue
+            physical.append({
+                "id": inventory_id(relative_path, sha256),
+                "basename": name,
+                "path": relative_path,
+                "relative_path": relative_path,
+                "size": stat.st_size,
+                "sha256": sha256,
+                "source": "tar" if path.parent != DATA else "upload",
+                "metadata_source": "filename",
+                "metadata_confidence": "low",
+                "lifecycle": "READY",
+                "type": suffix,
+            })
+
+    by_basename: dict[str, list[dict]] = {}
+    for item in physical:
+        by_basename.setdefault(item["basename"], []).append(item)
+    for group in by_basename.values():
+        hashes = {item["sha256"] for item in group}
+        paths = sorted(item["relative_path"] for item in group)
+        for item in group:
+            item["duplicate"] = len(group) > 1
+            item["duplicate_kind"] = (
+                "conflict" if len(hashes) > 1 else "identical" if len(group) > 1 else None
+            )
+            item["provenance"] = paths
+    return sorted(physical, key=lambda item: item["relative_path"])
+
+
+def resolve_rpm_identifiers(identifiers: list[str]) -> list[dict]:
+    """Resolve opaque inventory IDs, retaining legacy exact basenames temporarily."""
+    rpms = [item for item in inventory_files() if item["type"] == ".rpm"]
+    by_id = {item["id"]: item for item in rpms}
+    by_name: dict[str, list[dict]] = {}
+    for item in rpms:
+        by_name.setdefault(item["basename"], []).append(item)
+    resolved: list[dict] = []
+    for identifier in identifiers:
+        if identifier in by_id:
+            resolved.append(by_id[identifier])
+            continue
+        if Path(identifier).name != identifier or glob_metacharacters(identifier):
+            raise ValueError(f"RPM package must be an inventory ID or exact filename: {identifier!r}")
+        matches = by_name.get(identifier, [])
+        if not matches:
+            raise ValueError(f"RPM {identifier!r} was not found")
+        if len({item["sha256"] for item in matches}) > 1:
+            raise ValueError(
+                f"Different RPM files share the name {identifier!r}; select a specific inventory item"
+            )
+        resolved.append(matches[0])
+    selected_by_name: dict[str, set[str]] = {}
+    for item in resolved:
+        selected_by_name.setdefault(item["basename"], set()).add(item["sha256"])
+    conflicts = [name for name, hashes in selected_by_name.items() if len(hashes) > 1]
+    if conflicts:
+        raise ValueError("Conflicting RPM identities selected: " + ", ".join(sorted(conflicts)))
+    return resolved
+
+
+def package_names_for_validation(identifiers: list[str]) -> list[str]:
+    """Translate known inventory IDs while allowing filename-only preflight input."""
+    by_id = {item["id"]: item["basename"] for item in inventory_files()
+             if item["type"] == ".rpm"}
+    return [by_id.get(identifier, identifier) for identifier in identifiers]
 
 
 def giso_artifact_candidates(job_dir: Path) -> list[Path]:
@@ -629,21 +723,13 @@ def active_rpm_names() -> tuple[list[str], set[str]]:
 
 
 def discover() -> dict:
-    files, dirs = [], []
+    files, dirs = inventory_files(), []
     ignored = {".parts"}
     for root, names, filenames in os.walk(DATA):
         names[:] = [n for n in names if n not in ignored and not n.startswith("output_gisobuild")]
         root_path = Path(root)
         if root_path != DATA:
             dirs.append(rel_data(root_path))
-        for name in filenames:
-            if name.lower().endswith((".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".json")):
-                path = root_path / name
-                try:
-                    files.append({"path": rel_data(path), "size": path.stat().st_size,
-                                  "type": path.suffix.lower()})
-                except FileNotFoundError:
-                    continue
     candidates, superseded = active_rpm_names()
     isos = [item["path"] for item in files if item["type"] == ".iso"]
     if len(isos) == 1:
@@ -743,7 +829,10 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             payload["pkglist"] = package_plan["selected"]
         profile = validate_platform_options(payload)
         payload["platform"] = profile["id"]
-        smu_check = validate_smu_selection(iso, payload.get("pkglist", []))
+        selected_rpms = resolve_rpm_identifiers(payload.get("pkglist", []))
+        selected_names = [item["basename"] for item in selected_rpms]
+        payload["pkglist"] = selected_names
+        smu_check = validate_smu_selection(iso, selected_names)
         if smu_check["issues"]:
             raise ValueError("SMU compatibility check failed: " + "; ".join(smu_check["issues"]))
         command += ["--iso", str(safe_data_path(iso))]
@@ -752,23 +841,12 @@ def build_command(payload: dict, job_id: str) -> list[str]:
                 continue
             if payload.get(key):
                 command += [option, str(safe_data_path(payload[key]))]
-        if payload.get("auto_repo", True) and payload.get("pkglist"):
+        if payload.get("auto_repo", True) and selected_rpms:
             staged_repo = WORK / job_id / "repo"
             staged_repo.mkdir(parents=True, exist_ok=True)
-            for package in payload["pkglist"]:
-                if "/" in package:
-                    raise ValueError(f"RPM package must be a filename: {package!r}")
-                if Path(package).name != package or glob_metacharacters(package):
-                    raise ValueError(f"RPM package must be an exact filename: {package!r}")
-                matches = [path for path in DATA.rglob("*.rpm") if path.name == package]
-                if package.lower().endswith(".rpm") and not matches:
-                    raise ValueError(f"RPM {package!r} was not found")
-                if package.lower().endswith(".rpm") and len(matches) > 1:
-                    hashes = {file_sha256(match) for match in matches}
-                    if len(hashes) > 1:
-                        raise ValueError(f"Different RPM files share the name {package!r}; remove the unwanted copy")
-                if matches:
-                    shutil.copy2(matches[0], staged_repo / matches[0].name)
+            for package in selected_rpms:
+                source = safe_data_path(package["relative_path"])
+                shutil.copy2(source, staged_repo / package["basename"])
             command += ["--repo", str(staged_repo)]
         for key, option in LIST_OPTIONS.items():
             if key == "repo" and payload.get("auto_repo", True):
@@ -1050,7 +1128,8 @@ def compatibility():
         if (not isinstance(packages, list) or len(packages) > 10000 or
                 not all(isinstance(item, str) and len(item) <= 4096 for item in packages)):
             raise ValueError("Packages must be a list")
-        result = {"smu": validate_smu_selection(iso, packages), "upgrade": None}
+        package_names = package_names_for_validation(packages)
+        result = {"smu": validate_smu_selection(iso, package_names), "upgrade": None}
         matrix_name = body.get("matrix", "")
         if matrix_name:
             matrix_path = safe_data_path(cisco_text(matrix_name, "compatibility matrix", maximum=4096))
@@ -1061,7 +1140,7 @@ def compatibility():
                 matrix, cisco_text(body.get("source_release"), "source release"),
                 cisco_text(body.get("target_release"), "target release"),
                 cisco_text(body.get("platform"), "platform"),
-                packages,
+                package_names,
             )
         return jsonify(result)
     except (OSError, json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
