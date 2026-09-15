@@ -1,17 +1,17 @@
-# Graph Report - gisobuild-phase0-revive  (2026-09-15)
+# Graph Report - gisobuild-phase0-selection-final  (2026-09-15)
 
 ## Corpus Check
-- 46 files · ~38,362 words
+- 46 files · ~38,531 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 8, .css 4, .example 1)
 
 ## Summary
-- 613 nodes · 958 edges · 46 communities (30 shown, 8 thin omitted)
+- 620 nodes · 969 edges · 47 communities (30 shown, 8 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ec5e6fef`
+- Built from commit: `ceeb6772`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -36,7 +36,7 @@
 - build-giso.sh
 - Testing and acceptance
 - Release notes
-- Contributing
+- CONTRIBUTING.md
 - Platform support and validation
 - coord.sh script
 - worktree.sh
@@ -56,15 +56,15 @@
 - copilot-instructions.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `GisoWebTests` - 89 edges
+1. `GisoWebTests` - 90 edges
 2. `CiscoDownloadError` - 21 edges
 3. `CiscoSoftwareClient` - 19 edges
-4. `PlatformCompatibilityTests` - 16 edges
+4. `PlatformCompatibilityTests` - 18 edges
 5. `validate_smu_selection()` - 15 edges
 6. `log_event()` - 14 edges
-7. `TODO — Automation, Inventory & BuildPlan` - 14 edges
-8. `api()` - 13 edges
-9. `BuildScriptTests` - 13 edges
+7. `BuildScriptTests` - 14 edges
+8. `TODO — Automation, Inventory & BuildPlan` - 14 edges
+9. `api()` - 13 edges
 10. `CiscoDownloadTests` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -82,11 +82,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (46 total, 8 thin omitted)
+## Communities (47 total, 8 thin omitted)
 
 ### Community 0 - "app.py"
 Cohesion: 0.05
-Nodes (95): after_request, before_request, delete, errorhandler, Exception, get, active_rpm_names(), activity() (+87 more)
+Nodes (94): after_request, before_request, delete, errorhandler, Exception, get, active_rpm_names(), activity() (+86 more)
 
 ### Community 2 - "CiscoDownloadError"
 Cohesion: 0.07
@@ -94,15 +94,15 @@ Nodes (11): CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect
 
 ### Community 3 - "app.js"
 Cohesion: 0.11
-Nodes (40): api(), applySmuRecommendation(), checkCompatibility(), checksumRow(), compatibilityList(), compatibilityMetric(), copyText(), drop (+32 more)
+Nodes (41): api(), applySmuRecommendation(), checkCompatibility(), checksumRow(), compatibilityList(), compatibilityMetric(), copyText(), drop (+33 more)
 
 ### Community 4 - "Cisco IOS XR Golden ISO Build and Upgrade Guide"
 Cohesion: 0.08
 Nodes (25): 1. Determine the platform and install architecture, 2. Validate the supported upgrade path, 3. Prepare the build inputs, 4. Build the GISO, 5. Validate the build output, 6. Prepare the router and change window, 7. Install the GISO, 8. Post-upgrade validation (+17 more)
 
 ### Community 5 - "PlatformCompatibilityTests"
-Cohesion: 0.12
-Nodes (15): capabilities_for_platform(), check_upgrade_matrix(), GisoBuildCapabilities, infer_platform(), normalize_platform(), platform_profile(), Platform-aware validation for Cisco IOS XR GISO build options., Check deterministic filename compatibility before upstream dependency… (+7 more)
+Cohesion: 0.11
+Nodes (17): build_command(), capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), GisoBuildCapabilities, infer_platform(), normalize_platform(), platform_profile() (+9 more)
 
 ### Community 7 - "System architecture"
 Cohesion: 0.13
@@ -148,8 +148,8 @@ Nodes (6): 1. Static and unit verification, 2. Container smoke test, 3. Licensed
 Cohesion: 0.40
 Nodes (4): Release notes, Release safety, Unreleased, Validation status
 
-### Community 21 - "Contributing"
-Cohesion: 0.67
+### Community 21 - "CONTRIBUTING.md"
+Cohesion: 0.50
 Nodes (3): Contributing, Coordination and branches, Local verification
 
 ### Community 22 - "Platform support and validation"
@@ -206,13 +206,13 @@ Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 
 ## Knowledge Gaps
 - **183 isolated node(s):** `inputs`, `platformProfiles`, `drop`, `GitHub Copilot repository instructions`, `Mandatory project roadmap and Graphify — read before doing anything` (+178 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 319 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 321 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `.test_run_job_honors_cancellation_during_image_pull`, `.upload`, `dict`, `.test_build_waits_for_tar_extraction_to_finish`, `.test_failed_multi_file_cisco_download_removes_partial_results`?**
+- **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `.test_run_job_honors_cancellation_during_image_pull`, `.test_discover_tolerates_file_removed_during_scan`, `.upload`, `dict`, `.test_build_waits_for_tar_extraction_to_finish`, `.test_failed_multi_file_cisco_download_removes_partial_results`?**
   _High betweenness centrality (0.022) - this node is a cross-community bridge._
 - **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `app.py`?**
   _High betweenness centrality (0.018) - this node is a cross-community bridge._
@@ -223,6 +223,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **What connects `inputs`, `platformProfiles`, `drop` to the rest of the system?**
   _183 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `app.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.05280875236692615 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05219072164948454 - nodes in this community are weakly interconnected._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
   _Cohesion score 0.03508771929824561 - nodes in this community are weakly interconnected._

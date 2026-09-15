@@ -639,7 +639,11 @@ def discover() -> dict:
         for name in filenames:
             if name.lower().endswith((".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".json")):
                 path = root_path / name
-                files.append({"path": rel_data(path), "size": path.stat().st_size, "type": path.suffix.lower()})
+                try:
+                    files.append({"path": rel_data(path), "size": path.stat().st_size,
+                                  "type": path.suffix.lower()})
+                except FileNotFoundError:
+                    continue
     candidates, superseded = active_rpm_names()
     isos = [item["path"] for item in files if item["type"] == ".iso"]
     if len(isos) == 1:
