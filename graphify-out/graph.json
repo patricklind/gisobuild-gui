@@ -5210,6 +5210,18 @@
       "source_location": "L22"
     },
     {
+      "id": "docs_todo_07_bug_audit_todo_ci_ran_the_unit_test_suite_on_the_github_actions_host_python_instead_of_inside_the_built_container",
+      "label": "CI ran the unit test suite on the GitHub Actions host Python instead of inside the built container",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "TODO \u2014 Concrete Bug Audit",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "ci ran the unit test suite on the github actions host python instead of inside the built container",
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L233"
+    },
+    {
       "id": "docs_todo_07_bug_audit_todo_filename_heuristics_can_report_confidence_stronger_than_the_evidence_supports",
       "label": "Filename heuristics can report confidence stronger than the evidence supports",
       "_origin": "ast",
@@ -5294,6 +5306,18 @@
       "source_location": "L63"
     },
     {
+      "id": "docs_todo_07_bug_audit_todo_p2_ci_process_fidelity",
+      "label": "P2 \u2014 CI process fidelity",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "TODO \u2014 Concrete Bug Audit",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "p2 \u2014 ci process fidelity",
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L231"
+    },
+    {
       "id": "docs_todo_07_bug_audit_todo_p2_graphify_repository_correctness",
       "label": "P2 \u2014 Graphify / repository correctness",
       "_origin": "ast",
@@ -5327,7 +5351,7 @@
       "node_kind": "heading",
       "norm_label": "required regression-test additions",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L231"
+      "source_location": "L278"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_rpm_processor_architecture_is_not_checked_against_the_selected_iso",
@@ -13992,6 +14016,17 @@
       "weight": 1.0
     },
     {
+      "source": "docs_todo_07_bug_audit_todo_p2_ci_process_fidelity",
+      "target": "docs_todo_07_bug_audit_todo_ci_ran_the_unit_test_suite_on_the_github_actions_host_python_instead_of_inside_the_built_container",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L233",
+      "weight": 1.0
+    },
+    {
       "source": "docs_todo_07_bug_audit_todo_p2_graphify_repository_correctness",
       "target": "docs_todo_07_bug_audit_todo_tracked_graphify_output_is_stale_relative_to_current_main",
       "relation": "contains",
@@ -14070,13 +14105,24 @@
     },
     {
       "source": "docs_todo_07_bug_audit_todo_todo_concrete_bug_audit",
-      "target": "docs_todo_07_bug_audit_todo_required_regression_test_additions",
+      "target": "docs_todo_07_bug_audit_todo_p2_ci_process_fidelity",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
       "source_location": "L231",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_07_bug_audit_todo_todo_concrete_bug_audit",
+      "target": "docs_todo_07_bug_audit_todo_required_regression_test_additions",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L278",
       "weight": 1.0
     },
     {
@@ -18905,7 +18951,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L121",
+      "source_location": "L122",
       "weight": 1.0
     },
     {
@@ -19186,5 +19232,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "2d5e39bc21eec2e60e20a3b1e04b2b19cff362ab"
+  "built_at_commit": "adccf20bf89154e9f8759226b62e5ae5134ff0bb"
 }

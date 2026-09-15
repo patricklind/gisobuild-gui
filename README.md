@@ -113,13 +113,13 @@ docker compose run --rm --no-deps \
   -w /project/giso-webui \
   giso-webui python -B -m unittest discover -s tests -v
 cd ..
-bash -n build-giso.sh
+bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
 ```
 
-GitHub Actions runs unit tests, staging rehearsal, Ruff, `pip-audit`, Compose
-validation, shell syntax validation, and an application container build for
-every pull request. See the [release process](docs/releasing.md) for versioned
-GHCR publication.
+GitHub Actions runs unit tests (inside the built container image), staging
+rehearsal, Ruff, `pip-audit`, Actionlint, Hadolint, Compose validation, shell
+syntax validation, and an application container build for every pull request.
+See the [release process](docs/releasing.md) for versioned GHCR publication.
 
 ## Security
 
