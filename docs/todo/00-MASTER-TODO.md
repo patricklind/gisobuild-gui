@@ -63,7 +63,7 @@ Before large refactors hide the current failure modes, add regression tests and 
 - [x] cancellation during finalization
 - [x] successful build must not delete unrelated inputs
 - [x] multiple ISOs must never silently select the first candidate
-- [ ] RPM CPU architecture must match the selected ISO/build architecture
+- [x] RPM CPU architecture must match the selected ISO/build architecture
 - [x] RPM selection must use exact identity, never glob matching
 - [x] duplicate basenames must remain distinguishable by identity/checksum
 - [x] compatibility matrix platform aliases must use one canonical resolver

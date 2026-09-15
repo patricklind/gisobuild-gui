@@ -27,6 +27,13 @@ Suggested lifecycle:
 
 ## ISO inspection
 
+Progress: `giso-webui/app.py:inspect_iso_architecture()` now performs real
+`isoinfo`-based ISO inspection (see `07-BUG-AUDIT-TODO.md`), but only for the
+single "architecture" field below, not the full release/platform/engine
+model this section describes. Do not check off "upstream gisobuild
+inspection/isoinfo" below until release and platform detection are also
+metadata-driven instead of filename-driven.
+
 Detection order:
 
 - [ ] ISO metadata
