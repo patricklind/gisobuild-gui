@@ -74,7 +74,7 @@ Every exclusion must explain why:
 - [ ] wrong platform
 - [ ] wrong architecture
 - [ ] superseded
-- [ ] duplicate
+- [x] duplicate
 - [ ] malformed metadata
 - [ ] ambiguous metadata
 

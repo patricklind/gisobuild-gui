@@ -4,20 +4,20 @@
 
 Create one canonical inventory model.
 
-- [ ] every file receives stable ID
-- [ ] basename
-- [ ] relative path
+- [x] every ready file receives a stable path-and-checksum ID
+- [x] basename
+- [x] relative path
 - [ ] absolute path
-- [ ] size
-- [ ] SHA-256
+- [x] size
+- [x] SHA-256
 - [ ] source (`upload`, `tar`, `cisco-download`)
-- [ ] metadata source/confidence
+- [x] metadata source/confidence (currently explicit low-confidence filename metadata)
 - [ ] lifecycle state
 
 Suggested lifecycle:
 
 - [ ] `UPLOADING`
-- [ ] `READY`
+- [x] `READY`
 - [ ] `ANALYZING`
 - [ ] `VALID`
 - [ ] `INVALID`
@@ -83,8 +83,8 @@ Prefer metadata over filename parsing.
 
 ## Duplicate handling
 
-- [ ] same filename + same SHA → deduplicate
-- [ ] same filename + different SHA → hard error
+- [x] same filename + same SHA → deduplicate with retained provenance
+- [x] same filename + different SHA → hard error until the unwanted copy is removed
 - [ ] multiple versions same component → conflict
 - [ ] overlapping CSCs → show conflict/supersedence
 
@@ -105,7 +105,7 @@ Never silently exclude without a reason.
 - [ ] automatic mode and manual mode use the same backend model
 - [ ] manual mode modifies BuildPlan
 - [ ] no separate incompatible selection path
-- [ ] never submit workspace paths as package identifiers
+- [x] never submit workspace paths as package identifiers
 
 ## BuildPlan
 

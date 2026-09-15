@@ -1,11 +1,54 @@
-/* Manual package selection fixes layered on top of app.js.
- * Keep package values as RPM basenames because the build backend accepts
- * package names, not extracted workspace paths.
+/* Manual package selection uses opaque inventory IDs. Workspace paths are
+ * presentation-only and are never submitted as package identifiers.
  */
 (() => {
   let manualSelectionInitialized = false;
 
   const basename = value => String(value || '').split('/').pop();
+
+  function logicalRpms(files) {
+    const groups = new Map();
+    files.filter(file => file.type === '.rpm').forEach(file => {
+      const key = file.basename || basename(file.path);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(file);
+    });
+    return [...groups.entries()].flatMap(([name, matches]) => {
+      const hashes = new Set(matches.map(file => file.sha256));
+      if (hashes.size > 1) return matches.map(file => ({...file, name, conflict: true}));
+      return [{...matches[0], name, provenance: matches.map(file => file.relative_path || file.path),
+        identicalCopies: matches.length}];
+    });
+  }
+
+  function appendPackage(section, file, options = {}) {
+    const reason = options.reason || (file.conflict
+      ? 'Blocked: another RPM has the same filename but different content. Remove the unwanted copy.'
+      : 'Compatible RPM without a detected CSC group');
+    const label = document.createElement('label');
+    label.className = `manual-package-option${options.reason || file.conflict ? ' incompatible' : ''}`;
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.className = 'manual-rpm-checkbox';
+    box.value = file.id;
+    if (options.csc) box.dataset.csc = options.csc;
+    box.disabled = Boolean(options.reason || file.conflict);
+    box.checked = !box.disabled && options.checked;
+    const copy = document.createElement('span');
+    const strong = document.createElement('b');
+    strong.textContent = file.name;
+    const small = document.createElement('small');
+    const provenance = file.provenance || [file.relative_path || file.path];
+    const identity = `SHA-256 ${file.sha256.slice(0, 12)}…`;
+    small.textContent = file.conflict
+      ? `${reason} ${identity}; source: ${file.relative_path || file.path}`
+      : file.identicalCopies > 1
+        ? `${file.identicalCopies} identical copies deduplicated; sources: ${provenance.join(', ')}; ${identity}`
+        : `${reason}; source: ${provenance[0]}; ${identity}`;
+    copy.append(strong, small);
+    label.append(box, copy);
+    section.appendChild(label);
+  }
 
   window.selectedManualPackages = function selectedManualPackages() {
     return [...document.querySelectorAll('#manual-package-list .manual-rpm-checkbox:checked')]
@@ -32,10 +75,10 @@
 
   window.renderManualPackages = function renderManualPackages(data, plan) {
     const list = document.querySelector('#manual-package-list');
-    const previous = new Set(lines(document.querySelector('[name=pkglist_override]').value).map(basename));
+    const previous = new Set(lines(document.querySelector('[name=pkglist_override]').value));
     const recommended = new Set((plan.selected || data.recommended || []).map(basename));
     const excluded = new Map((plan.excluded || []).map(item => [basename(item.name), item.reason]));
-    const rpms = data.files.filter(file => file.type === '.rpm');
+    const rpms = logicalRpms(data.files);
 
     if (!packageListEdited) manualSelectionInitialized = false;
     list.replaceChildren();
@@ -58,7 +101,11 @@
       return;
     }
 
-    const byName = new Map(rpms.map(file => [basename(file.path), file]));
+    const byName = new Map();
+    rpms.forEach(file => {
+      if (!byName.has(file.name)) byName.set(file.name, []);
+      byName.get(file.name).push(file);
+    });
     const groupedNames = new Set();
     const usePrevious = manualSelectionInitialized;
 
@@ -81,29 +128,14 @@
       legend.appendChild(groupLabel);
       section.appendChild(legend);
 
-      members.forEach(name => {
-        const file = byName.get(name);
-        const label = document.createElement('label');
-        label.className = 'manual-package-option';
-        const box = document.createElement('input');
-        box.type = 'checkbox';
-        box.className = 'manual-rpm-checkbox';
-        box.value = name;
-        box.dataset.csc = group.csc;
-        box.checked = usePrevious ? previous.has(name) : recommended.has(name);
-        const copy = document.createElement('span');
-        const strong = document.createElement('b');
-        strong.textContent = name;
-        const small = document.createElement('small');
-        small.textContent = file.path === name ? 'Uploaded RPM' : `Extracted from ${file.path.slice(0, -name.length).replace(/\/$/, '')}`;
-        copy.append(strong, small);
-        label.append(box, copy);
-        section.appendChild(label);
-      });
+      members.forEach(name => byName.get(name).forEach(file => appendPackage(section, file, {
+        csc: group.csc,
+        checked: usePrevious ? previous.has(file.id) : recommended.has(name),
+      })));
       list.appendChild(section);
     });
 
-    const other = rpms.filter(file => !groupedNames.has(basename(file.path)));
+    const other = rpms.filter(file => !groupedNames.has(file.name));
     if (other.length) {
       const section = document.createElement('fieldset');
       section.className = 'manual-csc-group';
@@ -111,24 +143,9 @@
       legend.textContent = 'Other RPM packages';
       section.appendChild(legend);
       other.forEach(file => {
-        const name = basename(file.path);
-        const reason = excluded.get(name);
-        const label = document.createElement('label');
-        label.className = `manual-package-option${reason ? ' incompatible' : ''}`;
-        const box = document.createElement('input');
-        box.type = 'checkbox';
-        box.className = 'manual-rpm-checkbox';
-        box.value = name;
-        box.disabled = Boolean(reason);
-        box.checked = !reason && (usePrevious ? previous.has(name) : recommended.has(name));
-        const copy = document.createElement('span');
-        const strong = document.createElement('b');
-        strong.textContent = name;
-        const small = document.createElement('small');
-        small.textContent = reason || 'Compatible RPM without a detected CSC group';
-        copy.append(strong, small);
-        label.append(box, copy);
-        section.appendChild(label);
+        const reason = excluded.get(file.name);
+        appendPackage(section, file, {reason,
+          checked: usePrevious ? previous.has(file.id) : recommended.has(file.name)});
       });
       list.appendChild(section);
     }
