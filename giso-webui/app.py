@@ -828,7 +828,11 @@ def discover() -> dict:
     candidates, superseded = active_rpm_names()
     isos = [item["path"] for item in files if item["type"] == ".iso"]
     if len(isos) == 1:
-        recommendation = recommend_smu_selection(isos[0], candidates)
+        try:
+            iso_architectures = inspect_iso_architecture(safe_data_path(isos[0]))
+        except (OSError, ValueError):
+            iso_architectures = frozenset()
+        recommendation = recommend_smu_selection(isos[0], candidates, iso_architectures=iso_architectures)
     elif len(isos) > 1:
         recommendation = {"ready": False, "selected": [], "excluded": [],
                           "message": "More than one base ISO was found; keep one ISO or select it in Expert settings"}
@@ -917,8 +921,12 @@ def build_command(payload: dict, job_id: str) -> list[str]:
         iso = payload.get("iso", "")
         if not iso:
             raise ValueError("Select an ISO, or provide a YAML file")
+        iso_path = safe_data_path(iso)
+        iso_architectures = inspect_iso_architecture(iso_path)
         if payload.get("automatic_smu_selection"):
-            package_plan = recommend_smu_selection(iso, active_rpm_names()[0])
+            package_plan = recommend_smu_selection(
+                iso, active_rpm_names()[0], iso_architectures=iso_architectures
+            )
             if not package_plan["ready"]:
                 raise ValueError(package_plan["message"])
             payload["pkglist"] = package_plan["selected"]
@@ -927,10 +935,10 @@ def build_command(payload: dict, job_id: str) -> list[str]:
         selected_rpms = resolve_rpm_identifiers(payload.get("pkglist", []))
         selected_names = [item["basename"] for item in selected_rpms]
         payload["pkglist"] = selected_names
-        smu_check = validate_smu_selection(iso, selected_names)
+        smu_check = validate_smu_selection(iso, selected_names, iso_architectures=iso_architectures)
         if smu_check["issues"]:
             raise ValueError("SMU compatibility check failed: " + "; ".join(smu_check["issues"]))
-        command += ["--iso", str(safe_data_path(iso))]
+        command += ["--iso", str(iso_path)]
         for key, option in PATH_OPTIONS.items():
             if key in {"iso", "yamlfile"}:
                 continue
@@ -1209,7 +1217,8 @@ def smu_recommendation():
         if iso_path.suffix.lower() != ".iso" or not iso_path.is_file():
             raise ValueError("Select an uploaded base ISO")
         packages, _ = active_rpm_names()
-        return jsonify(recommend_smu_selection(iso, packages))
+        iso_architectures = inspect_iso_architecture(iso_path)
+        return jsonify(recommend_smu_selection(iso, packages, iso_architectures=iso_architectures))
     except (OSError, TypeError, ValueError) as exc:
         return jsonify(error=str(exc)), 400
 
@@ -1224,7 +1233,17 @@ def compatibility():
                 not all(isinstance(item, str) and len(item) <= 4096 for item in packages)):
             raise ValueError("Packages must be a list")
         package_names = package_names_for_validation(packages)
-        result = {"smu": validate_smu_selection(iso, package_names), "upgrade": None}
+        iso_architectures = frozenset()
+        try:
+            iso_candidate = safe_data_path(iso)
+            if iso_candidate.suffix.lower() == ".iso" and iso_candidate.is_file():
+                iso_architectures = inspect_iso_architecture(iso_candidate)
+        except ValueError:
+            iso_architectures = frozenset()
+        result = {
+            "smu": validate_smu_selection(iso, package_names, iso_architectures=iso_architectures),
+            "upgrade": None,
+        }
         matrix_name = body.get("matrix", "")
         if matrix_name:
             matrix_path = safe_data_path(cisco_text(matrix_name, "compatibility matrix", maximum=4096))
