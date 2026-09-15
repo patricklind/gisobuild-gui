@@ -370,6 +370,24 @@ function updatePlatformControls() {
   $('#lnt-controls-help').textContent=profile
     ? profile.architecture === 'lnt' ? `${profile.label} uses IOS XR7/LNT; these controls are available.` : `${profile.label} uses eXR; LNT-only controls are disabled.`
     : 'Select a platform or base ISO to determine whether these controls apply.';
+  const capabilityNames={
+    script:'script',optimize:'optimize',x86_only:'x86_only',migration:'migration',full_iso:'full_iso',
+    remove_packages:'remove_packages',only_support_pids:'only_support_pids',verbose_dep_check:'verbose_dependency_check',
+    clear_bridging_fixes:'clear_bridging_fixes',ownership_vouchers:'ownership_vouchers',
+    ownership_certificate:'ownership_certificate',clear_ownership_vouchers:'clear_ownership_vouchers',
+    clear_ownership_certificate:'clear_ownership_certificate',key_request:'key_request',
+    clear_key_request:'clear_key_request',no_buildinfo:'no_buildinfo'
+  };
+  Object.entries(capabilityNames).forEach(([name,capability])=>{
+    const control=$(`[name=${name}]`); if (!control) return;
+    const supported=!profile || profile.capabilities?.[capability] !== false;
+    const wrapper=control.closest('label');
+    if (wrapper) wrapper.hidden=!supported;
+    control.disabled=!supported;
+    if (!supported) control.type === 'checkbox' ? control.checked=false : control.value='';
+  });
+  const skipUsb=$('[name=skip_usb_image]');
+  if (profile && !profile.capabilities?.usb_image) skipUsb.checked=true;
   updateBuildAvailability();
 }
 

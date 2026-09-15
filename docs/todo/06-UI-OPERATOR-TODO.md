@@ -61,9 +61,9 @@ Do not ask for these unless ambiguous:
 
 Keep advanced controls, but:
 
-- [ ] capability-driven
-- [ ] hide unsupported settings
-- [ ] server validates everything
+- [x] capability-driven
+- [x] hide unsupported settings
+- [x] server validates everything
 - [ ] warn before unsafe/manual overrides
 
 ## Explain decisions

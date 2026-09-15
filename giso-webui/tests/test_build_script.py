@@ -64,6 +64,14 @@ class BuildScriptTests(unittest.TestCase):
         self.assertNotIn('name="verbose_dep_check" checked', template)
         self.assertIn("profile.architecture !== 'lnt'", script)
 
+    def test_expert_controls_follow_server_capabilities(self):
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+
+        self.assertIn("profile.capabilities?.[capability]", script)
+        self.assertIn("wrapper.hidden=!supported", script)
+        self.assertIn("control.disabled=!supported", script)
+        self.assertIn("profile.capabilities?.usb_image", script)
+
     def test_clean_rejects_traversal_outside_standard_output(self):
         bash = shutil.which("bash")
         if not bash:

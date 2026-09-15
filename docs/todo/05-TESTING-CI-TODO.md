@@ -5,8 +5,8 @@
 Cover:
 
 - [ ] platform alias normalization
-- [ ] eXR capability discovery
-- [ ] LNT capability discovery
+- [x] eXR capability discovery
+- [x] LNT capability discovery
 - [ ] ISO metadata detection
 - [ ] filename fallback detection
 - [ ] RPM metadata parsing

@@ -9,19 +9,19 @@ The application must distinguish:
 - [ ] Physical PID / SKU
 - [ ] Marketing family
 - [ ] Upstream gisobuild platform identifier
-- [ ] Build engine (`eXR` / `LNT`)
+- [x] Build engine (`eXR` / `LNT`)
 - [ ] IOS XR release
 - [ ] CPU architecture
-- [ ] Feature/capability support
+- [x] Feature/capability support
 
 ## Upstream-first model
 
 - [ ] Inspect pinned `ios-xr/gisobuild`
-- [ ] Read `src/utils/gisoglobals.py`
-- [ ] Read eXR-specific code
-- [ ] Read LNT-specific code
-- [ ] Detect supported CLI options from upstream
-- [ ] Build a `GisoBuildCapabilities` abstraction
+- [x] Read `src/utils/gisoglobals.py`
+- [x] Read eXR-specific code
+- [x] Read LNT-specific code
+- [x] Detect supported CLI options from upstream
+- [x] Build a `GisoBuildCapabilities` abstraction
 - [ ] Stop using a locally maintained list as the authoritative support list
 
 ## Representative eXR families
@@ -45,7 +45,7 @@ Do not hardcode these as the only supported platforms.
 - [ ] Detect LNT support from the pinned upstream code
 - [ ] Do not assume current local mappings are complete
 - [ ] Ensure Cisco 8000-class and NCS57xx-class images are handled generically when upstream supports them
-- [ ] Ensure LNT-only options are capability driven
+- [x] Ensure LNT-only options are capability driven
 
 ## Hardware aliases
 
@@ -86,30 +86,30 @@ if capabilities.optimize:
     ...
 ```
 
-- [ ] common options
-- [ ] eXR-only options
-- [ ] LNT-only options
-- [ ] unsupported options hidden/disabled
-- [ ] adapter rejects unsupported combinations server-side
+- [x] common options
+- [x] eXR-only options
+- [x] LNT-only options
+- [x] unsupported options hidden/disabled
+- [x] adapter rejects unsupported combinations server-side
 
 ## Required capability model
 
-- [ ] `repo`
-- [ ] `pkglist`
-- [ ] `xrconfig`
-- [ ] `ztp`
-- [ ] `usb_image`
-- [ ] `migration`
-- [ ] `optimize`
-- [ ] `x86_only`
-- [ ] `full_iso`
-- [ ] `remove_packages`
-- [ ] `only_support_pids`
-- [ ] `verbose_dependency_check`
-- [ ] `clear_bridging_fixes`
-- [ ] `key_request`
-- [ ] `ownership_vouchers`
-- [ ] `ownership_certificate`
+- [x] `repo`
+- [x] `pkglist`
+- [x] `xrconfig`
+- [x] `ztp`
+- [x] `usb_image`
+- [x] `migration`
+- [x] `optimize`
+- [x] `x86_only`
+- [x] `full_iso`
+- [x] `remove_packages`
+- [x] `only_support_pids`
+- [x] `verbose_dependency_check`
+- [x] `clear_bridging_fixes`
+- [x] `key_request`
+- [x] `ownership_vouchers`
+- [x] `ownership_certificate`
 
 ## Tests
 
@@ -120,3 +120,12 @@ if capabilities.optimize:
 - [ ] unknown/future upstream-supported platform
 - [ ] NCS-57C3 alias normalization
 - [ ] no false-positive alias matching
+
+## Implemented capability slice
+
+The API now returns an engine and explicit capability map for every known UI
+profile. The map mirrors the upstream eXR/LNT CLI maps and adds only narrow
+per-platform exceptions for ASR 9000 migration and XRv9K full ISO. It drives
+both browser visibility and server-side rejection. Runtime pinning and dynamic
+discovery from the bundled upstream checkout remain open because the current
+deployment still supplies gisobuild through an external mount.

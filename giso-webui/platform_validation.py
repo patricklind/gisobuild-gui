@@ -3,11 +3,29 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 # eXR identifiers are synchronized with ios-xr/gisobuild's
 # src/utils/gisoglobals.py. LNT uses metadata-driven validation upstream, so
 # its public product families are represented explicitly here for UI checks.
+COMMON_CAPABILITIES = {
+    "repo", "pkglist", "xrconfig", "ztp", "create_checksum", "skip_usb_image",
+    "label", "no_label", "debug",
+}
+EXR_CAPABILITIES = COMMON_CAPABILITIES | {
+    "script", "optimize", "x86_only", "bridging_fixes",
+}
+LNT_CAPABILITIES = COMMON_CAPABILITIES | {
+    "remove_packages", "only_support_pids", "verbose_dependency_check",
+    "bridging_fixes", "clear_bridging_fixes", "ownership_vouchers",
+    "ownership_certificate", "clear_ownership_vouchers",
+    "clear_ownership_certificate", "key_request", "clear_key_request", "no_buildinfo",
+}
+
+# The eXR identifiers and engine option sets come from the pinned upstream
+# src/utils/gisoglobals.py maps. Marketing aliases below aid presentation only;
+# upstream ISO inspection remains authoritative for actual build support.
 PLATFORMS = {
     "asr9k": {"label": "ASR 9000", "architecture": "exr", "usb": True},
     "ncs1k": {"label": "NCS 1000", "architecture": "exr", "usb": True},
@@ -26,6 +44,24 @@ PLATFORMS = {
     "ncs540l": {"label": "NCS 540L (XR7)", "architecture": "lnt", "usb": True},
     "ncs57": {"label": "NCS 5700 / NCS 57C3", "architecture": "lnt", "usb": True},
 }
+
+PLATFORM_CAPABILITY_OVERRIDES = {
+    "asr9k": {"migration"},
+    "xrv9k": {"full_iso"},
+}
+
+
+@dataclass(frozen=True)
+class GisoBuildCapabilities:
+    """Immutable option set shared by the API, UI and build adapter."""
+
+    supported: frozenset[str]
+
+    def supports(self, capability: str) -> bool:
+        return capability in self.supported
+
+    def as_dict(self, known: set[str]) -> dict[str, bool]:
+        return {name: self.supports(name) for name in sorted(known)}
 
 ALIASES = {
     "asr9000": "asr9k", "asr9k-x64": "asr9k", "ncs5000": "ncs5k",
@@ -46,6 +82,30 @@ RPM_COMPONENT = re.compile(
     re.IGNORECASE,
 )
 RPM_ARCHITECTURE = re.compile(r"\.(?P<architecture>x86_64|aarch64|arm64)\.rpm$", re.IGNORECASE)
+
+
+def capabilities_for_platform(platform: str) -> dict[str, bool]:
+    """Return the UI/adapter capabilities for one normalized platform."""
+    normalized = normalize_platform(platform)
+    profile = PLATFORMS[normalized]
+    supported = set(LNT_CAPABILITIES if profile["architecture"] == "lnt" else EXR_CAPABILITIES)
+    supported.update(PLATFORM_CAPABILITY_OVERRIDES.get(normalized, set()))
+    if profile["usb"]:
+        supported.add("usb_image")
+    known = COMMON_CAPABILITIES | EXR_CAPABILITIES | LNT_CAPABILITIES | {
+        "usb_image", "migration", "full_iso",
+    }
+    return GisoBuildCapabilities(frozenset(supported)).as_dict(known)
+
+
+def platform_profile(platform: str) -> dict:
+    normalized = normalize_platform(platform)
+    profile = {"id": normalized, **PLATFORMS[normalized]}
+    profile["engine"] = profile["architecture"]
+    profile["capabilities"] = capabilities_for_platform(normalized)
+    profile["source"] = "upstream-cli-map-and-local-aliases"
+    profile["confidence"] = "INFERRED"
+    return profile
 
 
 def normalize_platform(value: str) -> str:
@@ -243,20 +303,31 @@ def validate_platform_options(payload: dict) -> dict:
     platform = normalize_platform(requested) if requested else infer_platform(payload.get("iso", ""))
     if not platform:
         raise ValueError("Select the platform family; it could not be inferred from the ISO filename")
-    profile = {"id": platform, **PLATFORMS[platform]}
+    profile = platform_profile(platform)
     architecture = profile["architecture"]
     errors = []
     if payload.get("migration") and platform != "asr9k":
         errors.append("Migration TAR is supported only for ASR 9000 eXR images")
     if payload.get("full_iso") and platform != "xrv9k":
         errors.append("Full ISO is supported only for IOS XRv 9000")
-    exr_only = ("x86_only", "optimize", "script")
-    if architecture != "exr" and any(payload.get(option) for option in exr_only):
-        errors.append("x86-only, optimize, and boot-script are eXR-only options")
-    lnt_only = ("remove_packages", "only_support_pids", "clear_bridging_fixes",
-                "verbose_dep_check")
-    if architecture != "lnt" and any(payload.get(option) for option in lnt_only):
-        errors.append("remove packages, PID filtering, and LNT build controls require an IOS XR7/LNT image")
+    option_capabilities = {
+        "x86_only": "x86_only", "optimize": "optimize", "script": "script",
+        "remove_packages": "remove_packages", "only_support_pids": "only_support_pids",
+        "clear_bridging_fixes": "clear_bridging_fixes",
+        "verbose_dep_check": "verbose_dependency_check",
+        "ownership_vouchers": "ownership_vouchers",
+        "ownership_certificate": "ownership_certificate",
+        "clear_ownership_vouchers": "clear_ownership_vouchers",
+        "clear_ownership_certificate": "clear_ownership_certificate",
+        "key_request": "key_request", "clear_key_request": "clear_key_request",
+        "no_buildinfo": "no_buildinfo",
+    }
+    unsupported = [option for option, capability in option_capabilities.items()
+                   if payload.get(option) and not profile["capabilities"].get(capability, False)]
+    if unsupported:
+        errors.append(
+            f"{', '.join(unsupported)} not supported by the {profile['label']} {architecture.upper()} build engine"
+        )
     if not profile["usb"] and not payload.get("skip_usb_image"):
         errors.append(f"Automatic USB output is not supported for {profile['label']}; enable Skip USB image")
     if errors:
