@@ -57,7 +57,16 @@ TODO:
 
 - [x] Cleanup only files owned by the completed job request.
 - [x] Preserve unrelated inventory entries.
-- [ ] Track provenance/ownership of extracted files.
+- [x] Track provenance/ownership of extracted files. `archive_source_for_extraction()`
+  and `top_level_extraction_dir()` in `giso-webui/app.py` recover which
+  `.tar`/`.tgz` produced an extracted directory (deterministic from
+  `extraction_path()`'s naming, no new stored state needed). Wired into:
+  `archive_giso_artifacts_and_cleanup()` (a build-emptied extraction
+  directory and its source archive are now removed instead of orphaned;
+  a directory still holding other files is left alone), `delete_upload()`
+  (deleting an archive now cascades to its extraction directory), and
+  `inventory_files()` (each extracted file now reports `extracted_from`,
+  not just a `source:"tar"` boolean).
 - [x] Add regression test: build A must not delete unrelated inputs for build B.
 
 ## P1 — Wrong file/package selection
