@@ -62,6 +62,7 @@ JOB_DB = STATE / "jobs.sqlite3"
 IMAGE = validate_image_reference(
     os.environ.get("GISO_IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4")
 )
+APP_VERSION = os.environ.get("APP_VERSION", "0.0.1")
 jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
 job_persisted_at: dict[str, float] = {}
@@ -424,6 +425,10 @@ def validate_build_payload(body: dict) -> dict:
     for key in set(BOOL_OPTIONS) | {"auto_repo", "automatic_smu_selection"}:
         if key in payload and not isinstance(payload[key], bool):
             raise ValueError(f"{key} must be true or false")
+    if "confirmed_plan_fingerprint" in payload:
+        value = payload["confirmed_plan_fingerprint"]
+        if not isinstance(value, str) or len(value) > 128:
+            raise ValueError("confirmed_plan_fingerprint must be a string")
     return payload
 
 
@@ -638,6 +643,91 @@ def package_names_for_validation(identifiers: list[str]) -> list[str]:
     by_id = {item["id"]: item["basename"] for item in inventory_files()
              if item["type"] == ".rpm"}
     return [by_id.get(identifier, identifier) for identifier in identifiers]
+
+
+def current_inventory_revision(items: list[dict] | None = None) -> str:
+    """Fingerprint the exact ready inventory snapshot used for preflight."""
+    inventory = items if items is not None else inventory_files()
+    state = [{"id": item["id"], "lifecycle": item["lifecycle"]} for item in inventory]
+    return hashlib.sha256(json.dumps(state, sort_keys=True).encode()).hexdigest()[:24]
+
+
+def create_build_plan(payload: dict) -> dict:
+    """Create one immutable, backend-owned build decision from current inventory."""
+    inventory = inventory_files()
+    revision = current_inventory_revision(inventory)
+    blockers: list[str] = []
+    warnings: list[str] = []
+    iso_name = payload.get("iso", "")
+    iso = next((item for item in inventory
+                if item["type"] == ".iso" and item["relative_path"] == iso_name), None)
+    if not iso:
+        blockers.append("Select one ISO that exists in the current inventory")
+
+    recommendation = {"selected": [], "excluded": [], "package_groups": [],
+                      "component_conflicts": []}
+    selected: list[dict] = []
+    profile = None
+    if iso:
+        identifiers = payload.get("pkglist", [])
+        if payload.get("automatic_smu_selection"):
+            recommendation = recommend_smu_selection(iso_name, active_rpm_names()[0])
+            if recommendation.get("ready"):
+                identifiers = recommendation["selected"]
+            else:
+                blockers.append(recommendation["message"])
+        try:
+            selected = resolve_rpm_identifiers(identifiers)
+            profile = validate_platform_options(payload)
+            compatibility = validate_smu_selection(
+                iso_name, [item["basename"] for item in selected]
+            )
+            blockers.extend(compatibility["issues"])
+            warnings.extend(compatibility["warnings"])
+            if not recommendation["package_groups"]:
+                recommendation["package_groups"] = compatibility["package_groups"]
+                recommendation["component_conflicts"] = compatibility["component_conflicts"]
+        except ValueError as exc:
+            blockers.append(str(exc))
+
+    option_keys = sorted(set(BOOL_OPTIONS) | set(PATH_OPTIONS) | set(LIST_OPTIONS) |
+                         {"label", "platform", "auto_repo", "automatic_smu_selection"})
+    options = {key: payload[key] for key in option_keys if key in payload}
+    fingerprint_input = {
+        "application_version": APP_VERSION,
+        "builder_image": IMAGE,
+        "inventory_revision": revision,
+        "iso": {"id": iso["id"], "sha256": iso["sha256"]} if iso else None,
+        "packages": [{"id": item["id"], "sha256": item["sha256"]} for item in selected],
+        "options": options,
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_input, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return {
+        "fingerprint": fingerprint,
+        "inventory_revision": revision,
+        "ready": not blockers,
+        "iso": iso,
+        "engine": profile["engine"] if profile else None,
+        "platform": profile["id"] if profile else None,
+        "release": recommendation.get("release") or (
+            validate_smu_selection(iso_name, [])["iso_release"] if iso else None
+        ),
+        "capabilities": profile["capabilities"] if profile else {},
+        "selected_packages": selected,
+        "selected_csc_groups": recommendation["package_groups"],
+        "excluded_packages": recommendation["excluded"],
+        "component_conflicts": recommendation["component_conflicts"],
+        "options": options,
+        "blockers": sorted(set(blockers)),
+        "warnings": sorted(set(warnings)),
+        "expected_outputs": {
+            "iso": True,
+            "usb": bool(profile and profile["capabilities"].get("usb_image")
+                        and not payload.get("skip_usb_image")),
+        },
+    }
 
 
 def giso_artifact_candidates(job_dir: Path) -> list[Path]:
@@ -885,6 +975,7 @@ def discover() -> dict:
     matrices = [item["path"] for item in files
                 if item["type"] == ".json" and Path(item["path"]).name.startswith("compatibility_matrix_")]
     return {"files": sorted(files, key=lambda x: x["path"]), "dirs": sorted(dirs),
+            "inventory_revision": current_inventory_revision(files),
             "recommended": recommendation["selected"], "recommendation": recommendation,
             "superseded": sorted(superseded), "matrices": matrices}
 
@@ -1301,6 +1392,15 @@ def compatibility():
             )
         return jsonify(result)
     except (OSError, json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
+        return jsonify(error=str(exc)), 400
+
+
+@app.post("/api/build-plan")
+def build_plan():
+    try:
+        payload = validate_build_payload(json_object())
+        return jsonify(create_build_plan(payload))
+    except (OSError, TypeError, ValueError) as exc:
         return jsonify(error=str(exc)), 400
 
 
@@ -1781,13 +1881,29 @@ def create_job():
                 return jsonify(error="Wait for all uploads to finish before starting the build"), 409
         if docker_build_running():
             return jsonify(error="A Docker build is already running"), 409
+        with job_lock:
+            if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
+                return jsonify(error="A build is already running"), 409
+        plan = create_build_plan(payload)
+        if not plan["ready"]:
+            return jsonify(error="BuildPlan is blocked: " + "; ".join(plan["blockers"]),
+                           plan=plan), 400
+        confirmed_fingerprint = payload.get("confirmed_plan_fingerprint")
+        if confirmed_fingerprint and confirmed_fingerprint != plan["fingerprint"]:
+            return jsonify(error="Inventory changed since this BuildPlan was reviewed; "
+                                 "refresh and confirm the new plan before building",
+                           plan=plan), 409
+        payload["pkglist"] = [item["id"] for item in plan["selected_packages"]]
+        payload["automatic_smu_selection"] = False
         job_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         with job_lock:
             if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
                 return jsonify(error="A build is already running"), 409
             jobs[job_id] = {"id": job_id, "status": "queued", "created": time.time(),
                             "updated": time.time(), "progress": 1, "phase": "Validating inputs",
-                            "log": "", "artifacts": [], "payload": payload, "command": []}
+                            "log": "", "artifacts": [], "payload": payload, "command": [],
+                            "inventory_revision": plan["inventory_revision"],
+                            "plan_fingerprint": plan["fingerprint"], "build_plan": plan}
         try:
             command = build_command(payload, job_id)
             cleanup_paths = build_cleanup_paths(payload)

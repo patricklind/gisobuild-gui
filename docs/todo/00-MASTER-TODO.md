@@ -40,8 +40,8 @@ Core principle:
 - [ ] RPM metadata inspection
 - [ ] CSC grouping and supersedence model
 - [ ] Unified automatic/manual selection engine
-- [ ] Immutable BuildPlan
-- [ ] Inventory revision + stale-state prevention
+- [x] Immutable BuildPlan
+- [x] Inventory revision + stale-state prevention
 - [ ] Self-contained Docker image
 - [ ] GisoBuildRunner abstraction
 - [ ] Persistent state/database

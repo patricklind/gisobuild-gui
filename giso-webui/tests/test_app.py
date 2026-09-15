@@ -461,7 +461,14 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.build_command", side_effect=RuntimeError("/secret/internal/path"))
     def test_build_setup_error_does_not_expose_internal_details(self, _build):
-        response = self.client.post("/api/jobs", json={})
+        (self.data / "base.iso").write_bytes(b"iso")
+        rpm = self.data / "package.rpm"
+        rpm.write_bytes(b"rpm")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        response = self.client.post("/api/jobs", json={
+            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("/secret", response.get_json()["error"])
 
@@ -818,6 +825,88 @@ class GisoWebTests(unittest.TestCase):
                               "pkglist": [selected["id"]]}, "identity")
 
         self.assertEqual((module.WORK / "identity/repo/package.rpm").read_bytes(), b"second")
+
+    def test_build_plan_is_backend_owned_and_checksum_fingerprinted(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+        rpm = self.data / "package.rpm"
+        rpm.write_bytes(b"first")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
+                   "automatic_smu_selection": False, "auto_repo": True}
+
+        first = self.client.post("/api/build-plan", json=payload).get_json()
+        rpm.write_bytes(b"second")
+        second_item = next(entry for entry in module.inventory_files()
+                           if entry["type"] == ".rpm")
+        payload["pkglist"] = [second_item["id"]]
+        second = self.client.post("/api/build-plan", json=payload).get_json()
+
+        self.assertTrue(first["ready"])
+        self.assertEqual(first["selected_packages"][0]["id"], item["id"])
+        self.assertNotEqual(first["inventory_revision"], second["inventory_revision"])
+        self.assertNotEqual(first["fingerprint"], second["fingerprint"])
+
+    def test_build_plan_returns_blockers_instead_of_enabling_invalid_build(self):
+        response = self.client.post("/api/build-plan", json={
+            "iso": "missing.iso", "platform": "asr9k", "pkglist": [],
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["ready"])
+        self.assertIn("current inventory", response.get_json()["blockers"][0])
+
+    @patch("app.run_job")
+    @patch("app.child_mount_args", return_value=[])
+    def test_created_job_records_authoritative_build_plan(self, _mounts, _run_job):
+        (self.data / "base.iso").write_bytes(b"iso")
+        rpm = self.data / "package.rpm"
+        rpm.write_bytes(b"rpm")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+
+        response = self.client.post("/api/jobs", json={
+            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        self.assertEqual(response.status_code, 202)
+        job = module.jobs[response.get_json()["id"]]
+        self.assertEqual(job["plan_fingerprint"], job["build_plan"]["fingerprint"])
+        self.assertEqual(job["inventory_revision"], job["build_plan"]["inventory_revision"])
+
+    @patch("app.run_job")
+    @patch("app.child_mount_args", return_value=[])
+    def test_stale_confirmed_plan_is_rejected_when_inventory_changes(self, _mounts, _run_job):
+        (self.data / "base.iso").write_bytes(b"iso")
+        rpm = self.data / "package.rpm"
+        rpm.write_bytes(b"rpm")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
+                   "automatic_smu_selection": False, "auto_repo": True}
+        reviewed = self.client.post("/api/build-plan", json=payload).get_json()
+
+        (self.data / "other.rpm").write_bytes(b"unrelated new upload")
+        payload["confirmed_plan_fingerprint"] = reviewed["fingerprint"]
+        response = self.client.post("/api/jobs", json=payload)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Inventory changed", response.get_json()["error"])
+        self.assertEqual(module.jobs, {})
+
+    @patch("app.run_job")
+    @patch("app.child_mount_args", return_value=[])
+    def test_confirmed_plan_matching_current_inventory_is_accepted(self, _mounts, _run_job):
+        (self.data / "base.iso").write_bytes(b"iso")
+        rpm = self.data / "package.rpm"
+        rpm.write_bytes(b"rpm")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
+                   "automatic_smu_selection": False, "auto_repo": True}
+        reviewed = self.client.post("/api/build-plan", json=payload).get_json()
+
+        payload["confirmed_plan_fingerprint"] = reviewed["fingerprint"]
+        response = self.client.post("/api/jobs", json=payload)
+
+        self.assertEqual(response.status_code, 202)
 
     def test_manual_package_ui_uses_ids_and_renders_duplicate_conflicts(self):
         source = (Path(module.__file__).parent / "static/manual-packages.js").read_text()
