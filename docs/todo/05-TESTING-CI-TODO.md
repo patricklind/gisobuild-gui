@@ -52,12 +52,12 @@ Mandatory regression coverage for:
 - [ ] CSC group selection mismatch
 - [ ] "No RPM packages uploaded" despite inventory containing compatible RPMs
 - [ ] NCS-57C3 SKU normalization
-- [ ] cancel during builder preparation/pull
-- [ ] cancel during finalization
-- [ ] successful build preserves unrelated workspace inputs
+- [x] cancel during builder preparation/pull
+- [x] cancel during finalization
+- [x] successful build preserves unrelated workspace inputs
 - [ ] two uploaded ISOs never silently select the first candidate
 - [ ] RPM CPU architecture must match the selected ISO/build architecture
-- [ ] package names containing glob metacharacters cannot select unintended files
+- [x] package names containing glob metacharacters cannot select unintended files
 - [ ] duplicate basename + same hash is deterministic and keeps provenance
 - [ ] duplicate basename + different hash is a blocking conflict
 - [ ] upgrade-matrix aliases use the canonical platform resolver
@@ -112,7 +112,7 @@ upload
 - [ ] oversized expansion
 - [ ] duplicate filename conflict
 - [ ] malicious job/artifact path
-- [ ] package glob metacharacters
+- [x] package glob metacharacters
 - [ ] secret redaction
 
 ## CI pipeline
