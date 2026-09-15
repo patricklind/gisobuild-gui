@@ -25,9 +25,11 @@ jobs:
           cache: pip
           cache-dependency-path: giso-webui/requirements.txt
       - name: Install test tools
-        run: python -m pip install -r giso-webui/requirements.txt ruff pip-audit
+        run: python -m pip install -r giso-webui/requirements.txt ruff pip-audit graphifyy==0.9.61
       - name: Lint Python
         run: ruff check giso-webui/app.py giso-webui/cisco_download.py giso-webui/maintenance.py giso-webui/platform_validation.py giso-webui/tests staging scripts
+      - name: Validate Graphify freshness and artifact exclusions
+        run: python -B scripts/check_graphify_freshness.py
       - name: Run tests
         working-directory: giso-webui
         run: python -B -m unittest discover -s tests -v

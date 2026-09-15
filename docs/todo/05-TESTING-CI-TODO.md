@@ -128,7 +128,7 @@ Run:
 - [ ] synthetic eXR integration
 - [ ] synthetic LNT integration
 - [ ] SBOM generation
-- [ ] Graphify freshness validation for code-changing PRs
+- [x] Graphify freshness validation for code-changing PRs
 
 Optional:
 
@@ -137,9 +137,9 @@ Optional:
 
 ## Graphify CI guard
 
-- [ ] Compare Graphify's recorded source revision with the PR/head revision after relevant code changes
-- [ ] Fail or clearly block merge when tracked `graphify-out/` is stale
-- [ ] Verify `.graphifyignore` still excludes Cisco licensed/sensitive inputs and build outputs
+- [x] Regenerate from the PR/head tracked source tree and compare the structural graph (commit metadata is intentionally ignored)
+- [x] Fail the CI merge gate when tracked `graphify-out/graph.json` is stale
+- [x] Verify `.graphifyignore` still excludes Cisco licensed/sensitive inputs and build outputs
 
 ## Merge policy
 
@@ -149,4 +149,4 @@ Package-selection or build-runner changes must not merge unless:
 - [ ] integration tests pass
 - [ ] Docker image builds
 - [ ] regression suite passes
-- [ ] Graphify output is current when the change affects code/architecture
+- [x] Graphify output is current when the change affects code/architecture

@@ -70,7 +70,7 @@ Before large refactors hide the current failure modes, add regression tests and 
 - [x] bridge-SMU presence must use exact package/CSC identity
 - [x] inventory discovery must tolerate concurrent cleanup/delete
 - [x] auto-derived target release must not become stale when the ISO changes
-- [ ] Graphify output must be refreshed and freshness checked in CI
+- [x] Graphify output must be refreshed and freshness checked in CI
 
 See `07-BUG-AUDIT-TODO.md` for detailed scenarios and required regression tests.
 
