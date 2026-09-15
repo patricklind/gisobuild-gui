@@ -522,14 +522,14 @@ def inspect_iso_architecture(iso_path: Path) -> frozenset[str]:
     try:
         mdata = subprocess.run(
             [ISOINFO_BIN, "-R", "-i", str(iso_path), "-x", "/iosxr_image_mdata.yml"],
-            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS,
+            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS, check=False,
         )
         if mdata.returncode == 0 and mdata.stdout.strip():
             architectures = iso_architectures_from_mdata(mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES])
         if not architectures:
             listing = subprocess.run(
                 [ISOINFO_BIN, "-R", "-l", "-i", str(iso_path)],
-                capture_output=True, text=True, timeout=ISO_LISTING_TIMEOUT_SECONDS,
+                capture_output=True, text=True, timeout=ISO_LISTING_TIMEOUT_SECONDS, check=False,
             )
             if listing.returncode == 0:
                 architectures = iso_architectures_from_listing(

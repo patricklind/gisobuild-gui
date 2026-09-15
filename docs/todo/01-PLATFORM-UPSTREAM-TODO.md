@@ -56,10 +56,23 @@ Create a data-only alias layer, e.g. `hardware_aliases.yaml`.
 - [ ] `NCS57C3`
 - [ ] `NCS-57C3`
 - [ ] other known PID spelling variations
-- [ ] normalize dash/underscore/case safely
-- [ ] avoid loose substring matching
+- [x] normalize dash/underscore/case safely (verified:
+      `normalize_platform()` strips non-`[a-z0-9-]` characters before alias
+      lookup, so underscore/dash/case variants of the same SKU already
+      collapse to one key)
+- [x] avoid loose substring matching (see fix above)
 
 Hardware aliases must **not** become the source of truth for software support.
+
+Fixed: `infer_platform()` in `giso-webui/platform_validation.py` matched
+`ALIASES` with a bare substring check (`if alias in name`) while its primary
+platform-ID loop just above it used word-boundary matching — an alias such as
+`"8800"` could match inside an unrelated numeric run (e.g.
+`router-188005-image.iso`). The alias loop now uses the same word-boundary
+regex as the primary loop. Verified by
+`test_alias_matching_does_not_produce_false_positives_on_substrings` in
+`giso-webui/tests/test_platform_compatibility.py`, run inside the built
+container image (146/146 tests pass).
 
 ## Unknown-but-valid platforms
 
@@ -118,8 +131,11 @@ if capabilities.optimize:
 - [ ] eXR-only option rejection on LNT
 - [ ] LNT-only option rejection on eXR
 - [ ] unknown/future upstream-supported platform
-- [ ] NCS-57C3 alias normalization
-- [ ] no false-positive alias matching
+- [x] NCS-57C3 alias normalization (`test_ncs57c3_filename_is_inferred_as_ncs57`,
+      `test_ncs57c3_inventory_sku_normalizes_to_ncs57`, both pre-existing and
+      passing)
+- [x] no false-positive alias matching
+      (`test_alias_matching_does_not_produce_false_positives_on_substrings`)
 
 ## Implemented capability slice
 
