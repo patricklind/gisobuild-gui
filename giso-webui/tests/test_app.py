@@ -3,6 +3,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import time
@@ -12,6 +13,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import app as module
+
+ISOINFO_AVAILABLE = shutil.which("genisoimage") is not None and Path(module.ISOINFO_BIN).exists()
 
 
 class GisoWebTests(unittest.TestCase):
@@ -1157,6 +1160,69 @@ class GisoWebTests(unittest.TestCase):
             result["md5"], hashlib.md5(content, usedforsecurity=False).hexdigest()
         )
         self.assertEqual(result["sha256"], hashlib.sha256(content).hexdigest())
+
+
+@unittest.skipUnless(
+    ISOINFO_AVAILABLE,
+    "genisoimage and isoinfo are only available inside the giso-webui container image",
+)
+class IsoArchitectureInspectionTests(unittest.TestCase):
+    """Regression coverage for inspect_iso_architecture() against real ISO9660 images.
+
+    These build tiny synthetic ISOs with genisoimage; no Cisco content is
+    involved. They must run only inside the giso-webui container, which is
+    the sole place isoinfo/genisoimage are installed (see AGENTS.md).
+    """
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        module.iso_architecture_cache.clear()
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def _build_iso(self, files: dict[str, str]) -> Path:
+        source = Path(self.temp.name) / "iso-src"
+        source.mkdir()
+        for name, content in files.items():
+            path = source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+        iso_path = Path(self.temp.name) / "test.iso"
+        subprocess.run(
+            ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
+            check=True, capture_output=True,
+        )
+        return iso_path
+
+    def test_detects_x86_64_only_exr_image_from_metadata(self):
+        iso_path = self._build_iso({
+            "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list:\n",
+        })
+        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64"}))
+
+    def test_detects_dual_arch_exr_image_from_metadata(self):
+        iso_path = self._build_iso({
+            "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list: armv7l\n",
+        })
+        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64", "aarch64"}))
+
+    def test_falls_back_to_rpm_repository_listing_for_lnt_image(self):
+        iso_path = self._build_iso({"repo/foo-1.0-r0.x86_64.rpm": ""})
+        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64"}))
+
+    def test_unreadable_iso_reports_unknown_rather_than_raising(self):
+        bogus = Path(self.temp.name) / "not-an-iso.iso"
+        bogus.write_bytes(b"not a real iso9660 image")
+        self.assertEqual(module.inspect_iso_architecture(bogus), frozenset())
+
+    def test_result_is_cached_by_path_size_and_mtime(self):
+        iso_path = self._build_iso({"repo/foo-1.0-r0.x86_64.rpm": ""})
+        first = module.inspect_iso_architecture(iso_path)
+        with patch("app.subprocess.run") as run:
+            second = module.inspect_iso_architecture(iso_path)
+        run.assert_not_called()
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":

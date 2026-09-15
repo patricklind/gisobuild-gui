@@ -143,6 +143,59 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertFalse(result["compatible"])
         self.assertTrue(any("processor architecture" in issue for issue in result["issues"]))
 
+    def test_rpm_architecture_mismatched_with_iso_is_rejected(self):
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.aarch64.rpm"],
+            iso_architectures=frozenset({"x86_64"}),
+        )
+        self.assertFalse(result["compatible"])
+        self.assertTrue(any("processor architecture" in issue for issue in result["issues"]))
+        self.assertEqual(result["iso_architectures"], ["x86_64"])
+
+    def test_rpm_architecture_matching_iso_is_accepted(self):
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"],
+            iso_architectures=frozenset({"x86_64"}),
+        )
+        self.assertTrue(result["compatible"])
+
+    def test_unknown_iso_architecture_does_not_block_selection(self):
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.aarch64.rpm"],
+            iso_architectures=None,
+        )
+        self.assertTrue(result["compatible"])
+        self.assertEqual(result["iso_architectures"], [])
+
+    def test_exr_arm_variant_token_normalizes_to_aarch64(self):
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.corei7_64.rpm"],
+            iso_architectures=frozenset({"aarch64"}),
+        )
+        self.assertFalse(result["compatible"])
+        self.assertTrue(any("x86_64" in issue and "aarch64" in issue for issue in result["issues"]))
+
+    def test_automatic_selection_excludes_wrong_architecture_rpms(self):
+        result = recommend_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            [
+                "ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                "ncs5500-bgp-1.0.0.1-r2612.CSCtest00002.aarch64.rpm",
+            ],
+            iso_architectures=frozenset({"x86_64"}),
+        )
+        self.assertTrue(result["ready"])
+        self.assertEqual(result["selected"], ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"])
+        self.assertIn(
+            {"name": "ncs5500-bgp-1.0.0.1-r2612.CSCtest00002.aarch64.rpm",
+             "reason": "Processor architecture does not match the base ISO"},
+            result["excluded"],
+        )
+
     def test_upgrade_matrix_returns_bridge_smus_and_caveats(self):
         matrix = {"permitted": {"25.1.2": {"26.1.2": [{
             "platform": "ncs5500", "bridge_smus": ["bridge-placeholder.rpm"],
