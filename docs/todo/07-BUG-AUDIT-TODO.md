@@ -73,9 +73,9 @@ This creates an ambiguous state where an arbitrary first ISO can become the buil
 
 TODO:
 
-- [ ] Never auto-select an ISO when more than one candidate exists.
-- [ ] Require an explicit operator selection or metadata-based deterministic choice.
-- [ ] Build button must stay blocked while base ISO identity is ambiguous.
+- [x] Never auto-select an ISO when more than one candidate exists.
+- [x] Require an explicit operator selection or metadata-based deterministic choice.
+- [x] Build button must stay blocked while base ISO identity is ambiguous.
 - [ ] Add browser regression test with two uploaded ISOs.
 
 ### RPM processor architecture is not checked against the selected ISO
@@ -140,9 +140,9 @@ Values such as friendly names, punctuation variants or normalized SKU aliases ca
 
 TODO:
 
-- [ ] Route matrix platform values through the same canonical platform resolver.
-- [ ] Do not maintain separate normalization rules in compatibility code.
-- [ ] Add tests for aliases, case, punctuation and hardware PID variants.
+- [x] Route matrix platform values through the same canonical platform resolver.
+- [x] Do not maintain separate normalization rules in compatibility code.
+- [x] Add tests for aliases, case, punctuation and hardware PID variants.
 
 ### Bridge-SMU presence check can produce substring false positives
 
@@ -154,9 +154,9 @@ This can incorrectly accept a different filename/component that merely contains 
 
 TODO:
 
-- [ ] Compare exact canonical package IDs and exact CSC IDs.
-- [ ] Do not use one concatenated free-text string for package presence checks.
-- [ ] Add near-match regression tests.
+- [x] Compare exact package basenames and exact CSC IDs.
+- [x] Do not use one concatenated free-text string for package presence checks.
+- [x] Add near-match regression tests.
 
 ### Filename heuristics can report confidence stronger than the evidence supports
 
@@ -182,8 +182,8 @@ A file disappearing between directory enumeration and `stat()` can cause a reque
 TODO:
 
 - [ ] Use the persistent inventory model instead of live filesystem walking for every request.
-- [ ] Until then, synchronize discovery with destructive workspace operations or tolerate disappearing files safely.
-- [ ] Add concurrency regression test: discover while cleanup/delete occurs.
+- [x] Until then, synchronize discovery with destructive workspace operations or tolerate disappearing files safely.
+- [x] Add concurrency regression test: discover while cleanup/delete occurs.
 
 ### Target release can remain stale after the selected ISO changes
 
@@ -193,9 +193,9 @@ Current behavior:
 
 TODO:
 
-- [ ] Track whether release was automatically populated or manually overridden.
-- [ ] Refresh auto-derived release when the base ISO changes.
-- [ ] Preserve explicit manual override only when intentionally selected.
+- [x] Track whether release was automatically populated or manually overridden.
+- [x] Refresh auto-derived release when the base ISO changes.
+- [x] Preserve explicit manual override only when intentionally selected.
 - [ ] Add browser regression test switching between two releases.
 
 ### Mandatory Docker pull makes builds depend on registry availability even when the builder image is already cached
@@ -233,13 +233,13 @@ TODO:
 - [x] cancel during builder preparation/pull
 - [x] cancel during finalization
 - [x] successful build preserves unrelated workspace inputs
-- [ ] two ISOs never silently choose first candidate
+- [x] two ISOs never silently choose first candidate
 - [ ] wrong RPM CPU architecture is blocked
 - [x] package glob characters cannot select unintended files
 - [ ] duplicate basename / same hash
 - [ ] duplicate basename / different hash
-- [ ] upgrade matrix aliases normalize through one resolver
-- [ ] bridge-SMU near-match does not count as exact presence
-- [ ] discovery vs cleanup race
-- [ ] target release refreshes when ISO changes
+- [x] upgrade matrix aliases normalize through one resolver
+- [x] bridge-SMU near-match does not count as exact presence
+- [x] discovery vs cleanup race
+- [x] target release refreshes when ISO changes
 - [ ] Graphify freshness check

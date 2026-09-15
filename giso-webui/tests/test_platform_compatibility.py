@@ -153,6 +153,22 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertEqual(result["bridge_smus"], ["bridge-placeholder.rpm"])
         self.assertEqual(result["missing_bridge_smus"], ["bridge-placeholder.rpm"])
 
+    def test_upgrade_matrix_uses_canonical_platform_normalization(self):
+        matrix = {"permitted": {"25.1.2": {"26.1.2": [{
+            "platform": "NCS-57C3-MODS-SYS", "bridge_smus": [], "caveats": [],
+        }]}}}
+        result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5700", [])
+        self.assertTrue(result["permitted"])
+
+    def test_bridge_smu_near_match_is_not_accepted(self):
+        required = "ncs5500-routing-r2612.CSCabc123.x86_64.rpm"
+        matrix = {"permitted": {"25.1.2": {"26.1.2": [{
+            "platform": "ncs5500", "bridge_smus": [required], "caveats": [],
+        }]}}}
+        selected = ["ncs5500-routing-r2612.CSCabc1234.x86_64.rpm"]
+        result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", selected)
+        self.assertEqual(result["missing_bridge_smus"], [required])
+
 
 if __name__ == "__main__":
     unittest.main()

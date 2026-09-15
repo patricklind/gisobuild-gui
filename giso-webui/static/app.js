@@ -3,6 +3,8 @@ let inputs = { files: [], recommended: [] };
 let packageListEdited = false;
 let platformProfiles = [];
 let detectedPlatform = '';
+let targetReleaseIsAutomatic = true;
+let lastAutomaticTargetRelease = '';
 let pollTimer = null;
 let activityTimer = null;
 const $ = selector => document.querySelector(selector);
@@ -110,12 +112,12 @@ function renderInputs(data) {
   (data.matrices || []).forEach(path => { const option=document.createElement('option'); option.value=path; option.textContent=path; matrixSelect.appendChild(option); });
   if ([...matrixSelect.options].some(option => option.value === selectedMatrix)) matrixSelect.value=selectedMatrix;
 
-  const iso = isoFiles[0]?.path || '';
+  const iso = isoFiles.length === 1 ? isoFiles[0].path : '';
   $('[name=iso]').value = iso;
   const releaseMatch = iso.match(/-(\d+\.\d+\.\d+)(?:[-.]|$)/);
-  if (releaseMatch && !$('[name=target_release]').value) $('[name=target_release]').value = releaseMatch[1];
+  updateAutomaticTargetRelease(releaseMatch?.[1] || '');
   applySmuRecommendation(data.recommendation || {ready:false,selected:[],excluded:[],message:'No automatic package plan is available.'});
-  setReadyCard('#iso-check', Boolean(iso), iso ? 'Found and ready' : 'Upload the Cisco base file');
+  setReadyCard('#iso-check', Boolean(iso), iso ? 'Found and ready' : isoFiles.length > 1 ? 'Select one base ISO in Expert settings' : 'Upload the Cisco base file');
   const plan=data.recommendation || {};
   renderManualPackages(data, plan);
   const rpmStatus=plan.ready
@@ -130,6 +132,15 @@ function renderInputs(data) {
     const empty = document.createElement('p'); empty.textContent = 'No Cisco files have been found yet.'; empty.className = 'empty'; library.appendChild(empty);
   }
   updateBuildAvailability();
+}
+
+function updateAutomaticTargetRelease(release) {
+  const field=$('[name=target_release]');
+  if (targetReleaseIsAutomatic || field.value === lastAutomaticTargetRelease) {
+    field.value=release;
+    lastAutomaticTargetRelease=release;
+    targetReleaseIsAutomatic=true;
+  }
 }
 
 function applySmuRecommendation(plan) {
@@ -742,7 +753,12 @@ $('#use-automatic-packages').onclick=async()=>{
   packageListEdited=false; $('[name=pkglist_override]').value=''; $('[name=package_selection_mode][value=automatic]').checked=true; updatePackageSelectionMode();
   await refreshSmuRecommendation(); updateBuildAvailability();
 };
-$('[name=iso_override]').addEventListener('change',refreshSmuRecommendation);
+$('[name=iso_override]').addEventListener('change',()=>{
+  const match=$('[name=iso_override]').value.match(/-(\d+\.\d+\.\d+)(?:[-.]|$)/);
+  updateAutomaticTargetRelease(match?.[1] || '');
+  refreshSmuRecommendation();
+});
+$('[name=target_release]').addEventListener('input',()=>{ targetReleaseIsAutomatic=false; });
 $('[name=platform]').addEventListener('change',updatePlatformControls);
 $('#check-compatibility').onclick=checkCompatibility;
 document.querySelectorAll('[name=compatibility_mode]').forEach(control=>control.addEventListener('change', updateCompatibilityMode));

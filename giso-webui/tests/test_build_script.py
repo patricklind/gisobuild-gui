@@ -72,6 +72,14 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("control.disabled=!supported", script)
         self.assertIn("profile.capabilities?.usb_image", script)
 
+    def test_multiple_isos_block_automatic_selection_and_release_is_refreshed(self):
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+
+        self.assertIn("isoFiles.length === 1", script)
+        self.assertIn("Select one base ISO in Expert settings", script)
+        self.assertIn("updateAutomaticTargetRelease", script)
+        self.assertIn("targetReleaseIsAutomatic=false", script)
+
     def test_clean_rejects_traversal_outside_standard_output(self):
         bash = shutil.which("bash")
         if not bash:

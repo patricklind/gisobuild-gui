@@ -272,9 +272,15 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
     if not isinstance(candidates, list):
         raise TypeError("The compatibility matrix has an invalid upgrade entry")
     normalized = normalize_platform(platform)
-    match = next((item for item in candidates if isinstance(item, dict) and
-                  ALIASES.get(str(item.get("platform", "")).lower(),
-                              str(item.get("platform", "")).lower()) == normalized), None)
+    def matrix_platform(item: object) -> str | None:
+        if not isinstance(item, dict):
+            return None
+        try:
+            return normalize_platform(str(item.get("platform", "")))
+        except ValueError:
+            return None
+
+    match = next((item for item in candidates if matrix_platform(item) == normalized), None)
     if not match:
         return {"permitted": False, "bridge_smus": [], "missing_bridge_smus": [], "caveats": [],
                 "message": f"The matrix does not permit {source} to {target} on {PLATFORMS[normalized]['label']}"}
@@ -286,11 +292,16 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
     if (not isinstance(caveats, list) or len(caveats) > 100 or
             not all(isinstance(item, str) and len(item) <= 4096 for item in caveats)):
         raise ValueError("The compatibility matrix contains invalid caveats")
-    selected_text = " ".join(Path(item).name for item in (selected_packages or [])).lower()
+    selected_names = {Path(item).name.lower() for item in (selected_packages or [])}
+    selected_cscs = {
+        token.upper()
+        for item in selected_names
+        for token in re.findall(r"CSC[a-z0-9]+", item, re.IGNORECASE)
+    }
     missing_bridge_smus = [
         item for item in bridge_smus
-        if Path(item).name.lower() not in selected_text
-        and not any(token.lower() in selected_text
+        if Path(item).name.lower() not in selected_names
+        and not any(token.upper() in selected_cscs
                     for token in re.findall(r"CSC[a-z0-9]+", item, re.IGNORECASE))
     ]
     return {"permitted": True, "bridge_smus": bridge_smus,

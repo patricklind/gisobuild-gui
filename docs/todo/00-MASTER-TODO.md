@@ -62,14 +62,14 @@ Before large refactors hide the current failure modes, add regression tests and 
 - [x] cancellation during builder preparation/pull
 - [x] cancellation during finalization
 - [x] successful build must not delete unrelated inputs
-- [ ] multiple ISOs must never silently select the first candidate
+- [x] multiple ISOs must never silently select the first candidate
 - [ ] RPM CPU architecture must match the selected ISO/build architecture
 - [x] RPM selection must use exact identity, never glob matching
 - [ ] duplicate basenames must remain distinguishable by identity/checksum
-- [ ] compatibility matrix platform aliases must use one canonical resolver
-- [ ] bridge-SMU presence must use exact package/CSC identity
-- [ ] inventory discovery must tolerate concurrent cleanup/delete
-- [ ] auto-derived target release must not become stale when the ISO changes
+- [x] compatibility matrix platform aliases must use one canonical resolver
+- [x] bridge-SMU presence must use exact package/CSC identity
+- [x] inventory discovery must tolerate concurrent cleanup/delete
+- [x] auto-derived target release must not become stale when the ISO changes
 - [ ] Graphify output must be refreshed and freshness checked in CI
 
 See `07-BUG-AUDIT-TODO.md` for detailed scenarios and required regression tests.

@@ -640,6 +640,21 @@ class GisoWebTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.get_json()["recommendation"]["ready"])
+
+    def test_discover_tolerates_file_removed_during_scan(self):
+        disappearing = self.data / "disappearing.rpm"
+        disappearing.write_bytes(b"rpm")
+        original_stat = Path.stat
+
+        def concurrent_stat(path, *args, **kwargs):
+            if path == disappearing:
+                raise FileNotFoundError(path)
+            return original_stat(path, *args, **kwargs)
+
+        with patch.object(Path, "stat", new=concurrent_stat):
+            response = self.client.get("/api/inputs")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("disappearing.rpm", {item["path"] for item in response.get_json()["files"]})
         self.assertEqual(response.get_json()["recommended"], [])
 
     @patch("app.child_mount_args", return_value=[])

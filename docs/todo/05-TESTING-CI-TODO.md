@@ -60,10 +60,10 @@ Mandatory regression coverage for:
 - [x] package names containing glob metacharacters cannot select unintended files
 - [ ] duplicate basename + same hash is deterministic and keeps provenance
 - [ ] duplicate basename + different hash is a blocking conflict
-- [ ] upgrade-matrix aliases use the canonical platform resolver
-- [ ] bridge-SMU near-match does not satisfy exact package/CSC presence
-- [ ] discovery remains safe while cleanup/delete runs concurrently
-- [ ] auto-derived target release refreshes when base ISO changes
+- [x] upgrade-matrix aliases use the canonical platform resolver
+- [x] bridge-SMU near-match does not satisfy exact package/CSC presence
+- [x] discovery remains safe while cleanup/delete runs concurrently
+- [x] auto-derived target release refreshes when base ISO changes
 - [ ] cached builder behavior is defined when registry access fails during the migration period
 
 See `07-BUG-AUDIT-TODO.md` for the implementation details and failure scenarios behind these tests.
