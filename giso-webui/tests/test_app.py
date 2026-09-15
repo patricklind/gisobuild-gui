@@ -338,6 +338,52 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual((existing / "keep.rpm").read_bytes(), b"keep")
         self.assertEqual(len(list(self.data.glob("cisco-smu-*"))), 2)
 
+    def test_deleting_archive_removes_its_extraction_directory(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"rpm"
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        response = self.upload("vendor-bundle.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue((self.data / "vendor-bundle").is_dir())
+        self.assertTrue((self.data / "vendor-bundle" / "package.rpm").exists())
+
+        response = self.client.delete("/api/uploads/vendor-bundle.tar")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse((self.data / "vendor-bundle.tar").exists())
+        self.assertFalse((self.data / "vendor-bundle").exists())
+
+    def test_deleting_plain_upload_does_not_touch_unrelated_directory(self):
+        (self.data / "vendor-bundle").mkdir()
+        (self.data / "vendor-bundle" / "keep.rpm").write_bytes(b"keep")
+        unrelated = self.data / "standalone.rpm"
+        unrelated.write_bytes(b"standalone")
+
+        response = self.client.delete("/api/uploads/standalone.rpm")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(unrelated.exists())
+        self.assertTrue((self.data / "vendor-bundle" / "keep.rpm").exists())
+
+    def test_inventory_reports_extracted_from_source_archive(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"rpm"
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        self.upload("vendor-bundle.tar", stream.getvalue())
+
+        files = module.inventory_files()
+
+        extracted = next(item for item in files if item["basename"] == "package.rpm")
+        self.assertEqual(extracted["extracted_from"], "vendor-bundle.tar")
+        archive_entry = next(item for item in files if item["basename"] == "vendor-bundle.tar")
+        self.assertIsNone(archive_entry["extracted_from"])
+
     def test_upload_offset_must_be_sequential(self):
         upload_id = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3}).get_json()["id"]
         response = self.client.put(f"/api/uploads/{upload_id}?offset=2", data=b"abc")
@@ -878,6 +924,43 @@ class GisoWebTests(unittest.TestCase):
 
         self.assertFalse(owned.exists())
         self.assertTrue(unrelated.exists())
+
+    def test_successful_build_removes_emptied_extraction_directory_and_source_archive(self):
+        archive = self.data / "vendor-bundle.tar"
+        archive.write_bytes(b"tar contents")
+        extraction_dir = self.data / "vendor-bundle"
+        extraction_dir.mkdir()
+        owned = extraction_dir / "selected.rpm"
+        owned.write_bytes(b"selected")
+        job_dir = self.output / "extracted-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+
+        module.archive_giso_artifacts_and_cleanup("extracted-job", job_dir, [owned])
+
+        self.assertFalse(owned.exists())
+        self.assertFalse(extraction_dir.exists())
+        self.assertFalse(archive.exists())
+
+    def test_successful_build_preserves_extraction_directory_with_remaining_files(self):
+        archive = self.data / "vendor-bundle.tar"
+        archive.write_bytes(b"tar contents")
+        extraction_dir = self.data / "vendor-bundle"
+        extraction_dir.mkdir()
+        owned = extraction_dir / "selected.rpm"
+        owned.write_bytes(b"selected")
+        remaining = extraction_dir / "unused.rpm"
+        remaining.write_bytes(b"still needed by another build")
+        job_dir = self.output / "partial-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+
+        module.archive_giso_artifacts_and_cleanup("partial-job", job_dir, [owned])
+
+        self.assertFalse(owned.exists())
+        self.assertTrue(remaining.exists())
+        self.assertTrue(extraction_dir.exists())
+        self.assertTrue(archive.exists())
 
     def test_cancellation_during_finalization_preserves_inputs(self):
         owned = self.data / "selected.rpm"

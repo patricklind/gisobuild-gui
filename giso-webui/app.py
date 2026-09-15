@@ -570,6 +570,8 @@ def inventory_files() -> list[dict]:
                 sha256 = file_checksums(path)["sha256"]
             except OSError:
                 continue
+            extraction_dir = top_level_extraction_dir(path)
+            source_archive = archive_source_for_extraction(extraction_dir) if extraction_dir else None
             physical.append({
                 "id": inventory_id(relative_path, sha256),
                 "basename": name,
@@ -578,6 +580,7 @@ def inventory_files() -> list[dict]:
                 "size": stat.st_size,
                 "sha256": sha256,
                 "source": "tar" if path.parent != DATA else "upload",
+                "extracted_from": source_archive.name if source_archive else None,
                 "metadata_source": "filename",
                 "metadata_confidence": "low",
                 "lifecycle": "READY",
@@ -732,6 +735,7 @@ def archive_giso_artifacts_and_cleanup(
         except Exception:
             shutil.rmtree(archive_dir, ignore_errors=True)
             raise
+    touched_extraction_dirs: set[Path] = set()
     for child in cleanup_paths or []:
         resolved = child.resolve()
         if DATA not in resolved.parents or not resolved.exists():
@@ -739,7 +743,17 @@ def archive_giso_artifacts_and_cleanup(
         if resolved.is_dir():
             shutil.rmtree(resolved)
         else:
+            extraction_dir = top_level_extraction_dir(resolved)
             resolved.unlink()
+            if extraction_dir is not None:
+                touched_extraction_dirs.add(extraction_dir)
+    for extraction_dir in touched_extraction_dirs:
+        if not extraction_dir.is_dir() or any(item.is_file() for item in extraction_dir.rglob("*")):
+            continue
+        source = archive_source_for_extraction(extraction_dir)
+        shutil.rmtree(extraction_dir, ignore_errors=True)
+        if source is not None:
+            source.unlink(missing_ok=True)
     shutil.rmtree(WORK / job_id, ignore_errors=True)
     shutil.rmtree(job_dir, ignore_errors=True)
     return archived
@@ -764,6 +778,35 @@ def extraction_path(path: Path) -> Path | None:
     if path.name.lower().endswith((".tar", ".tgz")):
         return DATA / path.name.removesuffix(".tgz").removesuffix(".tar")
     return None
+
+
+def archive_source_for_extraction(directory: Path) -> Path | None:
+    """Return the archive file that produced this extraction directory, if any.
+
+    extraction_path() deterministically derives the extraction directory name
+    from the archive filename by stripping .tar/.tgz, so the relationship can
+    be recovered without persisting extra provenance state: a direct child of
+    DATA named "foo" was produced by extracting "foo.tar" or "foo.tgz" if
+    that archive file still exists alongside it.
+    """
+    if directory.parent != DATA:
+        return None
+    for suffix in (".tar", ".tgz"):
+        candidate = DATA / f"{directory.name}{suffix}"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def top_level_extraction_dir(path: Path) -> Path | None:
+    """Return the direct-child-of-DATA ancestor directory that contains `path`."""
+    try:
+        relative = path.relative_to(DATA)
+    except ValueError:
+        return None
+    if len(relative.parts) < 2:
+        return None
+    return DATA / relative.parts[0]
 
 
 def upload_name(value: object) -> str:
@@ -1710,7 +1753,10 @@ def delete_upload(name: str):
                 return jsonify(error="Inputs cannot be deleted while a build is running"), 409
         if docker_build_running():
             return jsonify(error="Inputs cannot be deleted while a Docker build is running"), 409
+        destination = extraction_path(path)
         path.unlink()
+        if destination is not None and destination.is_dir():
+            shutil.rmtree(destination, ignore_errors=True)
     return jsonify(ok=True)
 
 
