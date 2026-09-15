@@ -1,17 +1,17 @@
 # Graph Report - gisobuild-phase0-lifecycle  (2026-09-15)
 
 ## Corpus Check
-- 46 files · ~37,927 words
+- 46 files · ~37,966 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 8, .css 4, .example 1)
 
 ## Summary
-- 600 nodes · 931 edges · 39 communities (26 shown, 5 thin omitted)
+- 601 nodes · 933 edges · 46 communities (30 shown, 8 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c0b38ebb`
+- Built from commit: `6bab6e2b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -31,11 +31,17 @@
 - Cisco IOS XR GISO Builder
 - docs/README.md
 - rehearse.py
+- Operations runbook
 - build-giso.sh
+- Testing and acceptance
 - Release notes
+- Security policy
+- Platform support and validation
 - coord.sh script
 - worktree.sh
 - dict
+- CONTRIBUTING.md
+- releasing.md
 - TODO — Concrete Bug Audit
 - TODO — Self-contained Docker Image
 - TODO — Automation, Inventory & BuildPlan
@@ -47,9 +53,10 @@
 - GISOBuild GUI — Master TODO
 - TODO roadmap for AI-assisted development
 - copilot-instructions.md
+- staging/README.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `GisoWebTests` - 88 edges
+1. `GisoWebTests` - 89 edges
 2. `CiscoDownloadError` - 21 edges
 3. `CiscoSoftwareClient` - 19 edges
 4. `validate_smu_selection()` - 15 edges
@@ -75,7 +82,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (39 total, 5 thin omitted)
+## Communities (46 total, 8 thin omitted)
 
 ### Community 0 - "app.py"
 Cohesion: 0.05
@@ -117,21 +124,33 @@ Nodes (11): Build workflow, Configuration, Data lifecycle, IOS XR GISO Web UI, O
 Cohesion: 0.20
 Nodes (10): Cisco IOS XR GISO Builder, Components, License, Operational limitations, Quick start, Real ISO/USB acceptance test, Requirements, Security (+2 more)
 
-### Community 13 - "docs/README.md"
-Cohesion: 0.07
-Nodes (31): Contributing, Coordination and branches, Local verification, Back up and restore state, Decommission, Failure handling, Logs and capacity, Operations runbook (+23 more)
-
 ### Community 15 - "rehearse.py"
 Cohesion: 0.43
 Nodes (5): Verify upgrade and rollback state transitions against the XR simulator., run(), execute(), main(), Non-networked IOS XR transaction simulator for rehearsal only.
+
+### Community 16 - "Operations runbook"
+Cohesion: 0.29
+Nodes (7): Back up and restore state, Decommission, Failure handling, Logs and capacity, Operations runbook, Start and verify, Stop and upgrade
 
 ### Community 17 - "build-giso.sh"
 Cohesion: 0.70
 Nodes (4): die(), md5_file(), build-giso.sh script, usage()
 
+### Community 18 - "Testing and acceptance"
+Cohesion: 0.33
+Nodes (6): 1. Static and unit verification, 2. Container smoke test, 3. Licensed-ISO acceptance test, 4. Matching-hardware validation, Reporting results, Testing and acceptance
+
 ### Community 20 - "Release notes"
 Cohesion: 0.40
 Nodes (4): Release notes, Release safety, Unreleased, Validation status
+
+### Community 21 - "Security policy"
+Cohesion: 0.33
+Nodes (6): Deployment boundary, Operational controls, Reporting a vulnerability, Security policy, Sensitive data, Supported version
+
+### Community 22 - "Platform support and validation"
+Cohesion: 0.40
+Nodes (5): Option rules, Platform matrix, Platform support and validation, SMU compatibility checks, Source of truth
 
 ### Community 23 - "coord.sh script"
 Cohesion: 0.83
@@ -140,6 +159,10 @@ Nodes (3): coord.sh script, slug(), usage()
 ### Community 24 - "worktree.sh"
 Cohesion: 0.83
 Nodes (3): worktree.sh script, usage(), validate()
+
+### Community 26 - "CONTRIBUTING.md"
+Cohesion: 0.50
+Nodes (3): Contributing, Coordination and branches, Local verification
 
 ### Community 31 - "TODO — Concrete Bug Audit"
 Cohesion: 0.09
@@ -184,7 +207,7 @@ Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 ## Knowledge Gaps
 - **182 isolated node(s):** `inputs`, `platformProfiles`, `drop`, `GitHub Copilot repository instructions`, `Mandatory project roadmap and Graphify — read before doing anything` (+177 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 315 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
