@@ -27,7 +27,9 @@ from flask import (
 )
 from platform_validation import (
     PLATFORMS,
+    RPM_ARCHITECTURE,
     check_upgrade_matrix,
+    normalize_architecture,
     platform_profile,
     recommend_smu_selection,
     validate_platform_options,
@@ -47,6 +49,9 @@ app.logger.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
 DOCKER_BIN = os.environ.get("DOCKER_BIN", "/usr/bin/docker")
 if not Path(DOCKER_BIN).is_absolute():
     raise RuntimeError("DOCKER_BIN must be an absolute path")
+ISOINFO_BIN = os.environ.get("ISOINFO_BIN", "/usr/bin/isoinfo")
+if not Path(ISOINFO_BIN).is_absolute():
+    raise RuntimeError("ISOINFO_BIN must be an absolute path")
 DATA = Path(os.environ.get("DATA_ROOT", "/data")).resolve()
 OUTPUT = Path(os.environ.get("OUTPUT_ROOT", "/output")).resolve()
 TOOL = Path(os.environ.get("TOOL_ROOT", "/tool")).resolve()
@@ -65,6 +70,7 @@ cisco_searches: dict[str, dict] = {}
 cisco_download_jobs: dict[str, dict] = {}
 cisco_api_client: CiscoSoftwareClient | None = None
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
+iso_architecture_cache: dict[tuple[str, int, int], frozenset[str]] = {}
 job_lock = threading.RLock()
 upload_lock = threading.Lock()
 archive_lock = threading.RLock()
@@ -81,6 +87,9 @@ MAX_CHUNK_BYTES = int(os.environ.get("MAX_CHUNK_BYTES", str(16 * 1024**2)))
 MAX_LOG_BYTES = int(os.environ.get("MAX_LOG_BYTES", str(10 * 1024**2)))
 MAX_SUPERSEDENCE_FILE_BYTES = 2 * 1024**2
 MAX_SUPERSEDENCE_TOTAL_BYTES = 16 * 1024**2
+MAX_ISO_INSPECTION_OUTPUT_BYTES = 8 * 1024**2
+ISO_MDATA_TIMEOUT_SECONDS = 30
+ISO_LISTING_TIMEOUT_SECONDS = 60
 MAX_JOB_HISTORY = int(os.environ.get("MAX_JOB_HISTORY", "100"))
 ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
 MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
@@ -447,6 +456,92 @@ def file_checksums(path: Path) -> dict[str, str]:
             checksum_cache.pop(next(iter(checksum_cache)))
         checksum_cache[key] = result
         return result
+
+
+ISO_MDATA_X86_64_LIST = re.compile(
+    r"^x86_64 supported arch list:\s*(?P<value>\S.*)$", re.IGNORECASE | re.MULTILINE
+)
+ISO_MDATA_ARM_LIST = re.compile(
+    r"^arm supported arch list:\s*(?P<value>\S.*)$", re.IGNORECASE | re.MULTILINE
+)
+
+
+def iso_architectures_from_mdata(text: str) -> frozenset[str]:
+    """Read the canonical arch families straight from an eXR ``iosxr_image_mdata.yml``.
+
+    Upstream (src/exrmod/gisobuild_exr_engine.py) reads this file's "x86_64
+    supported arch list" / "arm supported arch list" keys as the authoritative
+    processor-family membership for the ISO. A narrow key match, not a full
+    YAML parse, is used deliberately: this text comes from inside an uploaded
+    ISO and a full parse of untrusted, unbounded content is unnecessary risk
+    when only two known keys are needed.
+    """
+    architectures: set[str] = set()
+    if ISO_MDATA_X86_64_LIST.search(text):
+        architectures.add("x86_64")
+    if ISO_MDATA_ARM_LIST.search(text):
+        architectures.add("aarch64")
+    return frozenset(architectures)
+
+
+def iso_architectures_from_listing(text: str) -> frozenset[str]:
+    """Fall back to the ISO's own RPM repository when no eXR metadata file exists.
+
+    LNT images carry their RPM repository directly on the ISO with the plain
+    x86_64/aarch64/arm64 filename suffix, so the same RPM_ARCHITECTURE
+    resolver used for operator-selected RPMs applies here.
+    """
+    architectures: set[str] = set()
+    for line in text.splitlines():
+        name = line.strip().split(";")[0].strip()
+        if not name.lower().endswith(".rpm"):
+            continue
+        match = RPM_ARCHITECTURE.search(name)
+        if match:
+            canonical = normalize_architecture(match.group("architecture"))
+            if canonical:
+                architectures.add(canonical)
+    return frozenset(architectures)
+
+
+def inspect_iso_architecture(iso_path: Path) -> frozenset[str]:
+    """Best-effort processor-architecture detection straight from the ISO contents.
+
+    Returns an empty frozenset when detection is inconclusive (missing
+    isoinfo, an ISO format isoinfo cannot read, or no recognizable RPM
+    architecture suffixes). Callers must treat an empty result as "unknown",
+    never as "no architecture", so an upstream-valid image is never blocked
+    solely because local inspection failed.
+    """
+    with checksum_lock:
+        stat = iso_path.stat()
+        key = (str(iso_path), stat.st_size, stat.st_mtime_ns)
+        if key in iso_architecture_cache:
+            return iso_architecture_cache[key]
+    architectures = frozenset()
+    try:
+        mdata = subprocess.run(
+            [ISOINFO_BIN, "-R", "-i", str(iso_path), "-x", "/iosxr_image_mdata.yml"],
+            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS,
+        )
+        if mdata.returncode == 0 and mdata.stdout.strip():
+            architectures = iso_architectures_from_mdata(mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES])
+        if not architectures:
+            listing = subprocess.run(
+                [ISOINFO_BIN, "-R", "-l", "-i", str(iso_path)],
+                capture_output=True, text=True, timeout=ISO_LISTING_TIMEOUT_SECONDS,
+            )
+            if listing.returncode == 0:
+                architectures = iso_architectures_from_listing(
+                    listing.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES]
+                )
+    except (OSError, subprocess.SubprocessError):
+        architectures = frozenset()
+    with checksum_lock:
+        if len(iso_architecture_cache) >= 256:
+            iso_architecture_cache.pop(next(iter(iso_architecture_cache)))
+        iso_architecture_cache[key] = architectures
+    return architectures
 
 
 def inventory_id(relative_path: str, sha256: str) -> str:
