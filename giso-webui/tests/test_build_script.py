@@ -139,6 +139,29 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("compatibilityList('Fix before building', blockers, 'fail')", fn)
         self.assertIn("'bad'", fn)
 
+    def test_expected_output_is_shown_during_review_not_only_at_final_confirmation(self):
+        # expected_outputs (ISO/USB) previously existed only in the
+        # /api/build-plan response, shown only in the final "Start build?"
+        # confirmation dialog text - never persistently during Step 2 review.
+        # expectedOutputText() computes the same thing (a platform's
+        # usb_image capability, folded with the live "Skip USB image"
+        # checkbox) from data already available during review: the automatic
+        # plan's platform and /api/platforms' per-platform capabilities.
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        self.assertIn("function expectedOutputText(platformId)", script)
+        expected_fn = script[script.index("function expectedOutputText(platformId)"):]
+        expected_fn = expected_fn[:expected_fn.index("\n}\n")]
+        self.assertIn("profile.capabilities?.usb_image", expected_fn)
+        self.assertIn("skip_usb_image", expected_fn)
+        plan_fn = script[script.index("function applySmuRecommendation(plan)"):]
+        plan_fn = plan_fn[:plan_fn.index("\nfunction smuGroupCard")]
+        self.assertIn("expectedOutputText(plan.platform)", plan_fn)
+        self.assertIn("expected-output-value", plan_fn)
+        # Toggling the checkbox or the manual platform override afterwards
+        # must refresh the same field live, not just at plan-calculation time.
+        self.assertIn("addEventListener('change', refreshExpectedOutput)", script)
+        self.assertIn("refreshExpectedOutput()", script[script.index("$('[name=platform]').addEventListener"):])
+
     def test_start_build_button_names_exactly_what_is_missing(self):
         # Previously the disabled hint always said "Waiting for an ISO and a
         # customization", even once one of those two was already satisfied -

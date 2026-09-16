@@ -143,9 +143,27 @@ function updateAutomaticTargetRelease(release) {
   }
 }
 
+function expectedOutputText(platformId) {
+  const profile=platformProfiles.find(item=>item.id === platformId);
+  if (!profile) return '—';
+  const usb=Boolean(profile.capabilities?.usb_image) && !$('[name=skip_usb_image]').checked;
+  return usb ? 'ISO + USB' : 'ISO only';
+}
+
+function refreshExpectedOutput() {
+  const value=$('#expected-output-value');
+  if (value) value.textContent=expectedOutputText($('[name=platform]').value || detectedPlatform);
+}
+$('[name=skip_usb_image]').addEventListener('change', refreshExpectedOutput);
+
 function applySmuRecommendation(plan) {
   detectedPlatform = plan.platform || '';
   if (!packageListEdited) $('[name=pkglist]').value=(plan.selected || []).join('\n');
+  // updatePlatformControls() force-checks "Skip USB image" for a platform
+  // without USB capability - run it before computing the "Expected output"
+  // field below so that field reflects the *new* platform's real USB
+  // capability, not a stale checkbox state left over from a previous plan.
+  updatePlatformControls();
   const blockers=plan.blockers || [];
   const blocked=plan.ready && blockers.length > 0;
   const state=$('#smu-plan-state'); const title=$('#smu-auto-plan-title'); const message=$('#smu-plan-message');
@@ -161,9 +179,12 @@ function applySmuRecommendation(plan) {
     const flow=document.createElement('div'); flow.className='smu-plan-flow';
     [['Base ISO',plan.iso],['Platform',String(plan.platform || '').toUpperCase()],
      ['Engine',profile ? profile.architecture.toUpperCase() : '—'],
-     ['IOS XR',plan.release],['Selected',`${plan.selected.length} RPMs`]].forEach(([label,value],index)=>{
+     ['IOS XR',plan.release],['Selected',`${plan.selected.length} RPMs`],
+     ['Expected output',expectedOutputText(plan.platform)]].forEach(([label,value],index)=>{
       if (index) { const arrow=document.createElement('span'); arrow.setAttribute('aria-hidden','true'); arrow.textContent='→'; flow.appendChild(arrow); }
-      const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label; const strong=document.createElement('b'); strong.textContent=value; step.append(small,strong); flow.appendChild(step);
+      const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label; const strong=document.createElement('b'); strong.textContent=value;
+      if (label === 'Expected output') strong.id='expected-output-value';
+      step.append(small,strong); flow.appendChild(step);
     });
     details.appendChild(flow);
     if (plan.confidence) details.appendChild(confidenceGrid(plan.confidence));
@@ -193,7 +214,6 @@ function applySmuRecommendation(plan) {
     const excluded=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`${plan.excluded.length} incompatible RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically`;
     const list=document.createElement('ul'); plan.excluded.forEach(item=>{const row=document.createElement('li'); row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);}); excluded.append(summary,list); details.appendChild(excluded);
   }
-  updatePlatformControls();
   updateBuildAvailability();
 }
 
@@ -998,7 +1018,7 @@ $('[name=iso_override]').addEventListener('change',()=>{
   refreshSmuRecommendation();
 });
 $('[name=target_release]').addEventListener('input',()=>{ targetReleaseIsAutomatic=false; });
-$('[name=platform]').addEventListener('change',updatePlatformControls);
+$('[name=platform]').addEventListener('change',()=>{ updatePlatformControls(); refreshExpectedOutput(); });
 $('#check-compatibility').onclick=checkCompatibility;
 document.querySelectorAll('[name=compatibility_mode]').forEach(control=>control.addEventListener('change', updateCompatibilityMode));
 updateCompatibilityMode();

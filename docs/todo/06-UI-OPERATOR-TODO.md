@@ -88,9 +88,26 @@ Show:
       `test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation`
       in `giso-webui/tests/test_build_script.py` (frontend rendering); full
       217-test suite passes, ruff clean, Graphify refreshed.
-- [ ] expected output — `expected_outputs` (ISO/USB) exists only in the
-      `/api/build-plan` response, shown only in the final confirmation
-      dialog text, not persistently during Step 2.
+- [x] expected output — fixed 2026-09-16: rather than duplicating
+      `/api/build-plan`'s `expected_outputs` computation server-side (which
+      needs the payload's `skip_usb_image` toggle, not available in the
+      lighter-weight `/api/smu/recommendation`/`discover()` preview),
+      `expectedOutputText()` in `giso-webui/static/app.js` computes the same
+      ISO-vs-USB answer client-side from data the Step 2 review already has:
+      the automatic plan's platform and each platform's `usb_image`
+      capability from `/api/platforms`, folded with the live "Skip USB
+      image" checkbox. Rendered as a persistent "Expected output" field
+      (`#expected-output-value`) in the same `smu-plan-flow` row as
+      Platform/Engine/IOS XR, and kept live afterwards: toggling "Skip USB
+      image" or manually overriding the platform in Expert settings updates
+      it in place via `refreshExpectedOutput()`, without recalculating the
+      whole plan. Verified by
+      `test_expected_output_is_shown_during_review_not_only_at_final_confirmation`
+      in `giso-webui/tests/test_build_script.py`, and confirmed live: uploaded
+      an NCS 5500 ISO to the running container and saw "ISO + USB" render
+      immediately, then flip to "ISO only" the instant "Skip USB image" was
+      checked, with no other action taken. Full 218-test suite passes, ruff
+      clean, Graphify refreshed.
 - [ ] free disk estimate — not implemented anywhere; no endpoint currently
       returns a projected build-output size versus available space (the
       backend only ever compares against `MIN_FREE_BYTES` internally when
