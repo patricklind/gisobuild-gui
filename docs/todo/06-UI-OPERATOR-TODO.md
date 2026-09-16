@@ -151,6 +151,30 @@ Show:
       the shared persistent volumes) by fetching a real `router.cfg`
       through the running UI and by exercising the traversal-rejection and
       missing-file paths.
+- [x] make every Expert-settings group collapsible, not just some of them —
+      fixed 2026-09-16 after the operator opened "Expert settings" and found
+      it hard to use: "1. Image identity" and "2. SMU compatibility" were
+      plain always-expanded `<section>`s, so opening the outer "Expert
+      settings" `<details>` dumped two large blocks of fields (including the
+      whole SMU compatibility-check UI) on screen at once, while the other
+      three groups (Additional files, LNT controls, Build behavior) were
+      already collapsible `<details>`. That inconsistency, not any one
+      field, was the actual "not easy to use" problem — matching
+      `docs/AI-MASTER-PROMPT.md` "UI principles"' explicit "avoid giant
+      forms" / "consistent typography and spacing" guidance. Converted both
+      remaining `<section class="expert-group">` blocks in
+      `giso-webui/templates/index.html` to `<details class="expert-group">`
+      with a plain `<summary>` (dropping the now-redundant `<h3
+      id="smu-compatibility-title">` / `aria-labelledby` pair, since a
+      `<summary>` is already the accessible name for its `<details>`).
+      Opening "Expert settings" now shows five short, equally-collapsed
+      group headers instead of a wall of fields. No JS in `app.js` or
+      `manual-packages.js` referenced `smu-compatibility-title` or depended
+      on either group being a `<section>`; the 190-test suite still passes
+      unchanged. Confirmed live in a browser: all five groups list as
+      `DETAILS` elements, and each expands/collapses independently on
+      click.
+
 ## Automatic by default
 
 Do not ask for these unless ambiguous:

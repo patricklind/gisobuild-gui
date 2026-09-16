@@ -7999,7 +7999,7 @@
       "node_kind": "heading",
       "norm_label": "automatic by default",
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L128"
+      "source_location": "L178"
     },
     {
       "id": "docs_todo_06_ui_operator_todo_confidence_display",
@@ -8011,7 +8011,7 @@
       "node_kind": "heading",
       "norm_label": "confidence display",
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L199"
+      "source_location": "L249"
     },
     {
       "id": "docs_todo_06_ui_operator_todo_expert_settings",
@@ -8023,7 +8023,7 @@
       "node_kind": "heading",
       "norm_label": "expert settings",
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L149"
+      "source_location": "L199"
     },
     {
       "id": "docs_todo_06_ui_operator_todo_explain_decisions",
@@ -8035,7 +8035,7 @@
       "node_kind": "heading",
       "norm_label": "explain decisions",
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L167"
+      "source_location": "L217"
     },
     {
       "id": "docs_todo_06_ui_operator_todo_normal_workflow",
@@ -8071,7 +8071,7 @@
       "node_kind": "heading",
       "norm_label": "search and filtering (`docs/ai-master-prompt.md` section 55)",
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L244"
+      "source_location": "L294"
     },
     {
       "id": "docs_todo_06_ui_operator_todo_step_1_files",
@@ -17222,17 +17222,6 @@
     },
     {
       "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
-      "target": "docs_todo_06_ui_operator_todo_automatic_by_default",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L128",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
       "target": "docs_todo_06_ui_operator_todo_normal_workflow",
       "relation": "contains",
       "_origin": "ast",
@@ -17244,29 +17233,18 @@
     },
     {
       "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
+      "target": "docs_todo_06_ui_operator_todo_automatic_by_default",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
+      "source_location": "L178",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
       "target": "docs_todo_06_ui_operator_todo_expert_settings",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L149",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
-      "target": "docs_todo_06_ui_operator_todo_explain_decisions",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L167",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
-      "target": "docs_todo_06_ui_operator_todo_confidence_display",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -17277,13 +17255,35 @@
     },
     {
       "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
+      "target": "docs_todo_06_ui_operator_todo_explain_decisions",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
+      "source_location": "L217",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
+      "target": "docs_todo_06_ui_operator_todo_confidence_display",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
+      "source_location": "L249",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_06_ui_operator_todo_todo_operator_ux",
       "target": "docs_todo_06_ui_operator_todo_search_and_filtering_docs_ai_master_prompt_md_section_55",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L244",
+      "source_location": "L294",
       "weight": 1.0
     },
     {
@@ -23955,5 +23955,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "1bc8ac4657f06b60fefbcd8512c55826fa4c6be8"
+  "built_at_commit": "54a33fa7e6cc212692547b354f0743ed203c6ac6"
 }
