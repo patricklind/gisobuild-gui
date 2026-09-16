@@ -98,8 +98,36 @@ MAX_FILE_PREVIEW_BYTES = 64 * 1024
 ISO_MDATA_TIMEOUT_SECONDS = 30
 ISO_LISTING_TIMEOUT_SECONDS = 60
 MAX_JOB_HISTORY = int(os.environ.get("MAX_JOB_HISTORY", "100"))
-ARCHIVE_RETENTION_DAYS = int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
-MAX_ARCHIVE_BYTES = int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
+
+
+def validate_archive_retention_days(value: int) -> int:
+    if value < 0:
+        # enforce_archive_policy()'s cutoff is time.time() -
+        # ARCHIVE_RETENTION_DAYS * 86400; a negative value pushes the cutoff
+        # into the future, so every archive - including one just created -
+        # looks "expired" and is deleted on the very next policy check. A
+        # misconfiguration typo must not silently destroy every build
+        # artifact; fail fast at startup instead.
+        raise RuntimeError("ARCHIVE_RETENTION_DAYS must not be negative")
+    return value
+
+
+def validate_max_archive_bytes(value: int) -> int:
+    if value <= 0:
+        # enforce_archive_policy() evicts the oldest archive while its total
+        # size exceeds this quota; zero or negative makes every archive
+        # "over quota" and evicts everything, immediately, on the next
+        # policy check.
+        raise RuntimeError("MAX_ARCHIVE_BYTES must be a positive number of bytes")
+    return value
+
+
+ARCHIVE_RETENTION_DAYS = validate_archive_retention_days(
+    int(os.environ.get("ARCHIVE_RETENTION_DAYS", "30"))
+)
+MAX_ARCHIVE_BYTES = validate_max_archive_bytes(
+    int(os.environ.get("MAX_ARCHIVE_BYTES", str(50 * 1024**3)))
+)
 UPLOAD_SESSION_TTL = int(os.environ.get("UPLOAD_SESSION_TTL", str(24 * 60 * 60)))
 GISO_PULL_TIMEOUT_SECONDS = int(os.environ.get("GISO_PULL_TIMEOUT_SECONDS", "600"))
 CISCO_DOWNLOAD_TIMEOUT_SECONDS = int(os.environ.get("CISCO_DOWNLOAD_TIMEOUT_SECONDS", "60"))

@@ -742,6 +742,22 @@ class GisoWebTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Docker image reference"):
             module.validate_image_reference("--privileged")
 
+    def test_negative_archive_retention_days_is_rejected(self):
+        # A negative value pushes enforce_archive_policy()'s cutoff into the
+        # future, which would delete every archive - including one just
+        # created - on the very next policy check. A misconfiguration typo
+        # must fail fast at startup, not silently destroy every artifact.
+        with self.assertRaisesRegex(RuntimeError, "ARCHIVE_RETENTION_DAYS must not be negative"):
+            module.validate_archive_retention_days(-1)
+
+    def test_zero_archive_retention_days_is_accepted(self):
+        self.assertEqual(module.validate_archive_retention_days(0), 0)
+
+    def test_non_positive_max_archive_bytes_is_rejected(self):
+        for value in (0, -1):
+            with self.assertRaisesRegex(RuntimeError, "MAX_ARCHIVE_BYTES must be a positive number"):
+                module.validate_max_archive_bytes(value)
+
     def test_log_is_bounded(self):
         module.jobs["job"] = {"log": "", "updated": 0, "progress": 0, "phase": ""}
         with patch.object(module, "MAX_LOG_BYTES", 32):

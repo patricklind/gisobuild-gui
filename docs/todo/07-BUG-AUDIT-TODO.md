@@ -57,6 +57,48 @@ fixed a second bug while verifying the first: the initial version called
 before any of this new detail could render, collapsing every failure back
 into the old generic message — only actually testing it live surfaced this.
 
+## P1 — Misconfiguration can silently destroy archived artifacts
+
+### `ARCHIVE_RETENTION_DAYS`/`MAX_ARCHIVE_BYTES` were never validated (2026-09-16)
+
+Current behavior (before this fix):
+
+`ARCHIVE_RETENTION_DAYS` and `MAX_ARCHIVE_BYTES` in `giso-webui/app.py` were
+read straight from their environment variables with no range check. A
+negative `ARCHIVE_RETENTION_DAYS` pushes `enforce_archive_policy()`'s cutoff
+(`time.time() - ARCHIVE_RETENTION_DAYS * 86400`) into the *future*, so every
+archive — including one just created — looks expired and is deleted on the
+very next policy check (the `archive-maintenance` container runs this every
+`ARCHIVE_CLEANUP_INTERVAL_SECONDS`, an hour by default). A zero or negative
+`MAX_ARCHIVE_BYTES` makes every archive "over quota" the same way. A
+deployment typo — an extra `-`, a decimal point turning `30` into `300000`
+misread as `0`, or similar — would silently wipe out every completed Golden
+ISO the next time the maintenance loop ran, with no warning beforehand.
+
+TODO:
+
+- [x] Reject a negative `ARCHIVE_RETENTION_DAYS` at startup.
+- [x] Reject a zero or negative `MAX_ARCHIVE_BYTES` at startup.
+- [x] Add regression tests for both.
+
+Fix: extracted `validate_archive_retention_days()` and
+`validate_max_archive_bytes()` (matching the existing
+`validate_image_reference()`/`DOCKER_BIN`/`ISOINFO_BIN` pattern of failing
+fast at module import time for a nonsensical config value) and wired them
+into both globals' initialization. `maintenance.py` needed no change: it
+imports `enforce_archive_policy` from `app`, so the same validation already
+guards the separate `archive-maintenance` container.
+
+Verified by `test_negative_archive_retention_days_is_rejected`,
+`test_zero_archive_retention_days_is_accepted` (zero days is a legitimate,
+if aggressive, explicit choice — only *negative* is nonsensical), and
+`test_non_positive_max_archive_bytes_is_rejected` in
+`giso-webui/tests/test_app.py`; full suite green (203 tests). Confirmed
+live: `docker run -e ARCHIVE_RETENTION_DAYS=-5 ... python3 -c "import app"`
+and the `MAX_ARCHIVE_BYTES=0` equivalent both fail immediately with the new,
+clear `RuntimeError`, while a plain `import app` with no overrides still
+succeeds. ruff and Graphify clean.
+
 ## P0/P1 — Build lifecycle and destructive cleanup
 
 ### Cancellation during image pull cannot reliably cancel the build
