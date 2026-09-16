@@ -57,15 +57,37 @@ Show:
       `giso-webui/tests/test_platform_compatibility.py`, and confirmed live:
       uploaded a matching ISO+RPM pair to the running container and saw the
       warning render in a real browser.
-- [ ] blockers — the persistent Step 2 panel shows `plan.message` (a single
-      string) when automatic selection can't proceed, but the richer,
-      itemized `blockers` array that `/api/build-plan` computes (e.g. a
-      specific architecture mismatch, a stale-plan fingerprint conflict) is
-      only ever seen at the final "Start build" confirmation, not during
-      ongoing review. `discover()`/`/api/smu/recommendation` return
-      `recommend_smu_selection()`'s shape, which has no `blockers` field at
-      all — closing this gap means either calling `/api/build-plan` from the
-      Review step too, or adding an equivalent field there.
+- [x] blockers — fixed 2026-09-16: `recommend_smu_selection()` in
+      `giso-webui/platform_validation.py` already ran `validate_smu_selection()`
+      against the automatically-selected package set internally (to compute
+      `package_groups`/`component_conflicts`) but discarded its `issues` list —
+      the exact same "warnings" bug already fixed above, but for the blocking
+      case. In practice this meant an automatic selection could pick two RPMs
+      for the same component and CSC at different versions (both individually
+      pass the platform/release filename filters that gate automatic
+      selection) and the persistent Step 2 panel would still show a green
+      "Calculated" pill and `plan.message` ("Selected N matching RPMs…") with
+      no hint of the problem — the operator only found out when `/api/build-plan`
+      rejected it at the final "Start build" click. `recommend_smu_selection()`
+      now returns `analysis["issues"]` as a `blockers` field (same shape
+      `/api/build-plan`'s own `blockers` already used); `discover()` and
+      `/api/smu/recommendation` both return this shape unchanged, so no
+      backend endpoint change was needed. `app.js`'s `applySmuRecommendation()`
+      now renders a red "Fix before building" list via the existing
+      `compatibilityList()` helper and switches the state pill to "Blocked"
+      (red) instead of "Calculated" (green) whenever blockers are present.
+      This does not (and does not need to) duplicate every blocker
+      `/api/build-plan` can produce — the other blocker sources there (no ISO
+      selected yet, platform/release undetectable, an Expert-settings manual
+      platform override that fails validation) are either already visible via
+      the existing not-ready pill/message, or only apply once the operator
+      has left automatic selection, so they remain correctly gated at final
+      confirmation. Verified by
+      `test_automatic_selection_surfaces_a_real_blocking_issue` in
+      `giso-webui/tests/test_platform_compatibility.py` (backend) and
+      `test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation`
+      in `giso-webui/tests/test_build_script.py` (frontend rendering); full
+      217-test suite passes, ruff clean, Graphify refreshed.
 - [ ] expected output — `expected_outputs` (ISO/USB) exists only in the
       `/api/build-plan` response, shown only in the final confirmation
       dialog text, not persistently during Step 2.

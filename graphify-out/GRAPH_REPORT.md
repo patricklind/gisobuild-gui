@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-16)
 
 ## Corpus Check
-- 49 files · ~65,904 words
+- 49 files · ~66,249 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 14 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 1)
 
 ## Summary
-- 849 nodes · 1325 edges · 56 communities (38 shown, 12 thin omitted)
+- 851 nodes · 1329 edges · 56 communities (38 shown, 12 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 21 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `68c59501`
+- Built from commit: `e419210f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -69,14 +69,14 @@
 
 ## God Nodes (most connected - your core abstractions)
 1. `GisoWebTests` - 158 edges
-2. `PlatformCompatibilityTests` - 26 edges
+2. `PlatformCompatibilityTests` - 27 edges
 3. `CiscoDownloadError` - 21 edges
 4. `validate_smu_selection()` - 21 edges
-5. `BuildScriptTests` - 20 edges
+5. `BuildScriptTests` - 21 edges
 6. `CiscoSoftwareClient` - 19 edges
 7. `AI Master Prompt — Cisco IOS-XR GISO Build Web UI` - 18 edges
-8. `create_build_plan()` - 15 edges
-9. `recommend_smu_selection()` - 15 edges
+8. `recommend_smu_selection()` - 16 edges
+9. `create_build_plan()` - 15 edges
 10. `api()` - 15 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -250,7 +250,7 @@ Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked cod
 
 ## Knowledge Gaps
 - **231 isolated node(s):** `inputs`, `platformProfiles`, `CONFIDENCE_LABELS`, `READY_CHECK_LABELS`, `drop` (+226 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 455 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 456 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions

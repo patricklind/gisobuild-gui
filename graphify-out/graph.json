@@ -2569,7 +2569,7 @@
       "file_type": "code",
       "norm_label": "applyarchivefilter()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L437"
+      "source_location": "L444"
     },
     {
       "id": "giso_webui_static_app_applyciscoresultsfilter",
@@ -2581,7 +2581,7 @@
       "file_type": "code",
       "norm_label": "applyciscoresultsfilter()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L877"
+      "source_location": "L884"
     },
     {
       "id": "giso_webui_static_app_applysmurecommendation",
@@ -2605,7 +2605,7 @@
       "file_type": "code",
       "norm_label": "buildreportfield()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L677"
+      "source_location": "L684"
     },
     {
       "id": "giso_webui_static_app_checkcompatibility",
@@ -2617,7 +2617,7 @@
       "file_type": "code",
       "norm_label": "checkcompatibility()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L300"
+      "source_location": "L307"
     },
     {
       "id": "giso_webui_static_app_checksumrow",
@@ -2629,7 +2629,7 @@
       "file_type": "code",
       "norm_label": "checksumrow()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L491"
+      "source_location": "L498"
     },
     {
       "id": "giso_webui_static_app_compatibilitylist",
@@ -2641,7 +2641,7 @@
       "file_type": "code",
       "norm_label": "compatibilitylist()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L330"
+      "source_location": "L337"
     },
     {
       "id": "giso_webui_static_app_compatibilitymetric",
@@ -2653,7 +2653,7 @@
       "file_type": "code",
       "norm_label": "compatibilitymetric()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L323"
+      "source_location": "L330"
     },
     {
       "id": "giso_webui_static_app_confidencegrid",
@@ -2665,7 +2665,7 @@
       "file_type": "code",
       "norm_label": "confidencegrid()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L218"
+      "source_location": "L225"
     },
     {
       "id": "giso_webui_static_app_copytext",
@@ -2689,7 +2689,7 @@
       "file_type": "code",
       "norm_label": "filerow()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L275"
+      "source_location": "L282"
     },
     {
       "id": "giso_webui_static_app_health",
@@ -2701,7 +2701,7 @@
       "file_type": "code",
       "norm_label": "health()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L565"
+      "source_location": "L572"
     },
     {
       "id": "giso_webui_static_app_lines",
@@ -2725,7 +2725,7 @@
       "file_type": "code",
       "norm_label": "loadarchive()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L445"
+      "source_location": "L452"
     },
     {
       "id": "giso_webui_static_app_loadinputs",
@@ -2737,7 +2737,7 @@
       "file_type": "code",
       "norm_label": "loadinputs()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L282"
+      "source_location": "L289"
     },
     {
       "id": "giso_webui_static_app_loadplatforms",
@@ -2749,7 +2749,7 @@
       "file_type": "code",
       "norm_label": "loadplatforms()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L287"
+      "source_location": "L294"
     },
     {
       "id": "giso_webui_static_app_loadstorage",
@@ -2761,7 +2761,7 @@
       "file_type": "code",
       "norm_label": "loadstorage()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L427"
+      "source_location": "L434"
     },
     {
       "id": "giso_webui_static_app_loadversion",
@@ -2773,7 +2773,7 @@
       "file_type": "code",
       "norm_label": "loadversion()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L605"
+      "source_location": "L612"
     },
     {
       "id": "giso_webui_static_app_openupgradeguide",
@@ -2785,7 +2785,7 @@
       "file_type": "code",
       "norm_label": "openupgradeguide()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L500"
+      "source_location": "L507"
     },
     {
       "id": "giso_webui_static_app_poll",
@@ -2797,7 +2797,7 @@
       "file_type": "code",
       "norm_label": "poll()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L760"
+      "source_location": "L767"
     },
     {
       "id": "giso_webui_static_app_pollactivity",
@@ -2809,7 +2809,7 @@
       "file_type": "code",
       "norm_label": "pollactivity()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L802"
+      "source_location": "L809"
     },
     {
       "id": "giso_webui_static_app_pollciscodownload",
@@ -2821,7 +2821,7 @@
       "file_type": "code",
       "norm_label": "pollciscodownload()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L852"
+      "source_location": "L859"
     },
     {
       "id": "giso_webui_static_app_previewfile",
@@ -2833,7 +2833,7 @@
       "file_type": "code",
       "norm_label": "previewfile()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L613"
+      "source_location": "L620"
     },
     {
       "id": "giso_webui_static_app_refreshsmurecommendation",
@@ -2845,7 +2845,7 @@
       "file_type": "code",
       "norm_label": "refreshsmurecommendation()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L237"
+      "source_location": "L244"
     },
     {
       "id": "giso_webui_static_app_renderbuildreport",
@@ -2857,7 +2857,7 @@
       "file_type": "code",
       "norm_label": "renderbuildreport()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L682"
+      "source_location": "L689"
     },
     {
       "id": "giso_webui_static_app_rendercompatibilityresult",
@@ -2869,7 +2869,7 @@
       "file_type": "code",
       "norm_label": "rendercompatibilityresult()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L338"
+      "source_location": "L345"
     },
     {
       "id": "giso_webui_static_app_renderinputs",
@@ -2893,7 +2893,7 @@
       "file_type": "code",
       "norm_label": "rendermissingdependencies()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L743"
+      "source_location": "L750"
     },
     {
       "id": "giso_webui_static_app_restorejob",
@@ -2905,7 +2905,7 @@
       "file_type": "code",
       "norm_label": "restorejob()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L814"
+      "source_location": "L821"
     },
     {
       "id": "giso_webui_static_app_selectedpackages",
@@ -2977,7 +2977,7 @@
       "file_type": "code",
       "norm_label": "smugroupcard()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L202"
+      "source_location": "L209"
     },
     {
       "id": "giso_webui_static_app_startciscodownload",
@@ -2989,7 +2989,7 @@
       "file_type": "code",
       "norm_label": "startciscodownload()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L864"
+      "source_location": "L871"
     },
     {
       "id": "giso_webui_static_app_updateautomatictargetrelease",
@@ -3013,7 +3013,7 @@
       "file_type": "code",
       "norm_label": "updatebuildavailability()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L248"
+      "source_location": "L255"
     },
     {
       "id": "giso_webui_static_app_updatecompatibilitymode",
@@ -3025,7 +3025,7 @@
       "file_type": "code",
       "norm_label": "updatecompatibilitymode()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L373"
+      "source_location": "L380"
     },
     {
       "id": "giso_webui_static_app_updateguideworkflow",
@@ -3037,7 +3037,7 @@
       "file_type": "code",
       "norm_label": "updateguideworkflow()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L507"
+      "source_location": "L514"
     },
     {
       "id": "giso_webui_static_app_updatepackageselectionmode",
@@ -3049,7 +3049,7 @@
       "file_type": "code",
       "norm_label": "updatepackageselectionmode()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L382"
+      "source_location": "L389"
     },
     {
       "id": "giso_webui_static_app_updateplatformcontrols",
@@ -3061,7 +3061,7 @@
       "file_type": "code",
       "norm_label": "updateplatformcontrols()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L393"
+      "source_location": "L400"
     },
     {
       "id": "giso_webui_static_app_updaterollbackworkflow",
@@ -3073,7 +3073,7 @@
       "file_type": "code",
       "norm_label": "updaterollbackworkflow()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L531"
+      "source_location": "L538"
     },
     {
       "id": "giso_webui_static_app_uploadfile",
@@ -3085,7 +3085,7 @@
       "file_type": "code",
       "norm_label": "uploadfile()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L823"
+      "source_location": "L830"
     },
     {
       "id": "giso_webui_static_app_uploadfiles",
@@ -3097,7 +3097,7 @@
       "file_type": "code",
       "norm_label": "uploadfiles()",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L847"
+      "source_location": "L854"
     },
     {
       "id": "giso_webui_static_manual_packages_appendpackage",
@@ -3685,7 +3685,7 @@
       "file_type": "code",
       "norm_label": "check_upgrade_matrix()",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L316"
+      "source_location": "L326"
     },
     {
       "id": "giso_webui_platform_validation_check_upgrade_matrix_matrix_platform",
@@ -3697,7 +3697,7 @@
       "file_type": "code",
       "norm_label": "matrix_platform()",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L327"
+      "source_location": "L337"
     },
     {
       "id": "giso_webui_platform_validation_gisobuildcapabilities_as_dict",
@@ -3793,7 +3793,7 @@
       "file_type": "code",
       "norm_label": "validate_platform_options()",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L364"
+      "source_location": "L374"
     },
     {
       "id": "giso_webui_platform_validation_validate_smu_selection",
@@ -3853,7 +3853,7 @@
       "file_type": "code",
       "norm_label": ".test_automatic_selection_excludes_wrong_architecture_rpms()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L213"
+      "source_location": "L232"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_automatic_selection_keeps_matching_repository_and_excludes_mismatches",
@@ -3876,6 +3876,18 @@
       "community_name": "PlatformCompatibilityTests",
       "file_type": "code",
       "norm_label": ".test_automatic_selection_refuses_to_guess_unknown_iso_release()",
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L110"
+    },
+    {
+      "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_automatic_selection_surfaces_a_real_blocking_issue",
+      "label": ".test_automatic_selection_surfaces_a_real_blocking_issue()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "PlatformCompatibilityTests",
+      "file_type": "code",
+      "norm_label": ".test_automatic_selection_surfaces_a_real_blocking_issue()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
       "source_location": "L91"
     },
@@ -3901,7 +3913,7 @@
       "file_type": "code",
       "norm_label": ".test_bridge_smu_near_match_is_not_accepted()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L247"
+      "source_location": "L266"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_capabilities_follow_upstream_exr_and_lnt_option_maps",
@@ -3925,7 +3937,7 @@
       "file_type": "code",
       "norm_label": ".test_csc_package_groups_show_components_that_belong_together()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L136"
+      "source_location": "L155"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_exr_arm_variant_token_normalizes_to_aarch64",
@@ -3937,7 +3949,7 @@
       "file_type": "code",
       "norm_label": ".test_exr_arm_variant_token_normalizes_to_aarch64()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L204"
+      "source_location": "L223"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_matching_platform_and_release_are_accepted",
@@ -3949,7 +3961,7 @@
       "file_type": "code",
       "norm_label": ".test_matching_platform_and_release_are_accepted()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L98"
+      "source_location": "L117"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_mixed_processor_architectures_are_rejected",
@@ -3961,7 +3973,7 @@
       "file_type": "code",
       "norm_label": ".test_mixed_processor_architectures_are_rejected()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L166"
+      "source_location": "L185"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_mixed_release_is_rejected",
@@ -3973,7 +3985,7 @@
       "file_type": "code",
       "norm_label": ".test_mixed_release_is_rejected()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L106"
+      "source_location": "L125"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_multiple_fixes_for_same_component_require_supersedence_data",
@@ -3985,7 +3997,7 @@
       "file_type": "code",
       "norm_label": ".test_multiple_fixes_for_same_component_require_supersedence_data()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L114"
+      "source_location": "L133"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_multiple_versions_of_same_component_and_fix_are_rejected",
@@ -3997,7 +4009,7 @@
       "file_type": "code",
       "norm_label": ".test_multiple_versions_of_same_component_and_fix_are_rejected()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L125"
+      "source_location": "L144"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_ncs57c3_filename_is_inferred_as_ncs57",
@@ -4033,7 +4045,7 @@
       "file_type": "code",
       "norm_label": ".test_overlapping_csc_fixes_are_explained()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L154"
+      "source_location": "L173"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_platform_specific_capabilities_are_narrow",
@@ -4057,7 +4069,7 @@
       "file_type": "code",
       "norm_label": ".test_rpm_architecture_matching_iso_is_accepted()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L187"
+      "source_location": "L206"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_rpm_architecture_mismatched_with_iso_is_rejected",
@@ -4069,7 +4081,7 @@
       "file_type": "code",
       "norm_label": ".test_rpm_architecture_mismatched_with_iso_is_rejected()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L177"
+      "source_location": "L196"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_unknown_iso_architecture_does_not_block_selection",
@@ -4081,7 +4093,7 @@
       "file_type": "code",
       "norm_label": ".test_unknown_iso_architecture_does_not_block_selection()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L195"
+      "source_location": "L214"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_upgrade_matrix_returns_bridge_smus_and_caveats",
@@ -4093,7 +4105,7 @@
       "file_type": "code",
       "norm_label": ".test_upgrade_matrix_returns_bridge_smus_and_caveats()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L230"
+      "source_location": "L249"
     },
     {
       "id": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_upgrade_matrix_uses_canonical_platform_normalization",
@@ -4105,7 +4117,7 @@
       "file_type": "code",
       "norm_label": ".test_upgrade_matrix_uses_canonical_platform_normalization()",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L240"
+      "source_location": "L259"
     },
     {
       "id": "giso_webui_app_append_activity",
@@ -5125,7 +5137,7 @@
       "file_type": "code",
       "norm_label": ".test_build_container_does_not_mount_entire_project()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L222"
+      "source_location": "L238"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_build_script_uses_unique_staging_and_rejects_option_like_images",
@@ -5137,7 +5149,7 @@
       "file_type": "code",
       "norm_label": ".test_build_script_uses_unique_staging_and_rejects_option_like_images()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L226"
+      "source_location": "L242"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_cisco_search_results_support_filtering_by_filename",
@@ -5173,7 +5185,7 @@
       "file_type": "code",
       "norm_label": ".test_clean_rejects_traversal_outside_standard_output()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L189"
+      "source_location": "L205"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_cleanup_resets_failed_artifacts_in_the_ui",
@@ -5197,7 +5209,7 @@
       "file_type": "code",
       "norm_label": ".test_expert_controls_follow_server_capabilities()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L173"
+      "source_location": "L189"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_lnt_only_defaults_do_not_block_exr_builds",
@@ -5209,7 +5221,7 @@
       "file_type": "code",
       "norm_label": ".test_lnt_only_defaults_do_not_block_exr_builds()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L153"
+      "source_location": "L169"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_manual_package_list_supports_compatible_and_selected_only_toggles",
@@ -5221,7 +5233,7 @@
       "file_type": "code",
       "norm_label": ".test_manual_package_list_supports_compatible_and_selected_only_toggles()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L138"
+      "source_location": "L154"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_manual_package_mode_renders_uploaded_rpms_as_choices",
@@ -5257,7 +5269,7 @@
       "file_type": "code",
       "norm_label": ".test_multiple_isos_block_automatic_selection_and_release_is_refreshed()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L181"
+      "source_location": "L197"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_real_iso_runner_rejects_non_local_url",
@@ -5269,7 +5281,7 @@
       "file_type": "code",
       "norm_label": ".test_real_iso_runner_rejects_non_local_url()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L255"
+      "source_location": "L271"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_real_iso_runner_url_encodes_archive_names",
@@ -5281,7 +5293,7 @@
       "file_type": "code",
       "norm_label": ".test_real_iso_runner_url_encodes_archive_names()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L251"
+      "source_location": "L267"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_real_iso_upload_uses_server_assigned_path",
@@ -5293,7 +5305,19 @@
       "file_type": "code",
       "norm_label": ".test_real_iso_upload_uses_server_assigned_path()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L240"
+      "source_location": "L256"
+    },
+    {
+      "id": "giso_webui_tests_test_build_script_buildscripttests_test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation",
+      "label": ".test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "BuildScriptTests",
+      "file_type": "code",
+      "norm_label": ".test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation()",
+      "source_file": "giso-webui/tests/test_build_script.py",
+      "source_location": "L126"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_start_build_button_names_exactly_what_is_missing",
@@ -5305,7 +5329,7 @@
       "file_type": "code",
       "norm_label": ".test_start_build_button_names_exactly_what_is_missing()",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L126"
+      "source_location": "L142"
     },
     {
       "id": "giso_webui_tests_test_build_script_buildscripttests_test_system_status_pill_uses_the_deep_readiness_check",
@@ -7000,7 +7024,7 @@
       "file_type": "code",
       "norm_label": "confidence_labels",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L212"
+      "source_location": "L219"
     },
     {
       "id": "giso_webui_static_app_drop",
@@ -7011,7 +7035,7 @@
       "file_type": "code",
       "norm_label": "drop",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L938"
+      "source_location": "L945"
     },
     {
       "id": "giso_webui_static_app_inputs",
@@ -7044,7 +7068,7 @@
       "file_type": "code",
       "norm_label": "ready_check_labels",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L557"
+      "source_location": "L564"
     },
     {
       "id": "scripts_coord_ps1_scripts_coord",
@@ -12730,7 +12754,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L326",
+      "source_location": "L336",
       "weight": 1.0
     },
     {
@@ -12742,7 +12766,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L331",
+      "source_location": "L341",
       "weight": 1.0
     },
     {
@@ -12826,7 +12850,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L366",
+      "source_location": "L376",
       "weight": 1.0
     },
     {
@@ -12838,7 +12862,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L366",
+      "source_location": "L376",
       "weight": 1.0
     },
     {
@@ -12850,7 +12874,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L369",
+      "source_location": "L379",
       "weight": 1.0
     },
     {
@@ -12886,7 +12910,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L164",
+      "source_location": "L169",
       "weight": 1.0
     },
     {
@@ -12898,7 +12922,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L169",
+      "source_location": "L174",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_static_app_applysmurecommendation",
+      "target": "giso_webui_static_app_compatibilitylist",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "giso-webui/static/app.js",
+      "source_location": "L183",
       "weight": 1.0
     },
     {
@@ -12910,7 +12946,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L189",
+      "source_location": "L196",
       "weight": 1.0
     },
     {
@@ -12922,7 +12958,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L190",
+      "source_location": "L197",
       "weight": 1.0
     },
     {
@@ -12934,7 +12970,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L303",
+      "source_location": "L310",
       "weight": 1.0
     },
     {
@@ -12946,7 +12982,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L314",
+      "source_location": "L321",
       "weight": 1.0
     },
     {
@@ -12958,7 +12994,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L318",
+      "source_location": "L325",
       "weight": 1.0
     },
     {
@@ -12970,7 +13006,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L496",
+      "source_location": "L503",
       "weight": 1.0
     },
     {
@@ -12994,7 +13030,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L447",
+      "source_location": "L454",
       "weight": 1.0
     },
     {
@@ -13006,7 +13042,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L465",
+      "source_location": "L472",
       "weight": 1.0
     },
     {
@@ -13018,7 +13054,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L475",
+      "source_location": "L482",
       "weight": 1.0
     },
     {
@@ -13030,7 +13066,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L477",
+      "source_location": "L484",
       "weight": 1.0
     },
     {
@@ -13042,7 +13078,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L480",
+      "source_location": "L487",
       "weight": 1.0
     },
     {
@@ -13054,7 +13090,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L481",
+      "source_location": "L488",
       "weight": 1.0
     },
     {
@@ -13066,35 +13102,11 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L487",
+      "source_location": "L494",
       "weight": 1.0
     },
     {
       "source": "giso_webui_static_app_loadinputs",
-      "target": "giso_webui_static_app_api",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "giso-webui/static/app.js",
-      "source_location": "L283",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_static_app_loadinputs",
-      "target": "giso_webui_static_app_renderinputs",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "giso-webui/static/app.js",
-      "source_location": "L283",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_static_app_loadplatforms",
       "target": "giso_webui_static_app_api",
       "relation": "calls",
       "_origin": "ast",
@@ -13106,6 +13118,30 @@
       "weight": 1.0
     },
     {
+      "source": "giso_webui_static_app_loadinputs",
+      "target": "giso_webui_static_app_renderinputs",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "giso-webui/static/app.js",
+      "source_location": "L290",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_static_app_loadplatforms",
+      "target": "giso_webui_static_app_api",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "giso-webui/static/app.js",
+      "source_location": "L297",
+      "weight": 1.0
+    },
+    {
       "source": "giso_webui_static_app_loadplatforms",
       "target": "giso_webui_static_app_updateplatformcontrols",
       "relation": "calls",
@@ -13114,7 +13150,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L296",
+      "source_location": "L303",
       "weight": 1.0
     },
     {
@@ -13126,7 +13162,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L429",
+      "source_location": "L436",
       "weight": 1.0
     },
     {
@@ -13138,7 +13174,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L607",
+      "source_location": "L614",
       "weight": 1.0
     },
     {
@@ -13150,7 +13186,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L503",
+      "source_location": "L510",
       "weight": 1.0
     },
     {
@@ -13162,7 +13198,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L765",
+      "source_location": "L772",
       "weight": 1.0
     },
     {
@@ -13174,7 +13210,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L786",
+      "source_location": "L793",
       "weight": 1.0
     },
     {
@@ -13186,7 +13222,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L794",
+      "source_location": "L801",
       "weight": 1.0
     },
     {
@@ -13198,7 +13234,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L795",
+      "source_location": "L802",
       "weight": 1.0
     },
     {
@@ -13210,7 +13246,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L795",
+      "source_location": "L802",
       "weight": 1.0
     },
     {
@@ -13222,7 +13258,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L795",
+      "source_location": "L802",
       "weight": 1.0
     },
     {
@@ -13234,7 +13270,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L806",
+      "source_location": "L813",
       "weight": 1.0
     },
     {
@@ -13246,7 +13282,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L855",
+      "source_location": "L862",
       "weight": 1.0
     },
     {
@@ -13258,7 +13294,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L858",
+      "source_location": "L865",
       "weight": 1.0
     },
     {
@@ -13270,7 +13306,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L622",
+      "source_location": "L629",
       "weight": 1.0
     },
     {
@@ -13282,7 +13318,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L239",
+      "source_location": "L246",
       "weight": 1.0
     },
     {
@@ -13294,7 +13330,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L242",
+      "source_location": "L249",
       "weight": 1.0
     },
     {
@@ -13306,7 +13342,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L693",
+      "source_location": "L700",
       "weight": 1.0
     },
     {
@@ -13318,7 +13354,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L715",
+      "source_location": "L722",
       "weight": 1.0
     },
     {
@@ -13330,7 +13366,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L723",
+      "source_location": "L730",
       "weight": 1.0
     },
     {
@@ -13342,7 +13378,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L341",
+      "source_location": "L348",
       "weight": 1.0
     },
     {
@@ -13354,7 +13390,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L359",
+      "source_location": "L366",
       "weight": 1.0
     },
     {
@@ -13366,7 +13402,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L368",
+      "source_location": "L375",
       "weight": 1.0
     },
     {
@@ -13438,7 +13474,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L816",
+      "source_location": "L823",
       "weight": 1.0
     },
     {
@@ -13450,7 +13486,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L818",
+      "source_location": "L825",
       "weight": 1.0
     },
     {
@@ -13462,7 +13498,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L818",
+      "source_location": "L825",
       "weight": 1.0
     },
     {
@@ -13510,7 +13546,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L865",
+      "source_location": "L872",
       "weight": 1.0
     },
     {
@@ -13522,7 +13558,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L874",
+      "source_location": "L881",
       "weight": 1.0
     },
     {
@@ -13534,7 +13570,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L259",
+      "source_location": "L266",
       "weight": 1.0
     },
     {
@@ -13546,7 +13582,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L260",
+      "source_location": "L267",
       "weight": 1.0
     },
     {
@@ -13558,7 +13594,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L390",
+      "source_location": "L397",
       "weight": 1.0
     },
     {
@@ -13570,7 +13606,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L424",
+      "source_location": "L431",
       "weight": 1.0
     },
     {
@@ -13582,7 +13618,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L824",
+      "source_location": "L831",
       "weight": 1.0
     },
     {
@@ -13594,7 +13630,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L832",
+      "source_location": "L839",
       "weight": 1.0
     },
     {
@@ -13606,7 +13642,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L841",
+      "source_location": "L848",
       "weight": 1.0
     },
     {
@@ -13618,7 +13654,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L847",
+      "source_location": "L854",
       "weight": 1.0
     },
     {
@@ -14050,7 +14086,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L241",
+      "source_location": "L257",
       "weight": 1.0
     },
     {
@@ -14242,7 +14278,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L214",
+      "source_location": "L233",
       "weight": 1.0
     },
     {
@@ -14266,7 +14302,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L92",
+      "source_location": "L111",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_automatic_selection_surfaces_a_real_blocking_issue",
+      "target": "giso_webui_platform_validation_recommend_smu_selection",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L102",
       "weight": 1.0
     },
     {
@@ -14290,7 +14338,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L253",
+      "source_location": "L272",
       "weight": 1.0
     },
     {
@@ -14314,7 +14362,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L137",
+      "source_location": "L156",
       "weight": 1.0
     },
     {
@@ -14326,7 +14374,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L205",
+      "source_location": "L224",
       "weight": 1.0
     },
     {
@@ -14338,7 +14386,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L99",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -14350,7 +14398,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L167",
+      "source_location": "L186",
       "weight": 1.0
     },
     {
@@ -14362,7 +14410,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L107",
+      "source_location": "L126",
       "weight": 1.0
     },
     {
@@ -14374,7 +14422,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L115",
+      "source_location": "L134",
       "weight": 1.0
     },
     {
@@ -14386,7 +14434,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L126",
+      "source_location": "L145",
       "weight": 1.0
     },
     {
@@ -14422,7 +14470,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L155",
+      "source_location": "L174",
       "weight": 1.0
     },
     {
@@ -14446,7 +14494,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L188",
+      "source_location": "L207",
       "weight": 1.0
     },
     {
@@ -14458,7 +14506,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L178",
+      "source_location": "L197",
       "weight": 1.0
     },
     {
@@ -14470,7 +14518,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L196",
+      "source_location": "L215",
       "weight": 1.0
     },
     {
@@ -14482,7 +14530,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L235",
+      "source_location": "L254",
       "weight": 1.0
     },
     {
@@ -14494,7 +14542,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L244",
+      "source_location": "L263",
       "weight": 1.0
     },
     {
@@ -14722,7 +14770,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L327",
+      "source_location": "L337",
       "weight": 1.0
     },
     {
@@ -19795,7 +19843,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L316",
+      "source_location": "L326",
       "weight": 1.0
     },
     {
@@ -19806,7 +19854,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/platform_validation.py",
-      "source_location": "L364",
+      "source_location": "L374",
       "weight": 1.0
     },
     {
@@ -20015,7 +20063,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L202",
+      "source_location": "L209",
       "weight": 1.0
     },
     {
@@ -20026,7 +20074,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L212",
+      "source_location": "L219",
       "weight": 1.0
     },
     {
@@ -20037,7 +20085,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L218",
+      "source_location": "L225",
       "weight": 1.0
     },
     {
@@ -20048,7 +20096,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L237",
+      "source_location": "L244",
       "weight": 1.0
     },
     {
@@ -20070,7 +20118,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L275",
+      "source_location": "L282",
       "weight": 1.0
     },
     {
@@ -20081,7 +20129,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L282",
+      "source_location": "L289",
       "weight": 1.0
     },
     {
@@ -20092,7 +20140,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L287",
+      "source_location": "L294",
       "weight": 1.0
     },
     {
@@ -20103,7 +20151,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L300",
+      "source_location": "L307",
       "weight": 1.0
     },
     {
@@ -20114,7 +20162,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L323",
+      "source_location": "L330",
       "weight": 1.0
     },
     {
@@ -20125,7 +20173,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L330",
+      "source_location": "L337",
       "weight": 1.0
     },
     {
@@ -20136,7 +20184,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L338",
+      "source_location": "L345",
       "weight": 1.0
     },
     {
@@ -20147,7 +20195,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L373",
+      "source_location": "L380",
       "weight": 1.0
     },
     {
@@ -20158,7 +20206,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L382",
+      "source_location": "L389",
       "weight": 1.0
     },
     {
@@ -20180,7 +20228,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L427",
+      "source_location": "L434",
       "weight": 1.0
     },
     {
@@ -20191,7 +20239,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L445",
+      "source_location": "L452",
       "weight": 1.0
     },
     {
@@ -20202,7 +20250,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L491",
+      "source_location": "L498",
       "weight": 1.0
     },
     {
@@ -20213,7 +20261,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L500",
+      "source_location": "L507",
       "weight": 1.0
     },
     {
@@ -20224,7 +20272,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L507",
+      "source_location": "L514",
       "weight": 1.0
     },
     {
@@ -20235,7 +20283,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L531",
+      "source_location": "L538",
       "weight": 1.0
     },
     {
@@ -20257,7 +20305,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L557",
+      "source_location": "L564",
       "weight": 1.0
     },
     {
@@ -20268,7 +20316,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L565",
+      "source_location": "L572",
       "weight": 1.0
     },
     {
@@ -20290,7 +20338,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L605",
+      "source_location": "L612",
       "weight": 1.0
     },
     {
@@ -20301,7 +20349,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L613",
+      "source_location": "L620",
       "weight": 1.0
     },
     {
@@ -20312,7 +20360,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L677",
+      "source_location": "L684",
       "weight": 1.0
     },
     {
@@ -20323,7 +20371,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L682",
+      "source_location": "L689",
       "weight": 1.0
     },
     {
@@ -20334,7 +20382,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L743",
+      "source_location": "L750",
       "weight": 1.0
     },
     {
@@ -20345,7 +20393,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L760",
+      "source_location": "L767",
       "weight": 1.0
     },
     {
@@ -20356,7 +20404,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L802",
+      "source_location": "L809",
       "weight": 1.0
     },
     {
@@ -20367,18 +20415,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L814",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_static_app",
-      "target": "giso_webui_static_app_uploadfile",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/static/app.js",
-      "source_location": "L823",
+      "source_location": "L821",
       "weight": 1.0
     },
     {
@@ -20394,13 +20431,24 @@
     },
     {
       "source": "giso_webui_static_app",
+      "target": "giso_webui_static_app_uploadfile",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/static/app.js",
+      "source_location": "L830",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_static_app",
       "target": "giso_webui_static_app_uploadfiles",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L847",
+      "source_location": "L854",
       "weight": 1.0
     },
     {
@@ -20411,7 +20459,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L852",
+      "source_location": "L859",
       "weight": 1.0
     },
     {
@@ -20422,7 +20470,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L864",
+      "source_location": "L871",
       "weight": 1.0
     },
     {
@@ -20444,7 +20492,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L938",
+      "source_location": "L945",
       "weight": 1.0
     },
     {
@@ -23507,7 +23555,7 @@
     },
     {
       "source": "giso_webui_tests_test_build_script_buildscripttests",
-      "target": "giso_webui_tests_test_build_script_buildscripttests_test_start_build_button_names_exactly_what_is_missing",
+      "target": "giso_webui_tests_test_build_script_buildscripttests_test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -23518,13 +23566,24 @@
     },
     {
       "source": "giso_webui_tests_test_build_script_buildscripttests",
+      "target": "giso_webui_tests_test_build_script_buildscripttests_test_start_build_button_names_exactly_what_is_missing",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_build_script.py",
+      "source_location": "L142",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_build_script_buildscripttests",
       "target": "giso_webui_tests_test_build_script_buildscripttests_test_manual_package_list_supports_compatible_and_selected_only_toggles",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L138",
+      "source_location": "L154",
       "weight": 1.0
     },
     {
@@ -23535,7 +23594,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L153",
+      "source_location": "L169",
       "weight": 1.0
     },
     {
@@ -23546,7 +23605,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L173",
+      "source_location": "L189",
       "weight": 1.0
     },
     {
@@ -23557,7 +23616,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L181",
+      "source_location": "L197",
       "weight": 1.0
     },
     {
@@ -23568,7 +23627,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L189",
+      "source_location": "L205",
       "weight": 1.0
     },
     {
@@ -23590,7 +23649,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L222",
+      "source_location": "L238",
       "weight": 1.0
     },
     {
@@ -23601,7 +23660,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L226",
+      "source_location": "L242",
       "weight": 1.0
     },
     {
@@ -23612,7 +23671,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L240",
+      "source_location": "L256",
       "weight": 1.0
     },
     {
@@ -23623,7 +23682,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L251",
+      "source_location": "L267",
       "weight": 1.0
     },
     {
@@ -23634,7 +23693,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_build_script.py",
-      "source_location": "L255",
+      "source_location": "L271",
       "weight": 1.0
     },
     {
@@ -23848,29 +23907,29 @@
     },
     {
       "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_automatic_selection_refuses_to_guess_unknown_iso_release",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L110",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_matching_platform_and_release_are_accepted",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L117",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
       "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_mixed_release_is_rejected",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L106",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
-      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_multiple_fixes_for_same_component_require_supersedence_data",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L114",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
-      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_multiple_versions_of_same_component_and_fix_are_rejected",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -23881,13 +23940,24 @@
     },
     {
       "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
-      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_csc_package_groups_show_components_that_belong_together",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_multiple_fixes_for_same_component_require_supersedence_data",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L136",
+      "source_location": "L133",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_multiple_versions_of_same_component_and_fix_are_rejected",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L144",
       "weight": 1.0
     },
     {
@@ -23903,13 +23973,24 @@
     },
     {
       "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_csc_package_groups_show_components_that_belong_together",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L155",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
       "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_overlapping_csc_fixes_are_explained",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L154",
+      "source_location": "L173",
       "weight": 1.0
     },
     {
@@ -23920,7 +24001,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L166",
+      "source_location": "L185",
       "weight": 1.0
     },
     {
@@ -23931,7 +24012,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L177",
+      "source_location": "L196",
       "weight": 1.0
     },
     {
@@ -23942,7 +24023,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L187",
+      "source_location": "L206",
       "weight": 1.0
     },
     {
@@ -23953,7 +24034,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L195",
+      "source_location": "L214",
       "weight": 1.0
     },
     {
@@ -23964,7 +24045,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L204",
+      "source_location": "L223",
       "weight": 1.0
     },
     {
@@ -23975,7 +24056,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L213",
+      "source_location": "L232",
       "weight": 1.0
     },
     {
@@ -23986,29 +24067,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L230",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
-      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_upgrade_matrix_uses_canonical_platform_normalization",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L240",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
-      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_bridge_smu_near_match_is_not_accepted",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L247",
+      "source_location": "L249",
       "weight": 1.0
     },
     {
@@ -24020,6 +24079,28 @@
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
       "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_upgrade_matrix_uses_canonical_platform_normalization",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L259",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_bridge_smu_near_match_is_not_accepted",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_platform_compatibility.py",
+      "source_location": "L266",
       "weight": 1.0
     },
     {
@@ -24101,24 +24182,13 @@
     },
     {
       "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
-      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_automatic_selection_refuses_to_guess_unknown_iso_release",
+      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_automatic_selection_surfaces_a_real_blocking_issue",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
       "source_location": "L91",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests",
-      "target": "giso_webui_tests_test_platform_compatibility_platformcompatibilitytests_test_matching_platform_and_release_are_accepted",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/tests/test_platform_compatibility.py",
-      "source_location": "L98",
       "weight": 1.0
     },
     {
@@ -25051,6 +25121,18 @@
     },
     {
       "source": "giso_webui_static_app",
+      "target": "giso_webui_static_app_updateplatformcontrols",
+      "relation": "indirect_call",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "context": "argument",
+      "source_file": "giso-webui/static/app.js",
+      "source_location": "L1001",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_static_app",
       "target": "giso_webui_static_app_applyarchivefilter",
       "relation": "indirect_call",
       "_origin": "ast",
@@ -25058,7 +25140,7 @@
       "confidence_score": 0.85,
       "context": "argument",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L443",
+      "source_location": "L450",
       "weight": 1.0
     },
     {
@@ -25070,7 +25152,7 @@
       "confidence_score": 0.85,
       "context": "argument",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L635",
+      "source_location": "L642",
       "weight": 1.0
     },
     {
@@ -25082,19 +25164,7 @@
       "confidence_score": 0.85,
       "context": "argument",
       "source_file": "giso-webui/static/app.js",
-      "source_location": "L883",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_static_app",
-      "target": "giso_webui_static_app_updateplatformcontrols",
-      "relation": "indirect_call",
-      "_origin": "ast",
-      "confidence": "INFERRED",
-      "confidence_score": 0.85,
-      "context": "argument",
-      "source_file": "giso-webui/static/app.js",
-      "source_location": "L994",
+      "source_location": "L890",
       "weight": 1.0
     },
     {
@@ -25249,5 +25319,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "68c59501ef8011883330d011fd252f72a21956cf"
+  "built_at_commit": "e419210f94ec618f30770ef35624f5eb748c0841"
 }

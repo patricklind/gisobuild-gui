@@ -146,9 +146,14 @@ function updateAutomaticTargetRelease(release) {
 function applySmuRecommendation(plan) {
   detectedPlatform = plan.platform || '';
   if (!packageListEdited) $('[name=pkglist]').value=(plan.selected || []).join('\n');
+  const blockers=plan.blockers || [];
+  const blocked=plan.ready && blockers.length > 0;
   const state=$('#smu-plan-state'); const title=$('#smu-auto-plan-title'); const message=$('#smu-plan-message');
-  state.className=`pill ${plan.ready ? 'success' : 'running'}`; state.textContent=plan.ready ? 'Calculated' : 'Needs input';
-  title.textContent=plan.ready ? `${plan.selected.length} matching RPM${plan.selected.length === 1 ? '' : 's'} selected` : 'Automatic selection paused';
+  state.className=`pill ${blocked ? 'bad' : plan.ready ? 'success' : 'running'}`;
+  state.textContent=blocked ? 'Blocked' : plan.ready ? 'Calculated' : 'Needs input';
+  title.textContent=blocked ? 'Automatic selection found a problem'
+    : plan.ready ? `${plan.selected.length} matching RPM${plan.selected.length === 1 ? '' : 's'} selected`
+    : 'Automatic selection paused';
   message.textContent=plan.message;
   const details=$('#smu-plan-details'); details.replaceChildren();
   if (plan.ready) {
@@ -175,6 +180,8 @@ function applySmuRecommendation(plan) {
       plan.component_conflicts.forEach(item=>{const row=document.createElement('p'); row.textContent=`${item.component}: ${item.cscs.join(' + ')}. ${item.reason}`; conflicts.appendChild(row);});
       details.appendChild(conflicts);
     }
+    const blockerList=compatibilityList('Fix before building', blockers, 'fail');
+    if (blockerList) details.appendChild(blockerList);
     if (plan.warnings?.length) {
       const warnings=document.createElement('div'); warnings.className='smu-relationship-warning';
       const heading=document.createElement('b'); heading.textContent='Review before building'; warnings.appendChild(heading);

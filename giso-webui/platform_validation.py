@@ -267,7 +267,7 @@ def recommend_smu_selection(
         missing = "platform" if not iso_platform else "release"
         return {"ready": False, "selected": [], "excluded": [], "package_groups": [],
                 "component_conflicts": [], "architectures": [], "iso_architectures": [],
-                "warnings": [], "iso": iso_name,
+                "warnings": [], "blockers": [], "iso": iso_name,
                 "message": f"The ISO {missing} could not be detected; select it in Expert settings"}
 
     for package in sorted(set(packages)):
@@ -306,6 +306,16 @@ def recommend_smu_selection(
         "architectures": analysis["architectures"],
         "iso_architectures": analysis["iso_architectures"],
         "warnings": analysis["warnings"],
+        # validate_smu_selection() runs against the automatically-selected set
+        # too - it can still fail here (e.g. two different fixes changing the
+        # same component to different versions both pass the platform/release
+        # filename filters above), so this is a real, itemized blocker list,
+        # not a duplicate of "warnings". Without this, an operator only ever
+        # saw the underlying issue as a generic error thrown from the final
+        # "Start build" click (create_build_plan()'s own blockers, computed
+        # the same way from the same identifiers), never during ongoing
+        # Step 2 review - see 06-UI-OPERATOR-TODO.md "blockers".
+        "blockers": analysis["issues"],
         "message": (
             f"Selected {len(selected)} matching RPMs; Cisco gisobuild will resolve dependencies "
             "and supersedence from the complete matching repository"

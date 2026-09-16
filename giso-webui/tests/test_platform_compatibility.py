@@ -88,6 +88,25 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertTrue(any("authoritative dependency check" in warning
                             for warning in result["warnings"]))
 
+    def test_automatic_selection_surfaces_a_real_blocking_issue(self):
+        # Two RPMs for the same component and CSC, but different versions,
+        # both pass the platform/release filename filters that gate automatic
+        # selection - so recommend_smu_selection() happily selects both, yet
+        # validate_smu_selection() flags this as an issue ("keep one RPM").
+        # Before this fix, recommend_smu_selection() computed that issue via
+        # its own validate_smu_selection() call but dropped it from the
+        # response entirely (mirroring the same "warnings" bug already fixed
+        # above for warnings) - so an operator relying on the default
+        # automatic-selection preview (discover()/api/smu/recommendation)
+        # never saw it until the final "Start build" click failed.
+        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
+            "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-mpls-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
+        ])
+        self.assertTrue(result["ready"])
+        self.assertEqual(len(result["selected"]), 2)
+        self.assertTrue(any("keep one RPM" in blocker for blocker in result["blockers"]))
+
     def test_automatic_selection_refuses_to_guess_unknown_iso_release(self):
         result = recommend_smu_selection("ncs5500-mini-x.iso", [
             "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",

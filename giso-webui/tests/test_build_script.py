@@ -123,6 +123,22 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("job.missing_dependencies", panel_fn)
         self.assertIn("required_by", panel_fn)
 
+    def test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation(self):
+        # recommend_smu_selection() (backing /api/smu/recommendation and
+        # discover(), the default automatic-selection preview used in Step 2)
+        # now returns a real "blockers" array (see
+        # test_automatic_selection_surfaces_a_real_blocking_issue in
+        # tests/test_platform_compatibility.py). Before this, the only place
+        # an operator ever saw this class of issue was a generic error thrown
+        # from clicking "Start build", which calls the separate
+        # /api/build-plan endpoint - never during ongoing Step 2 review.
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        fn = script[script.index("function applySmuRecommendation(plan)"):]
+        fn = fn[:fn.index("\nfunction smuGroupCard")]
+        self.assertIn("plan.blockers", fn)
+        self.assertIn("compatibilityList('Fix before building', blockers, 'fail')", fn)
+        self.assertIn("'bad'", fn)
+
     def test_start_build_button_names_exactly_what_is_missing(self):
         # Previously the disabled hint always said "Waiting for an ISO and a
         # customization", even once one of those two was already satisfied -
