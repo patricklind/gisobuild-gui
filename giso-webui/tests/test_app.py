@@ -909,6 +909,40 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(response.get_json()["ready"])
         self.assertIn("current inventory", response.get_json()["blockers"][0])
 
+    @unittest.skipUnless(
+        ISOINFO_AVAILABLE,
+        "genisoimage and isoinfo are only available inside the giso-webui container image",
+    )
+    def test_build_plan_blocks_rpm_architecture_mismatch_against_real_iso(self):
+        # create_build_plan() must apply the same iso_architectures check that
+        # discover(), /api/smu-recommendation, /api/compatibility, and
+        # build_command() already apply - otherwise /api/build-plan can show
+        # "ready" for a build that build_command() would reject afterward,
+        # defeating the point of one authoritative preflight.
+        source = Path(self.temp.name) / "iso-src"
+        source.mkdir()
+        (source / "iosxr_image_mdata.yml").write_text(
+            "x86_64 supported arch list: corei7_64\narm supported arch list:\n"
+        )
+        iso_path = self.data / "base.iso"
+        subprocess.run(
+            ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
+            check=True, capture_output=True,
+        )
+        rpm = self.data / "ncs5500-routing-1.0.0.1-r2612.CSCtest00001.aarch64.rpm"
+        rpm.write_bytes(b"rpm")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": "base.iso", "platform": "ncs5500", "pkglist": [item["id"]],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        plan = response.get_json()
+        self.assertFalse(plan["ready"])
+        self.assertTrue(any("architecture" in blocker.lower() for blocker in plan["blockers"]),
+                        plan["blockers"])
+
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
     def test_created_job_records_authoritative_build_plan(self, _mounts, _run_job):

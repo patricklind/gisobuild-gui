@@ -670,8 +670,15 @@ def create_build_plan(payload: dict) -> dict:
     profile = None
     if iso:
         identifiers = payload.get("pkglist", [])
+        # Same check discover(), /api/smu-recommendation, /api/compatibility, and
+        # build_command() already apply - the preview and the actual build must
+        # agree on whether a build is ready, not just build_command() as a
+        # second, later gate.
+        iso_architectures = inspect_iso_architecture(safe_data_path(iso["relative_path"]))
         if payload.get("automatic_smu_selection"):
-            recommendation = recommend_smu_selection(iso_name, active_rpm_names()[0])
+            recommendation = recommend_smu_selection(
+                iso_name, active_rpm_names()[0], iso_architectures=iso_architectures
+            )
             if recommendation.get("ready"):
                 identifiers = recommendation["selected"]
             else:
@@ -680,7 +687,8 @@ def create_build_plan(payload: dict) -> dict:
             selected = resolve_rpm_identifiers(identifiers)
             profile = validate_platform_options(payload)
             compatibility = validate_smu_selection(
-                iso_name, [item["basename"] for item in selected]
+                iso_name, [item["basename"] for item in selected],
+                iso_architectures=iso_architectures,
             )
             blockers.extend(compatibility["issues"])
             warnings.extend(compatibility["warnings"])

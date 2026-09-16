@@ -121,6 +121,30 @@ TODO:
   `genisoimage`, run only inside the `giso-webui` container where
   `isoinfo`/`genisoimage` are installed).
 
+### The immutable BuildPlan preview did not apply the RPM/ISO architecture check
+
+Current behavior (before this fix):
+
+`create_build_plan()` (`POST /api/build-plan`, and the sole gate `create_job()`
+uses before starting a build) called `recommend_smu_selection()` and
+`validate_smu_selection()` without passing `iso_architectures`, unlike every
+other caller of those functions (`discover()`, `/api/smu-recommendation`,
+`/api/compatibility`, and `build_command()`). The result: `/api/build-plan`
+could report `ready: true` for an architecture-mismatched selection, only for
+`build_command()` to reject it afterward when the operator actually tried to
+build — defeating the point of "one authoritative preflight decides whether
+Build is enabled" (`06-UI-OPERATOR-TODO.md`).
+
+TODO:
+
+- [x] Call `inspect_iso_architecture()` in `create_build_plan()` and pass its
+      result into both `recommend_smu_selection()` and `validate_smu_selection()`,
+      matching every other call site.
+- [x] Add a regression test building a real x86_64-only ISO with `genisoimage`
+      and an aarch64 RPM, proving `/api/build-plan` now reports `ready: false`
+      with an architecture blocker instead of `true`
+      (`test_build_plan_blocks_rpm_architecture_mismatch_against_real_iso`).
+
 Not done / follow-up:
 
 - [ ] Confirm the exact `iosxr_image_mdata.yml` key names and "arm supported
