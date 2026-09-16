@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-16)
 
 ## Corpus Check
-- 48 files · ~57,314 words
+- 48 files · ~57,617 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 1)
 
 ## Summary
-- 785 nodes · 1242 edges · 54 communities (38 shown, 10 thin omitted)
+- 786 nodes · 1243 edges · 54 communities (38 shown, 10 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `831aae58`
+- Built from commit: `19f62c90`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -44,7 +44,7 @@
 - AGENTS.md
 - Path
 - AI Master Prompt — Cisco IOS-XR GISO Build Web UI
-- Release process
+- releasing.md
 - TODO — Concrete Bug Audit
 - TODO — Self-contained Docker Image
 - TODO — Automation, Inventory & BuildPlan
@@ -180,7 +180,7 @@ Nodes (18): AI Master Prompt — Cisco IOS-XR GISO Build Web UI, Artifacts and r
 
 ### Community 31 - "TODO — Concrete Bug Audit"
 Cohesion: 0.06
-Nodes (34): `/api/inputs` can race cleanup/deletion, app.js and manual-packages.js both defined the manual-package-list logic, one of them dead (2026-09-16), Archive maintenance runs in a separate process with no cross-process lock (2026-09-16), Bridge-SMU presence check can produce substring false positives, Cancellation during image pull cannot reliably cancel the build, Cancelled build may still archive output and delete inputs, CI ran the unit test suite on the GitHub Actions host Python instead of inside the built container, DNS-rebinding TOCTOU in the Cisco download SSRF guard (2026-09-16) (+26 more)
+Nodes (35): `/api/inputs` can race cleanup/deletion, app.js and manual-packages.js both defined the manual-package-list logic, one of them dead (2026-09-16), Archive maintenance runs in a separate process with no cross-process lock (2026-09-16), Bridge-SMU presence check can produce substring false positives, Cancellation during image pull cannot reliably cancel the build, Cancelled build may still archive output and delete inputs, CI ran the unit test suite on the GitHub Actions host Python instead of inside the built container, DNS-rebinding TOCTOU in the Cisco download SSRF guard (2026-09-16) (+27 more)
 
 ### Community 32 - "TODO — Self-contained Docker Image"
 Cohesion: 0.11
@@ -247,8 +247,8 @@ Cohesion: 0.50
 Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked code graph from tracked files and compare it…, tracked_files(), verify_ignore_policy()
 
 ## Knowledge Gaps
-- **222 isolated node(s):** `inputs`, `platformProfiles`, `CONFIDENCE_LABELS`, `drop`, `GitHub Copilot repository instructions` (+217 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 410 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **223 isolated node(s):** `inputs`, `platformProfiles`, `CONFIDENCE_LABELS`, `drop`, `GitHub Copilot repository instructions` (+218 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 411 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -261,7 +261,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 5 inferred relationships involving `CiscoDownloadError` (e.g. with `cisco_accept()` and `cisco_config()`) actually correct?**
   _`CiscoDownloadError` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inputs`, `platformProfiles`, `CONFIDENCE_LABELS` to the rest of the system?**
-  _222 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _223 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `create_build_plan` be split into smaller, more focused modules?**
   _Cohesion score 0.1349206349206349 - nodes in this community are weakly interconnected._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**

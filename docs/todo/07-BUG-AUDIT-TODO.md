@@ -510,6 +510,45 @@ TODO:
 
 ## P2 — Tooling reliability
 
+### `gisobuild_commit()` silently returned null due to git's ownership check (2026-09-16)
+
+Found during a full post-change verification pass (not the initial feature
+work): re-running the full test suite from a clean image build after adding
+the `/api/version` feature earlier the same day showed
+`test_version_reports_the_real_commit_of_a_git_checkout` failing —
+`gisobuild_commit()` returned `None` instead of a real commit hash, even
+though `.git` genuinely existed at the checked path.
+
+Root cause: `git=2.54.0-r0` (added to `giso-webui/Dockerfile` for this same
+feature) enforces the "dubious ownership" protection introduced in modern
+git — it refuses to run `rev-parse` against a directory not owned by the
+container's user, which is exactly what a bind-mounted `.gisobuild-tool`
+checkout looks like from inside the container. Reproduced directly:
+`git -C /project rev-parse --short HEAD` failed with `fatal: detected
+dubious ownership in repository at '/project'`. `gisobuild_commit()`
+already degrades gracefully (catches the non-zero exit, returns `None`
+rather than raising), so this was never a crash — just a feature that would
+have silently returned "unknown" far more often than intended, depending on
+the host filesystem's exact ownership metadata for the mounted checkout.
+
+The exact same issue, and the same fix, had already been identified and
+applied to `docker/tooling.Dockerfile` for `scripts/check_graphify_freshness.py`'s
+`git ls-files` call earlier the same day — this entry is that same class of
+bug recurring in a second Dockerfile that happened to add `git` afterward,
+which is exactly the kind of thing a full verification pass catches and an
+isolated unit test of one new function does not.
+
+Fix:
+
+- [x] Added `git config --system --add safe.directory '*'` to
+      `giso-webui/Dockerfile` right after installing `git`. Safe here: this
+      container only ever reads a checkout mounted read-only by its own
+      operator, never a shared multi-tenant one.
+
+Verified: `git -C /project rev-parse --short HEAD` now succeeds inside the
+rebuilt image, `test_version_reports_the_real_commit_of_a_git_checkout`
+passes, full suite (182 tests) passes, hadolint stays clean.
+
 ### `ruff` is installed unpinned in CI, so its rule set can change without a code change
 
 Current behavior:
