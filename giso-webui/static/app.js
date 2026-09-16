@@ -7,6 +7,7 @@ let targetReleaseIsAutomatic = true;
 let lastAutomaticTargetRelease = '';
 let pollTimer = null;
 let activityTimer = null;
+let storageInfo = null;
 const $ = selector => document.querySelector(selector);
 const lines = value => value.split(/\n|,/).map(item => item.trim()).filter(Boolean);
 const selectedPackages = () => lines(
@@ -156,6 +157,36 @@ function refreshExpectedOutput() {
 }
 $('[name=skip_usb_image]').addEventListener('change', refreshExpectedOutput);
 
+function formatGiB(bytes) { return (bytes / 1073741824).toFixed(1); }
+
+function estimatedOutputBytes(plan) {
+  // Not an authoritative size (gisobuild may de-duplicate or add its own
+  // overhead) - a straightforward, honestly-labelled upper bound: the base
+  // ISO plus every selected RPM, from sizes already in the uploaded
+  // inventory (inputs.files), so this needs no extra backend request.
+  if (!plan?.ready) return null;
+  const iso=inputs.files.find(file => file.type === '.iso' && file.basename === plan.iso);
+  if (!iso) return null;
+  const packageBytes=(plan.selected || []).reduce((sum, name) => {
+    const file=inputs.files.find(item => item.basename === name);
+    return sum + (file ? file.size : 0);
+  }, 0);
+  return iso.size + packageBytes;
+}
+
+function renderDiskEstimate() {
+  const el=$('#disk-estimate');
+  if (!el) return;
+  const estimate=estimatedOutputBytes(inputs.recommendation);
+  if (estimate === null || !storageInfo) { el.hidden=true; el.textContent=''; return; }
+  const short=storageInfo.disk_free_bytes < estimate;
+  el.hidden=false;
+  el.className=`disk-estimate${short ? ' bad' : ''}`;
+  el.textContent=`Estimated output ~${formatGiB(estimate)} GiB (base ISO + selected RPMs) · `
+    + `${formatGiB(storageInfo.disk_free_bytes)} GiB free on the uploads volume`
+    + (short ? ' — this may not be enough space. The build also uses separate working and output volumes, which are not measured here.' : '.');
+}
+
 function applySmuRecommendation(plan) {
   detectedPlatform = plan.platform || '';
   if (!packageListEdited) $('[name=pkglist]').value=(plan.selected || []).join('\n');
@@ -187,6 +218,8 @@ function applySmuRecommendation(plan) {
       step.append(small,strong); flow.appendChild(step);
     });
     details.appendChild(flow);
+    const diskEstimate=document.createElement('p'); diskEstimate.id='disk-estimate'; diskEstimate.className='disk-estimate'; diskEstimate.hidden=true;
+    details.appendChild(diskEstimate);
     if (plan.confidence) details.appendChild(confidenceGrid(plan.confidence));
     if (plan.package_groups?.length) {
       const groups=document.createElement('section'); groups.className='smu-groups';
@@ -214,6 +247,7 @@ function applySmuRecommendation(plan) {
     const excluded=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`${plan.excluded.length} incompatible RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically`;
     const list=document.createElement('ul'); plan.excluded.forEach(item=>{const row=document.createElement('li'); row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);}); excluded.append(summary,list); details.appendChild(excluded);
   }
+  renderDiskEstimate();
   updateBuildAvailability();
 }
 
@@ -454,10 +488,12 @@ function updatePlatformControls() {
 async function loadStorage() {
   try {
     const usage = await api('/api/storage');
-    const archiveGb = (usage.archive_used_bytes / 1073741824).toFixed(1);
+    storageInfo = usage;
+    const archiveGb = formatGiB(usage.archive_used_bytes);
     const quotaGb = (usage.archive_quota_bytes / 1073741824).toFixed(0);
-    const freeGb = (usage.disk_free_bytes / 1073741824).toFixed(1);
+    const freeGb = formatGiB(usage.disk_free_bytes);
     $('#storage-usage').textContent = `Archive: ${archiveGb} of ${quotaGb} GiB used · ${freeGb} GiB free on the upload volume`;
+    renderDiskEstimate();
   } catch { /* Storage usage is diagnostic only; a missing line is not an error. */ }
 }
 

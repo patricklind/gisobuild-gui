@@ -108,11 +108,38 @@ Show:
       immediately, then flip to "ISO only" the instant "Skip USB image" was
       checked, with no other action taken. Full 218-test suite passes, ruff
       clean, Graphify refreshed.
-- [ ] free disk estimate — not implemented anywhere; no endpoint currently
-      returns a projected build-output size versus available space (the
-      backend only ever compares against `MIN_FREE_BYTES` internally when
-      actually starting an upload/build/extraction, never exposes the
-      numbers to the UI ahead of time).
+- [x] free disk estimate — fixed 2026-09-16, with a known scope limit noted
+      below: `estimatedOutputBytes()` in `giso-webui/static/app.js` computes
+      an honestly-labelled upper bound (base ISO size + every selected RPM's
+      size, not gisobuild's actual repack size) entirely from `inputs.files`
+      — the same inventory (with per-file `size`) already loaded for Step
+      1's file list, so no new backend endpoint was needed. `renderDiskEstimate()`
+      compares this against `/api/storage`'s `disk_free_bytes` (cached in a
+      new `storageInfo` global so it can be recomputed whenever either the
+      plan or the storage figure changes) and shows it as a persistent line
+      under the Step 2 flow, turning red with an explicit warning when the
+      estimate exceeds free space.
+      **Known limit**: `/api/storage`'s `disk_free_bytes` measures the
+      uploads volume (`DATA_ROOT`) — the same one `MIN_FREE_BYTES` already
+      gates uploads against. `giso-webui/compose.yaml` defines `giso-work`
+      and `giso-output` as separate named Docker volumes from `giso-uploads`,
+      and nothing in `app.py` measures free space on either of those today —
+      gisobuild actually extracts/builds in `WORK_ROOT` and writes the final
+      artifact to `OUTPUT_ROOT`, so a host that happens to size those volumes
+      differently from the uploads volume would get a misleading "enough
+      space" answer here. The estimate text says "on the uploads volume"
+      rather than implying it covers the whole build, and the low-space
+      warning explicitly says the working/output volumes are not measured -
+      but adding a real check there (and to the existing `MIN_FREE_BYTES`
+      gate itself, which has the identical blind spot) is real follow-up
+      work, not done here. Verified by
+      `test_disk_estimate_is_shown_during_review_and_uses_already_loaded_data`
+      in `giso-webui/tests/test_build_script.py`, and confirmed live: booted
+      a throwaway container, uploaded a real file, saw the estimate render
+      with the real free-space figure, then forced `storageInfo.disk_free_bytes`
+      below the estimate in the browser console and watched it switch to the
+      red "may not be enough space" state. Full 219-test suite passes, ruff
+      clean, Graphify refreshed.
 
 ### Step 3 — Build
 

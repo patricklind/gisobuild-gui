@@ -124,6 +124,48 @@ no customization → "Waiting for a customization (packages, config files,
 or bridging fixes)…"; customization present, no ISO → "Waiting for an
 ISO…". Full suite green (207 tests); ruff and Graphify clean.
 
+### No free-space check exists for the volumes a build actually writes to (found 2026-09-16, not fixed here)
+
+Current behavior:
+
+Every existing `shutil.disk_usage(...).free < ... + MIN_FREE_BYTES` guard in
+`giso-webui/app.py` (upload init, upload chunk, TAR/Cisco-archive extraction,
+Cisco download) checks `DATA` (`DATA_ROOT`, the uploads volume) exclusively.
+`giso-webui/compose.yaml` defines `giso-work`, `giso-output`, and
+`giso-uploads` as three separate named Docker volumes. gisobuild actually
+extracts and builds inside `WORK_ROOT` and writes the final Golden
+ISO/USB image to `OUTPUT_ROOT` — neither of which any code path measures
+free space on, before or during a build. A deployment that sizes those
+volumes independently of the uploads volume (a real possibility once
+`03-DOCKER-SELF-CONTAINED-TODO.md`'s volume-topology work lands, and even
+today if an operator mounts them on different host paths/disks) can start
+and run a build that has plenty of "free" uploads space but no room left to
+actually write its own output, failing only mid-build with no advance
+warning anywhere.
+
+This was found while implementing the Step 2 "free disk estimate" display
+(`06-UI-OPERATOR-TODO.md`, "Show: ... free disk estimate"): the new
+`renderDiskEstimate()` in `giso-webui/static/app.js` compares an estimated
+output size against `/api/storage`'s `disk_free_bytes`, which — honestly
+labelled in the UI text as "free on the uploads volume" — has this same
+blind spot, because it is the only free-space figure the backend computes
+anywhere.
+
+TODO:
+
+- [ ] Measure free space on `WORK_ROOT` and `OUTPUT_ROOT` (in addition to
+      `DATA_ROOT`) somewhere the operator can see it before starting a
+      build, and in whatever pre-build gate is added.
+- [ ] Consider adding a real `MIN_FREE_BYTES`-style guard against
+      `WORK_ROOT`/`OUTPUT_ROOT` before `run_job()` starts a build, mirroring
+      the existing upload-time guards, so a build that cannot possibly
+      finish is refused up front instead of failing partway through.
+- [ ] Add a regression test proving a build is refused (or at least clearly
+      warned) when the output/work volume is nearly full, independent of
+      how much free space the uploads volume has.
+- [ ] Update `06-UI-OPERATOR-TODO.md`'s "free disk estimate" entry once this
+      lands, since its own scope-limit note references this item.
+
 ## P1 — Misconfiguration can silently destroy archived artifacts
 
 ### `ARCHIVE_RETENTION_DAYS`/`MAX_ARCHIVE_BYTES` were never validated (2026-09-16)

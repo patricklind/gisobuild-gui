@@ -162,6 +162,30 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("addEventListener('change', refreshExpectedOutput)", script)
         self.assertIn("refreshExpectedOutput()", script[script.index("$('[name=platform]').addEventListener"):])
 
+    def test_disk_estimate_is_shown_during_review_and_uses_already_loaded_data(self):
+        # "free disk estimate" was previously not implemented anywhere - no
+        # endpoint returned a projected build-output size versus available
+        # space, so an operator had no idea until a build failed mid-way from
+        # disk exhaustion. estimatedOutputBytes() computes an honest upper
+        # bound (base ISO size + every selected RPM's size) entirely from
+        # inputs.files, the inventory already loaded for Step 1's file list -
+        # no new backend endpoint or duplicate size computation needed.
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        self.assertIn("function estimatedOutputBytes(plan)", script)
+        estimate_fn = script[script.index("function estimatedOutputBytes(plan)"):]
+        estimate_fn = estimate_fn[:estimate_fn.index("\n}\n")]
+        self.assertIn("inputs.files", estimate_fn)
+        self.assertIn("plan.selected", estimate_fn)
+        self.assertIn("function renderDiskEstimate()", script)
+        render_fn = script[script.index("function renderDiskEstimate()"):]
+        render_fn = render_fn[:render_fn.index("\n}\n")]
+        self.assertIn("storageInfo.disk_free_bytes", render_fn)
+        self.assertIn("this may not be enough space", render_fn)
+        # Loaded once at plan-calculation time and once when storage usage
+        # arrives, in whichever order those two independent requests finish.
+        self.assertIn("renderDiskEstimate()", script[script.index("function applySmuRecommendation(plan)"):script.index("\nfunction smuGroupCard")])
+        self.assertIn("renderDiskEstimate()", script[script.index("async function loadStorage()"):])
+
     def test_start_build_button_names_exactly_what_is_missing(self):
         # Previously the disabled hint always said "Waiting for an ISO and a
         # customization", even once one of those two was already satisfied -
