@@ -1118,10 +1118,23 @@ class GisoWebTests(unittest.TestCase):
     @patch("app.subprocess.run")
     def test_health_returns_service_unavailable_when_dependency_is_down(self, run):
         run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "info"], 5)
-        response = self.client.get("/api/health")
+        response = self.client.get("/api/ready")
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.get_json()["ok"])
         self.assertNotIn("image", response.get_json())
+
+    @patch("app.subprocess.run")
+    def test_health_is_pure_liveness_and_ignores_dependency_state(self, run):
+        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "info"], 5)
+        response = self.client.get("/api/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+
+    def test_ready_reports_database_and_disk_checks(self):
+        response = self.client.get("/api/ready")
+        payload = response.get_json()
+        self.assertIn("database", payload)
+        self.assertIn("disk", payload)
 
     @patch("app.subprocess.Popen")
     def test_image_pull_timeout_marks_build_failed(self, popen):

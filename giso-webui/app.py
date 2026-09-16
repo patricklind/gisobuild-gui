@@ -522,14 +522,14 @@ def inspect_iso_architecture(iso_path: Path) -> frozenset[str]:
     try:
         mdata = subprocess.run(
             [ISOINFO_BIN, "-R", "-i", str(iso_path), "-x", "/iosxr_image_mdata.yml"],
-            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS,
+            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS, check=False,
         )
         if mdata.returncode == 0 and mdata.stdout.strip():
             architectures = iso_architectures_from_mdata(mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES])
         if not architectures:
             listing = subprocess.run(
                 [ISOINFO_BIN, "-R", "-l", "-i", str(iso_path)],
-                capture_output=True, text=True, timeout=ISO_LISTING_TIMEOUT_SECONDS,
+                capture_output=True, text=True, timeout=ISO_LISTING_TIMEOUT_SECONDS, check=False,
             )
             if listing.returncode == 0:
                 architectures = iso_architectures_from_listing(
@@ -1225,6 +1225,18 @@ def validate_host():
 
 @app.get("/api/health")
 def health():
+    """Liveness only: has the process itself started and can it respond.
+
+    Dependency/storage/disk checks live in /api/ready. A container
+    orchestrator should restart on health failure but only stop routing
+    traffic (without restarting) on readiness failure - conflating the two
+    here made every dependency hiccup look like a crashed process.
+    """
+    return jsonify(ok=True), 200
+
+
+@app.get("/api/ready")
+def ready():
     docker_ok = False
     try:
         subprocess.run([DOCKER_BIN, "info"], timeout=5, check=True,
@@ -1232,13 +1244,27 @@ def health():
         docker_ok = True
     except (OSError, subprocess.SubprocessError):
         pass
+    db_ok = False
+    try:
+        with sqlite3.connect(JOB_DB, timeout=5) as database:
+            database.execute("SELECT 1")
+        db_ok = True
+    except sqlite3.Error:
+        pass
+    disk_ok = False
+    try:
+        disk_ok = shutil.disk_usage(DATA).free >= MIN_FREE_BYTES
+    except OSError:
+        pass
     checks = {
         "docker": docker_ok,
         "tool": (TOOL / "src/gisobuild.py").is_file(),
         "storage": all(path.is_dir() for path in (DATA, OUTPUT, WORK, ARCHIVE, STATE)),
+        "database": db_ok,
+        "disk": disk_ok,
     }
-    ready = all(checks.values())
-    return jsonify(ok=ready, **checks), 200 if ready else 503
+    is_ready = all(checks.values())
+    return jsonify(ok=is_ready, **checks), 200 if is_ready else 503
 
 
 @app.get("/api/inputs")
