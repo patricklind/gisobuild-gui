@@ -350,9 +350,22 @@ unavailable).
 
 Cache expensive metadata by:
 
-- [ ] path
-- [ ] size
-- [ ] mtime
-- [ ] checksum where known
+- [x] path
+- [x] size
+- [x] mtime
+- [x] checksum where known — already implemented before this pass:
+      `checksum_cache`/`iso_architecture_cache` in `giso-webui/app.py` key on
+      exactly `(str(path), stat.st_size, stat.st_mtime_ns)`, bounded (evicts
+      the oldest entry past 4096/256 entries respectively), and cleared on
+      the relevant mutations (upload completion, cleanup). What was missing
+      was proof a cache *hit* actually skips the hashing work rather than
+      merely returning the same answer via a coincidentally-fast
+      recomputation — "do not repeatedly rehash multi-GB files on browser
+      refresh" is exactly the scenario this needs to hold under. Added
+      `test_file_checksums_are_not_recomputed_for_an_unchanged_file` in
+      `giso-webui/tests/test_app.py`, which spies on `hashlib.md5`/`sha256`
+      (via `unittest.mock.patch(..., wraps=...)`, so the real hash still
+      runs and returns a correct result) across two requests for the same
+      unchanged file and asserts each is called exactly once, not twice.
 
 Do not repeatedly rehash multi-GB files on browser refresh.

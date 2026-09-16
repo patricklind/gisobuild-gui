@@ -2101,6 +2101,27 @@ class GisoWebTests(unittest.TestCase):
         )
         self.assertEqual(result["sha256"], hashlib.sha256(content).hexdigest())
 
+    def test_file_checksums_are_not_recomputed_for_an_unchanged_file(self):
+        # 04-STATE-SECURITY-OBSERVABILITY-TODO.md's "Caching" section asks
+        # for exactly this: "do not repeatedly rehash multi-GB files on
+        # browser refresh." checksum_cache already keys on
+        # (path, size, mtime_ns), but nothing proved a cache hit actually
+        # skips the hashing work rather than merely returning the same
+        # answer via a coincidentally-fast recomputation.
+        module.checksum_cache.clear()
+        archive_dir = module.ARCHIVE / "cache-job"
+        archive_dir.mkdir()
+        (archive_dir / "golden.iso").write_bytes(b"golden iso content")
+
+        with patch("app.hashlib.md5", wraps=hashlib.md5) as md5_spy, \
+                patch("app.hashlib.sha256", wraps=hashlib.sha256) as sha256_spy:
+            first = self.client.get("/api/archive/cache-job/golden.iso/checksums").get_json()
+            second = self.client.get("/api/archive/cache-job/golden.iso/checksums").get_json()
+
+        self.assertEqual(first, second)
+        self.assertEqual(md5_spy.call_count, 1)
+        self.assertEqual(sha256_spy.call_count, 1)
+
 
 @unittest.skipUnless(
     ISOINFO_AVAILABLE,
