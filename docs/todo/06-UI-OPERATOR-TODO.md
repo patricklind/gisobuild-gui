@@ -222,3 +222,20 @@ Future work, not implemented: parsing real RPM headers (e.g. via an `rpm`
 binary in the container) to earn a genuine `VERIFIED` for RPM architecture,
 and parsing ISO metadata for platform/release the same way architecture is
 read today.
+
+## Search and filtering (`docs/AI-MASTER-PROMPT.md` section 55)
+
+- [x] Manual package list search by filename or CSC ID — added 2026-09-16:
+      `#manual-package-filter` in `giso-webui/static/manual-packages.js`,
+      only shown once there are 8+ RPMs (small lists don't need it). Filters
+      by substring against each RPM's filename or its CSC group's legend
+      text; matching the group name reveals every member. Purely a
+      visibility toggle (`hidden`), so it never touches checkbox selection
+      state. Verified live in a browser with 10 fixture RPMs: typing
+      "pkg03" left exactly 1 of 10 options and its CSC group visible,
+      clearing the filter restored all 10.
+- [ ] Compatible-only / selected-only / architecture / version filters —
+      not implemented; only filename/CSC-ID substring search exists so far.
+- [ ] Search/filter for the automatic-selection review or the Cisco search
+      results list — not implemented; only the manual package list has
+      this today.

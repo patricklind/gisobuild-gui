@@ -73,8 +73,26 @@
     updateBuildAvailability();
   };
 
+  function applyManualPackageFilter() {
+    const query = document.querySelector('#manual-package-filter').value.trim().toLowerCase();
+    document.querySelectorAll('#manual-package-list .manual-csc-group').forEach(group => {
+      const legend = group.querySelector('legend');
+      const legendMatches = !query || Boolean(legend?.textContent.toLowerCase().includes(query));
+      let anyVisible = false;
+      group.querySelectorAll('.manual-package-option').forEach(option => {
+        const name = option.querySelector('b')?.textContent.toLowerCase() || '';
+        const visible = legendMatches || name.includes(query);
+        option.hidden = !visible;
+        if (visible) anyVisible = true;
+      });
+      group.hidden = !anyVisible;
+    });
+  }
+  window.applyManualPackageFilter = applyManualPackageFilter;
+
   window.renderManualPackages = function renderManualPackages(data, plan) {
     const list = document.querySelector('#manual-package-list');
+    const filterInput = document.querySelector('#manual-package-filter');
     const previous = new Set(lines(document.querySelector('[name=pkglist_override]').value));
     const recommended = new Set((plan.selected || data.recommended || []).map(basename));
     const excluded = new Map((plan.excluded || []).map(item => [basename(item.name), item.reason]));
@@ -84,6 +102,7 @@
     list.replaceChildren();
 
     if (!rpms.length) {
+      filterInput.hidden = true;
       const empty = document.createElement('div');
       empty.className = 'manual-package-empty';
       const message = document.createElement('p');
@@ -100,6 +119,7 @@
       updateBuildAvailability();
       return;
     }
+    filterInput.hidden = rpms.length < 8;
 
     const byName = new Map();
     rpms.forEach(file => {
@@ -152,7 +172,10 @@
 
     manualSelectionInitialized = true;
     window.syncManualPackageValue();
+    applyManualPackageFilter();
   };
+
+  document.querySelector('#manual-package-filter').addEventListener('input', applyManualPackageFilter);
 
   document.querySelector('#manual-package-list').addEventListener('change', event => {
     if (!event.target.classList.contains('manual-csc-checkbox')) return;

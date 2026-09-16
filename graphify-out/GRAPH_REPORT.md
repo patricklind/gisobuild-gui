@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-16)
 
 ## Corpus Check
-- 48 files · ~56,845 words
+- 48 files · ~57,077 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 1)
 
 ## Summary
-- 778 nodes · 1231 edges · 54 communities (37 shown, 11 thin omitted)
+- 780 nodes · 1233 edges · 54 communities (36 shown, 12 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c4c99b63`
+- Built from commit: `1fca02f4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -58,10 +58,10 @@
 - copilot-instructions.md
 - Path
 - app.py
-- normalize_architecture
+- build_cleanup_paths
 - find_cisco_images
 - log_event
-- create_job
+- run_job
 - check_graphify_freshness.py
 - staging/README.md
 
@@ -78,8 +78,6 @@
 10. `api()` - 14 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `cisco_config()` --uses--> `CiscoDownloadError`  [INFERRED]
-  giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_search()` --uses--> `CiscoDownloadError`  [INFERRED]
   giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_download_start()` --uses--> `CiscoDownloadError`  [INFERRED]
@@ -88,19 +86,21 @@
   giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_client()` --calls--> `CiscoSoftwareClient`  [EXTRACTED]
   giso-webui/app.py → giso-webui/cisco_download.py
+- `cisco_client()` --calls--> `secret_value()`  [EXTRACTED]
+  giso-webui/app.py → giso-webui/cisco_download.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (54 total, 11 thin omitted)
+## Communities (54 total, 12 thin omitted)
 
 ### Community 0 - "create_build_plan"
-Cohesion: 0.11
-Nodes (29): active_rpm_names(), add_superseded_exclusions(), build_command(), confidence_report(), create_build_plan(), current_inventory_revision(), discover(), glob_metacharacters() (+21 more)
+Cohesion: 0.10
+Nodes (31): active_rpm_names(), add_superseded_exclusions(), build_command(), confidence_report(), create_build_plan(), current_inventory_revision(), discover(), glob_metacharacters() (+23 more)
 
 ### Community 2 - "CiscoDownloadError"
 Cohesion: 0.07
-Nodes (11): CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect, Path, RuntimeError, Cisco Automated Software Distribution client with strict download controls., Safe error suitable for returning to the local UI. (+3 more)
+Nodes (12): cisco_config(), CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect, Path, RuntimeError, Cisco Automated Software Distribution client with strict download controls. (+4 more)
 
 ### Community 3 - "app.js"
 Cohesion: 0.10
@@ -112,7 +112,7 @@ Nodes (25): 1. Determine the platform and install architecture, 2. Validate the 
 
 ### Community 5 - "PlatformCompatibilityTests"
 Cohesion: 0.09
-Nodes (16): capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), GisoBuildCapabilities, infer_platform(), normalize_platform(), platform_profile(), Platform-aware validation for Cisco IOS XR GISO build options. (+8 more)
+Nodes (18): capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), GisoBuildCapabilities, infer_platform(), normalize_architecture(), normalize_platform(), platform_profile() (+10 more)
 
 ### Community 7 - "System architecture"
 Cohesion: 0.13
@@ -203,8 +203,8 @@ Cohesion: 0.18
 Nodes (10): Browser/DOM tests, CI pipeline, Graphify CI guard, Integration test, Merge policy, Regression tests, Representative platform fixtures, Security tests (+2 more)
 
 ### Community 37 - "TODO — Operator UX"
-Cohesion: 0.18
-Nodes (10): Automatic by default, Confidence display, Expert settings, Explain decisions, Normal workflow, Primary UX goal, Step 1 — Files, Step 2 — Review BuildPlan (+2 more)
+Cohesion: 0.17
+Nodes (11): Automatic by default, Confidence display, Expert settings, Explain decisions, Normal workflow, Primary UX goal, Search and filtering (`docs/AI-MASTER-PROMPT.md` section 55), Step 1 — Files (+3 more)
 
 ### Community 38 - "AI-INSTRUCTIONS.md"
 Cohesion: 0.22
@@ -219,33 +219,29 @@ Cohesion: 0.50
 Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 
 ### Community 45 - "Path"
-Cohesion: 0.11
-Nodes (26): before_request, delete, archive_delete(), archive_giso_artifacts_and_cleanup(), archive_list(), archive_size(), archive_source_for_extraction(), archive_timestamp() (+18 more)
+Cohesion: 0.10
+Nodes (28): before_request, delete, archive_delete(), archive_giso_artifacts_and_cleanup(), archive_list(), archive_size(), archive_source_for_extraction(), archive_timestamp() (+20 more)
 
 ### Community 47 - "app.py"
-Cohesion: 0.14
-Nodes (24): errorhandler, get, activity(), archive_checksums(), archive_download(), bad_request(), cisco_config(), cisco_download_status() (+16 more)
-
-### Community 48 - "normalize_architecture"
-Cohesion: 0.50
-Nodes (4): iso_architectures_from_listing(), Fall back to the ISO's own RPM repository when no eXR metadata file exists. LNT…, normalize_architecture(), Return the canonical processor family for a filename/metadata token.
+Cohesion: 0.13
+Nodes (25): after_request, errorhandler, get, activity(), archive_checksums(), archive_download(), bad_request(), cisco_download_status() (+17 more)
 
 ### Community 51 - "log_event"
-Cohesion: 0.15
-Nodes (27): after_request, Exception, append_activity(), cancel_upload(), cisco_accept(), cisco_client(), cisco_download_running(), cisco_download_start() (+19 more)
+Cohesion: 0.16
+Nodes (26): Exception, append_activity(), build_plan(), cisco_accept(), cisco_client(), cisco_download_running(), cisco_download_start(), cisco_failure() (+18 more)
 
-### Community 52 - "create_job"
-Cohesion: 0.12
-Nodes (22): append_log(), build_cleanup_paths(), build_plan(), BuildCancelled, cancel_job(), cancellation_requested(), child_mount_args(), create_job() (+14 more)
+### Community 52 - "run_job"
+Cohesion: 0.15
+Nodes (17): append_log(), BuildCancelled, cancel_job(), cancellation_requested(), child_mount_args(), initialize_job_store(), persist_job(), prepare_destructive_finalization() (+9 more)
 
 ### Community 53 - "check_graphify_freshness.py"
 Cohesion: 0.50
 Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked code graph from tracked files and compare it…, tracked_files(), verify_ignore_policy()
 
 ## Knowledge Gaps
-- **221 isolated node(s):** `inputs`, `platformProfiles`, `CONFIDENCE_LABELS`, `drop`, `GitHub Copilot repository instructions` (+216 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 405 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **222 isolated node(s):** `inputs`, `platformProfiles`, `CONFIDENCE_LABELS`, `drop`, `GitHub Copilot repository instructions` (+217 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 407 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -257,10 +253,10 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 5 inferred relationships involving `CiscoDownloadError` (e.g. with `cisco_accept()` and `cisco_config()`) actually correct?**
   _`CiscoDownloadError` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inputs`, `platformProfiles`, `CONFIDENCE_LABELS` to the rest of the system?**
-  _221 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _222 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `create_build_plan` be split into smaller, more focused modules?**
-  _Cohesion score 0.11083743842364532 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1010752688172043 - nodes in this community are weakly interconnected._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
   _Cohesion score 0.02564102564102564 - nodes in this community are weakly interconnected._
 - **Should `CiscoDownloadError` be split into smaller, more focused modules?**
-  _Cohesion score 0.07227891156462585 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07102040816326531 - nodes in this community are weakly interconnected._
