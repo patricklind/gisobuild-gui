@@ -43,7 +43,23 @@ PLATFORMS = {
     "ncs1010": {"label": "NCS 1010/1014", "architecture": "lnt", "usb": True},
     "ncs540l": {"label": "NCS 540L (XR7)", "architecture": "lnt", "usb": True},
     "ncs57": {"label": "NCS 5700 / NCS 57C3", "architecture": "lnt", "usb": True},
+    # Manual-only fallbacks so an upstream-supported platform this local
+    # marketing map does not yet know by name never dead-ends the operator -
+    # see 01-PLATFORM-UPSTREAM-TODO.md "Unknown-but-valid platforms". Only
+    # selectable by explicit operator override in Expert settings, never
+    # inferred from a filename (GENERIC_PLATFORM_IDS below excludes them from
+    # infer_platform()'s candidate loop). USB defaults to unsupported (the
+    # conservative default) since the real platform's capabilities are
+    # unknown here; the operator can still uncheck "Skip USB image" if they
+    # know the real platform supports it. Exposes only the common capability
+    # set for the chosen engine - no migration/full_iso/other named-platform
+    # quirks, which are genuine Cisco/GISO-specific differences this profile
+    # cannot know apply.
+    "exr-generic": {"label": "Other eXR platform (manual override)", "architecture": "exr", "usb": False},
+    "lnt-generic": {"label": "Other LNT platform (manual override)", "architecture": "lnt", "usb": False},
 }
+
+GENERIC_PLATFORM_IDS = frozenset({"exr-generic", "lnt-generic"})
 
 PLATFORM_CAPABILITY_OVERRIDES = {
     "asr9k": {"migration"},
@@ -137,7 +153,7 @@ def normalize_platform(value: str) -> str:
 
 def infer_platform(filename: str) -> str | None:
     name = filename.lower()
-    candidates = sorted(PLATFORMS, key=len, reverse=True)
+    candidates = sorted(PLATFORMS.keys() - GENERIC_PLATFORM_IDS, key=len, reverse=True)
     for platform in candidates:
         if re.search(rf"(^|[^a-z0-9]){re.escape(platform)}([^a-z0-9]|$)", name):
             return platform

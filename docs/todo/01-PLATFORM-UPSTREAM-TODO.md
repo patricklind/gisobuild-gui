@@ -27,6 +27,25 @@ The application must distinguish:
 - [x] Detect supported CLI options from upstream
 - [x] Build a `GisoBuildCapabilities` abstraction
 - [ ] Stop using a locally maintained list as the authoritative support list
+      — still open: `platform_validation.PLATFORMS`'s eXR entries remain a
+      hand-maintained Python literal, not something read from the mounted
+      `.gisobuild-tool` checkout at runtime. What changed 2026-09-16: added
+      `test_exr_platform_list_matches_the_pinned_upstream_engine` in
+      `giso-webui/tests/test_platform_compatibility.py`, which reads
+      `Giso.SUPPORTED_PLATFORMS` directly out of the pinned
+      `.gisobuild-tool/src/exrmod/gisobuild_exr_engine.py` (via
+      `ast.literal_eval` on the regex-extracted list literal, not a
+      hand-copied assumption) and asserts `PLATFORMS`'s eXR entries are
+      exactly that set. Confirmed the two lists are identical today (12
+      platforms each), and this closes the *silent-drift* risk — a future
+      pinned-commit bump that changes upstream's list now fails this test
+      loudly instead of the local copy quietly going stale. It does not
+      close the item itself: the list is still hardcoded, only verified;
+      true dynamic discovery would mean parsing `SUPPORTED_PLATFORMS` out of
+      the mounted checkout at application startup (or build time) instead of
+      maintaining a parallel Python literal at all. That is real remaining
+      work — the test above is a safety net for the interim, not a
+      replacement for it.
 
 ## CLI option compatibility matrix (2026-09-16)
 
@@ -198,12 +217,56 @@ container image (146/146 tests pass).
 
 ## Unknown-but-valid platforms
 
-- [ ] If upstream accepts an ISO but local marketing metadata is unknown, do not block automatically
+- [x] If upstream accepts an ISO but local marketing metadata is unknown, do
+      not block automatically — fixed 2026-09-16: before this, an ISO/RPM
+      set for a real platform gisobuild supports but whose filename
+      `infer_platform()` cannot recognize (a genuinely new upstream platform,
+      or just an unusually named file) had **no path forward at all** — not
+      even a manual override, since `normalize_platform()` rejected any
+      value that was not already a literal key in `PLATFORMS`. Added two
+      manual-only fallback entries, `exr-generic` and `lnt-generic`
+      (`GENERIC_PLATFORM_IDS` in `giso-webui/platform_validation.py`),
+      explicitly excluded from `infer_platform()`'s candidate loop (a
+      *guessed* generic platform is worthless — the whole point is the
+      operator affirmatively saying "I know this is eXR/LNT, I just can't
+      name it"), so they only ever come from an explicit Expert-settings
+      override. They expose only the common capability set for the chosen
+      engine (no `migration`/`full_iso`, which are genuine ASR9k/XRv9K-only
+      quirks this profile cannot know apply) and default `usb: False`
+      (unknown real support, conservative default, operator can still
+      uncheck "Skip USB image" if they know better). This does **not**
+      extend to automatic package selection, which still correctly requires
+      a recognizable platform to cross-check RPM filenames against — an
+      unknown platform must use Manual package list mode; deciding this was
+      the right line to hold rather than inventing an unsafe automatic-match
+      heuristic for a fundamentally underdetermined case.
+      Verified by `test_unknown_upstream_platform_can_still_be_built_via_manual_override`
+      and `test_generic_platform_fallbacks_are_never_inferred_from_a_filename`
+      in `giso-webui/tests/test_platform_compatibility.py`, and confirmed
+      live end-to-end against an isolated throwaway container: uploaded a
+      real ISO+RPM named `mystery-platform-*` (a filename `infer_platform()`
+      correctly returns `None` for) through the actual upload API, selected
+      `exr-generic` with manual package selection, and got
+      `POST /api/build-plan` → `"ready": true` — a build that was previously
+      impossible to start at all.
 - [ ] Show upstream identifier
 - [ ] Show engine
 - [ ] Show release
-- [ ] Show marketing name as unknown
-- [ ] Preserve an explicit confidence/source field
+- [x] Show marketing name as unknown — the generic fallback's own label
+      ("Other eXR platform (manual override)") already communicates this;
+      no separate marketing-name field needed for the fallback case itself.
+- [ ] Preserve an explicit confidence/source field — `confidence_report()`'s
+      platform entry currently reports `value: "INFERRED"` even when the
+      operator picked `exr-generic`/`lnt-generic`, which reads as a filename
+      guess rather than "operator declared this is a generic engine
+      profile, real platform unverified." `source: "operator-selected"` is
+      already correct and distinguishes it from a filename match, but a
+      genuine third confidence tier (something like `MANUAL`/`UNVERIFIED`,
+      distinct from `INFERRED`/`VERIFIED`) would need updating
+      `CONFIDENCE_LABELS`/the confidence badge CSS/existing tests
+      everywhere they assume two tiers — not done here to avoid a
+      half-finished ripple through code this pass didn't have room to
+      verify end-to-end.
 
 ## Capability-driven UI
 
@@ -254,7 +317,15 @@ if capabilities.optimize:
       (`test_adapter_rejects_exr_only_capability_on_lnt_platform`); until
       then only the reverse direction had a test.
 - [x] LNT-only option rejection on eXR (`test_adapter_rejects_capability_not_supported_by_engine`)
-- [ ] unknown/future upstream-supported platform
+- [x] unknown/future upstream-supported platform — see "Unknown-but-valid
+      platforms" above (`test_unknown_upstream_platform_can_still_be_built_via_manual_override`).
+      Covers "the operator manually declares an unrecognized platform and
+      still gets a valid, buildable profile"; does not cover "a future
+      pinned-commit bump adds a genuinely new upstream eXR platform to
+      `SUPPORTED_PLATFORMS`" being picked up automatically — that is the
+      still-open "Stop using a locally maintained list" item above, which
+      `test_exr_platform_list_matches_the_pinned_upstream_engine` now at
+      least fails loudly on instead of silently drifting.
 - [x] NCS-57C3 alias normalization (`test_ncs57c3_filename_is_inferred_as_ncs57`,
       `test_ncs57c3_inventory_sku_normalizes_to_ncs57`, both pre-existing and
       passing)

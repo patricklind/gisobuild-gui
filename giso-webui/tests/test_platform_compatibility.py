@@ -1,6 +1,11 @@
+import ast
+import re
 import unittest
+from pathlib import Path
 
 from platform_validation import (
+    GENERIC_PLATFORM_IDS,
+    PLATFORMS,
     capabilities_for_platform,
     check_upgrade_matrix,
     infer_platform,
@@ -12,6 +17,93 @@ from platform_validation import (
 
 
 class PlatformCompatibilityTests(unittest.TestCase):
+    def test_exr_platform_list_matches_the_pinned_upstream_engine(self):
+        # PLATFORMS in platform_validation.py is a locally maintained copy of
+        # the eXR platform whitelist upstream gisobuild actually enforces
+        # (Giso.SUPPORTED_PLATFORMS in
+        # .gisobuild-tool/src/exrmod/gisobuild_exr_engine.py, which matches
+        # src/utils/gisoglobals.py's EXR_SUPPORTED_PLATFORMS). Nothing ties
+        # the two together today - if a future pinned-commit bump changes
+        # upstream's list, this local copy would silently drift out of sync
+        # instead of failing loudly, either blocking a now-supported platform
+        # or (less likely but possible) accepting one upstream no longer
+        # does. See 01-PLATFORM-UPSTREAM-TODO.md "Stop using a locally
+        # maintained list as the authoritative support list".
+        engine_path = (
+            Path(__file__).parents[2]
+            / ".gisobuild-tool/src/exrmod/gisobuild_exr_engine.py"
+        )
+        source = engine_path.read_text()
+        match = re.search(r"SUPPORTED_PLATFORMS\s*=\s*(\[[^\]]*\])", source)
+        self.assertIsNotNone(
+            match, "Could not find SUPPORTED_PLATFORMS in the pinned gisobuild engine - "
+            "has upstream renamed or restructured this list?"
+        )
+        upstream_platforms = set(ast.literal_eval(match.group(1)))
+        local_exr_platforms = {
+            key for key, profile in PLATFORMS.items()
+            if profile["architecture"] == "exr" and key not in GENERIC_PLATFORM_IDS
+        }
+        missing_locally = upstream_platforms - local_exr_platforms
+        self.assertFalse(
+            missing_locally,
+            f"Upstream gisobuild supports {sorted(missing_locally)} but "
+            "platform_validation.PLATFORMS does not - add it (see "
+            "01-PLATFORM-UPSTREAM-TODO.md).",
+        )
+        extra_locally = local_exr_platforms - upstream_platforms
+        self.assertFalse(
+            extra_locally,
+            f"platform_validation.PLATFORMS claims eXR support for "
+            f"{sorted(extra_locally)}, which the pinned gisobuild engine's "
+            "own SUPPORTED_PLATFORMS does not list - this would let an "
+            "operator select a platform gisobuild itself will reject.",
+        )
+
+    def test_unknown_upstream_platform_can_still_be_built_via_manual_override(self):
+        # An ISO/RPM set for a real platform gisobuild supports but this
+        # local marketing map does not (yet) recognize by name must not
+        # dead-end the operator - see 01-PLATFORM-UPSTREAM-TODO.md
+        # "Unknown-but-valid platforms". infer_platform() correctly returns
+        # None for such a filename (it must not guess), but the operator can
+        # still explicitly select the generic eXR/LNT fallback in Expert
+        # settings and get a valid, capability-correct profile to build with
+        # (in Manual package list mode - automatic selection still correctly
+        # requires a recognizable platform, since there is nothing to
+        # deterministically match RPM filenames against otherwise).
+        self.assertIsNone(infer_platform("some-brand-new-platform-mini-x-30.1.1.iso"))
+        # The generic profile's usb capability is False (real support is
+        # unknown), so validate_platform_options() correctly refuses to
+        # proceed until the operator acknowledges that with skip_usb_image -
+        # the same gate any other no-USB platform (e.g. ncs5k) goes through.
+        profile = validate_platform_options({
+            "iso": "some-brand-new-platform-mini-x-30.1.1.iso",
+            "platform": "exr-generic",
+            "skip_usb_image": True,
+        })
+        self.assertEqual(profile["architecture"], "exr")
+        self.assertFalse(profile["capabilities"]["migration"])
+        self.assertFalse(profile["capabilities"]["full_iso"])
+        self.assertFalse(profile["usb"])
+        lnt_profile = validate_platform_options({
+            "iso": "some-brand-new-platform-mini-x-30.1.1.iso",
+            "platform": "lnt-generic",
+            "skip_usb_image": True,
+        })
+        self.assertEqual(lnt_profile["architecture"], "lnt")
+        self.assertTrue(lnt_profile["capabilities"]["remove_packages"])
+
+    def test_generic_platform_fallbacks_are_never_inferred_from_a_filename(self):
+        # These two IDs exist only as an explicit manual escape hatch: a
+        # filename containing the literal substring "exr-generic" or
+        # "lnt-generic" is not a real Cisco naming pattern, but infer_platform()
+        # must never resolve to them even in principle, since a *guessed*
+        # generic platform is worthless - the whole point is that the
+        # operator affirmatively said "I know this is an eXR/LNT image, I
+        # just can't tell you its exact name."
+        for generic_id in GENERIC_PLATFORM_IDS:
+            self.assertIsNone(infer_platform(f"{generic_id}-mini-x-25.1.1.iso"))
+
     def test_capabilities_follow_upstream_exr_and_lnt_option_maps(self):
         exr = capabilities_for_platform("ncs5500")
         lnt = capabilities_for_platform("ncs57")

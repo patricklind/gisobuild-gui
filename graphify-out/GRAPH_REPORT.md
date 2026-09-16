@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-16)
 
 ## Corpus Check
-- 49 files · ~67,912 words
+- 49 files · ~68,729 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 14 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 1)
 
 ## Summary
-- 861 nodes · 1347 edges · 56 communities (39 shown, 11 thin omitted)
+- 864 nodes · 1353 edges · 57 communities (38 shown, 13 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 22 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c4ac7d7e`
+- Built from commit: `ffb55a73`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -60,16 +60,17 @@
 - app.py
 - RuntimeError
 - MaintenanceTests
-- run_cisco_download
-- create_job
+- find_cisco_images
+- log_event
 - enforce_archive_policy
 - check_graphify_freshness.py
-- normalize_architecture
+- iso_architectures_from_listing
+- add_superseded_exclusions
 - staging/README.md
 
 ## God Nodes (most connected - your core abstractions)
 1. `GisoWebTests` - 158 edges
-2. `PlatformCompatibilityTests` - 27 edges
+2. `PlatformCompatibilityTests` - 30 edges
 3. `BuildScriptTests` - 24 edges
 4. `CiscoDownloadError` - 21 edges
 5. `validate_smu_selection()` - 21 edges
@@ -94,11 +95,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (56 total, 11 thin omitted)
+## Communities (57 total, 13 thin omitted)
 
 ### Community 0 - "create_build_plan"
-Cohesion: 0.14
-Nodes (23): active_rpm_names(), add_superseded_exclusions(), build_cleanup_paths(), build_command(), cisco_text(), compatibility(), confidence_report(), create_build_plan() (+15 more)
+Cohesion: 0.13
+Nodes (31): Exception, active_rpm_names(), build_cleanup_paths(), build_command(), build_plan(), cisco_accept(), cisco_client(), cisco_download_running() (+23 more)
 
 ### Community 2 - "CiscoDownloadError"
 Cohesion: 0.06
@@ -113,8 +114,8 @@ Cohesion: 0.08
 Nodes (25): 1. Determine the platform and install architecture, 2. Validate the supported upgrade path, 3. Prepare the build inputs, 4. Build the GISO, 5. Validate the build output, 6. Prepare the router and change window, 7. Install the GISO, 8. Post-upgrade validation (+17 more)
 
 ### Community 5 - "PlatformCompatibilityTests"
-Cohesion: 0.09
-Nodes (16): capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), GisoBuildCapabilities, infer_platform(), normalize_platform(), platform_profile(), Platform-aware validation for Cisco IOS XR GISO build options. (+8 more)
+Cohesion: 0.08
+Nodes (18): capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), GisoBuildCapabilities, infer_platform(), normalize_architecture(), normalize_platform(), platform_profile() (+10 more)
 
 ### Community 7 - "System architecture"
 Cohesion: 0.13
@@ -221,8 +222,8 @@ Cohesion: 0.50
 Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 
 ### Community 45 - "Path"
-Cohesion: 0.12
-Nodes (23): archive_giso_artifacts_and_cleanup(), archive_source_for_extraction(), command_preview(), file_checksums(), file_sha256(), giso_artifact_candidates(), glob_metacharacters(), inventory_files() (+15 more)
+Cohesion: 0.10
+Nodes (28): archive_giso_artifacts_and_cleanup(), archive_source_for_extraction(), command_preview(), current_inventory_revision(), discover(), file_checksums(), file_sha256(), giso_artifact_candidates() (+20 more)
 
 ### Community 47 - "app.py"
 Cohesion: 0.10
@@ -232,42 +233,38 @@ Nodes (33): errorhandler, get, activity(), archive_checksums(), archive_delete()
 Cohesion: 0.20
 Nodes (10): BuildCancelled, child_mount_args(), prepare_destructive_finalization(), RuntimeError, Share only required storage with the build container, never docker.sock., Commit the final state transition before any owned input is removed., Stop a build lifecycle without converting cancellation into failure., validate_archive_retention_days() (+2 more)
 
-### Community 50 - "run_cisco_download"
-Cohesion: 0.18
-Nodes (18): Exception, build_plan(), cisco_accept(), cisco_client(), cisco_download_start(), cisco_failure(), cisco_response_requires(), cisco_search() (+10 more)
-
-### Community 51 - "create_job"
-Cohesion: 0.16
-Nodes (23): after_request, delete, append_activity(), append_log(), cancel_job(), cancel_upload(), cancellation_requested(), cisco_download_running() (+15 more)
+### Community 51 - "log_event"
+Cohesion: 0.13
+Nodes (24): after_request, delete, append_activity(), append_log(), cancel_job(), cancel_upload(), cancellation_requested(), cleanup() (+16 more)
 
 ### Community 52 - "enforce_archive_policy"
-Cohesion: 0.17
-Nodes (12): before_request, archive_size(), archive_timestamp(), enforce_archive_policy(), expire_upload_sessions(), initialize_job_store(), Operator-facing storage visibility (AI-MASTER-PROMPT.md section 37/45). A read,…, Create the job store and restore safe job history once per process. (+4 more)
+Cohesion: 0.20
+Nodes (10): before_request, archive_size(), archive_timestamp(), enforce_archive_policy(), expire_upload_sessions(), Operator-facing storage visibility (AI-MASTER-PROMPT.md section 37/45). A read,…, Remove expired archive jobs, then oldest jobs until the archive fits its quota., storage() (+2 more)
 
 ### Community 53 - "check_graphify_freshness.py"
 Cohesion: 0.50
 Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked code graph from tracked files and compare it…, tracked_files(), verify_ignore_policy()
 
-### Community 54 - "normalize_architecture"
+### Community 55 - "add_superseded_exclusions"
 Cohesion: 0.50
-Nodes (4): iso_architectures_from_listing(), Fall back to the ISO's own RPM repository when no eXR metadata file exists. LNT…, normalize_architecture(), Return the canonical processor family for a filename/metadata token.
+Nodes (4): add_superseded_exclusions(), A package's containing directory names the Cisco supersedence identifier it…, Explain, rather than silently drop, RPMs active_rpm_names() already filtered…, rpm_is_superseded()
 
 ## Knowledge Gaps
 - **232 isolated node(s):** `inputs`, `platformProfiles`, `CONFIDENCE_LABELS`, `READY_CHECK_LABELS`, `drop` (+227 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 460 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 461 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `IsoArchitectureInspectionTests`, `.test_discover_tolerates_file_removed_during_scan`, `.upload`, `dict`, `Path`?**
   _High betweenness centrality (0.122) - this node is a cross-community bridge._
-- **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `run_cisco_download`, `app.py`?**
+- **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `create_build_plan`, `app.py`?**
   _High betweenness centrality (0.028) - this node is a cross-community bridge._
 - **What connects `inputs`, `platformProfiles`, `CONFIDENCE_LABELS` to the rest of the system?**
   _232 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `create_build_plan` be split into smaller, more focused modules?**
-  _Cohesion score 0.1422924901185771 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13118279569892474 - nodes in this community are weakly interconnected._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
   _Cohesion score 0.02 - nodes in this community are weakly interconnected._
 - **Should `CiscoDownloadError` be split into smaller, more focused modules?**
