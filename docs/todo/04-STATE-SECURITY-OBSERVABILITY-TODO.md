@@ -146,12 +146,31 @@ Protect against:
 
 ## Cisco secrets
 
-- [ ] never return secrets to browser
-- [ ] never log secrets
-- [ ] never store secrets in jobs
-- [ ] never bake secrets into image
-- [ ] prefer secret files
-- [ ] browser sees only configured yes/no
+Audited 2026-09-16 — all already true, no code change needed:
+
+- [x] never return secrets to browser — no route ever `jsonify()`s
+      `client_id`/`client_secret`/an OAuth token; `CiscoSoftwareClient`
+      keeps its `_access_token` as a private instance attribute, never
+      copied into a `jobs`/`cisco_download_jobs` dict or a response body.
+- [x] never log secrets — every `log_event("cisco_*", ...)` call
+      (`cisco_search_failed`, `cisco_search_completed`,
+      `cisco_download_completed`, `cisco_download_failed`) passes only
+      counts/ids/error types, never a credential or token value.
+- [x] never store secrets in jobs — `cisco_download_jobs[job_id]` holds
+      `id`/`status`/`progress`/`files`/`error`/`created` only; the OAuth
+      token lives solely on the `CiscoSoftwareClient` instance
+      (`cisco_download.py`), not in any persisted job dict.
+- [x] never bake secrets into image — `giso-webui/compose.yaml` passes
+      `CISCO_CLIENT_ID`/`CISCO_CLIENT_SECRET` (and their `_FILE`
+      counterparts) through `${VAR:-}` with empty defaults; the Dockerfile
+      declares no `ARG`/`ENV` default for either.
+- [x] prefer secret files — `secret_value()` in `cisco_download.py` reads
+      `<NAME>_FILE` first (a mounted Docker secret file) and only falls
+      back to the plain `<NAME>` env var; `compose.yaml` mounts
+      `${CISCO_SECRETS_DIR:-./secrets}` at `/run/secrets` for this.
+- [x] browser sees only configured yes/no — the only client-visible signal
+      is `enabled = bool(secret_value("CISCO_CLIENT_ID") and
+      secret_value("CISCO_CLIENT_SECRET"))`, never the values themselves.
 
 ## Structured logging
 
