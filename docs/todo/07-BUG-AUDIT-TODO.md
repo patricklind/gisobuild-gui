@@ -87,7 +87,13 @@ Verified by the updated `test_lnt_only_defaults_do_not_block_exr_builds` in
 through three states: before any platform is known (checked, matching the
 new default), after selecting a synthetic eXR platform (unchecked, disabled,
 hidden), and after selecting a synthetic LNT platform on a fresh page load
-(checked). Full suite green (207 tests); ruff and Graphify clean.
+(checked). Follow-up: the frontend checkbox default had no matching backend
+test proving `--verbose-dep-check` (or any `BOOL_OPTIONS` flag) actually
+reaches the real build command — added
+`test_verbose_dep_check_is_passed_through_for_lnt_platforms` and
+`test_verbose_dep_check_is_omitted_when_not_requested` in
+`giso-webui/tests/test_app.py` to close that gap directly. Full suite green
+(209 tests); ruff and Graphify clean.
 
 ### The "Start build" disabled hint could name a requirement that was already satisfied (2026-09-16)
 

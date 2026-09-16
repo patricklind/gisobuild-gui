@@ -995,6 +995,23 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("package.rpm", command)
 
     @patch("app.child_mount_args", return_value=[])
+    def test_verbose_dep_check_is_passed_through_for_lnt_platforms(self, _mounts):
+        # verbose_dep_check now defaults to checked in the UI (2026-09-16);
+        # this confirms the backend actually includes --verbose-dep-check
+        # in the real build command when the payload requests it.
+        (self.data / "base.iso").write_bytes(b"iso")
+        command = module.build_command({"iso": "base.iso", "platform": "ncs57",
+                                        "pkglist": [], "verbose_dep_check": True}, "job")
+        self.assertIn("--verbose-dep-check", command)
+
+    @patch("app.child_mount_args", return_value=[])
+    def test_verbose_dep_check_is_omitted_when_not_requested(self, _mounts):
+        (self.data / "base.iso").write_bytes(b"iso")
+        command = module.build_command({"iso": "base.iso", "platform": "ncs57",
+                                        "pkglist": []}, "job")
+        self.assertNotIn("--verbose-dep-check", command)
+
+    @patch("app.child_mount_args", return_value=[])
     def test_different_duplicate_rpms_are_rejected(self, _mounts):
         (self.data / "base.iso").write_bytes(b"iso")
         (self.data / "one").mkdir()
