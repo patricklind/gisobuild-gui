@@ -14,7 +14,11 @@ Cover:
 - [x] duplicate checksums
 - [x] same filename/different content
 - [ ] release mismatch
-- [ ] architecture mismatch
+- [x] architecture mismatch (`test_rpm_architecture_mismatched_with_iso_is_rejected`,
+      `test_rpm_architecture_matching_iso_is_accepted`,
+      `test_unknown_iso_architecture_does_not_block_selection`; this was
+      already implemented and tested by the merged ISO/RPM architecture
+      change, just left unchecked here)
 - [ ] incomplete CSC
 - [ ] supersedence
 - [ ] BuildPlan generation
@@ -24,7 +28,9 @@ Cover:
 - [ ] artifact verification
 - [ ] cleanup
 - [ ] restart recovery
-- [ ] malicious paths
+- [x] malicious paths (TAR traversal/symlink/hardlink/absolute-path members,
+      `safe_data_path` traversal, and archive-delete traversal — see
+      Security tests below for the specific tests)
 
 ## Representative platform fixtures
 
@@ -106,14 +112,26 @@ upload
 
 ## Security tests
 
-- [ ] TAR traversal
-- [ ] symlink archive member
-- [ ] absolute path
-- [ ] oversized expansion
+- [x] TAR traversal (`test_tar_path_traversal_is_rejected`; the protective
+      code already existed, this section was just under-checked)
+- [x] symlink archive member (`test_tar_symlink_member_is_rejected`,
+      `test_tar_hardlink_member_is_rejected` — new, closing a real gap: the
+      rejection code existed in both `extract_cisco_archive()` and the
+      upload-completion TAR path, but nothing exercised it)
+- [x] absolute path (`test_tar_absolute_path_member_is_rejected` — new)
+- [x] oversized expansion (`test_tar_expansion_size_limit_is_enforced` — new,
+      covers `MAX_EXTRACTED_BYTES` directly; the pre-existing
+      `test_tar_extraction_requires_reserved_free_space` only covered the
+      separate free-disk-space guard)
 - [x] duplicate filename conflict
-- [ ] malicious job/artifact path
+- [x] malicious job/artifact path (`test_archive_delete_rejects_path_traversal`,
+      `test_path_traversal_is_rejected`; pre-existing, just under-checked)
 - [x] package glob metacharacters
-- [ ] secret redaction
+- [x] secret redaction (`test_cisco_config_only_exposes_availability` proves
+      Cisco credentials never leave the config-check endpoint beyond a
+      yes/no; `test_quoted_artifact_path_with_spaces_is_fully_redacted` and
+      `test_build_output_is_redacted_and_written_to_service_log` cover
+      filename/command redaction in logs)
 
 ## CI pipeline
 

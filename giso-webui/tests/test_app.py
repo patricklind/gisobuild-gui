@@ -284,6 +284,60 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse((Path(self.temp.name) / "outside.rpm").exists())
         self.assertFalse((self.data / "unsafe.tar").exists())
 
+    def test_tar_symlink_member_is_rejected(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            info = tarfile.TarInfo("escape-link")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "/etc/passwd"
+            archive.addfile(info)
+        response = self.upload("unsafe-symlink.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Links are not accepted", response.get_json()["error"])
+        self.assertFalse((self.data / "unsafe-symlink.tar").exists())
+
+    def test_tar_hardlink_member_is_rejected(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"rpm"
+            target_info = tarfile.TarInfo("package.rpm")
+            target_info.size = len(payload)
+            archive.addfile(target_info, io.BytesIO(payload))
+            link_info = tarfile.TarInfo("hardlink-to-package")
+            link_info.type = tarfile.LNKTYPE
+            link_info.linkname = "package.rpm"
+            archive.addfile(link_info)
+        response = self.upload("unsafe-hardlink.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Links are not accepted", response.get_json()["error"])
+        self.assertFalse((self.data / "unsafe-hardlink.tar").exists())
+
+    def test_tar_absolute_path_member_is_rejected(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"bad"
+            info = tarfile.TarInfo("/etc/cron.d/evil")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        response = self.upload("unsafe-abs.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Tar archive rejected", response.get_json()["error"])
+        self.assertFalse(Path("/etc/cron.d/evil").exists())
+        self.assertFalse((self.data / "unsafe-abs.tar").exists())
+
+    def test_tar_expansion_size_limit_is_enforced(self):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            payload = b"x" * 100
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        with patch.object(module, "MAX_EXTRACTED_BYTES", 10):
+            response = self.upload("too-big.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("too large", response.get_json()["error"])
+        self.assertFalse((self.data / "too-big.tar").exists())
+
     def test_tar_extraction_requires_reserved_free_space(self):
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode="w") as archive:
