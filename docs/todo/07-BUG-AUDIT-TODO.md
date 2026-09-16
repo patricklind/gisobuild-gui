@@ -290,6 +290,44 @@ TODO:
 - [x] Same name + different hash is a hard conflict until the unwanted copy is removed.
 - [ ] Add DOM regression tests for both duplicate cases.
 
+### A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16)
+
+Current behavior (before this fix):
+
+`syncManualPackageValue()` in `giso-webui/static/manual-packages.js` computed
+each CSC group checkbox's checked/indeterminate state from *every* RPM
+checkbox carrying that `data-csc`, including ones disabled by the
+same-name/different-hash conflict handling above. The group checkbox's own
+click handler already correctly skips disabled boxes
+(`if (!box.disabled) box.checked = ...`), so a group with one conflicted
+duplicate and two selectable RPMs could never reach `checked === 3`
+(the conflicted RPM can never be checked) — checking both selectable RPMs
+by hand left the group checkbox stuck showing `indeterminate` forever,
+never `checked`, even though every box the group checkbox can actually
+affect was already checked.
+
+TODO:
+
+- [x] Compute the group checkbox's checked/indeterminate state from only
+      the members it can actually toggle (i.e. exclude disabled/conflicted
+      RPMs from both the denominator and the checked count).
+
+Fix: filter `members` to `!box.disabled` before computing `checked`/
+`groupBox.checked`/`groupBox.indeterminate` in `syncManualPackageValue()`.
+
+Verified live in a browser (isolated throwaway container, its own temp
+`DATA_ROOT`/etc., never the shared persistent volumes): injected a fixture
+with one CSC group of two selectable RPMs (`a.rpm`, `b.rpm`) plus a
+same-basename-different-hash conflict pair (`c.rpm` ×2, both disabled),
+called the real `renderManualPackages(data, plan)`, checked both selectable
+boxes, called `syncManualPackageValue()`, and confirmed the group checkbox
+reports `checked: true, indeterminate: false` (previously would have been
+`checked: false, indeterminate: true` given 2 of 4 total members checked).
+No DOM/JS test runner exists in this repo yet (tracked separately in
+`05-TESTING-CI-TODO.md`), so this fix could not get an automated regression
+test; the existing Python test suite (199 tests) is unaffected and still
+passes, and ruff/Graphify remain clean.
+
 ## P1/P2 — Platform and compatibility validation
 
 ### Ownership vouchers/certificate could be submitted one without the other with no warning (2026-09-16)

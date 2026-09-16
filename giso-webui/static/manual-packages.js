@@ -63,9 +63,14 @@
       `${selected.length} of ${all.length} RPM packages selected.`;
 
     document.querySelectorAll('#manual-package-list .manual-csc-checkbox').forEach(groupBox => {
+      // Only count boxes the group checkbox can actually affect (its own
+      // click handler already skips disabled ones - see the 'change'
+      // listener below). Counting disabled/conflicted RPMs here too would
+      // leave the group checkbox stuck showing indeterminate forever, even
+      // after every selectable member in the group is checked.
       const members = [...document.querySelectorAll(
         `#manual-package-list .manual-rpm-checkbox[data-csc="${CSS.escape(groupBox.dataset.csc)}"]`
-      )];
+      )].filter(box => !box.disabled);
       const checked = members.filter(box => box.checked).length;
       groupBox.checked = members.length > 0 && checked === members.length;
       groupBox.indeterminate = checked > 0 && checked < members.length;
