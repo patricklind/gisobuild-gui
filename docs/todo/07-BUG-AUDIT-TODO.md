@@ -687,7 +687,15 @@ TODO:
 - [x] Track whether release was automatically populated or manually overridden.
 - [x] Refresh auto-derived release when the base ISO changes.
 - [x] Preserve explicit manual override only when intentionally selected.
-- [ ] Add browser regression test switching between two releases.
+- [x] Add browser regression test switching between two releases — same
+      live-verification pattern as the two-ISO item above (no JS/DOM test
+      runner exists in this repo). Confirmed 2026-09-16 against an isolated
+      throwaway container: uploaded `ncs5500-mini-x-26.1.1.iso` → target
+      release auto-filled to `26.1.1`; replaced it with
+      `ncs5500-mini-x-27.2.3.iso` and refreshed → target release followed to
+      `27.2.3` (not stuck on the old value); manually set the field to
+      `99.9.9` and refreshed again → stayed `99.9.9` (manual override
+      correctly not clobbered by the next automatic refresh).
 
 ### Archive maintenance runs in a separate process with no cross-process lock (2026-09-16)
 
