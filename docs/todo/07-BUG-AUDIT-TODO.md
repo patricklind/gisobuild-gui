@@ -211,6 +211,22 @@ TODO:
 - [x] Do not use one concatenated free-text string for package presence checks.
 - [x] Add near-match regression tests.
 
+### Hardware alias matching used loose substrings instead of word boundaries
+
+Fixed. `infer_platform()`'s primary platform-ID loop already used a
+word-boundary regex, but its `ALIASES` fallback loop used a bare `if alias in
+name` substring check — the same class of bug as the bridge-SMU issue above.
+An alias such as `"8800"` (→ Cisco 8000 family) could match inside an
+unrelated numeric run, e.g. `router-188005-image.iso`.
+
+TODO:
+
+- [x] Use the same word-boundary matching for alias lookups as for direct
+      platform-ID lookups.
+- [x] Add a regression test for both the false-positive and the legitimate
+      match case
+      (`test_alias_matching_does_not_produce_false_positives_on_substrings`).
+
 ### Filename heuristics can report confidence stronger than the evidence supports
 
 Current platform/release/CSC checks are largely filename based. This is already covered by the metadata-first architecture TODO, but it is also a current correctness risk.
@@ -265,6 +281,34 @@ TODO:
 - [ ] During migration, define an explicit pull policy and safe cached-image fallback.
 - [ ] Pin builder identity by digest/commit rather than mutable tag semantics.
 - [ ] Add offline/cached-builder regression test if nested Docker remains during transition.
+
+## P2 — Tooling reliability
+
+### `ruff` is installed unpinned in CI, so its rule set can change without a code change
+
+Current behavior:
+
+`.github/workflows/ci.yml` runs `pip install ... ruff ...` with no version
+pin, and the repository has no `pyproject.toml`/`ruff.toml`, so every CI run
+lints with whatever `ruff` resolves to that day using its own default rule
+set. Reproduced locally: `ruff check giso-webui/app.py ...` with a freshly
+installed `ruff 0.16.7` flagged `PLW1510` (`subprocess.run` without an
+explicit `check=` argument) on the two `isoinfo` calls added by the ISO
+architecture-detection change — a real style issue, but a lint failure that
+appeared with no corresponding code change is a process risk on its own.
+Fixed the two flagged calls by adding `check=False` (matching their existing
+manual `returncode` handling). Could not confirm live GitHub Actions status
+for `main` from this sandbox (`gh` is installed but not authenticated here).
+
+TODO:
+
+- [x] Add explicit `check=False` to the two `isoinfo` `subprocess.run` calls
+      in `giso-webui/app.py:inspect_iso_architecture()`.
+- [ ] Pin `ruff`'s version in CI (and locally, e.g. via
+      `giso-webui/requirements.txt` or a dedicated dev-requirements file) so
+      lint results are reproducible across runs and machines.
+- [ ] Add a `pyproject.toml`/`ruff.toml` that explicitly selects the intended
+      rule set, instead of relying on whatever ruff's shifting defaults are.
 
 ## P2 — Graphify / repository correctness
 

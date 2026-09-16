@@ -41,6 +41,14 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertEqual(infer_platform("NCS-57C3-MODS-SYS-26.1.2.iso"), "ncs57")
         self.assertEqual(infer_platform("ncs57c3modsys-25.1.2.iso"), "ncs57")
 
+    def test_alias_matching_does_not_produce_false_positives_on_substrings(self):
+        # "8800" is an alias for the Cisco 8000 family; it must not match when
+        # it merely occurs inside an unrelated numeric run in the filename.
+        self.assertIsNone(infer_platform("router-188005-image.iso"))
+        self.assertIsNone(infer_platform("build-8800123-mini-x.iso"))
+        # A real alias occurrence, properly bounded, still resolves.
+        self.assertEqual(infer_platform("cisco-8800-mini-x-26.1.2.iso"), "8000")
+
     def test_automatic_selection_keeps_matching_repository_and_excludes_mismatches(self):
         result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
             "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",

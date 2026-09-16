@@ -141,9 +141,12 @@ def infer_platform(filename: str) -> str | None:
     for platform in candidates:
         if re.search(rf"(^|[^a-z0-9]){re.escape(platform)}([^a-z0-9]|$)", name):
             return platform
-    for alias, platform in ALIASES.items():
-        if alias in name:
-            return platform
+    # Word-boundary matched, same as the loop above: a bare substring check
+    # here would let an alias like "8800" match inside an unrelated numeric
+    # run (for example "router-188005-image.iso").
+    for alias in sorted(ALIASES, key=len, reverse=True):
+        if re.search(rf"(^|[^a-z0-9]){re.escape(alias)}([^a-z0-9]|$)", name):
+            return ALIASES[alias]
     return None
 
 
