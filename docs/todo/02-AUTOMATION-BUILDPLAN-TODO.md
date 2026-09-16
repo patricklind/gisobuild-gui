@@ -45,6 +45,63 @@ model this section describes. Do not check off "upstream gisobuild
 inspection/isoinfo" below until release and platform detection are also
 metadata-driven instead of filename-driven.
 
+### Found 2026-09-16: `isols.py` is the real upstream tool for exactly this, for LNT
+
+`.gisobuild-tool/src/lnt/tools/_isols.py` is a complete, existing upstream
+CLI (`--dump-mdata --json`) that returns platform family, XR release, ISO
+type/format version, GISO label/build metadata, the full RPM/package list
+per group, optional packages, key request/ownership voucher-certificate
+presence, **and `supported-pids`** (`iso.query_content(supported_pids=True)`
+in `image.py`) — real, upstream-verified data, not filename regex. This is
+exactly the "prefer upstream tooling" principle in
+`docs/AI-MASTER-PROMPT.md` section 40/41, and would directly upgrade
+platform/release/PID detection from `INFERRED` to a genuine `VERIFIED`
+(see the "Confidence display" honesty accounting in
+`06-UI-OPERATOR-TODO.md`) and unblock a real PID picker for
+`--only-support-pids` instead of a free-text field.
+
+Why this isn't a quick pass-through, and wasn't implemented in this pass:
+
+- `isols.py`'s `Image` class extracts and runs `image.py` **from inside the
+  uploaded ISO itself** (`gisoutils.extract_image_py_sig()` in
+  `.gisobuild-tool/src/lnt/gisoutils.py`), after signature verification. That
+  needs the full `lnt`/`utils` package environment
+  (`gisoutils`, `lnt_gisoglobals`, whatever `wrappers` module
+  `add_wrappers_to_path()` pulls in) — dependencies that live in the pinned
+  `ciscogisobuild/cisco-xr-gisobuild:2.3.4` build image, not in
+  `giso-webui`'s own lightweight Alpine image (which only has `isoinfo` via
+  `cdrkit`, no Python `lnt` package at all).
+- Running it therefore means a **second, read-only `docker run` against the
+  same pinned build image** (giso-webui already runs this image for real
+  builds via `build_command()`), a genuinely new invocation pattern that
+  needs the same care already applied to `inspect_iso_architecture()`:
+  output size caps, a timeout, no write access to anything but a scratch
+  temp dir, and graceful degradation to filename inference when the image
+  is eXR (this tool is LNT-only), the ISO predates this capability, or the
+  container can't run for any reason — never a new way to block an
+  otherwise-buildable image.
+- Only applies to LNT; eXR platform/release detection would still need its
+  own investigation (likely `gisobuild_exr_engine.py`/`isotools_exr.py`).
+
+TODO:
+
+- [ ] Prototype invoking `isols.py --iso <mounted-iso> --dump-mdata --json`
+      inside the pinned build image from `giso-webui`, capped and
+      timed-out the same way `inspect_iso_architecture()` is.
+- [ ] Fold real `platform-family`/`xr-version`/`supported-pids` results into
+      `confidence_report()` as `VERIFIED` (`source: "isols-metadata"`) when
+      available, keeping the existing filename fallback and `UNKNOWN` states
+      unchanged when it isn't.
+- [ ] Replace the free-text `--only-support-pids` field with a picklist
+      populated from `supported-pids`, per
+      `docs/AI-MASTER-PROMPT.md` section 25's hardware-PID-filtering UX. The
+      warning copy this item specifies (verbatim from upstream's own
+      `--only-support-pids` help text: "Removing hardware support is
+      irreversible... may fail to boot... discuss with Cisco support") is
+      already in place next to the field in `giso-webui/templates/index.html`
+      as of 2026-09-16 — only the free-text-to-picklist upgrade remains,
+      which depends on the `isols.py` work above.
+
 Detection order:
 
 - [ ] ISO metadata
