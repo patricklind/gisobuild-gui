@@ -322,7 +322,17 @@ TODO:
 - [x] Never auto-select an ISO when more than one candidate exists.
 - [x] Require an explicit operator selection or metadata-based deterministic choice.
 - [x] Build button must stay blocked while base ISO identity is ambiguous.
-- [ ] Add browser regression test with two uploaded ISOs.
+- [x] Add browser regression test with two uploaded ISOs — no JS/DOM test
+      runner exists in this repo (see `05-TESTING-CI-TODO.md`), so this is
+      a live-verification record rather than an automated test, matching
+      how other browser-only regressions in this project are tracked.
+      Confirmed 2026-09-16 against an isolated throwaway container: uploaded
+      two real ISOs (`ncs5500-mini-x-26.1.1.iso`,
+      `ncs5500-mini-x-26.1.2.iso`) through the actual `/api/uploads` flow,
+      then read the live DOM — `[name=iso]` stayed empty (no arbitrary
+      first-ISO auto-selection), `#start-build` stayed disabled ("Waiting
+      for an ISO and a customization…"), and `#iso-check` explicitly read
+      "Select one base ISO in Expert settings."
 
 ### app.js and manual-packages.js both defined the manual-package-list logic, one of them dead (2026-09-16)
 
@@ -639,8 +649,15 @@ and are honestly reported as `INFERRED`. Only ISO architecture
 TODO:
 
 - [x] Label filename-only results as `INFERRED`, never `VERIFIED`.
-- [ ] Do not block an upstream-valid platform solely because the local filename parser does not recognize it.
-- [ ] Add unknown/future-platform regression fixture.
+- [x] Do not block an upstream-valid platform solely because the local
+      filename parser does not recognize it — fixed 2026-09-16; see
+      `01-PLATFORM-UPSTREAM-TODO.md` "Unknown-but-valid platforms"
+      (`exr-generic`/`lnt-generic` manual fallback platforms) for the full
+      writeup and evidence.
+- [x] Add unknown/future-platform regression fixture — same fix;
+      `test_unknown_upstream_platform_can_still_be_built_via_manual_override`
+      and `test_generic_platform_fallbacks_are_never_inferred_from_a_filename`
+      in `giso-webui/tests/test_platform_compatibility.py`.
 
 ## P2 — Inventory consistency and races
 
