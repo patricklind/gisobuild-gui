@@ -118,42 +118,75 @@ Never silently exclude without a reason.
 
 Create backend-owned immutable BuildPlan.
 
+Implemented in `giso-webui/app.py` as `create_build_plan()`, exposed at
+`POST /api/build-plan`, and re-derived (never trusted from the client) inside
+`create_job()` before any build starts.
+
 Required content:
 
-- [ ] base ISO metadata/checksum
-- [ ] engine
-- [ ] release
-- [ ] platform
-- [ ] selected packages
-- [ ] selected CSC groups
-- [ ] excluded packages + reasons
-- [ ] capabilities
-- [ ] options
-- [ ] blockers
-- [ ] warnings
-- [ ] inventory revision
-- [ ] plan fingerprint
+- [x] base ISO metadata/checksum
+- [x] engine
+- [x] release
+- [x] platform
+- [x] selected packages
+- [x] selected CSC groups
+- [x] excluded packages + reasons (populated when automatic selection excludes a
+      candidate; see `recommend_smu_selection()` in `platform_validation.py`)
+- [x] capabilities
+- [x] options
+- [x] blockers
+- [x] warnings
+- [x] inventory revision
+- [x] plan fingerprint
+
+Verified by `test_build_plan_is_backend_owned_and_checksum_fingerprinted`,
+`test_build_plan_returns_blockers_instead_of_enabling_invalid_build`, and
+`test_created_job_records_authoritative_build_plan` in
+`giso-webui/tests/test_app.py`, run inside the built container image.
 
 ## BuildPlan fingerprint
 
 Hash together:
 
-- [ ] ISO checksum
-- [ ] selected RPM checksums
-- [ ] configuration files
-- [ ] gisobuild version/commit
-- [ ] application version
-- [ ] build options
+- [x] ISO checksum
+- [x] selected RPM checksums
+- [ ] configuration files (build option paths such as `xrconfig`/`ztp_ini` are
+      included as literal values in `options`, but their *content* is not
+      independently checksummed into the fingerprint yet)
+- [ ] gisobuild version/commit (only the builder container image tag is
+      captured today; the pinned upstream `gisobuild` source revision inside
+      that image is not separately tracked)
+- [x] application version (`APP_VERSION` env var, defaults to `0.0.1`)
+- [x] build options
 
 ## Inventory revision
 
-- [ ] increment after upload
-- [ ] increment after extraction
-- [ ] increment after delete
-- [ ] increment after cleanup
-- [ ] increment after Cisco download
-- [ ] invalidate BuildPlan if revision changes
-- [ ] frontend never owns authoritative build state
+`current_inventory_revision()` fingerprints the exact set of ready inventory
+items (id + lifecycle) rather than an incrementing counter, so any mutation of
+the ready inventory changes the revision without needing separate counters
+per event type:
+
+- [x] increment after upload (any new ready file changes the hashed item set)
+- [x] increment after extraction (extracted files become ready inventory items)
+- [x] increment after delete (removing a file changes the hashed item set)
+- [x] increment after cleanup (same mechanism as delete)
+- [x] increment after Cisco download (downloaded files become ready inventory
+      items)
+- [x] invalidate BuildPlan if revision changes — `create_job()` rejects
+      `POST /api/jobs` with 409 when the client's `confirmed_plan_fingerprint`
+      (captured from a prior `/api/build-plan` review) no longer matches the
+      freshly recomputed plan, verified by
+      `test_stale_confirmed_plan_is_rejected_when_inventory_changes` and
+      `test_confirmed_plan_matching_current_inventory_is_accepted`
+- [x] frontend never owns authoritative build state — `create_job()` always
+      recomputes the BuildPlan itself from current inventory; a client-supplied
+      plan is only ever used to detect staleness, never trusted as the plan
+
+Only individual "increment after X" scenarios beyond upload/delete (extraction,
+Cisco download) are verified indirectly through the shared revision mechanism
+and existing tests for those features, not by a dedicated per-event regression
+test — a good target for follow-up coverage if the revision computation
+strategy ever changes from content-hash to an explicit counter.
 
 ## Automatic refresh
 

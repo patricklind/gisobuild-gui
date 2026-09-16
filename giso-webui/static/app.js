@@ -541,11 +541,16 @@ $('#build-form').addEventListener('submit', async event => {
     ownership_certificate: form.get('ownership_certificate') || ''
   };
   event.target.querySelectorAll('input[type=checkbox]').forEach(box => { payload[box.name] = box.checked; });
-  const usbText = payload.skip_usb_image ? 'No USB boot image was requested.' : 'A USB boot image is retained when the selected platform produces one.';
-  const message = `Start the build with ${payload.pkglist.length} updates?\n\nAfter a successful build, the verified Golden ISO will be kept. ${usbText} Uploaded source files and other build output will be permanently removed.`;
-  if (!await showConfirmation('Start Golden ISO build?', message, 'Start build')) return;
   const button = $('#start-build'); button.disabled = true; button.textContent = 'Starting…';
-  try { const result = await api('/api/jobs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }); currentJob = result.id; poll(); }
+  try {
+    const plan = await api('/api/build-plan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    if (!plan.ready) throw new Error(`BuildPlan is blocked: ${plan.blockers.join('; ')}`);
+    const usbText = plan.expected_outputs.usb ? 'A USB boot image is expected.' : 'No USB boot image is expected for these settings.';
+    const message = `Start the verified plan with ${plan.selected_packages.length} updates?\n\nPlatform: ${String(plan.platform).toUpperCase()} · Engine: ${String(plan.engine).toUpperCase()} · Inventory: ${plan.inventory_revision}\nPlan: ${plan.fingerprint.slice(0, 16)}…\n\n${usbText}`;
+    if (!await showConfirmation('Start Golden ISO build?', message, 'Start build')) { updateBuildAvailability(); return; }
+    payload.confirmed_plan_fingerprint = plan.fingerprint;
+    const result = await api('/api/jobs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }); currentJob = result.id; poll();
+  }
   catch (error) { $('#error').textContent = error.message; updateBuildAvailability(); }
 });
 
