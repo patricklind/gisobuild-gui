@@ -340,6 +340,20 @@ read today.
       clearing the filter restored all 10.
 - [ ] Compatible-only / selected-only / architecture / version filters —
       not implemented; only filename/CSC-ID substring search exists so far.
+- [x] Archive list search by filename — added 2026-09-16, same pattern as
+      the manual package filter: `#archive-filter` in
+      `giso-webui/templates/index.html`, only shown once there are 6+
+      archived artifacts (each row is a full card with several buttons, so
+      it takes more vertical space than a checkbox line — a lower
+      visibility threshold than the manual package list's 8 makes sense).
+      Filters `giso-webui/static/app.js`'s `#archive-list .archive-row`
+      elements by substring against the artifact's own filename
+      (`row.dataset.name`), a pure `hidden` visibility toggle that never
+      touches the delete/checksum/build-report actions on any row.
+      Verified live in a browser (isolated throwaway container, its own
+      temp `ARCHIVE_ROOT`, never the shared persistent volumes) with 7
+      fixture archived ISOs: typing "router-3" left exactly 1 of 7 visible,
+      clearing the filter restored all 7.
 - [ ] Search/filter for the automatic-selection review or the Cisco search
-      results list — not implemented; only the manual package list has
-      this today.
+      results list — not implemented; only the manual package list and the
+      archive list have this today.

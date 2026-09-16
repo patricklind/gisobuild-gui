@@ -44,6 +44,17 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("result.cleared_artifacts", cleanup_handler)
         self.assertIn("currentJob = null", cleanup_handler)
 
+    def test_archive_list_supports_filtering_by_filename(self):
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        template = (Path(__file__).parents[1] / "templates" / "index.html").read_text()
+        self.assertIn('id="archive-filter"', template)
+        load_archive = script[script.index("async function loadArchive()"):]
+        self.assertIn("row.dataset.name=item.name.toLowerCase()", load_archive)
+        self.assertIn("applyArchiveFilter()", load_archive)
+        filter_fn = script[script.index("function applyArchiveFilter()"):]
+        filter_fn = filter_fn[:filter_fn.index("\n}\n")]
+        self.assertIn("row.dataset.name.includes(query)", filter_fn)
+
     def test_system_status_pill_uses_the_deep_readiness_check(self):
         # /api/health only proves the Flask process is responding; it does
         # not check Docker, the mounted gisobuild checkout, storage, the job

@@ -421,13 +421,27 @@ async function loadStorage() {
   } catch { /* Storage usage is diagnostic only; a missing line is not an error. */ }
 }
 
+function applyArchiveFilter() {
+  const query = $('#archive-filter').value.trim().toLowerCase();
+  document.querySelectorAll('#archive-list .archive-row').forEach(row => {
+    row.hidden = Boolean(query) && !row.dataset.name.includes(query);
+  });
+}
+$('#archive-filter').addEventListener('input', applyArchiveFilter);
+
 async function loadArchive() {
   try {
     const items = await api('/api/archive');
     const list = $('#archive-list'); list.replaceChildren();
-    if (!items.length) { const empty=document.createElement('p'); empty.className='empty'; empty.textContent='No archived GISO images yet. Completed Golden ISO and USB boot artifacts appear here automatically after a successful build.'; list.appendChild(empty); return; }
+    const filter = $('#archive-filter');
+    if (!items.length) {
+      filter.hidden = true; filter.value = '';
+      const empty=document.createElement('p'); empty.className='empty'; empty.textContent='No archived GISO images yet. Completed Golden ISO and USB boot artifacts appear here automatically after a successful build.'; list.appendChild(empty); return;
+    }
+    filter.hidden = items.length < 6;
     items.forEach(item => {
       const row=document.createElement('div'); row.className='archive-row';
+      row.dataset.name=item.name.toLowerCase();
       const link=document.createElement('a'); link.href=item.url;
       const name=document.createElement('span'); name.textContent=item.name;
       const meta=document.createElement('small'); meta.textContent=`${new Date(item.created*1000).toLocaleString()} · ${(item.size/1073741824).toFixed(2)} GB ↓`;
@@ -457,6 +471,7 @@ async function loadArchive() {
       const actions=document.createElement('div'); actions.className='archive-actions'; actions.append(guide,report,showChecksums,remove);
       link.append(name,meta); row.append(link,actions,checksums); list.appendChild(row);
     });
+    applyArchiveFilter();
   } catch (error) { $('#archive-list').textContent=error.message; }
 }
 
