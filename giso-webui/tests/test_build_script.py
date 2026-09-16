@@ -186,6 +186,34 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("renderDiskEstimate()", script[script.index("function applySmuRecommendation(plan)"):script.index("\nfunction smuGroupCard")])
         self.assertIn("renderDiskEstimate()", script[script.index("async function loadStorage()"):])
 
+    def test_automatic_selection_review_list_supports_filtering(self):
+        # The manual package list, archive list and Cisco search results all
+        # already had a filter box; the automatic-selection review list (CSC
+        # groups and the excluded-packages list in Step 2) was the one place
+        # left without one, despite being the list an operator scans through
+        # on every single build - see 06-UI-OPERATOR-TODO.md.
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        template = (Path(__file__).parents[1] / "templates" / "index.html").read_text()
+        self.assertIn('id="smu-review-filter"', template)
+        # Must sit outside #smu-plan-details, which applySmuRecommendation()
+        # wipes with replaceChildren() on every render - a filter box living
+        # inside it would be destroyed and recreated (losing focus/value) on
+        # every automatic recalculation.
+        details_start = template.index('id="smu-plan-details"')
+        filter_start = template.index('id="smu-review-filter"')
+        self.assertLess(filter_start, details_start)
+        group_card_fn = script[script.index("function smuGroupCard(group)"):]
+        group_card_fn = group_card_fn[:group_card_fn.index("\n}\n")]
+        self.assertIn("card.dataset.search=", group_card_fn)
+        plan_fn = script[script.index("function applySmuRecommendation(plan)"):]
+        plan_fn = plan_fn[:plan_fn.index("\nfunction smuGroupCard")]
+        self.assertIn("row.dataset.search=", plan_fn)
+        self.assertIn("applySmuReviewFilter()", plan_fn)
+        filter_fn = script[script.index("function applySmuReviewFilter()"):]
+        filter_fn = filter_fn[:filter_fn.index("\n}\n")]
+        self.assertIn(".csc-card, #smu-plan-details .excluded-package", filter_fn)
+        self.assertIn("el.dataset.search.includes(query)", filter_fn)
+
     def test_start_build_button_names_exactly_what_is_missing(self):
         # Previously the disabled hint always said "Waiting for an ISO and a
         # customization", even once one of those two was already satisfied -

@@ -61,6 +61,7 @@
         <section id="smu-auto-plan" class="smu-auto-plan" aria-labelledby="smu-auto-plan-title" aria-live="polite">
           <div class="smu-plan-heading"><div><span class="eyebrow">AUTOMATIC PACKAGE PLAN</span><h3 id="smu-auto-plan-title">Waiting for one base ISO</h3></div><span id="smu-plan-state" class="pill neutral">Waiting</span></div>
           <p id="smu-plan-message">Upload one base ISO and the Cisco SMU TAR files. The system will select the matching RPM repository automatically.</p>
+          <input type="search" id="smu-review-filter" class="manual-package-filter" placeholder="Filter by filename or CSC ID…" aria-label="Filter the automatic package plan by filename or CSC ID" hidden>
           <div id="smu-plan-details" class="smu-plan-details"></div>
           <button id="refresh-smu-plan" class="secondary small" type="button">Recalculate package set</button>
         </section>

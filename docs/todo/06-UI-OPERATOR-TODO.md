@@ -481,6 +481,28 @@ read today.
       `applyCiscoResultsFilter()`: filtering by a CSC ID left exactly 1 of
       6 visible, clearing restored all 6, and the filter element was
       confirmed to sit outside the form in the live DOM.
-- [ ] Search/filter for the automatic-selection review list — not
-      implemented; the manual package list, archive list and Cisco search
-      results all have this now.
+- [x] Search/filter for the automatic-selection review list — fixed
+      2026-09-16: `#smu-review-filter` in `giso-webui/templates/index.html`
+      sits right after `#smu-plan-message`, outside `#smu-plan-details` (that
+      div is fully rebuilt via `replaceChildren()` on every automatic
+      recalculation — a filter box living inside it would lose focus/value
+      on every re-render, the same reasoning that placed the Cisco-results
+      filter outside its form). `smuGroupCard()` (shared by the Step 2
+      review, the manual "Check compatibility" result, and the Step 3 build
+      report) now tags every CSC card with a lowercase `dataset.search` of
+      its CSC ID, components and RPM filenames; the excluded-packages list
+      in `applySmuRecommendation()` tags each row the same way with its name
+      and reason. `applySmuReviewFilter()` hides/shows both against one
+      query, mirroring `applyArchiveFilter()`/`applyCiscoResultsFilter()`.
+      The filter only appears once there are 6+ combined CSC groups and
+      excluded RPMs, matching the archive list's "only show when it's
+      actually useful" threshold. Verified by
+      `test_automatic_selection_review_list_supports_filtering` in
+      `giso-webui/tests/test_build_script.py`, and confirmed live in a
+      browser against an isolated throwaway container: uploaded a real ISO
+      plus 6 RPMs (4 matching, 2 excluded for different reasons) through the
+      actual upload API, saw the filter box appear, filtering by a CSC ID
+      left exactly 1 of 4 CSC cards visible, filtering by an excluded
+      RPM's filename left exactly that 1 of 6 total rows visible, and
+      clearing the filter restored all 6. Full 220-test suite passes, ruff
+      clean, Graphify refreshed.

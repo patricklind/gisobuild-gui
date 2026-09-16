@@ -245,8 +245,18 @@ function applySmuRecommendation(plan) {
   }
   if (plan.excluded?.length) {
     const excluded=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`${plan.excluded.length} incompatible RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically`;
-    const list=document.createElement('ul'); plan.excluded.forEach(item=>{const row=document.createElement('li'); row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);}); excluded.append(summary,list); details.appendChild(excluded);
+    const list=document.createElement('ul');
+    plan.excluded.forEach(item=>{
+      const row=document.createElement('li'); row.className='excluded-package';
+      row.dataset.search=`${item.name} ${item.reason}`.toLowerCase();
+      row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);
+    });
+    excluded.append(summary,list); details.appendChild(excluded);
   }
+  const reviewFilter=$('#smu-review-filter');
+  const reviewItemCount=(plan.package_groups?.length || 0) + (plan.excluded?.length || 0);
+  reviewFilter.hidden=reviewItemCount < 6;
+  applySmuReviewFilter();
   renderDiskEstimate();
   updateBuildAvailability();
 }
@@ -262,6 +272,7 @@ function applySmuRecommendation(plan) {
 
 function smuGroupCard(group) {
   const card=document.createElement('article'); card.className=`csc-card ${group.count > 1 ? 'linked' : ''}`;
+  card.dataset.search=[group.csc, ...group.components, ...group.files].join(' ').toLowerCase();
   const title=document.createElement('b'); title.textContent=group.csc;
   const status=document.createElement('small'); status.textContent=group.relationship;
   const components=document.createElement('p'); components.textContent=group.components.join(' · ');
@@ -269,6 +280,15 @@ function smuGroupCard(group) {
   const list=document.createElement('ul'); group.files.forEach(name=>{const item=document.createElement('li'); item.textContent=name; list.appendChild(item);}); files.append(summary,list);
   card.append(title,status,components,files); return card;
 }
+
+function applySmuReviewFilter() {
+  const filter=$('#smu-review-filter');
+  const query=filter.value.trim().toLowerCase();
+  document.querySelectorAll('#smu-plan-details .csc-card, #smu-plan-details .excluded-package').forEach(el => {
+    el.hidden=Boolean(query) && !el.dataset.search.includes(query);
+  });
+}
+$('#smu-review-filter').addEventListener('input', applySmuReviewFilter);
 
 const CONFIDENCE_LABELS = {
   platform: 'Platform', release: 'IOS XR release', iso_architecture: 'ISO architecture',
