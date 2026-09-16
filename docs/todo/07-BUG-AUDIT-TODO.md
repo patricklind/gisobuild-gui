@@ -580,10 +580,23 @@ TODO:
       `pip-audit`, `scripts/check_graphify_freshness.py`, and
       `staging/rehearse.py` all inside it with matching results, and
       confirmed the Dockerfile itself passes `hadolint`.
-- [ ] Add a `pyproject.toml`/`ruff.toml` that explicitly selects the intended
+- [x] Add a `pyproject.toml`/`ruff.toml` that explicitly selects the intended
       rule set, instead of relying on whatever ruff's shifting defaults are.
       Pinning the *version* (above) makes results reproducible across runs;
-      this remaining item is about pinning the *rule selection* too.
+      this remaining item is about pinning the *rule selection* too. Fixed
+      2026-09-16: added `ruff.toml` at the repo root with an explicit
+      `[lint] select = [...]` listing all 413 rule codes that ruff 0.16.7
+      actually enables with no config file present (confirmed via
+      `ruff check --isolated --show-settings`, which is unaffected by any
+      config discovery). Verified by diffing `ruff check --show-settings`'s
+      resolved `linter.rules.enabled`/`linter.rules.should_fix` output
+      before and after adding the file — byte-for-byte identical — and by
+      re-running `ruff check` across every path the CI lint step covers
+      (`giso-webui/app.py`, `cisco_download.py`, `maintenance.py`,
+      `platform_validation.py`, `tests`, `staging`, `scripts`), which still
+      reports "All checks passed!" with no behavior change. A future ruff
+      upgrade can now only change what a given rule *code* checks for, not
+      silently add or remove rules by changing its own defaults.
 
 ## P2 — Graphify / repository correctness
 
