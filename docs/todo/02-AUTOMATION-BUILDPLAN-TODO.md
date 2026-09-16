@@ -177,19 +177,56 @@ Cisco-downloaded archive). Both are now covered.
 
 ## CSC grouping
 
-- [ ] group packages by CSC
-- [ ] select complete groups by default
-- [ ] warn/block incomplete CSC groups
-- [ ] show components
-- [ ] preserve exclusion reason
-- [ ] advanced RPM-level manipulation only in Expert mode
+Audited 2026-09-16 against real Cisco content (a real NCS5500 IOS XR 25.1.2
+base bundle plus 20 real SMU tars, uploaded through the actual `/api/uploads`
+flow and checked via `/api/inputs` and `/api/compatibility` — not synthetic
+fixtures). All packages/data came from real Cisco distribution; nothing from
+this session was retained afterward per `SECURITY.md`.
+
+- [x] group packages by CSC — `validate_smu_selection()`'s `RPM_COMPONENT`
+      regex correctly grouped a real 3-RPM Cisco fix (`CSCwu13268`:
+      `ncs5500-infra`/`ncs5500-iosxr-fwding`/`ncs5500-routing`) into one CSC
+      group, and nine other real single-RPM fixes into their own groups.
+- [x] select complete groups by default — the real 3-RPM `CSCwu13268` group
+      was selected as a whole by automatic selection, not partially.
+- [ ] warn/block incomplete CSC groups — not implemented, and not
+      implementable with the current data model: the app only knows a CSC
+      group's members from *which uploaded RPMs happen to share that CSC ID*
+      in their filename. There is no external manifest saying "CSCxxxxxxx
+      requires exactly N RPMs", so if an operator uploads only 2 of a real
+      3-RPM fix, the app has no way to know a 3rd RPM is supposed to exist —
+      it correctly shows a complete 2-member group for what it can see, not
+      an incomplete 3-member one. This would need a genuine external source
+      of truth (e.g. Cisco's own bug/fix metadata), not just smarter
+      filename parsing.
+- [x] show components — each `package_groups` entry lists its member
+      component names (confirmed live: `CSCwu13268` showed `ncs5500-infra`,
+      `ncs5500-iosxr-fwding`, `ncs5500-routing`).
+- [x] preserve exclusion reason — every automatically-excluded real RPM
+      carried a specific reason ("Superseded by a newer fix per Cisco
+      supersedence notes"), not a generic rejection.
+- [x] advanced RPM-level manipulation only in Expert mode — manual package
+      selection (`package_selection_mode`) lives inside the "SMU
+      compatibility" Expert settings group; automatic mode is the default
+      and requires no Expert settings interaction at all.
 
 ## Duplicate handling
 
 - [x] same filename + same SHA → deduplicate with retained provenance
 - [x] same filename + different SHA → hard error until the unwanted copy is removed
-- [ ] multiple versions same component → conflict
-- [ ] overlapping CSCs → show conflict/supersedence
+- [x] multiple versions same component → conflict — audited 2026-09-16 with
+      real data: two real, independent single-CSC fixes
+      (`CSCwv36143`/`CSCwv38342`) each touched a component
+      (`ncs5500-iosxr-fwding`/`ncs5500-routing`) that a third, separate
+      multi-component fix (`CSCwu13268`) also touched. `component_conflicts`
+      correctly flagged both as "More than one fix changes this component;
+      Cisco supersedence decides which remains" — a real version conflict
+      the filename-only model surfaced correctly rather than silently
+      picking one side.
+- [x] overlapping CSCs → show conflict/supersedence — same evidence as
+      above; both `/api/inputs`' automatic recommendation and
+      `/api/compatibility`'s deterministic check agreed on the same two
+      conflicts and warnings.
 
 ## Supersedence
 
@@ -197,7 +234,15 @@ Create an explicit supersedence model.
 
 - [ ] bundle metadata
 - [ ] RPM metadata
-- [ ] README metadata
+- [x] README metadata — `active_rpm_names()` parses each uploaded SMU's own
+      `README.txt`-style file for Cisco's own supersedence notation
+      (`<identifier> Full`) and excludes the packages it names. Verified
+      2026-09-16 with real Cisco SMU tars: 10 real, genuinely-superseded
+      RPMs (older `ncs5500-infra`/`ncs5500-iosxr-fwding`/`ncs5500-isis`/
+      `ncs5500-mpls-te-rsvp`/`ncs5500-ospf`/`ncs5500-routing` fixes) were all
+      correctly excluded with reason "Superseded by a newer fix per Cisco
+      supersedence notes", exactly matching the real supersedence
+      relationships stated in their own bundled README files.
 - [ ] compatibility metadata
 - [ ] gisobuild dependency output
 

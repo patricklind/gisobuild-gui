@@ -57,6 +57,38 @@ fixed a second bug while verifying the first: the initial version called
 before any of this new detail could render, collapsing every failure back
 into the old generic message — only actually testing it live surfaced this.
 
+### "Detailed dependency check" defaulted to off for no real reason (2026-09-16)
+
+Current behavior (before this fix):
+
+The LNT "Detailed dependency check" checkbox (`verbose_dep_check`, maps to
+gisobuild's `--verbose-dep-check`) defaulted to unchecked. Checking upstream
+gisobuild's own `--help` text confirms this flag is "Verbose output for the
+dependency check" — the dependency check itself is unconditional and always
+runs; the flag only controls how much diagnostic detail its output includes.
+There was no reason to make an operator opt in to more detail for a check
+that was happening either way, and `giso-webui/README.md` already
+(incorrectly, until now) claimed it "runs with the detailed dependency
+option enabled by default."
+
+TODO:
+
+- [x] Default the checkbox to checked for LNT builds.
+- [x] Confirm it is still correctly forced off (and hidden/disabled) for
+      non-LNT platforms, matching every other LNT-only Expert control.
+
+Fix: added `checked` to the template. `updatePlatformControls()` already
+force-unchecks every LNT-only control (including this one) whenever the
+detected/selected platform is not LNT, so the new default cannot leak into
+an eXR build's command.
+
+Verified by the updated `test_lnt_only_defaults_do_not_block_exr_builds` in
+`giso-webui/tests/test_build_script.py`, and confirmed live in a browser
+through three states: before any platform is known (checked, matching the
+new default), after selecting a synthetic eXR platform (unchecked, disabled,
+hidden), and after selecting a synthetic LNT platform on a fresh page load
+(checked). Full suite green (207 tests); ruff and Graphify clean.
+
 ### The "Start build" disabled hint could name a requirement that was already satisfied (2026-09-16)
 
 Current behavior (before this fix):

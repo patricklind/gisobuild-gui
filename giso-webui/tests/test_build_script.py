@@ -140,13 +140,24 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("applyManualPackageFilter()", manual_script[manual_script.index("window.syncManualPackageValue"):])
 
     def test_lnt_only_defaults_do_not_block_exr_builds(self):
+        # verbose_dep_check defaults to checked in the template (gisobuild's
+        # dependency check always runs regardless of this flag - it only
+        # controls whether that check's own output is verbose - so there is
+        # no reason to make an operator opt in to more diagnostic detail).
+        # The safety property this test actually guards is that
+        # updatePlatformControls() forces it back to unchecked, along with
+        # every other LNT-only control, whenever the detected/selected
+        # platform is not LNT - never the HTML default itself.
         web_root = Path(__file__).parents[1]
         template = (web_root / "templates" / "index.html").read_text()
         script = (web_root / "static" / "app.js").read_text()
 
         self.assertIn('id="lnt-controls"', template)
-        self.assertNotIn('name="verbose_dep_check" checked', template)
+        self.assertIn('name="verbose_dep_check" checked', template)
         self.assertIn("profile.architecture !== 'lnt'", script)
+        reset_for_unsupported = script[script.index("Object.entries(capabilityNames)"):]
+        self.assertIn("control.checked=false", reset_for_unsupported)
+        self.assertIn("verbose_dep_check:'verbose_dependency_check'", script)
 
     def test_expert_controls_follow_server_capabilities(self):
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
