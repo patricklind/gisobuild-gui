@@ -576,6 +576,63 @@ $('#build-form').addEventListener('submit', async event => {
   catch (error) { $('#error').textContent = error.message; updateBuildAvailability(); }
 });
 
+function buildReportField(label, value) {
+  const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label;
+  const strong=document.createElement('b'); strong.textContent=value; step.append(small,strong); return step;
+}
+
+function renderBuildReport(job) {
+  const report=$('#build-report'); const body=$('#build-report-body'); body.replaceChildren();
+  const plan=job.build_plan;
+  if (!plan) { report.hidden=true; return; }
+  report.hidden=false;
+  const flow=document.createElement('div'); flow.className='smu-plan-flow';
+  [['Base ISO',plan.iso?.relative_path || '—'],['Platform',String(plan.platform||'').toUpperCase()],
+   ['Engine',String(plan.engine||'').toUpperCase()],['IOS XR',plan.release||'—'],
+   ['Packages',`${plan.selected_packages.length} RPM${plan.selected_packages.length===1?'':'s'}`]]
+    .forEach(([label,value],index)=>{
+      if (index) { const arrow=document.createElement('span'); arrow.setAttribute('aria-hidden','true'); arrow.textContent='→'; flow.appendChild(arrow); }
+      flow.appendChild(buildReportField(label,value));
+    });
+  body.appendChild(flow);
+
+  const meta=document.createElement('p'); meta.className='build-report-meta';
+  meta.textContent=`Inventory revision ${plan.inventory_revision} · BuildPlan fingerprint ${plan.fingerprint.slice(0,16)}…`;
+  body.appendChild(meta);
+
+  if (plan.iso?.sha256 || plan.selected_packages?.length) {
+    const checksums=document.createElement('details');
+    const summary=document.createElement('summary'); summary.textContent='Show input checksums (SHA-256)';
+    const list=document.createElement('ul');
+    if (plan.iso?.sha256) { const row=document.createElement('li'); row.textContent=`${plan.iso.relative_path} — ${plan.iso.sha256}`; list.appendChild(row); }
+    plan.selected_packages.forEach(item=>{ const row=document.createElement('li'); row.textContent=`${item.basename} — ${item.sha256}`; list.appendChild(row); });
+    checksums.append(summary,list); body.appendChild(checksums);
+  }
+
+  if (plan.selected_csc_groups?.length) {
+    const groups=document.createElement('section'); groups.className='smu-groups';
+    const heading=document.createElement('h4'); heading.textContent='Fixes included'; groups.appendChild(heading);
+    const grid=document.createElement('div'); grid.className='csc-grid';
+    plan.selected_csc_groups.forEach(group=>grid.appendChild(smuGroupCard(group)));
+    groups.appendChild(grid); body.appendChild(groups);
+  }
+
+  if (plan.excluded_packages?.length) {
+    const excluded=document.createElement('details');
+    const summary=document.createElement('summary'); summary.textContent=`${plan.excluded_packages.length} package${plan.excluded_packages.length===1?'':'s'} excluded`;
+    const list=document.createElement('ul');
+    plan.excluded_packages.forEach(item=>{ const row=document.createElement('li'); row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row); });
+    excluded.append(summary,list); body.appendChild(excluded);
+  }
+
+  if (plan.warnings?.length) {
+    const warnings=document.createElement('div'); warnings.className='smu-relationship-warning';
+    const heading=document.createElement('b'); heading.textContent='Reviewed warnings'; warnings.appendChild(heading);
+    plan.warnings.forEach(text=>{ const row=document.createElement('p'); row.textContent=text; warnings.appendChild(row); });
+    body.appendChild(warnings);
+  }
+}
+
 async function poll() {
   if (!currentJob) return;
   clearTimeout(activityTimer);
@@ -601,6 +658,7 @@ async function poll() {
       const size = document.createElement('small'); size.textContent = `${(artifact.size/1048576).toFixed(1)} MB ↓`;
       link.append(name, size); artifacts.appendChild(link);
     });
+    renderBuildReport(job);
     if (['running','queued','cancelling'].includes(job.status)) pollTimer = setTimeout(poll, 1500); else { await loadInputs(); await loadArchive(); }
   } catch (error) {
     $('#friendly-status').textContent = `Status temporarily unavailable: ${error.message}. Retrying…`;

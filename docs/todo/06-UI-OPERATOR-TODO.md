@@ -93,12 +93,19 @@ Show:
       `loadArchive()` runs automatically right after a build finishes
       (`poll()`'s terminal branch) and each archived file has a "Show MD5 /
       SHA-256" button (`/api/archive/<job>/<name>/checksums`).
-- [ ] build report — no dedicated report view exists; the raw build log,
-      the artifact list, and (when "Create checksums" is enabled)
-      gisobuild's own `checksums.json` as a downloadable artifact are the
-      only pieces today. A structured, human-readable build summary (what
-      was included, what was excluded and why, final checksums, elapsed
-      time) is not implemented.
+- [x] build report — added 2026-09-16: a "Show build report" `<details>` in
+      Step 3 (`giso-webui/static/app.js`'s `renderBuildReport()`), populated
+      from `job.build_plan` — already stored on every job and exposed by
+      `GET /api/jobs/<id>` (`build_plan` is not in `PRIVATE_JOB_FIELDS`), so
+      this was a pure frontend addition, no backend change. Shows base
+      ISO/platform/engine/release/package count, inventory revision and
+      BuildPlan fingerprint, a collapsible list of every input's SHA-256
+      (ISO and each selected RPM — the "final checksums" `docs/AI-MASTER-PROMPT.md`
+      section 17 asks for), the CSC fix groups included, excluded packages
+      with reasons, and any BuildPlan warnings (e.g. the ownership
+      voucher/certificate mismatch warning above). Confirmed by injecting a
+      realistic `build_plan` shape into the running page in a browser and
+      verifying every section rendered correctly.
 
 ## Automatic by default
 
