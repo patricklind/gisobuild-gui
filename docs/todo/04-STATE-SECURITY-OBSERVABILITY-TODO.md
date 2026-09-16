@@ -128,21 +128,82 @@ Guarantee:
 
 ## Path security
 
+Audited 2026-09-16 against the real code (not a fresh implementation — this
+formalizes protections that already existed, several with their own
+regression tests already in `giso-webui/tests/test_app.py`):
+
+Every path check in `giso-webui/app.py` follows the same pattern:
+`(BASE / user_value).resolve()`, then containment via `.parents`/`==` on the
+*resolved* `Path` object — never a naive string prefix check
+(`str(path).startswith(str(BASE))`). That distinction matters for Unicode
+normalization tricks below: `Path.resolve()` asks the real filesystem to
+resolve the path, so whatever normalization/case-folding the OS itself
+applies is already baked into both sides of the comparison before it
+happens — there's no separate string-matching step for a crafted byte
+sequence to slip past.
+
 Audit every:
 
-- [ ] filename
-- [ ] relative path
-- [ ] archive member
-- [ ] job ID
-- [ ] artifact path
+- [x] filename — `upload_name()` rejects any value where
+      `value != Path(value).name` (i.e. anything containing a path
+      separator) or that has a control character; `upload_complete()`
+      auto-renames on any collision with an existing file or extraction
+      directory rather than overwriting it.
+- [x] relative path — `safe_data_path()` (used by `discover()`,
+      `create_build_plan()`, `/api/file-preview`, ISO/RPM resolution) does
+      `(DATA / value).resolve()` then requires `DATA in path.parents` (or
+      `path == DATA`).
+- [x] archive member — tar extraction in `upload_complete()` resolves each
+      `member.name` against the destination and requires containment,
+      rejects `member.issym()`/`member.islnk()` outright, and caps member
+      count (`MAX_TAR_MEMBERS`) and expanded size (`MAX_EXTRACTED_BYTES`).
+      The Cisco-download tar path (`cisco_download.py`) applies the same
+      checks. Covered by `test_cisco_archive_extraction_rejects_path_traversal`,
+      `test_cisco_archive_extraction_rejects_symlink_members`,
+      `test_cisco_archive_extraction_enforces_member_count_limit`.
+- [x] job ID — never used for direct filesystem access by itself; every
+      route that takes a `<job_id>` (`/archive/<job_id>/...`,
+      `/download/<job_id>/...`, `/api/archive/<job_id>/...`) joins it under
+      `ARCHIVE`/`OUTPUT`, resolves, and checks parents before touching disk
+      — a `job_id` of `..` simply resolves outside `ARCHIVE`/`OUTPUT` and
+      fails the containment check, same as any other traversal attempt.
+      `/api/jobs/<job_id>` only ever does a `jobs.get(job_id)` dict lookup,
+      no filesystem access at all.
+- [x] artifact path — `archive_download`/`download`/`archive_delete`/
+      `archive_checksums` all resolve the requested name under
+      `ARCHIVE`/`OUTPUT` and check parents before calling
+      `send_from_directory()` or touching the file; `archive_delete` and
+      `archive_checksums` additionally restrict to `.iso`/`.zip` suffixes.
+      Covered by `test_archive_delete_rejects_path_traversal`,
+      `test_symlink_build_artifact_is_rejected`.
 
 Protect against:
 
-- [ ] `../`
-- [ ] absolute paths
-- [ ] symlink escapes
-- [ ] Unicode normalization tricks
-- [ ] duplicate aliases
+- [x] `../` — every check above compares the *resolved* path, so `../`
+      anywhere in the input collapses during `.resolve()` before the
+      containment check runs; it can't produce a false "contained" result.
+- [x] absolute paths — `safe_data_path()` does `value.lstrip("/")` first;
+      `upload_name()` separately rejects any value that isn't a bare
+      filename (which includes absolute paths, since `Path(value).name`
+      would strip everything but the last segment).
+- [x] symlink escapes — tar/zip extraction rejects symlink/hardlink
+      members outright (see "archive member" above); archived build
+      artifacts are rejected if `source.is_symlink()`
+      (`archive_giso_artifacts_and_cleanup`), covered by
+      `test_symlink_build_artifact_is_rejected`.
+- [x] Unicode normalization tricks — not handled by a dedicated check, but
+      not exploitable either: every containment check compares fully
+      *resolved* `Path` objects (see above), so there is no string-equality
+      step for two differently-normalized-but-equivalent byte sequences to
+      disagree on.
+- [x] duplicate aliases — `upload_complete()` auto-renames
+      (`{stem}-{uuid8}{suffix}`) on any filename collision with an existing
+      file or in-progress extraction directory, so an upload can never
+      silently overwrite or shadow another file by name; package identity
+      in `resolve_rpm_identifiers()`/`recommend_smu_selection()` is
+      SHA-256-based, not filename-based, so two files with the same or
+      confusable names are never treated as the same package unless their
+      contents actually match.
 
 ## Cisco secrets
 
