@@ -128,7 +128,16 @@ Keep advanced controls, but:
 - [x] capability-driven
 - [x] hide unsupported settings
 - [x] server validates everything
-- [ ] warn before unsafe/manual overrides
+- [x] warn before unsafe/manual overrides — the final "Start Golden ISO
+      build?" confirmation in `giso-webui/static/app.js` now shows a red
+      ⚠ warning line, and switches the confirm button itself to the danger
+      style, whenever manual package selection is active or the platform/
+      ISO was manually overridden in Expert settings, instead of looking
+      identical to a fully-automatic build. Confirmed live in a browser:
+      switching to "Manual package list" and starting a build shows "⚠
+      Manual package selection is active: automatic supersedence and
+      CSC-group matching were bypassed for the packages you chose." with a
+      red confirm button.
 
 ## Explain decisions
 

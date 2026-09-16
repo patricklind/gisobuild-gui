@@ -581,8 +581,13 @@ $('#build-form').addEventListener('submit', async event => {
     const plan = await api('/api/build-plan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
     if (!plan.ready) throw new Error(`BuildPlan is blocked: ${plan.blockers.join('; ')}`);
     const usbText = plan.expected_outputs.usb ? 'A USB boot image is expected.' : 'No USB boot image is expected for these settings.';
-    const message = `Start the verified plan with ${plan.selected_packages.length} updates?\n\nPlatform: ${String(plan.platform).toUpperCase()} · Engine: ${String(plan.engine).toUpperCase()} · Inventory: ${plan.inventory_revision}\nPlan: ${plan.fingerprint.slice(0, 16)}…\n\n${usbText}`;
-    if (!await showConfirmation('Start Golden ISO build?', message, 'Start build')) { updateBuildAvailability(); return; }
+    const overrideWarnings = [];
+    if (!payload.automatic_smu_selection) overrideWarnings.push('Manual package selection is active: automatic supersedence and CSC-group matching were bypassed for the packages you chose.');
+    if (payload.platform && payload.platform !== detectedPlatform) overrideWarnings.push(`Platform was manually set to ${payload.platform.toUpperCase()}, overriding automatic detection.`);
+    if (form.get('iso_override')) overrideWarnings.push('The base ISO was manually selected in Expert settings, overriding automatic detection.');
+    const overrideText = overrideWarnings.length ? `⚠ ${overrideWarnings.join('\n⚠ ')}\n\n` : '';
+    const message = `${overrideText}Start the verified plan with ${plan.selected_packages.length} updates?\n\nPlatform: ${String(plan.platform).toUpperCase()} · Engine: ${String(plan.engine).toUpperCase()} · Inventory: ${plan.inventory_revision}\nPlan: ${plan.fingerprint.slice(0, 16)}…\n\n${usbText}`;
+    if (!await showConfirmation('Start Golden ISO build?', message, 'Start build', overrideWarnings.length > 0)) { updateBuildAvailability(); return; }
     payload.confirmed_plan_fingerprint = plan.fingerprint;
     const result = await api('/api/jobs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }); currentJob = result.id; poll();
   }
