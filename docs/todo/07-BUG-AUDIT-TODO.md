@@ -494,11 +494,21 @@ TODO:
 
 - [x] Add explicit `check=False` to the two `isoinfo` `subprocess.run` calls
       in `giso-webui/app.py:inspect_iso_architecture()`.
-- [ ] Pin `ruff`'s version in CI (and locally, e.g. via
-      `giso-webui/requirements.txt` or a dedicated dev-requirements file) so
-      lint results are reproducible across runs and machines.
+- [x] Pin `ruff`'s version in CI (and locally) — fixed 2026-09-16 as part of
+      adopting the Docker-only execution policy (`AGENTS.md`): added
+      `docker/tooling.Dockerfile`, a small pinned image (`ruff==0.16.7`,
+      `pip-audit==2.7.3`, `graphifyy==0.9.61`) that both CI
+      (`.github/workflows/ci.yml`) and local development
+      (`docs/testing.md`) now use identically, replacing the previous
+      unpinned `pip install ruff pip-audit graphifyy==0.9.61` on the bare
+      Actions runner. Verified: built the image, ran `ruff check`,
+      `pip-audit`, `scripts/check_graphify_freshness.py`, and
+      `staging/rehearse.py` all inside it with matching results, and
+      confirmed the Dockerfile itself passes `hadolint`.
 - [ ] Add a `pyproject.toml`/`ruff.toml` that explicitly selects the intended
       rule set, instead of relying on whatever ruff's shifting defaults are.
+      Pinning the *version* (above) makes results reproducible across runs;
+      this remaining item is about pinning the *rule selection* too.
 
 ## P2 — Graphify / repository correctness
 

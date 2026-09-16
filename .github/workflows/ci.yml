@@ -19,17 +19,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install lint and audit tools
-        run: python -m pip install ruff pip-audit graphifyy==0.9.61
+      - name: Build pinned tooling image (Ruff, pip-audit, Graphify)
+        run: docker build -f docker/tooling.Dockerfile -t gisobuild-tooling .
       - name: Lint Python
-        run: ruff check giso-webui/app.py giso-webui/cisco_download.py giso-webui/maintenance.py giso-webui/platform_validation.py giso-webui/tests staging scripts
+        run: |
+          docker run --rm -v "$PWD:/project:ro" -w /project gisobuild-tooling \
+            ruff check giso-webui/app.py giso-webui/cisco_download.py \
+            giso-webui/maintenance.py giso-webui/platform_validation.py \
+            giso-webui/tests staging scripts --cache-dir=/tmp/ruff-cache
       - name: Validate Graphify freshness and artifact exclusions
-        run: python -B scripts/check_graphify_freshness.py
+        run: |
+          docker run --rm -v "$PWD:/project" -w /project gisobuild-tooling \
+            python -B scripts/check_graphify_freshness.py --graphify graphify
       - name: Audit Python dependencies
-        run: pip-audit -r giso-webui/requirements.txt
+        run: |
+          docker run --rm -v "$PWD:/project:ro" -w /project gisobuild-tooling \
+            pip-audit -r giso-webui/requirements.txt
       - name: Validate shell script
         run: bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
       - name: Lint GitHub Actions workflows
@@ -38,11 +43,14 @@ jobs:
         run: |
           docker run --rm -i hadolint/hadolint:2.12.0 < giso-webui/Dockerfile
           docker run --rm -i hadolint/hadolint:2.12.0 < staging/Dockerfile
+          docker run --rm -i hadolint/hadolint:2.12.0 < docker/tooling.Dockerfile
       - name: Validate Compose configuration
         working-directory: giso-webui
         run: docker compose config -q
       - name: Rehearse staged upgrade and rollback
-        run: python -B staging/rehearse.py
+        run: |
+          docker run --rm -v "$PWD:/project:ro" -w /project/staging gisobuild-tooling \
+            python -B rehearse.py
       - name: Validate staging Compose configuration
         run: docker compose -f staging/compose.yaml config -q
       - name: Build production container

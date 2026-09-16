@@ -184,10 +184,12 @@ Run (`.github/workflows/ci.yml`):
       (`giso-webui/tests` via `unittest discover`, matching `docs/testing.md`).
 - [ ] JS/DOM tests — no JS test runner exists in this repo at all; the
       "Browser/DOM tests" list below is entirely aspirational.
-- [x] lint — `ruff check` step, though note it runs with ruff's default
-      rule set (no pinned `pyproject.toml`/`ruff.toml`), which is its own
-      tracked risk — see "`ruff` is installed unpinned in CI" in
-      `07-BUG-AUDIT-TODO.md`.
+- [x] lint — `ruff check` step, now running a pinned `ruff==0.16.7` from
+      `docker/tooling.Dockerfile` (fixed 2026-09-16; previously an unpinned
+      `pip install ruff` — see "`ruff` is installed unpinned in CI" in
+      `07-BUG-AUDIT-TODO.md`). Still uses ruff's default rule set (no
+      `pyproject.toml`/`ruff.toml`) — the version is now reproducible, the
+      rule *selection* is not yet.
 - [ ] formatting check — ruff lints but nothing runs `ruff format --check`
       or an equivalent formatter gate.
 - [ ] static security checks — no bandit/semgrep-equivalent step; ruff's

@@ -17,13 +17,33 @@ docker compose -f staging/compose.yaml config -q
 docker compose -f giso-webui/compose.yaml build giso-webui
 docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui \
   giso-webui-giso-webui python -B -m unittest discover -s tests -v
-python3 staging/rehearse.py
+docker build -f docker/tooling.Dockerfile -t gisobuild-tooling .
+docker run --rm -v "$(pwd):/project:ro" -w /project/staging gisobuild-tooling python -B rehearse.py
 bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
 git diff --check
 ```
 
-CI additionally runs Ruff and `pip-audit`. Workflow and Dockerfile changes
-should also pass Actionlint and Hadolint.
+Never run `python3 staging/rehearse.py` (or any project Python) directly
+against the host interpreter — see "CRITICAL: Docker-only execution
+boundary" in `AGENTS.md`. `docker/tooling.Dockerfile` is a small, pinned
+container (Python 3.12 + git) that `rehearse.py`'s pure-stdlib logic runs in
+unmodified; build it once and reuse the image.
+
+CI additionally runs Ruff and `pip-audit`. Locally, run the pinned
+equivalents from the same `gisobuild-tooling` image built above — never
+`pip install ruff`/`pip install pip-audit` on the host:
+
+```bash
+docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling \
+  ruff check giso-webui staging scripts --cache-dir=/tmp/ruff-cache
+docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling \
+  pip-audit -r giso-webui/requirements.txt
+```
+
+Workflow and Dockerfile changes should also pass Actionlint and Hadolint —
+both already run as containers (`docker run --rm ... rhysd/actionlint:1.7.7`,
+`docker run --rm -i hadolint/hadolint:2.12.0 < <file>`), matching
+`.github/workflows/ci.yml`.
 
 Pull requests from trusted, same-repository `codex/*` branches are squash-merged
 automatically only after the `CI` workflow succeeds. External forks and other
@@ -46,10 +66,19 @@ This verifies the application and Docker connection, not `gisobuild` output.
 Use a Cisco base ISO and matching packages that the operator is authorized to
 use. Select a family for which automatic USB output is expected:
 
+`scripts/e2e_real_iso.py` is pure-stdlib Python, so it runs unmodified in the
+same `gisobuild-tooling` image built in step 1 above — never on the host.
+`--add-host` makes the `giso-webui` container's published port reachable
+from inside the tooling container on both Linux and Docker Desktop:
+
 ```bash
-python3 scripts/e2e_real_iso.py /path/to/base.iso \
-  --platform ncs5500 \
-  --rpm-dir /path/to/matching/optional-rpms
+docker run --rm --add-host=host.docker.internal:host-gateway \
+  -v "$(pwd)/scripts:/scripts:ro" \
+  -v /path/to/base.iso:/input/base.iso:ro \
+  -v /path/to/matching/optional-rpms:/input/optional-rpms:ro \
+  gisobuild-tooling python -B /scripts/e2e_real_iso.py /input/base.iso \
+  --platform ncs5500 --rpm-dir /input/optional-rpms \
+  --url http://host.docker.internal:8080
 ```
 
 The runner uploads the files, waits for the real Cisco build container, requires

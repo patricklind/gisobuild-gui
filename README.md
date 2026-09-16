@@ -88,19 +88,35 @@ With the application running, provide a properly licensed Cisco base ISO for a
 platform with USB support:
 
 ```bash
-python3 scripts/e2e_real_iso.py /path/to/licensed-image.iso --platform ncs5500 \
-  --rpm-dir /path/to/matching/optional-rpms
+docker build -f docker/tooling.Dockerfile -t gisobuild-tooling .
+docker run --rm --add-host=host.docker.internal:host-gateway \
+  -v "$(pwd)/scripts:/scripts:ro" \
+  -v /path/to/licensed-image.iso:/input/base.iso:ro \
+  -v /path/to/matching/optional-rpms:/input/optional-rpms:ro \
+  gisobuild-tooling python -B /scripts/e2e_real_iso.py /input/base.iso \
+  --platform ncs5500 --rpm-dir /input/optional-rpms \
+  --url http://host.docker.internal:8080
 ```
 
 The test requires both an ISO and USB ZIP and prints SHA-256 evidence. Cisco
-images are neither included nor downloaded by this repository.
+images are neither included nor downloaded by this repository. This (and every
+project Python invocation) always runs inside the pinned `gisobuild-tooling`
+container, never against the host interpreter — see "CRITICAL: Docker-only
+execution boundary" in [`AGENTS.md`](AGENTS.md).
 
 ## Staging
 
-Run `python3 staging/rehearse.py` to safely exercise pre-check, staged upgrade,
-commit, rollback, and recovery sequencing. This simulator does not replace a
-test on matching lab hardware. See [testing](docs/testing.md) for the four
-validation levels.
+Run the staged upgrade/rollback simulator inside the same tooling container to
+safely exercise pre-check, staged upgrade, commit, rollback, and recovery
+sequencing:
+
+```bash
+docker run --rm -v "$(pwd):/project:ro" -w /project/staging gisobuild-tooling \
+  python -B rehearse.py
+```
+
+This simulator does not replace a test on matching lab hardware. See
+[testing](docs/testing.md) for the four validation levels.
 
 ## Test and verify
 

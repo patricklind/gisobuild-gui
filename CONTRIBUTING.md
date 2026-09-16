@@ -30,9 +30,18 @@ docker compose run --rm --no-deps \
 cd ..
 docker compose -f staging/compose.yaml config -q
 bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
-python3 staging/rehearse.py
+docker build -f docker/tooling.Dockerfile -t gisobuild-tooling .
+docker run --rm -v "$(pwd):/project:ro" -w /project/staging gisobuild-tooling python -B rehearse.py
 git diff --check
 ```
+
+Never run `python3`, `pip`, `ruff`, or Graphify directly on the host — see
+"CRITICAL: Docker-only execution boundary" in [`AGENTS.md`](AGENTS.md).
+`docker/tooling.Dockerfile` is a small, pinned container (Python 3.12 + git
++ Ruff + Graphify + pip-audit) for everything that policy forbids on the
+host; build it once and reuse the image. See
+[`docs/testing.md`](docs/testing.md) for the Ruff/pip-audit/Graphify
+invocations.
 
 Never add Cisco-distributed software, generated images, device configuration,
 credentials, build logs, or customer data to commits or test fixtures.
