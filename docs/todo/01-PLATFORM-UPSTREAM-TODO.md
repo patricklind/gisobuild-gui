@@ -47,6 +47,33 @@ The application must distinguish:
       work — the test above is a safety net for the interim, not a
       replacement for it.
 
+      **Considered and deliberately deferred (2026-09-16): full runtime
+      discovery.** Designed this out before writing code: `PLATFORMS` also
+      carries marketing label and `usb` capability per platform, neither of
+      which exists in gisobuild's own source (there is no per-platform USB
+      flag anywhere in `.gisobuild-tool` — confirmed by direct source
+      inspection while investigating a since-disproven `--skip-usb-image`
+      concern, see `07-BUG-AUDIT-TODO.md`), so a discovered ID with no local
+      entry can only ever get a synthetic, unnamed, conservative profile —
+      exactly `exr-generic`'s shape, just keyed by a real ID instead of a
+      placeholder. Building that means either mutating the module-level
+      `PLATFORMS` dict once at startup (test-isolation risk: any test
+      importing it fresh after that mutation sees extra synthetic keys) or
+      threading an optional `platforms` parameter through `normalize_platform()`,
+      `infer_platform()`, `capabilities_for_platform()`, `platform_profile()`
+      and `validate_platform_options()` and every one of their ~15 call
+      sites — real, invasive surface area for a change that is a **complete
+      no-op today**, since the sync test above already proves upstream and
+      local are identical. The chosen alternative achieves the same
+      practical outcome with far less risk: the sync test makes drift
+      impossible to miss silently, and the fix when it *does* fire is a
+      one-line `PLATFORMS` addition (the same shape as `exr-generic`) — not
+      a redesign. That satisfies "handle a new upstream platform without
+      major code changes" without the standing complexity and blast radius
+      of a live filesystem-parsing merge running on every request. Revisit
+      if the sync test ever actually fires in practice and a one-line fix
+      turns out to be too slow to ship for a given deployment's needs.
+
 ## CLI option compatibility matrix (2026-09-16)
 
 Audited directly against `.gisobuild-tool/src/gisobuild.py`'s `parsecli()` —
