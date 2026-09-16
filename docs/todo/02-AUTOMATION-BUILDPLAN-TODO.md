@@ -57,12 +57,23 @@ Detection order:
 
 Return:
 
-- [ ] release
-- [ ] platform identifier
-- [ ] engine
-- [ ] architecture
-- [ ] detected_by
-- [ ] confidence
+- [x] release — `create_build_plan()`/`discover()` `"release"` field
+- [x] platform identifier — `"platform"` field
+- [x] engine — `"engine"` field (derived from platform, not independently
+      detected — see `detected_by` below)
+- [x] architecture — `"iso_architecture"` confidence entry plus
+      `validate_smu_selection()`'s `"iso_architectures"` list
+- [x] detected_by — implemented as `confidence.<field>.source` (added
+      2026-09-16 alongside the confidence display fix): `"iso-filename-pattern"`
+      for platform/release, `"iso-contents"` for architecture,
+      `"operator-selected"` when the operator picked the platform manually.
+      Engine and CSC grouping don't get an independent `detected_by` — engine
+      is derived from platform's own detection, and CSC grouping's source is
+      always `"rpm-filename-pattern"` (see `confidence_report()` in
+      `giso-webui/app.py`).
+- [x] confidence — `confidence_report()`, see "Confidence display" in
+      `06-UI-OPERATOR-TODO.md` for the full honesty accounting of what is
+      actually `VERIFIED` versus `INFERRED` today.
 
 ## RPM inspection
 
