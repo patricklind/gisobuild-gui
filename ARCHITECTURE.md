@@ -122,7 +122,12 @@ its distribution terms.
 
 The health endpoint verifies Docker access, the tool entry point, and all
 required storage directories. It returns HTTP 503 when any check fails, so the
-container health check no longer treats a non-ready service as healthy.
+container health check no longer treats a non-ready service as healthy. The
+browser header status pill now reads this same endpoint (`/api/ready`), not
+the separate bare-liveness `/api/health` it originally used, and names the
+specific failing check(s) in plain English rather than a generic "not ready" —
+an operator can no longer see a reassuring "System ready" while Docker,
+storage, or the tool checkout is actually unavailable.
 
 **Limitation:** It does not perform writes or reserve build capacity. Disk-space
 requirements are checked again when an upload starts and before TAR extraction.
