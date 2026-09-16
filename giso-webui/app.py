@@ -94,6 +94,7 @@ MAX_LOG_BYTES = int(os.environ.get("MAX_LOG_BYTES", str(10 * 1024**2)))
 MAX_SUPERSEDENCE_FILE_BYTES = 2 * 1024**2
 MAX_SUPERSEDENCE_TOTAL_BYTES = 16 * 1024**2
 MAX_ISO_INSPECTION_OUTPUT_BYTES = 8 * 1024**2
+MAX_FILE_PREVIEW_BYTES = 64 * 1024
 ISO_MDATA_TIMEOUT_SECONDS = 30
 ISO_LISTING_TIMEOUT_SECONDS = 60
 MAX_JOB_HISTORY = int(os.environ.get("MAX_JOB_HISTORY", "100"))
@@ -1617,6 +1618,29 @@ def inputs():
 @app.get("/api/platforms")
 def platforms():
     return jsonify([platform_profile(key) for key in PLATFORMS])
+
+
+@app.get("/api/file-preview")
+def file_preview():
+    """Best-effort text preview of an expert-mode config path (xrconfig, ztp_ini,
+    boot script, key request, ...) so an operator can see what they are about to
+    hand gisobuild without opening it outside the browser - AI-MASTER-PROMPT.md
+    section 27 ("offer preview" for text configuration files).
+    """
+    try:
+        path = safe_data_path(request.args.get("path", ""))
+    except ValueError as exc:
+        raise BadRequest(str(exc)) from exc
+    if not path.is_file():
+        raise BadRequest("Path is not a file")
+    size = path.stat().st_size
+    if size > MAX_FILE_PREVIEW_BYTES:
+        return jsonify(previewable=False, reason="File is too large to preview here", size=size)
+    try:
+        text = path.read_bytes().decode("utf-8")
+    except UnicodeDecodeError:
+        return jsonify(previewable=False, reason="File is not plain text", size=size)
+    return jsonify(previewable=True, text=text, size=size)
 
 
 @app.post("/api/smu/recommendation")

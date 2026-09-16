@@ -539,6 +539,23 @@ async function loadVersion() {
   } catch { /* Version info is diagnostic only; a missing line is not an error. */ }
 }
 
+async function previewFile(button) {
+  const field = button.dataset.field;
+  const input = document.querySelector(`[name="${field}"]`);
+  const output = $('#file-preview-output');
+  const path = input.value.trim();
+  output.hidden = false;
+  if (!path) { output.textContent = 'Enter or choose a file first.'; return; }
+  output.textContent = 'Loading preview…';
+  try {
+    const data = await api(`/api/file-preview?path=${encodeURIComponent(path)}`);
+    output.textContent = data.previewable
+      ? `${path}:\n\n${data.text}`
+      : `${path}: ${data.reason}`;
+  } catch (err) { output.textContent = err.message; }
+}
+document.querySelectorAll('.preview-file').forEach(button => button.addEventListener('click', () => previewFile(button)));
+
 document.querySelectorAll('[name=mode]').forEach(radio => radio.addEventListener('change', event => {
   const yaml = event.target.value === 'yaml';
   $('#form-mode').hidden = yaml; $('#yaml-mode').hidden = !yaml;

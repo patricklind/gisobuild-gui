@@ -1702,6 +1702,33 @@ class GisoWebTests(unittest.TestCase):
         payload = self.client.get("/api/storage").get_json()
         self.assertEqual(payload["archive_used_bytes"], 0)
 
+    def test_file_preview_returns_text_content_of_a_small_config_file(self):
+        (self.data / "router.cfg").write_text("hostname router1\n")
+        payload = self.client.get("/api/file-preview?path=router.cfg").get_json()
+        self.assertTrue(payload["previewable"])
+        self.assertEqual(payload["text"], "hostname router1\n")
+
+    def test_file_preview_refuses_a_file_that_is_too_large(self):
+        (self.data / "big.cfg").write_bytes(b"x" * (module.MAX_FILE_PREVIEW_BYTES + 1))
+        payload = self.client.get("/api/file-preview?path=big.cfg").get_json()
+        self.assertFalse(payload["previewable"])
+        self.assertIn("too large", payload["reason"])
+
+    def test_file_preview_refuses_a_binary_file(self):
+        (self.data / "voucher.bin").write_bytes(b"\xff\xfe\x00\x01binary")
+        payload = self.client.get("/api/file-preview?path=voucher.bin").get_json()
+        self.assertFalse(payload["previewable"])
+        self.assertIn("not plain text", payload["reason"])
+
+    def test_file_preview_rejects_a_path_outside_the_upload_directory(self):
+        response = self.client.get("/api/file-preview?path=../outside.cfg")
+        self.assertEqual(response.status_code, 400)
+
+    def test_file_preview_rejects_a_directory(self):
+        (self.data / "a-dir").mkdir()
+        response = self.client.get("/api/file-preview?path=a-dir")
+        self.assertEqual(response.status_code, 400)
+
     @patch("app.subprocess.Popen")
     def test_image_pull_timeout_marks_build_failed(self, popen):
         pull = MagicMock()

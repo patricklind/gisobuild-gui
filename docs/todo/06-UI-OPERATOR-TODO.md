@@ -124,7 +124,33 @@ Show:
       host path, and a fake Docker volume name are all absent from the
       output) and `test_created_job_exposes_a_safe_command_preview_but_not_the_real_command`
       in `giso-webui/tests/test_app.py`, and confirmed live in a browser.
-
+- [x] preview text config files before building (`docs/AI-MASTER-PROMPT.md`
+      "UI principles" — avoid unexplained flags, give operators enough
+      information to trust a build without leaving the browser) —
+      added 2026-09-16. The six Expert-settings file fields (XR config, ZTP
+      ini, boot script, key request, ownership vouchers, ownership
+      certificate) previously only offered a bare path `<input>` with
+      autocomplete; an operator had no way to confirm *which* file they had
+      picked without opening it outside the UI. Each field now has a
+      "Preview" button next to it. `GET /api/file-preview?path=...` in
+      `giso-webui/app.py` resolves the path through the existing
+      `safe_data_path()` (the same traversal guard `discover()` and the
+      build-plan endpoints already use), refuses anything over
+      `MAX_FILE_PREVIEW_BYTES` (64 KiB — these are small text configs, never
+      the multi-GB ISO/RPM inputs) or that fails to decode as UTF-8 (the
+      ownership voucher/certificate fields are frequently binary PKCS7/DER,
+      which must show a clear "not plain text" message rather than garbage
+      or a raw exception), and otherwise returns the file's text. Verified
+      by `test_file_preview_returns_text_content_of_a_small_config_file`,
+      `test_file_preview_refuses_a_file_that_is_too_large`,
+      `test_file_preview_refuses_a_binary_file`,
+      `test_file_preview_rejects_a_path_outside_the_upload_directory`, and
+      `test_file_preview_rejects_a_directory` in
+      `giso-webui/tests/test_app.py`, and confirmed live against a
+      throwaway, isolated container (its own temp `DATA_ROOT`/etc., never
+      the shared persistent volumes) by fetching a real `router.cfg`
+      through the running UI and by exercising the traversal-rejection and
+      missing-file paths.
 ## Automatic by default
 
 Do not ask for these unless ambiguous:
