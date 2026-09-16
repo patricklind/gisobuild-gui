@@ -338,8 +338,26 @@ read today.
       state. Verified live in a browser with 10 fixture RPMs: typing
       "pkg03" left exactly 1 of 10 options and its CSC group visible,
       clearing the filter restored all 10.
-- [ ] Compatible-only / selected-only / architecture / version filters —
-      not implemented; only filename/CSC-ID substring search exists so far.
+- [x] Compatible-only / selected-only filters — added 2026-09-16:
+      `#manual-package-compatible-only`/`#manual-package-selected-only`
+      checkboxes next to the existing text filter, shown/hidden together
+      with it (8+ RPMs). `applyManualPackageFilter()` now composes three
+      independent conditions (text match, `!incompatible` when
+      compatible-only is checked, checkbox `.checked` when selected-only is
+      checked) — an option is visible only when all active filters pass.
+      "Selected only" updates live as boxes are checked/unchecked (wired
+      through the existing `syncManualPackageValue()`, which already runs
+      on every checkbox change), so unchecking a currently-visible item
+      while the filter is active removes it from view immediately — the
+      same behavior as a "starred items" filter elsewhere. Verified live in
+      a browser with 8 fixture RPMs (6 compatible, a same-basename/
+      different-hash conflict pair): compatible-only correctly hid both
+      conflicted options; checking two compatible options then enabling
+      selected-only showed exactly those two; unchecking one of them live
+      narrowed the view to the other, with no page reload.
+      Architecture/version filters remain unimplemented — RPM
+      architecture is already shown in the checksums/build report but has
+      no dedicated filter control yet.
 - [x] Archive list search by filename — added 2026-09-16, same pattern as
       the manual package filter: `#archive-filter` in
       `giso-webui/templates/index.html`, only shown once there are 6+

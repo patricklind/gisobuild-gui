@@ -112,6 +112,21 @@ class BuildScriptTests(unittest.TestCase):
         self.assertNotIn("function renderManualPackages", app_script)
         self.assertNotIn('name="pkglist_override" rows=', template)
 
+    def test_manual_package_list_supports_compatible_and_selected_only_toggles(self):
+        web_root = Path(__file__).parents[1]
+        manual_script = (web_root / "static" / "manual-packages.js").read_text()
+        template = (web_root / "templates" / "index.html").read_text()
+
+        self.assertIn('id="manual-package-compatible-only"', template)
+        self.assertIn('id="manual-package-selected-only"', template)
+        filter_fn = manual_script[manual_script.index("function applyManualPackageFilter()"):]
+        filter_fn = filter_fn[:filter_fn.index("\n  }\n")]
+        self.assertIn("compatibleOnly", filter_fn)
+        self.assertIn("option.classList.contains('incompatible')", filter_fn)
+        self.assertIn("selectedOnly", filter_fn)
+        self.assertIn(".manual-rpm-checkbox').checked", filter_fn)
+        self.assertIn("applyManualPackageFilter()", manual_script[manual_script.index("window.syncManualPackageValue"):])
+
     def test_lnt_only_defaults_do_not_block_exr_builds(self):
         web_root = Path(__file__).parents[1]
         template = (web_root / "templates" / "index.html").read_text()

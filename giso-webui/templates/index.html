@@ -90,7 +90,7 @@
                   <label><input type="radio" name="package_selection_mode" value="manual"><span><b>Manual package list</b><small>Use only with an approved Cisco package list. Partial CSC groups can make a build fail.</small></span></label>
                 </fieldset>
                 <div id="manual-package-override" class="manual-package-override" hidden>
-                  <fieldset><legend>Uploaded RPM packages</legend><p id="manual-package-summary">No RPM packages uploaded.</p><input type="search" id="manual-package-filter" class="manual-package-filter" placeholder="Filter by filename or CSC ID…" aria-label="Filter RPM packages by filename or CSC ID" hidden><div id="manual-package-list" class="manual-package-list"></div></fieldset>
+                  <fieldset><legend>Uploaded RPM packages</legend><p id="manual-package-summary">No RPM packages uploaded.</p><input type="search" id="manual-package-filter" class="manual-package-filter" placeholder="Filter by filename or CSC ID…" aria-label="Filter RPM packages by filename or CSC ID" hidden><div id="manual-package-filter-toggles" class="manual-package-filter-toggles" hidden><label><input type="checkbox" id="manual-package-compatible-only"> Compatible only</label><label><input type="checkbox" id="manual-package-selected-only"> Selected only</label></div><div id="manual-package-list" class="manual-package-list"></div></fieldset>
                   <textarea name="pkglist_override" hidden aria-hidden="true"></textarea>
                   <small>Select complete approved CSC groups. The server still checks platform, release, architecture and duplicate versions.</small>
                   <button id="use-automatic-packages" class="secondary small" type="button">Return to automatic selection</button>

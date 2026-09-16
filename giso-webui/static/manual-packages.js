@@ -76,17 +76,23 @@
       groupBox.indeterminate = checked > 0 && checked < members.length;
     });
     updateBuildAvailability();
+    applyManualPackageFilter();
   };
 
   function applyManualPackageFilter() {
     const query = document.querySelector('#manual-package-filter').value.trim().toLowerCase();
+    const compatibleOnly = document.querySelector('#manual-package-compatible-only').checked;
+    const selectedOnly = document.querySelector('#manual-package-selected-only').checked;
     document.querySelectorAll('#manual-package-list .manual-csc-group').forEach(group => {
       const legend = group.querySelector('legend');
       const legendMatches = !query || Boolean(legend?.textContent.toLowerCase().includes(query));
       let anyVisible = false;
       group.querySelectorAll('.manual-package-option').forEach(option => {
         const name = option.querySelector('b')?.textContent.toLowerCase() || '';
-        const visible = legendMatches || name.includes(query);
+        const queryMatches = legendMatches || name.includes(query);
+        const passesCompatible = !compatibleOnly || !option.classList.contains('incompatible');
+        const passesSelected = !selectedOnly || option.querySelector('.manual-rpm-checkbox').checked;
+        const visible = queryMatches && passesCompatible && passesSelected;
         option.hidden = !visible;
         if (visible) anyVisible = true;
       });
@@ -94,10 +100,13 @@
     });
   }
   window.applyManualPackageFilter = applyManualPackageFilter;
+  document.querySelector('#manual-package-compatible-only').addEventListener('change', applyManualPackageFilter);
+  document.querySelector('#manual-package-selected-only').addEventListener('change', applyManualPackageFilter);
 
   window.renderManualPackages = function renderManualPackages(data, plan) {
     const list = document.querySelector('#manual-package-list');
     const filterInput = document.querySelector('#manual-package-filter');
+    const filterToggles = document.querySelector('#manual-package-filter-toggles');
     const previous = new Set(lines(document.querySelector('[name=pkglist_override]').value));
     const recommended = new Set((plan.selected || data.recommended || []).map(basename));
     const excluded = new Map((plan.excluded || []).map(item => [basename(item.name), item.reason]));
@@ -108,6 +117,7 @@
 
     if (!rpms.length) {
       filterInput.hidden = true;
+      filterToggles.hidden = true;
       const empty = document.createElement('div');
       empty.className = 'manual-package-empty';
       const message = document.createElement('p');
@@ -125,6 +135,7 @@
       return;
     }
     filterInput.hidden = rpms.length < 8;
+    filterToggles.hidden = rpms.length < 8;
 
     const byName = new Map();
     rpms.forEach(file => {
