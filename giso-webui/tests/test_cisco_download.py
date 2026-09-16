@@ -73,6 +73,32 @@ class CiscoDownloadTests(unittest.TestCase):
             self.assertEqual(result.sha256, hashlib.sha256(payload).hexdigest())
             self.assertEqual(progress, [(len(payload), len(payload))])
 
+    def test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten(self):
+        content = b"licensed fixture placeholder"
+        client = self.client()
+        client._access_token = lambda: "token"
+        client._validate_download_url = lambda url: None
+
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): return None
+            def read(self, size):
+                nonlocal content
+                value, content = content, b""
+                return value
+
+        client._opener.open = lambda request, timeout: Response()
+        payload = b"licensed fixture placeholder"
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "file.iso"
+            destination.with_name(".file.iso.part").write_bytes(b"leftover from a crashed attempt")
+            result = client.download(
+                "https://download.cisco.com/file.iso", destination,
+                expected_size=len(payload), max_bytes=1024,
+            )
+            self.assertEqual(result.size, len(payload))
+            self.assertEqual(destination.read_bytes(), payload)
+
     def test_partial_file_is_removed_after_size_mismatch(self):
         client = self.client()
         client._access_token = lambda: "token"

@@ -734,6 +734,43 @@ the container's upload volume, and saw "ncs5500-bgp-1.0.0.1-r2612.CSCold00001
 ... — Superseded by a newer fix per Cisco supersedence notes" render in the
 Review BuildPlan step in a real browser.
 
+### A stale partial file from a crashed download made the next attempt fail too (2026-09-16)
+
+Current behavior (before this fix):
+
+`CiscoSoftwareClient.download()` in `giso-webui/cisco_download.py` writes to
+`destination.with_name(f".{destination.name}.part")` opened with mode
+`"xb"` (exclusive create — fails if the file already exists). If a previous
+download was interrupted by something that skips the function's own
+`except` cleanup — the process being killed, the host restarting — that
+`.part` file is left on disk. The next download attempt for the same
+destination then fails `open("xb")` with `FileExistsError`, which the
+generic `except (OSError, ...)` handler at the bottom turns into "Cisco
+download was interrupted" — a confusing failure for what is actually a
+leftover from a *previous* attempt, not this one. That handler does delete
+the stale file as a side effect before re-raising, so a second retry
+happens to succeed — but only after one needlessly failed attempt.
+
+Fix: `download()` now removes any existing `.part` file for this
+destination before starting, since only one Cisco download runs at a time
+(`cisco_download_running()`), so there is never a legitimate concurrent
+writer to protect against — only ever a stale leftover from a dead attempt.
+
+TODO:
+
+- [x] Remove any pre-existing `.part` file before opening it exclusively.
+- [x] Add a regression test using a real pre-created stale file, confirmed
+      to fail against the old code (`FileExistsError` →
+      `CiscoDownloadError: Cisco download was interrupted`) and pass with
+      the fix.
+
+Verified by `test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten`
+in `giso-webui/tests/test_cisco_download.py`. Confirmed the regression test
+actually exercises the bug by temporarily reverting the one-line fix and
+re-running just that test in the built container — it failed with exactly
+the predicted error — then restoring the fix and confirming the full suite
+(199 tests) passes; ruff and Graphify clean.
+
 ## P3 — Cisco download hardening (residual, deferred)
 
 ### DNS-rebinding TOCTOU in the Cisco download SSRF guard (2026-09-16)

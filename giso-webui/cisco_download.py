@@ -205,6 +205,13 @@ class CiscoSoftwareClient:
             url = urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query)))
             body, method, headers = None, "GET", {}
         temporary = destination.with_name(f".{destination.name}.part")
+        # A previous attempt that crashed mid-download (killed process, host
+        # restart) can leave this file behind; only one Cisco download runs
+        # at a time (see cisco_download_running()), so it is never a
+        # concurrent writer to guard against - remove it before the
+        # exclusive-create open below, or a stale leftover would fail this
+        # attempt too, one retry too many.
+        temporary.unlink(missing_ok=True)
         current = url
         digests = {name: hashlib.new(name) for name in ("sha256", "md5", "sha512")}
         written = 0

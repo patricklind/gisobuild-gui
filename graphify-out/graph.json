@@ -114,7 +114,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 49,
-      "community_name": "MaintenanceTests",
+      "community_name": "maintenance.py",
       "file_type": "code",
       "norm_label": "maintenancetests",
       "source_file": "giso-webui/tests/test_maintenance.py",
@@ -182,6 +182,18 @@
       "norm_label": "add_superseded_exclusions()",
       "source_file": "giso-webui/app.py",
       "source_location": "L1108"
+    },
+    {
+      "id": "giso_webui_app_archive_source_for_extraction",
+      "label": "archive_source_for_extraction()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Path",
+      "file_type": "code",
+      "norm_label": "archive_source_for_extraction()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1043"
     },
     {
       "id": "giso_webui_app_build_cleanup_paths",
@@ -316,6 +328,18 @@
       "source_location": "L558"
     },
     {
+      "id": "giso_webui_app_iso_architectures_from_listing",
+      "label": "iso_architectures_from_listing()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Path",
+      "file_type": "code",
+      "norm_label": "iso_architectures_from_listing()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L498"
+    },
+    {
       "id": "giso_webui_app_iso_architectures_from_mdata",
       "label": "iso_architectures_from_mdata()",
       "_callable": true,
@@ -386,6 +410,18 @@
       "norm_label": "smu_recommendation()",
       "source_file": "giso-webui/app.py",
       "source_location": "L1690"
+    },
+    {
+      "id": "giso_webui_app_top_level_extraction_dir",
+      "label": "top_level_extraction_dir()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Path",
+      "file_type": "code",
+      "norm_label": "top_level_extraction_dir()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1061"
     },
     {
       "id": "giso_webui_tests_test_app_gisowebtests_teardown",
@@ -2065,7 +2101,7 @@
       "file_type": "code",
       "norm_label": ".test_interrupted_download_is_redacted_and_partial_file_is_removed()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L94"
+      "source_location": "L120"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_interrupted_download_is_redacted_and_partial_file_is_removed_enter",
@@ -2077,7 +2113,7 @@
       "file_type": "code",
       "norm_label": "__enter__()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L100"
+      "source_location": "L126"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_interrupted_download_is_redacted_and_partial_file_is_removed_exit",
@@ -2089,7 +2125,7 @@
       "file_type": "code",
       "norm_label": "__exit__()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L101"
+      "source_location": "L127"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_interrupted_download_is_redacted_and_partial_file_is_removed_read",
@@ -2101,7 +2137,7 @@
       "file_type": "code",
       "norm_label": "read()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L102"
+      "source_location": "L128"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_partial_file_is_removed_after_size_mismatch",
@@ -2113,7 +2149,7 @@
       "file_type": "code",
       "norm_label": ".test_partial_file_is_removed_after_size_mismatch()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L76"
+      "source_location": "L102"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_partial_file_is_removed_after_size_mismatch_enter",
@@ -2125,7 +2161,7 @@
       "file_type": "code",
       "norm_label": "__enter__()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L82"
+      "source_location": "L108"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_partial_file_is_removed_after_size_mismatch_exit",
@@ -2137,7 +2173,7 @@
       "file_type": "code",
       "norm_label": "__exit__()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L83"
+      "source_location": "L109"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_partial_file_is_removed_after_size_mismatch_read",
@@ -2149,7 +2185,7 @@
       "file_type": "code",
       "norm_label": "read()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L84"
+      "source_location": "L110"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_private_and_unapproved_download_destinations_are_rejected",
@@ -2173,7 +2209,7 @@
       "file_type": "code",
       "norm_label": ".test_redirect_is_revalidated_before_download()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L113"
+      "source_location": "L139"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_redirect_is_revalidated_before_download_enter",
@@ -2185,7 +2221,7 @@
       "file_type": "code",
       "norm_label": "__enter__()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L121"
+      "source_location": "L147"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_redirect_is_revalidated_before_download_exit",
@@ -2197,7 +2233,7 @@
       "file_type": "code",
       "norm_label": "__exit__()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L122"
+      "source_location": "L148"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_redirect_is_revalidated_before_download_open_request",
@@ -2209,7 +2245,7 @@
       "file_type": "code",
       "norm_label": "open_request()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L129"
+      "source_location": "L155"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_redirect_is_revalidated_before_download_read",
@@ -2221,7 +2257,55 @@
       "file_type": "code",
       "norm_label": "read()",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L123"
+      "source_location": "L149"
+    },
+    {
+      "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten",
+      "label": ".test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "CiscoDownloadError",
+      "file_type": "code",
+      "norm_label": ".test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten()",
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L76"
+    },
+    {
+      "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten_enter",
+      "label": "__enter__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "CiscoDownloadError",
+      "file_type": "code",
+      "norm_label": "__enter__()",
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L83"
+    },
+    {
+      "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten_exit",
+      "label": "__exit__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "CiscoDownloadError",
+      "file_type": "code",
+      "norm_label": "__exit__()",
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L84"
+    },
+    {
+      "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten_read",
+      "label": "read()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "CiscoDownloadError",
+      "file_type": "code",
+      "norm_label": "read()",
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L85"
     },
     {
       "id": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_token_is_cached_until_close_to_expiry",
@@ -2956,16 +3040,52 @@
       "source_location": "L924"
     },
     {
-      "id": "giso_webui_app_archive_source_for_extraction",
-      "label": "archive_source_for_extraction()",
+      "id": "giso_webui_app_archive_list",
+      "label": "archive_list()",
       "_callable": true,
       "_origin": "ast",
       "community": 45,
       "community_name": "archive_giso_artifacts_and_cleanup",
       "file_type": "code",
-      "norm_label": "archive_source_for_extraction()",
+      "norm_label": "archive_list()",
       "source_file": "giso-webui/app.py",
-      "source_location": "L1043"
+      "source_location": "L1950"
+    },
+    {
+      "id": "giso_webui_app_archive_timestamp",
+      "label": "archive_timestamp()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 45,
+      "community_name": "archive_giso_artifacts_and_cleanup",
+      "file_type": "code",
+      "norm_label": "archive_timestamp()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L844"
+    },
+    {
+      "id": "giso_webui_app_cross_process_archive_lock",
+      "label": "cross_process_archive_lock()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 45,
+      "community_name": "archive_giso_artifacts_and_cleanup",
+      "file_type": "code",
+      "norm_label": "cross_process_archive_lock()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L851"
+    },
+    {
+      "id": "giso_webui_app_enforce_archive_policy",
+      "label": "enforce_archive_policy()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 45,
+      "community_name": "archive_giso_artifacts_and_cleanup",
+      "file_type": "code",
+      "norm_label": "enforce_archive_policy()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L890"
     },
     {
       "id": "giso_webui_app_file_sha256",
@@ -2990,18 +3110,6 @@
       "norm_label": "giso_artifact_candidates()",
       "source_file": "giso-webui/app.py",
       "source_location": "L830"
-    },
-    {
-      "id": "giso_webui_app_top_level_extraction_dir",
-      "label": "top_level_extraction_dir()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 45,
-      "community_name": "archive_giso_artifacts_and_cleanup",
-      "file_type": "code",
-      "norm_label": "top_level_extraction_dir()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1061"
     },
     {
       "id": "giso_webui_tests_test_app_gisowebtests_test_discover_tolerates_file_removed_during_scan",
@@ -3052,18 +3160,6 @@
       "source_location": "L1967"
     },
     {
-      "id": "giso_webui_app_archive_delete",
-      "label": "archive_delete()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 47,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "archive_delete()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L2362"
-    },
-    {
       "id": "giso_webui_app_archive_download",
       "label": "archive_download()",
       "_callable": true,
@@ -3076,16 +3172,16 @@
       "source_location": "L2354"
     },
     {
-      "id": "giso_webui_app_archive_list",
-      "label": "archive_list()",
+      "id": "giso_webui_app_archive_size",
+      "label": "archive_size()",
       "_callable": true,
       "_origin": "ast",
       "community": 47,
       "community_name": "app.py",
       "file_type": "code",
-      "norm_label": "archive_list()",
+      "norm_label": "archive_size()",
       "source_file": "giso-webui/app.py",
-      "source_location": "L1950"
+      "source_location": "L840"
     },
     {
       "id": "giso_webui_app_bad_request",
@@ -3134,18 +3230,6 @@
       "norm_label": "cisco_download_status()",
       "source_file": "giso-webui/app.py",
       "source_location": "L1942"
-    },
-    {
-      "id": "giso_webui_app_cross_process_archive_lock",
-      "label": "cross_process_archive_lock()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 47,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "cross_process_archive_lock()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L851"
     },
     {
       "id": "giso_webui_app_download",
@@ -3292,6 +3376,18 @@
       "source_location": "L1532"
     },
     {
+      "id": "giso_webui_app_storage",
+      "label": "storage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 47,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "storage()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1607"
+    },
+    {
       "id": "giso_webui_app_version",
       "label": "version()",
       "_callable": true,
@@ -3352,12 +3448,24 @@
       "source_location": "L43"
     },
     {
+      "id": "giso_webui_maintenance_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 49,
+      "community_name": "maintenance.py",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "giso-webui/maintenance.py",
+      "source_location": "L11"
+    },
+    {
       "id": "giso_webui_tests_test_maintenance_maintenancetests_test_successful_cycle_reports_removed_jobs",
       "label": ".test_successful_cycle_reports_removed_jobs()",
       "_callable": true,
       "_origin": "ast",
       "community": 49,
-      "community_name": "MaintenanceTests",
+      "community_name": "maintenance.py",
       "file_type": "code",
       "norm_label": ".test_successful_cycle_reports_removed_jobs()",
       "source_file": "giso-webui/tests/test_maintenance.py",
@@ -3369,23 +3477,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 49,
-      "community_name": "MaintenanceTests",
+      "community_name": "maintenance.py",
       "file_type": "code",
       "norm_label": ".test_transient_os_error_does_not_crash_the_loop()",
       "source_file": "giso-webui/tests/test_maintenance.py",
       "source_location": "L8"
-    },
-    {
-      "id": "giso_webui_app_iso_architectures_from_listing",
-      "label": "iso_architectures_from_listing()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "PlatformCompatibilityTests",
-      "file_type": "code",
-      "norm_label": "iso_architectures_from_listing()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L498"
     },
     {
       "id": "giso_webui_platform_validation_capabilities_for_platform",
@@ -3837,7 +3933,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "build_plan()",
       "source_file": "giso-webui/app.py",
@@ -3849,7 +3945,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "cisco_accept()",
       "source_file": "giso-webui/app.py",
@@ -3861,7 +3957,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "cisco_client()",
       "source_file": "giso-webui/app.py",
@@ -3873,7 +3969,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "cisco_download_start()",
       "source_file": "giso-webui/app.py",
@@ -3885,7 +3981,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "cisco_failure()",
       "source_file": "giso-webui/app.py",
@@ -3897,7 +3993,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "cisco_response_requires()",
       "source_file": "giso-webui/app.py",
@@ -3909,7 +4005,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "cisco_search()",
       "source_file": "giso-webui/app.py",
@@ -3921,7 +4017,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "cisco_text()",
       "source_file": "giso-webui/app.py",
@@ -3933,35 +4029,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "compatibility()",
       "source_file": "giso-webui/app.py",
       "source_location": "L1715"
-    },
-    {
-      "id": "giso_webui_app_extract_cisco_archive",
-      "label": "extract_cisco_archive()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "run_cisco_download",
-      "file_type": "code",
-      "norm_label": "extract_cisco_archive()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L214"
-    },
-    {
-      "id": "giso_webui_app_extraction_path",
-      "label": "extraction_path()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "run_cisco_download",
-      "file_type": "code",
-      "norm_label": "extraction_path()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1037"
     },
     {
       "id": "giso_webui_app_find_cisco_images",
@@ -3969,7 +4041,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "find_cisco_images()",
       "source_file": "giso-webui/app.py",
@@ -3981,7 +4053,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "json_object()",
       "source_file": "giso-webui/app.py",
@@ -3993,59 +4065,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "package_names_for_validation()",
       "source_file": "giso-webui/app.py",
       "source_location": "L647"
-    },
-    {
-      "id": "giso_webui_app_run_cisco_download",
-      "label": "run_cisco_download()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "run_cisco_download",
-      "file_type": "code",
-      "norm_label": "run_cisco_download()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1795"
-    },
-    {
-      "id": "giso_webui_app_run_cisco_download_update_progress",
-      "label": "update_progress()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "run_cisco_download",
-      "file_type": "code",
-      "norm_label": "update_progress()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1808"
-    },
-    {
-      "id": "giso_webui_app_upload_complete",
-      "label": "upload_complete()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "run_cisco_download",
-      "file_type": "code",
-      "norm_label": "upload_complete()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L2135"
-    },
-    {
-      "id": "giso_webui_app_upload_name",
-      "label": "upload_name()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "run_cisco_download",
-      "file_type": "code",
-      "norm_label": "upload_name()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1072"
     },
     {
       "id": "giso_webui_app_validate_build_payload",
@@ -4053,7 +4077,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "validate_build_payload()",
       "source_file": "giso-webui/app.py",
@@ -4082,6 +4106,18 @@
       "norm_label": "append_log()",
       "source_file": "giso-webui/app.py",
       "source_location": "L1186"
+    },
+    {
+      "id": "giso_webui_app_archive_delete",
+      "label": "archive_delete()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 51,
+      "community_name": "create_job",
+      "file_type": "code",
+      "norm_label": "archive_delete()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L2362"
     },
     {
       "id": "giso_webui_app_cancel_job",
@@ -4228,18 +4264,6 @@
       "source_location": "L1379"
     },
     {
-      "id": "giso_webui_app_safe_log_text",
-      "label": "safe_log_text()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "create_job",
-      "file_type": "code",
-      "norm_label": "safe_log_text()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L256"
-    },
-    {
       "id": "giso_webui_app_security_headers",
       "label": "security_headers()",
       "_callable": true,
@@ -4264,6 +4288,18 @@
       "source_location": "L2087"
     },
     {
+      "id": "giso_webui_app_upload_complete",
+      "label": "upload_complete()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 51,
+      "community_name": "create_job",
+      "file_type": "code",
+      "norm_label": "upload_complete()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L2135"
+    },
+    {
       "id": "giso_webui_app_upload_init",
       "label": "upload_init()",
       "_callable": true,
@@ -4276,48 +4312,12 @@
       "source_location": "L2047"
     },
     {
-      "id": "giso_webui_app_archive_size",
-      "label": "archive_size()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "enforce_archive_policy",
-      "file_type": "code",
-      "norm_label": "archive_size()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L840"
-    },
-    {
-      "id": "giso_webui_app_archive_timestamp",
-      "label": "archive_timestamp()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "enforce_archive_policy",
-      "file_type": "code",
-      "norm_label": "archive_timestamp()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L844"
-    },
-    {
-      "id": "giso_webui_app_enforce_archive_policy",
-      "label": "enforce_archive_policy()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "enforce_archive_policy",
-      "file_type": "code",
-      "norm_label": "enforce_archive_policy()",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L890"
-    },
-    {
       "id": "giso_webui_app_expire_upload_sessions",
       "label": "expire_upload_sessions()",
       "_callable": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "enforce_archive_policy",
+      "community_name": "initialize_job_store",
       "file_type": "code",
       "norm_label": "expire_upload_sessions()",
       "source_file": "giso-webui/app.py",
@@ -4329,23 +4329,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "enforce_archive_policy",
+      "community_name": "initialize_job_store",
       "file_type": "code",
       "norm_label": "initialize_job_store()",
       "source_file": "giso-webui/app.py",
       "source_location": "L284"
     },
     {
-      "id": "giso_webui_app_storage",
-      "label": "storage()",
+      "id": "giso_webui_app_safe_log_text",
+      "label": "safe_log_text()",
       "_callable": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "enforce_archive_policy",
+      "community_name": "initialize_job_store",
       "file_type": "code",
-      "norm_label": "storage()",
+      "norm_label": "safe_log_text()",
       "source_file": "giso-webui/app.py",
-      "source_location": "L1607"
+      "source_location": "L256"
     },
     {
       "id": "giso_webui_app_validate_host",
@@ -4353,23 +4353,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "enforce_archive_policy",
+      "community_name": "initialize_job_store",
       "file_type": "code",
       "norm_label": "validate_host()",
       "source_file": "giso-webui/app.py",
       "source_location": "L1537"
-    },
-    {
-      "id": "giso_webui_maintenance_main",
-      "label": "main()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "enforce_archive_policy",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "giso-webui/maintenance.py",
-      "source_location": "L11"
     },
     {
       "id": "scripts_check_graphify_freshness_check",
@@ -4430,6 +4418,66 @@
       "norm_label": "verify_ignore_policy()",
       "source_file": "scripts/check_graphify_freshness.py",
       "source_location": "L44"
+    },
+    {
+      "id": "giso_webui_app_extract_cisco_archive",
+      "label": "extract_cisco_archive()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "run_cisco_download",
+      "file_type": "code",
+      "norm_label": "extract_cisco_archive()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L214"
+    },
+    {
+      "id": "giso_webui_app_extraction_path",
+      "label": "extraction_path()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "run_cisco_download",
+      "file_type": "code",
+      "norm_label": "extraction_path()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1037"
+    },
+    {
+      "id": "giso_webui_app_run_cisco_download",
+      "label": "run_cisco_download()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "run_cisco_download",
+      "file_type": "code",
+      "norm_label": "run_cisco_download()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1795"
+    },
+    {
+      "id": "giso_webui_app_run_cisco_download_update_progress",
+      "label": "update_progress()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "run_cisco_download",
+      "file_type": "code",
+      "norm_label": "update_progress()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1808"
+    },
+    {
+      "id": "giso_webui_app_upload_name",
+      "label": "upload_name()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "run_cisco_download",
+      "file_type": "code",
+      "norm_label": "upload_name()",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1072"
     },
     {
       "id": "giso_webui_tests_test_app_gisowebtests_test_background_build_error_is_safe_for_job_api",
@@ -5031,6 +5079,28 @@
       "source_location": ""
     },
     {
+      "id": "giso_webui_app_rationale_1044",
+      "label": "Return the archive file that produced this extraction directory, if any.\u2026",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Path",
+      "file_type": "rationale",
+      "norm_label": "return the archive file that produced this extraction directory, if any....",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1044"
+    },
+    {
+      "id": "giso_webui_app_rationale_1062",
+      "label": "Return the direct-child-of-DATA ancestor directory that contains `path`.",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Path",
+      "file_type": "rationale",
+      "norm_label": "return the direct-child-of-data ancestor directory that contains `path`.",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1062"
+    },
+    {
       "id": "giso_webui_app_rationale_1104",
       "label": "A package's containing directory names the Cisco supersedence identifier it\u2026",
       "_origin": "ast",
@@ -5073,6 +5143,17 @@
       "norm_label": "read the canonical arch families straight from an exr...",
       "source_file": "giso-webui/app.py",
       "source_location": "L481"
+    },
+    {
+      "id": "giso_webui_app_rationale_499",
+      "label": "Fall back to the ISO's own RPM repository when no eXR metadata file exists. LNT\u2026",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Path",
+      "file_type": "rationale",
+      "norm_label": "fall back to the iso's own rpm repository when no exr metadata file exists. lnt...",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L499"
     },
     {
       "id": "giso_webui_app_rationale_519",
@@ -6747,6 +6828,18 @@
       "source_location": "L1"
     },
     {
+      "id": "docs_todo_07_bug_audit_todo_a_single_failed_archive_policy_cycle_crashed_the_maintenance_daemon_entirely_2026_09_16",
+      "label": "A single failed archive-policy cycle crashed the maintenance daemon entirely (2026-09-16)",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "TODO \u2014 Concrete Bug Audit",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "a single failed archive-policy cycle crashed the maintenance daemon entirely (2026-09-16)",
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L496"
+    },
+    {
       "id": "docs_todo_07_bug_audit_todo_api_inputs_can_race_cleanup_deletion",
       "label": "`/api/inputs` can race cleanup/deletion",
       "_origin": "ast",
@@ -6828,7 +6921,7 @@
       "node_kind": "heading",
       "norm_label": "ci ran the unit test suite on the github actions host python instead of inside the built container",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L618"
+      "source_location": "L659"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_dns_rebinding_toctou_in_the_cisco_download_ssrf_guard_2026_09_16",
@@ -6840,7 +6933,7 @@
       "node_kind": "heading",
       "norm_label": "dns-rebinding toctou in the cisco download ssrf guard (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L698"
+      "source_location": "L739"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_filename_heuristics_can_report_confidence_stronger_than_the_evidence_supports",
@@ -6864,7 +6957,7 @@
       "node_kind": "heading",
       "norm_label": "`gisobuild_commit()` silently returned null due to git's ownership check (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L513"
+      "source_location": "L554"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_hardware_alias_matching_used_loose_substrings_instead_of_word_boundaries",
@@ -6888,7 +6981,7 @@
       "node_kind": "heading",
       "norm_label": "mandatory docker pull makes builds depend on registry availability even when the builder image is already cached",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L496"
+      "source_location": "L537"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_manual_package_ui_collapses_duplicate_rpm_basenames_before_the_operator_can_inspect_them",
@@ -6972,7 +7065,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 ci process fidelity",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L616"
+      "source_location": "L657"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_graphify_repository_correctness",
@@ -6984,7 +7077,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 graphify / repository correctness",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L601"
+      "source_location": "L642"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
@@ -7008,7 +7101,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 tooling reliability",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L511"
+      "source_location": "L552"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p3_cisco_download_hardening_residual_deferred",
@@ -7020,7 +7113,7 @@
       "node_kind": "heading",
       "norm_label": "p3 \u2014 cisco download hardening (residual, deferred)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L696"
+      "source_location": "L737"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_post_build_cleanup_could_delete_an_unselected_duplicate_basename_rpm_2026_09_16",
@@ -7044,7 +7137,7 @@
       "node_kind": "heading",
       "norm_label": "required regression-test additions",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L735"
+      "source_location": "L776"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_rpm_processor_architecture_is_not_checked_against_the_selected_iso",
@@ -7080,7 +7173,7 @@
       "node_kind": "heading",
       "norm_label": "`ruff` is installed unpinned in ci, so its rule set can change without a code change",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L552"
+      "source_location": "L593"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_successful_build_deletes_unrelated_files_from_the_entire_upload_workspace",
@@ -7104,7 +7197,7 @@
       "node_kind": "heading",
       "norm_label": "superseded rpms were silently dropped instead of being explained (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L663"
+      "source_location": "L704"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_target_release_can_remain_stale_after_the_selected_iso_changes",
@@ -7152,7 +7245,7 @@
       "node_kind": "heading",
       "norm_label": "tracked graphify output is stale relative to current main",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L603"
+      "source_location": "L644"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_upgrade_matrix_platform_normalization_is_inconsistent",
@@ -8834,28 +8927,6 @@
       "source_location": "L1"
     },
     {
-      "id": "giso_webui_app_rationale_1044",
-      "label": "Return the archive file that produced this extraction directory, if any.\u2026",
-      "_origin": "ast",
-      "community": 45,
-      "community_name": "archive_giso_artifacts_and_cleanup",
-      "file_type": "rationale",
-      "norm_label": "return the archive file that produced this extraction directory, if any....",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1044"
-    },
-    {
-      "id": "giso_webui_app_rationale_1062",
-      "label": "Return the direct-child-of-DATA ancestor directory that contains `path`.",
-      "_origin": "ast",
-      "community": 45,
-      "community_name": "archive_giso_artifacts_and_cleanup",
-      "file_type": "rationale",
-      "norm_label": "return the direct-child-of-data ancestor directory that contains `path`.",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1062"
-    },
-    {
       "id": "giso_webui_app_rationale_831",
       "label": "Return output images eligible for verified archival.",
       "_origin": "ast",
@@ -8865,6 +8936,28 @@
       "norm_label": "return output images eligible for verified archival.",
       "source_file": "giso-webui/app.py",
       "source_location": "L831"
+    },
+    {
+      "id": "giso_webui_app_rationale_852",
+      "label": "Serialize ARCHIVE access across processes, not just threads. archive_lock (a\u2026",
+      "_origin": "ast",
+      "community": 45,
+      "community_name": "archive_giso_artifacts_and_cleanup",
+      "file_type": "rationale",
+      "norm_label": "serialize archive access across processes, not just threads. archive_lock (a...",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L852"
+    },
+    {
+      "id": "giso_webui_app_rationale_891",
+      "label": "Remove expired archive jobs, then oldest jobs until the archive fits its quota.",
+      "_origin": "ast",
+      "community": 45,
+      "community_name": "archive_giso_artifacts_and_cleanup",
+      "file_type": "rationale",
+      "norm_label": "remove expired archive jobs, then oldest jobs until the archive fits its quota.",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L891"
     },
     {
       "id": "giso_webui_app_rationale_930",
@@ -8922,6 +9015,17 @@
       "source_location": "L1564"
     },
     {
+      "id": "giso_webui_app_rationale_1608",
+      "label": "Operator-facing storage visibility (AI-MASTER-PROMPT.md section 37/45). A read,\u2026",
+      "_origin": "ast",
+      "community": 47,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "operator-facing storage visibility (ai-master-prompt.md section 37/45). a read,...",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1608"
+    },
+    {
       "id": "giso_webui_app_rationale_1625",
       "label": "Best-effort short git commit of the mounted .gisobuild-tool checkout. Returns\u2026",
       "_origin": "ast",
@@ -8953,17 +9057,6 @@
       "norm_label": "best-effort text preview of an expert-mode config path (xrconfig, ztp_ini, boot...",
       "source_file": "giso-webui/app.py",
       "source_location": "L1668"
-    },
-    {
-      "id": "giso_webui_app_rationale_852",
-      "label": "Serialize ARCHIVE access across processes, not just threads. archive_lock (a\u2026",
-      "_origin": "ast",
-      "community": 47,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "serialize archive access across processes, not just threads. archive_lock (a...",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L852"
     },
     {
       "id": "giso_webui_app_rationale_991",
@@ -9021,11 +9114,22 @@
       "source_location": "L1372"
     },
     {
+      "id": "giso_webui_maintenance",
+      "label": "maintenance.py",
+      "_origin": "ast",
+      "community": 49,
+      "community_name": "maintenance.py",
+      "file_type": "code",
+      "norm_label": "maintenance.py",
+      "source_file": "giso-webui/maintenance.py",
+      "source_location": "L1"
+    },
+    {
       "id": "giso_webui_tests_test_maintenance",
       "label": "test_maintenance.py",
       "_origin": "ast",
       "community": 49,
-      "community_name": "MaintenanceTests",
+      "community_name": "maintenance.py",
       "file_type": "code",
       "norm_label": "test_maintenance.py",
       "source_file": "giso-webui/tests/test_maintenance.py",
@@ -9052,17 +9156,6 @@
       "norm_label": "test_platform_compatibility.py",
       "source_file": "giso-webui/tests/test_platform_compatibility.py",
       "source_location": "L1"
-    },
-    {
-      "id": "giso_webui_app_rationale_499",
-      "label": "Fall back to the ISO's own RPM repository when no eXR metadata file exists. LNT\u2026",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "PlatformCompatibilityTests",
-      "file_type": "rationale",
-      "norm_label": "fall back to the iso's own rpm repository when no exr metadata file exists. lnt...",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L499"
     },
     {
       "id": "giso_webui_platform_validation_rationale_1",
@@ -9135,7 +9228,7 @@
       "label": "Exception",
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "exception",
       "source_file": "",
@@ -9146,29 +9239,18 @@
       "label": "post",
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "code",
       "norm_label": "post",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "giso_webui_app_rationale_1073",
-      "label": "Validate a client filename without silently rewriting path components.",
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "run_cisco_download",
-      "file_type": "rationale",
-      "norm_label": "validate a client filename without silently rewriting path components.",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L1073"
-    },
-    {
       "id": "giso_webui_app_rationale_172",
       "label": "Flatten Cisco's nested product/release response without returning secrets.",
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "rationale",
       "norm_label": "flatten cisco's nested product/release response without returning secrets.",
       "source_file": "giso-webui/app.py",
@@ -9179,7 +9261,7 @@
       "label": "Translate known inventory IDs while allowing filename-only preflight input.",
       "_origin": "ast",
       "community": 50,
-      "community_name": "run_cisco_download",
+      "community_name": "cisco_download_start",
       "file_type": "rationale",
       "norm_label": "translate known inventory ids while allowing filename-only preflight input.",
       "source_file": "giso-webui/app.py",
@@ -9241,70 +9323,37 @@
       "source_location": "L244"
     },
     {
-      "id": "giso_webui_app_rationale_257",
-      "label": "Remove licensed or sensitive artifact names from operator-visible logs.",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "create_job",
-      "file_type": "rationale",
-      "norm_label": "remove licensed or sensitive artifact names from operator-visible logs.",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L257"
-    },
-    {
       "id": "before_request",
       "label": "before_request",
       "_origin": "ast",
       "community": 52,
-      "community_name": "enforce_archive_policy",
+      "community_name": "initialize_job_store",
       "file_type": "code",
       "norm_label": "before_request",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "giso_webui_maintenance",
-      "label": "maintenance.py",
+      "id": "giso_webui_app_rationale_257",
+      "label": "Remove licensed or sensitive artifact names from operator-visible logs.",
       "_origin": "ast",
       "community": 52,
-      "community_name": "enforce_archive_policy",
-      "file_type": "code",
-      "norm_label": "maintenance.py",
-      "source_file": "giso-webui/maintenance.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "giso_webui_app_rationale_1608",
-      "label": "Operator-facing storage visibility (AI-MASTER-PROMPT.md section 37/45). A read,\u2026",
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "enforce_archive_policy",
+      "community_name": "initialize_job_store",
       "file_type": "rationale",
-      "norm_label": "operator-facing storage visibility (ai-master-prompt.md section 37/45). a read,...",
+      "norm_label": "remove licensed or sensitive artifact names from operator-visible logs.",
       "source_file": "giso-webui/app.py",
-      "source_location": "L1608"
+      "source_location": "L257"
     },
     {
       "id": "giso_webui_app_rationale_285",
       "label": "Create the job store and restore safe job history once per process.",
       "_origin": "ast",
       "community": 52,
-      "community_name": "enforce_archive_policy",
+      "community_name": "initialize_job_store",
       "file_type": "rationale",
       "norm_label": "create the job store and restore safe job history once per process.",
       "source_file": "giso-webui/app.py",
       "source_location": "L285"
-    },
-    {
-      "id": "giso_webui_app_rationale_891",
-      "label": "Remove expired archive jobs, then oldest jobs until the archive fits its quota.",
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "enforce_archive_policy",
-      "file_type": "rationale",
-      "norm_label": "remove expired archive jobs, then oldest jobs until the archive fits its quota.",
-      "source_file": "giso-webui/app.py",
-      "source_location": "L891"
     },
     {
       "id": "scripts_check_graphify_freshness",
@@ -9338,6 +9387,17 @@
       "norm_label": "regenerate the tracked code graph from tracked files and compare it...",
       "source_file": "scripts/check_graphify_freshness.py",
       "source_location": "L2"
+    },
+    {
+      "id": "giso_webui_app_rationale_1073",
+      "label": "Validate a client filename without silently rewriting path components.",
+      "_origin": "ast",
+      "community": 54,
+      "community_name": "run_cisco_download",
+      "file_type": "rationale",
+      "norm_label": "validate a client filename without silently rewriting path components.",
+      "source_file": "giso-webui/app.py",
+      "source_location": "L1073"
     },
     {
       "id": "staging_readme",
@@ -12072,7 +12132,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/cisco_download.py",
-      "source_location": "L213",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -12084,7 +12144,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/cisco_download.py",
-      "source_location": "L246",
+      "source_location": "L253",
       "weight": 1.0
     },
     {
@@ -13632,7 +13692,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L95",
+      "source_location": "L121",
       "weight": 1.0
     },
     {
@@ -13644,7 +13704,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L77",
+      "source_location": "L103",
       "weight": 1.0
     },
     {
@@ -13680,7 +13740,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L115",
+      "source_location": "L141",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_client",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L78",
       "weight": 1.0
     },
     {
@@ -17696,7 +17768,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L618",
+      "source_location": "L659",
       "weight": 1.0
     },
     {
@@ -17707,7 +17779,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L663",
+      "source_location": "L704",
       "weight": 1.0
     },
     {
@@ -17718,7 +17790,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L603",
+      "source_location": "L644",
       "weight": 1.0
     },
     {
@@ -17756,13 +17828,24 @@
     },
     {
       "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
-      "target": "docs_todo_07_bug_audit_todo_mandatory_docker_pull_makes_builds_depend_on_registry_availability_even_when_the_builder_image_is_already_cached",
+      "target": "docs_todo_07_bug_audit_todo_a_single_failed_archive_policy_cycle_crashed_the_maintenance_daemon_entirely_2026_09_16",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
       "source_location": "L496",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
+      "target": "docs_todo_07_bug_audit_todo_mandatory_docker_pull_makes_builds_depend_on_registry_availability_even_when_the_builder_image_is_already_cached",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L537",
       "weight": 1.0
     },
     {
@@ -17773,7 +17856,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L513",
+      "source_location": "L554",
       "weight": 1.0
     },
     {
@@ -17784,7 +17867,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L552",
+      "source_location": "L593",
       "weight": 1.0
     },
     {
@@ -17795,7 +17878,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L698",
+      "source_location": "L739",
       "weight": 1.0
     },
     {
@@ -17850,7 +17933,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L511",
+      "source_location": "L552",
       "weight": 1.0
     },
     {
@@ -17861,7 +17944,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L601",
+      "source_location": "L642",
       "weight": 1.0
     },
     {
@@ -17872,7 +17955,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L616",
+      "source_location": "L657",
       "weight": 1.0
     },
     {
@@ -17883,7 +17966,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L696",
+      "source_location": "L737",
       "weight": 1.0
     },
     {
@@ -17894,7 +17977,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L735",
+      "source_location": "L776",
       "weight": 1.0
     },
     {
@@ -19907,7 +19990,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L100",
+      "source_location": "L126",
       "weight": 1.0
     },
     {
@@ -19918,7 +20001,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L101",
+      "source_location": "L127",
       "weight": 1.0
     },
     {
@@ -19929,7 +20012,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L102",
+      "source_location": "L128",
       "weight": 1.0
     },
     {
@@ -19940,7 +20023,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L82",
+      "source_location": "L108",
       "weight": 1.0
     },
     {
@@ -19951,7 +20034,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L83",
+      "source_location": "L109",
       "weight": 1.0
     },
     {
@@ -19962,7 +20045,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L84",
+      "source_location": "L110",
       "weight": 1.0
     },
     {
@@ -19973,7 +20056,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L121",
+      "source_location": "L147",
       "weight": 1.0
     },
     {
@@ -19984,7 +20067,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L122",
+      "source_location": "L148",
       "weight": 1.0
     },
     {
@@ -19995,7 +20078,40 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L123",
+      "source_location": "L149",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten_enter",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L83",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten_exit",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L84",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten_read",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L85",
       "weight": 1.0
     },
     {
@@ -22816,13 +22932,24 @@
     },
     {
       "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests",
-      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_redirect_is_revalidated_before_download",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_partial_file_is_removed_after_size_mismatch",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L113",
+      "source_location": "L102",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_interrupted_download_is_redacted_and_partial_file_is_removed",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
@@ -22834,6 +22961,17 @@
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
       "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_redirect_is_revalidated_before_download",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/tests/test_cisco_download.py",
+      "source_location": "L139",
       "weight": 1.0
     },
     {
@@ -22904,24 +23042,13 @@
     },
     {
       "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests",
-      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_partial_file_is_removed_after_size_mismatch",
+      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_stale_partial_file_from_a_previous_crashed_attempt_is_overwritten",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_cisco_download.py",
       "source_location": "L76",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_tests_test_cisco_download_ciscodownloadtests",
-      "target": "giso_webui_tests_test_cisco_download_ciscodownloadtests_test_interrupted_download_is_redacted_and_partial_file_is_removed",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L94",
       "weight": 1.0
     },
     {
@@ -24231,7 +24358,7 @@
       "confidence_score": 0.85,
       "context": "assignment",
       "source_file": "giso-webui/tests/test_cisco_download.py",
-      "source_location": "L138",
+      "source_location": "L164",
       "weight": 1.0
     },
     {
@@ -24314,5 +24441,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "6798e4bf870be3afe3912cb77b0daeeefd59f2ee"
+  "built_at_commit": "99425ce05af3a4be4a418608de270fb16d3cb429"
 }
