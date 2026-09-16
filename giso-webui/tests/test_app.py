@@ -1641,6 +1641,22 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("database", payload)
         self.assertIn("disk", payload)
 
+    def test_storage_reports_real_disk_and_archive_usage(self):
+        archive_dir = module.ARCHIVE / "job-1"
+        archive_dir.mkdir(parents=True)
+        (archive_dir / "golden.iso").write_bytes(b"x" * 1000)
+
+        payload = self.client.get("/api/storage").get_json()
+
+        self.assertEqual(payload["archive_used_bytes"], 1000)
+        self.assertEqual(payload["archive_quota_bytes"], module.MAX_ARCHIVE_BYTES)
+        self.assertEqual(payload["archive_retention_days"], module.ARCHIVE_RETENTION_DAYS)
+        self.assertEqual(payload["disk_free_bytes"], 100 * 1024**3)
+
+    def test_storage_reports_zero_archive_usage_before_any_archive_exists(self):
+        payload = self.client.get("/api/storage").get_json()
+        self.assertEqual(payload["archive_used_bytes"], 0)
+
     @patch("app.subprocess.Popen")
     def test_image_pull_timeout_marks_build_failed(self, popen):
         pull = MagicMock()

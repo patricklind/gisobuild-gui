@@ -134,8 +134,17 @@ container — `/api/version` returned the actual pinned
 engine ciscogisobuild/cisco-xr-gisobuild:2.3.4 @ 0388af2" in a browser.
 
 This answers `docs/AI-MASTER-PROMPT.md` section 18's "GISO Build Engine
-version" ask directly; the fuller section 37 admin/system page (build
-worker status, storage usage, required-binary checks) remains open.
+version" ask directly. Storage usage (section 37/45) is also now answered:
+`GET /api/storage` returns free disk space and archive quota usage, shown
+as "Archive: X of 50 GiB used · Y GiB free on the upload volume" in the
+GISO Archive panel (`loadStorage()` in `giso-webui/static/app.js`),
+refreshed on load, after a build completes, after workspace cleanup, and
+on manual archive refresh. Verified by
+`test_storage_reports_real_disk_and_archive_usage` and
+`test_storage_reports_zero_archive_usage_before_any_archive_exists` in
+`giso-webui/tests/test_app.py`, and live against the real container.
+The fuller section 37 admin/system page (build worker status,
+required-binary checks) remains open.
 
 ## Representative eXR families
 

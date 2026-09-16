@@ -1533,6 +1533,24 @@ def ready():
     return jsonify(ok=is_ready, **checks), 200 if is_ready else 503
 
 
+@app.get("/api/storage")
+def storage():
+    """Operator-facing storage visibility (AI-MASTER-PROMPT.md section 37/45).
+
+    A read, not a mutation, so - like archive_download() - this does not
+    take cross_process_archive_lock(): a transiently stale number during a
+    concurrent archive write is harmless for a usage display and self
+    corrects on the next poll.
+    """
+    archive_used = archive_size(ARCHIVE) if ARCHIVE.is_dir() else 0
+    return jsonify(
+        disk_free_bytes=shutil.disk_usage(DATA).free,
+        archive_used_bytes=archive_used,
+        archive_quota_bytes=MAX_ARCHIVE_BYTES,
+        archive_retention_days=ARCHIVE_RETENTION_DAYS,
+    )
+
+
 def gisobuild_commit() -> str | None:
     """Best-effort short git commit of the mounted .gisobuild-tool checkout.
 

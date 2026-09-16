@@ -411,6 +411,16 @@ function updatePlatformControls() {
   updateBuildAvailability();
 }
 
+async function loadStorage() {
+  try {
+    const usage = await api('/api/storage');
+    const archiveGb = (usage.archive_used_bytes / 1073741824).toFixed(1);
+    const quotaGb = (usage.archive_quota_bytes / 1073741824).toFixed(0);
+    const freeGb = (usage.disk_free_bytes / 1073741824).toFixed(1);
+    $('#storage-usage').textContent = `Archive: ${archiveGb} of ${quotaGb} GiB used · ${freeGb} GiB free on the upload volume`;
+  } catch { /* Storage usage is diagnostic only; a missing line is not an error. */ }
+}
+
 async function loadArchive() {
   try {
     const items = await api('/api/archive');
@@ -667,7 +677,7 @@ async function poll() {
       link.append(name, size); artifacts.appendChild(link);
     });
     renderBuildReport(job);
-    if (['running','queued','cancelling'].includes(job.status)) pollTimer = setTimeout(poll, 1500); else { await loadInputs(); await loadArchive(); }
+    if (['running','queued','cancelling'].includes(job.status)) pollTimer = setTimeout(poll, 1500); else { await loadInputs(); await loadArchive(); await loadStorage(); }
   } catch (error) {
     $('#friendly-status').textContent = `Status temporarily unavailable: ${error.message}. Retrying…`;
     pollTimer = setTimeout(poll, 3000);
@@ -801,7 +811,7 @@ const drop = $('#drop-zone');
 ['dragleave','drop'].forEach(name => drop.addEventListener(name, event => { event.preventDefault(); drop.classList.remove('drag'); }));
 drop.addEventListener('drop', event => uploadFiles(event.dataTransfer.files));
 $('#refresh').onclick = loadInputs;
-$('#refresh-archive').onclick = loadArchive;
+$('#refresh-archive').onclick = () => { loadArchive(); loadStorage(); };
 $('#general-guide').onclick = () => openUpgradeGuide('GOLDEN-ISO.iso');
 $('#rollback-guide-button').onclick = () => { updateRollbackWorkflow(); $('#rollback-guide').showModal(); };
 $('#close-guide').onclick = () => $('#upgrade-guide').close();
@@ -829,7 +839,7 @@ $('#cleanup').onclick = async () => {
     $('#friendly-status').textContent = 'Workspace files and expired diagnostic links were cleared. Archived ISO and USB files are unchanged.';
     $('#cancel-build').hidden = true;
     await showNotice('Workspace cleanup complete', `${result.removed_items} items (${mb} MB) removed and ${result.cleared_artifacts || 0} expired download links cleared.\n\nUploads: ${areas.uploads || 0} · Work: ${areas.work || 0} · Raw output: ${areas.output || 0}\nCompleted archive files were kept.`);
-    currentJob = null; pollActivity();
+    currentJob = null; pollActivity(); loadStorage();
   } catch (error) { await showNotice('Could not clear workspace', error.message); }
 };
 $('#copy-log').onclick = () => copyText($('#log').textContent, $('#copy-log'), 'Copy log');
@@ -859,4 +869,4 @@ updateCompatibilityMode();
 updatePackageSelectionMode();
 
 api('/api/cisco/config').then(config => { $('#cisco-download').hidden = !config.enabled; }).catch(() => {});
-health(); loadVersion(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();
+health(); loadVersion(); loadStorage(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();
