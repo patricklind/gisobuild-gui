@@ -267,7 +267,7 @@ def recommend_smu_selection(
         missing = "platform" if not iso_platform else "release"
         return {"ready": False, "selected": [], "excluded": [], "package_groups": [],
                 "component_conflicts": [], "architectures": [], "iso_architectures": [],
-                "iso": iso_name,
+                "warnings": [], "iso": iso_name,
                 "message": f"The ISO {missing} could not be detected; select it in Expert settings"}
 
     for package in sorted(set(packages)):
@@ -305,6 +305,7 @@ def recommend_smu_selection(
         "component_conflicts": analysis["component_conflicts"],
         "architectures": analysis["architectures"],
         "iso_architectures": analysis["iso_architectures"],
+        "warnings": analysis["warnings"],
         "message": (
             f"Selected {len(selected)} matching RPMs; Cisco gisobuild will resolve dependencies "
             "and supersedence from the complete matching repository"

@@ -152,8 +152,11 @@ function applySmuRecommendation(plan) {
   message.textContent=plan.message;
   const details=$('#smu-plan-details'); details.replaceChildren();
   if (plan.ready) {
+    const profile=platformProfiles.find(item=>item.id === plan.platform);
     const flow=document.createElement('div'); flow.className='smu-plan-flow';
-    [['Base ISO',plan.iso],['Platform',String(plan.platform || '').toUpperCase()],['IOS XR',plan.release],['Selected',`${plan.selected.length} RPMs`]].forEach(([label,value],index)=>{
+    [['Base ISO',plan.iso],['Platform',String(plan.platform || '').toUpperCase()],
+     ['Engine',profile ? profile.architecture.toUpperCase() : '—'],
+     ['IOS XR',plan.release],['Selected',`${plan.selected.length} RPMs`]].forEach(([label,value],index)=>{
       if (index) { const arrow=document.createElement('span'); arrow.setAttribute('aria-hidden','true'); arrow.textContent='→'; flow.appendChild(arrow); }
       const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label; const strong=document.createElement('b'); strong.textContent=value; step.append(small,strong); flow.appendChild(step);
     });
@@ -171,6 +174,12 @@ function applySmuRecommendation(plan) {
       const heading=document.createElement('b'); heading.textContent='Overlapping fixes detected'; conflicts.appendChild(heading);
       plan.component_conflicts.forEach(item=>{const row=document.createElement('p'); row.textContent=`${item.component}: ${item.cscs.join(' + ')}. ${item.reason}`; conflicts.appendChild(row);});
       details.appendChild(conflicts);
+    }
+    if (plan.warnings?.length) {
+      const warnings=document.createElement('div'); warnings.className='smu-relationship-warning';
+      const heading=document.createElement('b'); heading.textContent='Review before building'; warnings.appendChild(heading);
+      plan.warnings.forEach(text=>{const row=document.createElement('p'); row.textContent=text; warnings.appendChild(row);});
+      details.appendChild(warnings);
     }
   }
   if (plan.excluded?.length) {

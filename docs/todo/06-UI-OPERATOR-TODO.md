@@ -14,48 +14,112 @@ The UI should immediately answer:
 
 ### Step 1 — Files
 
-- [ ] drag/drop ISO
-- [ ] drag/drop TAR/RPM/SMU
-- [ ] Cisco download integration
-- [ ] automatic analysis starts immediately
+- [x] drag/drop ISO — `#drop-zone` in `giso-webui/static/app.js` accepts any
+      dropped file via `uploadFiles(event.dataTransfer.files)`; the backend
+      accepts `.iso` in `upload_init()`.
+- [x] drag/drop TAR/RPM/SMU — same drop handler; `.rpm`/`.tar`/`.tgz` are all
+      in `upload_init()`'s allowed extension set, and `.tar`/`.tgz` are
+      auto-extracted server-side in `upload_complete()`.
+- [x] Cisco download integration — `#cisco-search-form`/`#cisco-results-form`/
+      `#cisco-accept` in `app.js`, backed by `/api/cisco/search`,
+      `/api/cisco/downloads`, and `/api/cisco/downloads/<id>/accept`.
+- [x] automatic analysis starts immediately — `renderInputs()` calls
+      `applySmuRecommendation(data.recommendation)` on every `loadInputs()`,
+      and `uploadFile()` calls `loadInputs()` right after each upload
+      completes, with no operator action required in between.
 
 ### Step 2 — Review BuildPlan
 
 Show:
 
-- [ ] ISO
-- [ ] release
-- [ ] engine
-- [ ] platform
-- [ ] confidence/source
-- [ ] CSC groups
-- [ ] excluded packages
-- [ ] warnings
-- [ ] blockers
-- [ ] expected output
-- [ ] free disk estimate
+- [x] ISO — `smu-plan-flow` "Base ISO" field.
+- [x] release — `smu-plan-flow` "IOS XR" field.
+- [x] engine — added 2026-09-16: the flow now looks up the platform's
+      `architecture` from `/api/platforms` and shows an "Engine" field
+      (EXR/LNT) alongside Platform; previously this was only shown in the
+      final "Start build?" confirmation dialog, not during ongoing review.
+- [x] platform — `smu-plan-flow` "Platform" field.
+- [x] confidence/source — see "Confidence display" below.
+- [x] CSC groups — `smu-groups`/`csc-grid` section.
+- [x] excluded packages — `excluded` `<details>` list, each with its reason.
+- [x] warnings — fixed 2026-09-16: `recommend_smu_selection()` in
+      `giso-webui/platform_validation.py` computed
+      `validate_smu_selection()`'s `warnings` (e.g. "Filename checks cannot
+      prove RPM dependencies; Cisco gisobuild performs the authoritative
+      dependency check", or "supersedence data is required" for a
+      multi-fix-per-component conflict) but never included them in its
+      return value, so the automatic-selection preview used by `discover()`
+      and `/api/smu/recommendation` — the actual default workflow — silently
+      dropped every warning; only the separately-triggered, manually-run
+      "Check compatibility" tool (`/api/compatibility`) ever showed them.
+      Now rendered as a "Review before building" box in `app.js`. Verified
+      by `test_automatic_selection_surfaces_dependency_check_warning` in
+      `giso-webui/tests/test_platform_compatibility.py`, and confirmed live:
+      uploaded a matching ISO+RPM pair to the running container and saw the
+      warning render in a real browser.
+- [ ] blockers — the persistent Step 2 panel shows `plan.message` (a single
+      string) when automatic selection can't proceed, but the richer,
+      itemized `blockers` array that `/api/build-plan` computes (e.g. a
+      specific architecture mismatch, a stale-plan fingerprint conflict) is
+      only ever seen at the final "Start build" confirmation, not during
+      ongoing review. `discover()`/`/api/smu/recommendation` return
+      `recommend_smu_selection()`'s shape, which has no `blockers` field at
+      all — closing this gap means either calling `/api/build-plan` from the
+      Review step too, or adding an equivalent field there.
+- [ ] expected output — `expected_outputs` (ISO/USB) exists only in the
+      `/api/build-plan` response, shown only in the final confirmation
+      dialog text, not persistently during Step 2.
+- [ ] free disk estimate — not implemented anywhere; no endpoint currently
+      returns a projected build-output size versus available space (the
+      backend only ever compares against `MIN_FREE_BYTES` internally when
+      actually starting an upload/build/extraction, never exposes the
+      numbers to the UI ahead of time).
 
 ### Step 3 — Build
 
-- [ ] clear progress
-- [ ] current phase
-- [ ] cancellation
-- [ ] friendly error
-- [ ] technical details collapsed by default
-- [ ] artifact download
-- [ ] checksums
-- [ ] build report
+- [x] clear progress — `#build-progress`/`#build-percent`, driven by real log
+      milestones (`append_log()`'s `milestones` table in `giso-webui/app.py`),
+      not a fake animation.
+- [x] current phase — `#build-phase`, set from `job.phase`.
+- [x] cancellation — `#cancel-build`, backed by `DELETE /api/jobs/<id>`.
+- [x] friendly error — `#friendly-status` gives a plain-language message per
+      job status (interrupted/failed/cancelled/success/running).
+- [x] technical details collapsed by default — `<details class="technical-log">`
+      in `giso-webui/templates/index.html` has no `open` attribute, so the
+      raw build log is closed until the operator clicks "Show technical
+      details".
+- [x] artifact download — `#artifacts` links built from `job.artifacts`.
+- [x] checksums — not shown inline on the job-completion card itself, but
+      `loadArchive()` runs automatically right after a build finishes
+      (`poll()`'s terminal branch) and each archived file has a "Show MD5 /
+      SHA-256" button (`/api/archive/<job>/<name>/checksums`).
+- [ ] build report — no dedicated report view exists; the raw build log,
+      the artifact list, and (when "Create checksums" is enabled)
+      gisobuild's own `checksums.json` as a downloadable artifact are the
+      only pieces today. A structured, human-readable build summary (what
+      was included, what was excluded and why, final checksums, elapsed
+      time) is not implemented.
 
 ## Automatic by default
 
 Do not ask for these unless ambiguous:
 
-- [ ] platform
-- [ ] architecture
-- [ ] target release
-- [ ] repo path
-- [ ] package list
-- [ ] build engine
+- [x] platform — `infer_platform()` from the ISO filename; the platform
+      `<select>` is only meant to be touched when detection fails (see
+      `test_unknown_iso_requires_platform_selection`).
+- [x] architecture — `inspect_iso_architecture()` reads it from the ISO's
+      own contents; never asked.
+- [x] target release — `updateAutomaticTargetRelease()` auto-fills from the
+      ISO filename and tracks whether the operator manually overrode it, so
+      it only stays put once touched intentionally.
+- [x] repo path — `auto_repo: true` is the default; `build_command()` stages
+      selected RPMs into a repo directory automatically instead of asking
+      for one.
+- [x] package list — "Automatic — recommended" is the `checked` default
+      radio in `giso-webui/templates/index.html`; manual package selection
+      is the opt-in alternative.
+- [x] build engine — derived from the detected/selected platform
+      (`platform_profile()["engine"]`); never asked directly.
 
 ## Expert settings
 

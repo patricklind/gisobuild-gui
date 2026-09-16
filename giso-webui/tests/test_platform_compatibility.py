@@ -65,6 +65,21 @@ class PlatformCompatibilityTests(unittest.TestCase):
                          {"Different IOS XR release", "Different platform",
                           "Platform is missing from filename"})
 
+    def test_automatic_selection_surfaces_dependency_check_warning(self):
+        # validate_smu_selection() always warns that filename checks cannot
+        # prove RPM dependencies once at least one RPM was checked, but
+        # recommend_smu_selection() computed that analysis and then silently
+        # dropped its "warnings" key from the response - the operator-facing
+        # automatic-selection preview (discover()/api/smu/recommendation)
+        # never surfaced it, only the separately-triggered /api/compatibility
+        # checker did.
+        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
+            "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+        ])
+        self.assertTrue(result["ready"])
+        self.assertTrue(any("authoritative dependency check" in warning
+                            for warning in result["warnings"]))
+
     def test_automatic_selection_refuses_to_guess_unknown_iso_release(self):
         result = recommend_smu_selection("ncs5500-mini-x.iso", [
             "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
