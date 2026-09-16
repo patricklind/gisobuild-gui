@@ -58,7 +58,7 @@ cd giso-webui
 cp .env.example .env
 docker compose up --build -d
 docker compose ps
-curl --fail http://127.0.0.1:8080/api/health
+curl --fail http://127.0.0.1:8080/api/ready
 ```
 
 Open <http://127.0.0.1:8080> and upload the Cisco base ISO and relevant update

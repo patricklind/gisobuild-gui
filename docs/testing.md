@@ -34,6 +34,7 @@ branch prefixes are never selected by this automation.
 ```bash
 docker compose -f giso-webui/compose.yaml up --build -d
 curl --fail http://127.0.0.1:8080/api/health
+curl --fail http://127.0.0.1:8080/api/ready
 curl --fail http://127.0.0.1:8080/api/platforms
 docker compose -f giso-webui/compose.yaml ps
 ```

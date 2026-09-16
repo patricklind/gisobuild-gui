@@ -112,18 +112,37 @@ Return:
 
 ## Health and readiness
 
+Implemented: `/api/health` and `/api/ready` are now separate endpoints in
+`giso-webui/app.py`. Previously a single `/api/health` conflated liveness
+with dependency readiness, so a Docker/storage/tool hiccup looked like a
+crashed process to an orchestrator. The Dockerfile `HEALTHCHECK` now points
+at `/api/ready` (the container-restart-worthy check); `/api/health` is for a
+liveness probe that should not trigger a restart on its own. Verified by
+`test_health_is_pure_liveness_and_ignores_dependency_state` and
+`test_ready_reports_database_and_disk_checks` in `giso-webui/tests/test_app.py`,
+run inside the built container image, plus a live smoke test
+(`curl /api/health` → `200` always; `curl /api/ready` → `503` with per-check
+detail when a dependency, here the missing `.gisobuild-tool` checkout, is
+unavailable).
+
 ### `/api/health`
 
-- [ ] process alive
+- [x] process alive
 
 ### `/api/ready`
 
-- [ ] storage
-- [ ] gisobuild
-- [ ] binaries
-- [ ] DB/state
-- [ ] free disk
-- [ ] no fatal startup error
+- [x] storage
+- [x] gisobuild (checked via `TOOL/src/gisobuild.py`; this is the *current*
+      external-checkout model, not the bundled runtime the self-contained
+      image TODO targets)
+- [x] binaries (`docker info` — the only external binary the current
+      Docker-socket-based build runner depends on)
+- [x] DB/state (`SELECT 1` against `JOB_DB`)
+- [x] free disk (`shutil.disk_usage(DATA).free >= MIN_FREE_BYTES`, the same
+      threshold already used before uploads/extraction)
+- [ ] no fatal startup error (there is no dedicated startup-error flag to
+      report yet; a truly fatal startup error currently prevents the process
+      from serving requests at all, so `/api/ready` never gets called at all)
 
 ## Startup self-test
 

@@ -11,6 +11,7 @@ cp giso-webui/.env.example giso-webui/.env
 docker compose -f giso-webui/compose.yaml up --build -d
 docker compose -f giso-webui/compose.yaml ps
 curl --fail http://127.0.0.1:8080/api/health
+curl --fail http://127.0.0.1:8080/api/ready
 ```
 
 Expected services:
@@ -33,10 +34,15 @@ technical-details panel reads the same persistent activity stream for upload,
 extraction, build, and cleanup events. Cisco artifact names are replaced with
 `[artifact]`; request payloads and configuration content are omitted.
 
-The Web UI health check returns HTTP 503 when Docker, required storage mounts,
-or the local `gisobuild` tool entry point is unavailable. Image pulls are
-bounded by `GISO_PULL_TIMEOUT_SECONDS` (600 seconds by default); a timeout marks
-the job failed and preserves uploaded inputs for diagnosis or retry.
+`/api/health` reports only whether the process itself is alive (always `200`
+once the server is up) and is what the container `HEALTHCHECK` and an
+orchestrator's restart policy should watch. `/api/ready` returns HTTP 503 when
+Docker, required storage mounts, the state database, free disk space, or the
+local `gisobuild` tool entry point is unavailable — use it to decide whether
+to route traffic or investigate a degraded-but-alive container, not whether to
+restart it. Image pulls are bounded by `GISO_PULL_TIMEOUT_SECONDS` (600
+seconds by default); a timeout marks the job failed and preserves uploaded
+inputs for diagnosis or retry.
 
 The application accepts one build at a time. A separate maintenance service
 removes complete archives older than 30 days and then removes the oldest
@@ -90,7 +96,8 @@ licensed and protected appropriately. Test restore procedures periodically.
 
 | Symptom | Check | Safe action |
 | --- | --- | --- |
-| Health endpoint fails | `docker info`, `/tool/src/gisobuild.py`, mounted storage, and web logs | Restore the failed dependency; do not expose the service remotely |
+| `/api/ready` fails | `docker info`, `/tool/src/gisobuild.py`, mounted storage, the state database, free disk space, and web logs | Restore the failed dependency; do not expose the service remotely |
+| `/api/health` fails | Container/process state and web logs | The process itself is down or unresponsive; restart the service |
 | Build will not start | Active jobs/uploads and `giso-build-*` containers | Wait, cancel the active upload, or investigate the surviving build container before cleanup |
 | Job is `interrupted` | Saved log and Docker container list | Reconcile the old container; do not assume the build failed cleanly |
 | Upload rejected | Extension, configured limits, and free space | Correct the input or increase a reviewed limit |
