@@ -157,13 +157,43 @@ Protect against:
 
 Every event should support:
 
-- [ ] request_id
-- [ ] job_id
-- [ ] inventory_revision
-- [ ] plan_fingerprint
-- [ ] event
-- [ ] duration
-- [ ] result
+- [x] event — every `log_event()` call names itself (`build_started`,
+      `http_request`, `upload_completed`, ...); it's the log line's own
+      `event=` field.
+- [x] request_id — `after_request` in `giso-webui/app.py` logs
+      `event=http_request ... request_id=<id>` for every HTTP request
+      (echoed back as the `X-Request-ID` response header too); verified by
+      `test_request_log_uses_endpoint_and_safe_correlation_id`. Background
+      job events (`build_started`, etc.) have no HTTP request to hang a
+      request_id off of — `job_id` is their correlating key instead, which
+      is a genuine difference in kind, not a gap.
+- [x] job_id — every job/upload/download-lifecycle `log_event()` call
+      already passes it (`build_started`, `build_progress`,
+      `build_finished`, `build_cancelled`, `build_failed`,
+      `build_setup_failed`, `upload_started`, `cisco_download_completed`,
+      ...).
+- [x] inventory_revision / plan_fingerprint — added 2026-09-16.
+      `create_job()` already computed both per `create_build_plan()`'s
+      immutable BuildPlan, but they weren't on the build-lifecycle log
+      events themselves, only inside job state — so a log-based audit
+      trail couldn't tie a given build's logs back to the exact inventory
+      snapshot and BuildPlan it ran against. `run_job()` now reads both
+      once from the job dict at entry and attaches them to
+      `build_started`/`build_finished`/`build_cancelled`/`build_failed`;
+      `build_setup_failed` (raised in `create_job()`, before `run_job()`
+      starts) gets them directly from the just-computed `plan`. Verified by
+      `test_build_events_are_logged_with_inventory_revision_and_plan_fingerprint`
+      in `giso-webui/tests/test_app.py`, which asserts on the real captured
+      log lines from a simulated successful build.
+- [x] duration — added 2026-09-16 alongside the above: `build_finished`,
+      `build_cancelled` and `build_failed` now log `duration_ms` (wall
+      time since the job's `created` timestamp). `http_request` already
+      logged `elapsed_ms` for the same purpose on every HTTP request.
+- [x] result — `build_finished` already logs `status=` (`success`/
+      `failed`); `http_request` already logs `status=` (the HTTP status
+      code); `build_failed`/`build_setup_failed`/`cisco_search_failed`/
+      `cisco_download_failed`/`upload_archive_failed` already log
+      `error_type=`.
 
 ## Error taxonomy
 

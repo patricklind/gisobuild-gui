@@ -1777,6 +1777,29 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
     @patch("app.subprocess.Popen")
+    def test_build_events_are_logged_with_inventory_revision_and_plan_fingerprint(self, popen):
+        pull = MagicMock(returncode=0, args=[module.DOCKER_BIN, "pull"])
+        pull.communicate.return_value = ("", None)
+        job_dir = self.output / "job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+        build = SimpleNamespace(pid=123, stdout=[], wait=lambda: 0)
+        popen.side_effect = [pull, build]
+        module.jobs["job"] = {"id": "job", "status": "running", "created": time.time(),
+                              "updated": time.time(), "log": "", "progress": 3,
+                              "phase": "Preparing", "artifacts": [],
+                              "inventory_revision": "rev-1", "plan_fingerprint": "fp-1"}
+        with patch.object(module, "gisobuild_commit", return_value=None), \
+             self.assertLogs(module.app.logger.name, level="INFO") as captured:
+            module.run_job("job", [module.DOCKER_BIN, "run"])
+        log = "\n".join(captured.output)
+        self.assertIn("event=build_started", log)
+        self.assertIn("inventory_revision=rev-1", log)
+        self.assertIn("plan_fingerprint=fp-1", log)
+        self.assertIn("event=build_finished", log)
+        self.assertIn("duration_ms=", log)
+
+    @patch("app.subprocess.Popen")
     def test_image_pull_timeout_marks_build_failed(self, popen):
         pull = MagicMock()
         pull.communicate.side_effect = module.subprocess.TimeoutExpired(

@@ -1377,9 +1377,13 @@ def prepare_destructive_finalization(job_id: str) -> None:
 
 
 def run_job(job_id: str, command: list[str]) -> None:
+    with job_lock:
+        job_started = jobs[job_id]["created"]
+        build_log_context = {"inventory_revision": jobs[job_id].get("inventory_revision"),
+                             "plan_fingerprint": jobs[job_id].get("plan_fingerprint")}
     try:
         append_log(job_id, "$ " + shlex.join(command) + "\n\n")
-        log_event("build_started", job_id=job_id)
+        log_event("build_started", job_id=job_id, **build_log_context)
         log_event("image_pull_started", job_id=job_id)
         pull = subprocess.Popen(
             [DOCKER_BIN, "pull", "--platform", "linux/amd64", IMAGE],
@@ -1450,14 +1454,16 @@ def run_job(job_id: str, command: list[str]) -> None:
         if success:
             write_build_report(job_id, job_snapshot, artifacts)
         log_event("build_finished", exit_code=code, job_id=job_id,
-                  status="success" if success else "failed")
+                  status="success" if success else "failed",
+                  duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
     except BuildCancelled:
         with job_lock:
             job_processes.pop(job_id, None)
             jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
                                 updated=time.time())
         persist_job(job_id)
-        log_event("build_cancelled", job_id=job_id)
+        log_event("build_cancelled", job_id=job_id,
+                  duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
     except Exception as exc:  # noqa: BLE001 - background failures must update job state
         append_log(job_id, f"\nERROR: {exc}\n")
         with job_lock:
@@ -1474,7 +1480,8 @@ def run_job(job_id: str, command: list[str]) -> None:
                     updated=time.time(),
                 )
         persist_job(job_id)
-        log_event("build_failed", error_type=type(exc).__name__, job_id=job_id)
+        log_event("build_failed", error_type=type(exc).__name__, job_id=job_id,
+                  duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
 
 
 @app.get("/")
@@ -2262,7 +2269,8 @@ def create_job():
         except Exception as exc:  # noqa: BLE001 - setup failures become a stable API error
             with job_lock:
                 jobs.pop(job_id, None)
-            log_event("build_setup_failed", error_type=type(exc).__name__, job_id=job_id)
+            log_event("build_setup_failed", error_type=type(exc).__name__, job_id=job_id,
+                      inventory_revision=plan["inventory_revision"], plan_fingerprint=plan["fingerprint"])
             return jsonify(error="Build setup failed; inspect the service log using the request ID"), 503
         with job_lock:
             jobs[job_id].update(status="running", progress=3, phase="Preparing build container",
