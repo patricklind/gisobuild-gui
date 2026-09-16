@@ -247,16 +247,29 @@ async function refreshSmuRecommendation() {
 
 function updateBuildAvailability() {
   const yamlMode = $('[name=mode]:checked').value === 'yaml';
+  const button = $('#start-build');
+  if (yamlMode) {
+    const ready = Boolean($('[name=yamlfile]').value.trim());
+    button.disabled = !ready;
+    button.textContent = ready ? 'Start build' : 'Waiting for a YAML file…';
+    return;
+  }
   const customFiles = ['xrconfig','ztp_ini','script','key_request','ownership_vouchers','ownership_certificate']
     .some(name => $(`[name=${name}]`).value.trim());
   const packageUpdates = selectedPackages().length > 0;
   const otherChanges = customFiles || packageUpdates || lines($('[name=bridging_fixes]').value).length > 0 ||
     lines($('[name=remove_packages]').value).length > 0;
-  const ready = yamlMode
-    ? Boolean($('[name=yamlfile]').value.trim())
-    : Boolean(($('[name=iso_override]').value || $('[name=iso]').value) && otherChanges);
-  const button = $('#start-build'); button.disabled = !ready;
-  button.textContent = ready ? 'Start build' : `Waiting for ${yamlMode ? 'a YAML file' : 'an ISO and a customization'}…`;
+  const hasIso = Boolean($('[name=iso_override]').value || $('[name=iso]').value);
+  const ready = hasIso && otherChanges;
+  button.disabled = !ready;
+  // Naming exactly what's still missing, rather than always "an ISO and a
+  // customization", matters once one of the two is already satisfied - an
+  // operator who already uploaded an ISO and just needs to add a package
+  // should not be told to wait for "an ISO" too.
+  button.textContent = ready ? 'Start build'
+    : !hasIso && !otherChanges ? 'Waiting for an ISO and a customization…'
+    : !hasIso ? 'Waiting for an ISO…'
+    : 'Waiting for a customization (packages, config files, or bridging fixes)…';
 }
 
 function fileRow(label, value) {

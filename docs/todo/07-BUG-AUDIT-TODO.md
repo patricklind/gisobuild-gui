@@ -57,6 +57,35 @@ fixed a second bug while verifying the first: the initial version called
 before any of this new detail could render, collapsing every failure back
 into the old generic message — only actually testing it live surfaced this.
 
+### The "Start build" disabled hint could name a requirement that was already satisfied (2026-09-16)
+
+Current behavior (before this fix):
+
+`updateBuildAvailability()` in `giso-webui/static/app.js` always showed
+"Waiting for an ISO and a customization…" while the button was disabled in
+form mode, regardless of *which* of the two was actually missing. An
+operator who had already selected an ISO and just needed to add a package,
+config file or bridging fix was told the ISO was still missing too — a
+minor but real dishonesty in a hint whose entire purpose is telling the
+operator what to do next.
+
+TODO:
+
+- [x] Name exactly what is still missing: ISO only, customization only, or
+      both.
+
+Fix: split the disabled-button text into three specific messages based on
+`hasIso`/`otherChanges`, instead of one message covering all three
+"not ready" cases.
+
+Verified by `test_start_build_button_names_exactly_what_is_missing` in
+`giso-webui/tests/test_build_script.py`, and confirmed live in a browser
+(isolated throwaway container) through all three states: no ISO and no
+customization → "Waiting for an ISO and a customization…"; ISO present,
+no customization → "Waiting for a customization (packages, config files,
+or bridging fixes)…"; customization present, no ISO → "Waiting for an
+ISO…". Full suite green (207 tests); ruff and Graphify clean.
+
 ## P1 — Misconfiguration can silently destroy archived artifacts
 
 ### `ARCHIVE_RETENTION_DAYS`/`MAX_ARCHIVE_BYTES` were never validated (2026-09-16)

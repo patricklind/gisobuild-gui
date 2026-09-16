@@ -112,6 +112,18 @@ class BuildScriptTests(unittest.TestCase):
         self.assertNotIn("function renderManualPackages", app_script)
         self.assertNotIn('name="pkglist_override" rows=', template)
 
+    def test_start_build_button_names_exactly_what_is_missing(self):
+        # Previously the disabled hint always said "Waiting for an ISO and a
+        # customization", even once one of those two was already satisfied -
+        # an operator who had already uploaded an ISO and just needed to add
+        # a package was wrongly told the ISO was still missing too.
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        fn = script[script.index("function updateBuildAvailability()"):]
+        fn = fn[:fn.index("\n}\n")]
+        self.assertIn("Waiting for an ISO and a customization", fn)
+        self.assertIn("Waiting for an ISO…", fn)
+        self.assertIn("Waiting for a customization", fn)
+
     def test_manual_package_list_supports_compatible_and_selected_only_toggles(self):
         web_root = Path(__file__).parents[1]
         manual_script = (web_root / "static" / "manual-packages.js").read_text()
