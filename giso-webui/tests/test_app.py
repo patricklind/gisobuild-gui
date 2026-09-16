@@ -1230,6 +1230,51 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(job["plan_fingerprint"], job["build_plan"]["fingerprint"])
         self.assertEqual(job["inventory_revision"], job["build_plan"]["inventory_revision"])
 
+    def test_command_preview_strips_docker_wrapper_and_shows_basenames(self):
+        real_command = [
+            "/usr/bin/docker", "run", "--rm", "-v", "/home/alice/secret-project:/uploads:ro",
+            "-v", "giso-webui_giso-output:/output:rw", "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
+            "/tool/src/gisobuild.py", "--iso", "/uploads/base.iso",
+            "--pkglist", "/uploads/one/package.rpm", "--label", "MYLABEL",
+            "--out-directory", "/output/job-1", "--clean",
+        ]
+        preview = module.command_preview(real_command)
+        self.assertNotIn("docker", preview)
+        self.assertNotIn("/home/alice", preview)
+        self.assertNotIn("giso-webui_giso-output", preview)
+        self.assertTrue(preview.startswith("gisobuild.py --iso base.iso"))
+        self.assertIn("package.rpm", preview)
+        self.assertNotIn("/uploads", preview)
+
+    def test_command_preview_returns_empty_string_for_a_yaml_only_command(self):
+        # build_command() still points at gisobuild.py even for --yamlfile
+        # builds, so this only exercises the "script not found" fallback
+        # directly, since it can't otherwise occur from build_command().
+        self.assertEqual(module.command_preview(["docker", "run", "some-image"]), "")
+
+    @patch("app.run_job")
+    @patch("app.child_mount_args", return_value=[])
+    def test_created_job_exposes_a_safe_command_preview_but_not_the_real_command(self, _mounts, _run_job):
+        (self.data / "base.iso").write_bytes(b"iso")
+        rpm = self.data / "package.rpm"
+        rpm.write_bytes(b"rpm")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+
+        response = self.client.post("/api/jobs", json={
+            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        self.assertEqual(response.status_code, 202)
+        job_id = response.get_json()["id"]
+        api_job = self.client.get(f"/api/jobs/{job_id}").get_json()
+        self.assertIn("command_preview", api_job)
+        self.assertTrue(api_job["command_preview"].startswith("gisobuild.py --iso base.iso"))
+        self.assertNotIn("command", api_job)
+        internal_job = module.jobs[job_id]
+        self.assertIn("command", internal_job)
+        self.assertEqual(internal_job["command_preview"], api_job["command_preview"])
+
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
     def test_cleanup_paths_do_not_include_an_unselected_duplicate_basename(self, _mounts, _run_job):

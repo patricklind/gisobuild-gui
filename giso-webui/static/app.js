@@ -619,6 +619,15 @@ function renderBuildReport(job) {
     checksums.append(summary,list); body.appendChild(checksums);
   }
 
+  if (job.command_preview) {
+    const commandDetails=document.createElement('details');
+    const summary=document.createElement('summary'); summary.textContent='Show generated gisobuild command';
+    const pre=document.createElement('pre'); pre.className='command-preview'; pre.textContent=job.command_preview;
+    const copy=document.createElement('button'); copy.type='button'; copy.className='secondary small';
+    copy.textContent='Copy command'; copy.onclick=()=>copyText(job.command_preview, copy, 'Copy command');
+    commandDetails.append(summary,pre,copy); body.appendChild(commandDetails);
+  }
+
   if (plan.selected_csc_groups?.length) {
     const groups=document.createElement('section'); groups.className='smu-groups';
     const heading=document.createElement('h4'); heading.textContent='Fixes included'; groups.appendChild(heading);

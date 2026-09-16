@@ -106,6 +106,24 @@ Show:
       voucher/certificate mismatch warning above). Confirmed by injecting a
       realistic `build_plan` shape into the running page in a browser and
       verifying every section rendered correctly.
+- [x] generated command preview (`docs/AI-MASTER-PROMPT.md` section 10) —
+      added 2026-09-16 alongside the build report: a "Show generated
+      gisobuild command" `<details>` with a copy button. The real `command`
+      list stays in `PRIVATE_JOB_FIELDS` — its `docker run ... -v <source>
+      ...` prefix can contain the real host filesystem path or Docker
+      volume name behind a bind mount, which is genuinely sensitive
+      deployment detail, not something a build operator needs. A new
+      `command_preview()` in `giso-webui/app.py` strips that prefix down to
+      the actual `gisobuild.py` invocation and shows each absolute
+      container path as its basename — accurate (the real arguments, not a
+      guess), matching section 10's own example shape. Stored as a new,
+      non-private `command_preview` job field, computed once at job
+      creation. Verified by
+      `test_command_preview_strips_docker_wrapper_and_shows_basenames` (a
+      synthetic real-looking command proving the docker wrapper, a fake
+      host path, and a fake Docker volume name are all absent from the
+      output) and `test_created_job_exposes_a_safe_command_preview_but_not_the_real_command`
+      in `giso-webui/tests/test_app.py`, and confirmed live in a browser.
 
 ## Automatic by default
 

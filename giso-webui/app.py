@@ -1275,6 +1275,32 @@ def build_command(payload: dict, job_id: str) -> list[str]:
     return command
 
 
+def command_preview(command: list[str]) -> str:
+    """Redacted, script-only view of the real build command for operator display.
+
+    docs/AI-MASTER-PROMPT.md section 10 asks operators be able to inspect
+    "the effective command" for troubleshooting/reproducing builds/TAC
+    cases, with "secrets or sensitive filesystem paths... masked where
+    appropriate". The real `command` list is never sent to the browser
+    (it's in PRIVATE_JOB_FIELDS) because its `docker run ... -v <source> ...`
+    prefix can contain the real host filesystem path or Docker volume name
+    behind a bind mount (see child_mount_args()) - genuinely sensitive
+    deployment detail, not something a build operator needs. This strips
+    that prefix entirely and keeps only the actual gisobuild.py invocation,
+    showing each absolute container path (e.g. "/uploads/foo.rpm") as just
+    its basename for readability - the same shape as a typical documented
+    gisobuild command line, and accurate, since these are the real
+    arguments, not a reconstruction.
+    """
+    try:
+        script_index = next(i for i, arg in enumerate(command) if arg.endswith("gisobuild.py"))
+    except StopIteration:
+        return ""
+    tail = ["gisobuild.py", *command[script_index + 1:]]
+    cleaned = [Path(arg).name if arg.startswith("/") else arg for arg in tail]
+    return shlex.join(cleaned)
+
+
 def glob_metacharacters(value: str) -> bool:
     return any(character in value for character in "*?[]")
 
@@ -2179,7 +2205,7 @@ def create_job():
             return jsonify(error="Build setup failed; inspect the service log using the request ID"), 503
         with job_lock:
             jobs[job_id].update(status="running", progress=3, phase="Preparing build container",
-                                command=command,
+                                command=command, command_preview=command_preview(command),
                                 cleanup_paths=[str(path) for path in cleanup_paths])
         with store_lock, sqlite3.connect(JOB_DB) as database:
             rows = database.execute(
