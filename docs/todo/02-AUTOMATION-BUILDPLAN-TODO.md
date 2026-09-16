@@ -70,14 +70,31 @@ Prefer metadata over filename parsing.
 
 ## TAR/TGZ handling
 
-- [ ] safe extraction
-- [ ] reject traversal
-- [ ] reject symlinks/hardlinks
-- [ ] expansion-size limit
-- [ ] member-count limit
-- [ ] source provenance
-- [ ] no duplicate extraction
-- [ ] automatically inventory extracted RPMs
+Two independent implementations share these rules: `upload_complete()` (an
+operator-uploaded `.tar`/`.tgz`) and `extract_cisco_archive()` (a
+Cisco-downloaded archive). Both are now covered.
+
+- [x] safe extraction (`test_chunked_upload_and_safe_tar_extraction`,
+      `test_cisco_archive_extraction_succeeds_for_a_safe_archive`)
+- [x] reject traversal (`test_tar_path_traversal_is_rejected`,
+      `test_cisco_archive_extraction_rejects_path_traversal`)
+- [x] reject symlinks/hardlinks (`test_tar_symlink_member_is_rejected`,
+      `test_tar_hardlink_member_is_rejected`,
+      `test_cisco_archive_extraction_rejects_symlink_members`)
+- [x] expansion-size limit (`test_tar_expansion_size_limit_is_enforced`;
+      `extract_cisco_archive()`'s equivalent `MAX_EXTRACTED_BYTES` check has
+      no dedicated test yet, only the upload path does)
+- [x] member-count limit — fixed 2026-09-16: `MAX_TAR_MEMBERS` had
+      protective code in both implementations but neither was ever
+      exercised by a test. Added `test_tar_member_count_limit_is_enforced`
+      and `test_cisco_archive_extraction_enforces_member_count_limit`.
+- [x] source provenance (`test_inventory_reports_extracted_from_source_archive`)
+- [x] no duplicate extraction (`test_reupload_does_not_overwrite_existing_extracted_directory`)
+- [x] automatically inventory extracted RPMs — `inventory_files()` walks all
+      of `DATA` recursively with no special-casing for extracted
+      directories, so an extracted RPM appears in `/api/inputs` the same as
+      an uploaded one; exercised indirectly by every test that places an
+      RPM inside a subdirectory (e.g. the duplicate-inventory tests).
 
 ## CSC grouping
 

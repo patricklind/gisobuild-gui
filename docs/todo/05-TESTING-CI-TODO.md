@@ -153,14 +153,19 @@ upload
 - [x] TAR traversal (`test_tar_path_traversal_is_rejected`; the protective
       code already existed, this section was just under-checked)
 - [x] symlink archive member (`test_tar_symlink_member_is_rejected`,
-      `test_tar_hardlink_member_is_rejected` — new, closing a real gap: the
-      rejection code existed in both `extract_cisco_archive()` and the
-      upload-completion TAR path, but nothing exercised it)
+      `test_tar_hardlink_member_is_rejected` for the upload path;
+      `test_cisco_archive_extraction_rejects_symlink_members` added
+      2026-09-16 to cover `extract_cisco_archive()`'s identical check
+      directly — until then that function had no test coverage at all)
 - [x] absolute path (`test_tar_absolute_path_member_is_rejected` — new)
 - [x] oversized expansion (`test_tar_expansion_size_limit_is_enforced` — new,
       covers `MAX_EXTRACTED_BYTES` directly; the pre-existing
       `test_tar_extraction_requires_reserved_free_space` only covered the
       separate free-disk-space guard)
+- [x] member-count limit — fixed 2026-09-16: `MAX_TAR_MEMBERS` existed in
+      both the upload path and `extract_cisco_archive()` but neither was
+      tested. Added `test_tar_member_count_limit_is_enforced` and
+      `test_cisco_archive_extraction_enforces_member_count_limit`.
 - [x] duplicate filename conflict
 - [x] malicious job/artifact path (`test_archive_delete_rejects_path_traversal`,
       `test_path_traversal_is_rejected`; pre-existing, just under-checked)

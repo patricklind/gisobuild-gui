@@ -599,3 +599,14 @@ TODO:
 - [x] discovery vs cleanup race
 - [x] target release refreshes when ISO changes
 - [x] Graphify freshness check
+- [x] `extract_cisco_archive()` tar safety (traversal, symlink, member-count,
+      happy path) — this function duplicates `upload_complete()`'s TAR
+      safety checks for the Cisco-download path but had zero test coverage
+      of its own until 2026-09-16:
+      `test_cisco_archive_extraction_rejects_path_traversal`,
+      `test_cisco_archive_extraction_rejects_symlink_members`,
+      `test_cisco_archive_extraction_enforces_member_count_limit`,
+      `test_cisco_archive_extraction_succeeds_for_a_safe_archive`
+- [x] TAR member-count limit is actually enforced, not just present in code
+      — `test_tar_member_count_limit_is_enforced` (upload path) and the
+      `extract_cisco_archive()` test above (Cisco-download path)

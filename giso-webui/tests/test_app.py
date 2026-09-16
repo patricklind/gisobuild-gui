@@ -313,6 +313,53 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("Links are not accepted", response.get_json()["error"])
         self.assertFalse((self.data / "unsafe-hardlink.tar").exists())
 
+    # extract_cisco_archive() duplicates upload_complete()'s tar safety checks
+    # for the Cisco-download path, but nothing exercised it directly - every
+    # test above only reaches upload_complete()'s copy of this logic.
+    def test_cisco_archive_extraction_rejects_path_traversal(self):
+        archive_path = self.data / "cisco-bundle.tar"
+        with tarfile.open(archive_path, "w") as archive:
+            info = tarfile.TarInfo("../escape.rpm")
+            info.size = 3
+            archive.addfile(info, io.BytesIO(b"rpm"))
+        with self.assertRaisesRegex(module.CiscoDownloadError, "unsafe path"):
+            module.extract_cisco_archive(archive_path)
+        self.assertFalse((self.data / "cisco-bundle").exists())
+
+    def test_cisco_archive_extraction_rejects_symlink_members(self):
+        archive_path = self.data / "cisco-symlink.tar"
+        with tarfile.open(archive_path, "w") as archive:
+            info = tarfile.TarInfo("link")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "/etc/passwd"
+            archive.addfile(info)
+        with self.assertRaisesRegex(module.CiscoDownloadError, "unsafe path"):
+            module.extract_cisco_archive(archive_path)
+        self.assertFalse((self.data / "cisco-symlink").exists())
+
+    def test_cisco_archive_extraction_enforces_member_count_limit(self):
+        archive_path = self.data / "cisco-many-members.tar"
+        with tarfile.open(archive_path, "w") as archive:
+            for index in range(3):
+                info = tarfile.TarInfo(f"package{index}.rpm")
+                info.size = 0
+                archive.addfile(info, io.BytesIO(b""))
+        with patch.object(module, "MAX_TAR_MEMBERS", 2), \
+                self.assertRaisesRegex(module.CiscoDownloadError, "too many files"):
+            module.extract_cisco_archive(archive_path)
+        self.assertFalse((self.data / "cisco-many-members").exists())
+
+    def test_cisco_archive_extraction_succeeds_for_a_safe_archive(self):
+        archive_path = self.data / "cisco-safe.tar"
+        with tarfile.open(archive_path, "w") as archive:
+            payload = b"rpm contents"
+            info = tarfile.TarInfo("package.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        extracted = module.extract_cisco_archive(archive_path)
+        self.assertEqual(extracted, 1)
+        self.assertEqual((self.data / "cisco-safe/package.rpm").read_bytes(), b"rpm contents")
+
     def test_tar_absolute_path_member_is_rejected(self):
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode="w") as archive:
@@ -338,6 +385,23 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("too large", response.get_json()["error"])
         self.assertFalse((self.data / "too-big.tar").exists())
+
+    def test_tar_member_count_limit_is_enforced(self):
+        # MAX_TAR_MEMBERS has protective code in upload_complete() but,
+        # unlike the size/traversal/symlink checks nearby, nothing exercised
+        # it - a tar bomb with many tiny/empty members would pass the byte
+        # size limit while still being expensive to iterate/extract.
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            for index in range(3):
+                info = tarfile.TarInfo(f"package{index}.rpm")
+                info.size = 0
+                archive.addfile(info, io.BytesIO(b""))
+        with patch.object(module, "MAX_TAR_MEMBERS", 2):
+            response = self.upload("too-many-members.tar", stream.getvalue())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("too many files", response.get_json()["error"])
+        self.assertFalse((self.data / "too-many-members.tar").exists())
 
     def test_tar_extraction_requires_reserved_free_space(self):
         stream = io.BytesIO()
