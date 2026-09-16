@@ -843,12 +843,21 @@ async function startCiscoDownload(imageGuids) {
   } else { pollCiscoDownload(); }
 }
 
+function applyCiscoResultsFilter() {
+  const query = $('#cisco-results-filter').value.trim().toLowerCase();
+  document.querySelectorAll('#cisco-results label').forEach(label => {
+    label.hidden = Boolean(query) && !label.dataset.name.includes(query);
+  });
+}
+$('#cisco-results-filter').addEventListener('input', applyCiscoResultsFilter);
+
 $('#cisco-search-form').addEventListener('submit', async event => {
   event.preventDefault();
   const submit = event.submitter; submit.disabled = true;
   const form = new FormData(event.target);
   $('#cisco-status').textContent = 'Authenticating and searching Cisco…';
   $('#cisco-results-form').hidden = true;
+  $('#cisco-results-filter').hidden = true;
   $('#cisco-agreement').hidden = true;
   try {
     const result = await api('/api/cisco/search', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid:form.get('pid'),current_release:form.get('current_release'),target_release:form.get('target_release')})});
@@ -856,11 +865,16 @@ $('#cisco-search-form').addEventListener('submit', async event => {
     const list = $('#cisco-results'); list.replaceChildren();
     result.images.forEach(image => {
       const label = document.createElement('label');
+      label.dataset.name=image.name.toLowerCase();
       const input = document.createElement('input'); input.type='checkbox'; input.name='image_guid'; input.value=image.guid;
       const text = document.createElement('span'); text.textContent=`${image.name} · ${image.release || 'release not supplied'} · ${(image.size/1048576).toFixed(1)} MB${image.entitlement ? ' · contract required' : ''}`;
       label.append(input,text); list.appendChild(label);
     });
     $('#cisco-results-form').hidden = result.images.length === 0;
+    const resultsFilter = $('#cisco-results-filter');
+    resultsFilter.hidden = result.images.length < 6;
+    resultsFilter.value = '';
+    applyCiscoResultsFilter();
     $('#cisco-status').textContent = result.images.length ? `Found ${result.images.length} files. Select up to five.` : 'Cisco returned no matching files.';
   } catch (error) { $('#cisco-status').textContent = error.message; }
   finally { submit.disabled = false; }

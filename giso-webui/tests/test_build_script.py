@@ -55,6 +55,23 @@ class BuildScriptTests(unittest.TestCase):
         filter_fn = filter_fn[:filter_fn.index("\n}\n")]
         self.assertIn("row.dataset.name.includes(query)", filter_fn)
 
+    def test_cisco_search_results_support_filtering_by_filename(self):
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        template = (Path(__file__).parents[1] / "templates" / "index.html").read_text()
+        self.assertIn('id="cisco-results-filter"', template)
+        # The filter must not live inside <form id="cisco-results-form">,
+        # which has its own submit button ("Download selected files") -
+        # pressing Enter while typing a filter would otherwise submit it.
+        form_start = template.index('id="cisco-results-form"')
+        filter_start = template.index('id="cisco-results-filter"')
+        self.assertLess(filter_start, form_start)
+        search_handler = script[script.index("$('#cisco-search-form').addEventListener"):]
+        self.assertIn("label.dataset.name=image.name.toLowerCase()", search_handler)
+        self.assertIn("applyCiscoResultsFilter()", search_handler)
+        filter_fn = script[script.index("function applyCiscoResultsFilter()"):]
+        filter_fn = filter_fn[:filter_fn.index("\n}\n")]
+        self.assertIn("label.dataset.name.includes(query)", filter_fn)
+
     def test_system_status_pill_uses_the_deep_readiness_check(self):
         # /api/health only proves the Flask process is responding; it does
         # not check Docker, the mounted gisobuild checkout, storage, the job

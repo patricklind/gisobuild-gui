@@ -354,6 +354,24 @@ read today.
       temp `ARCHIVE_ROOT`, never the shared persistent volumes) with 7
       fixture archived ISOs: typing "router-3" left exactly 1 of 7 visible,
       clearing the filter restored all 7.
-- [ ] Search/filter for the automatic-selection review or the Cisco search
-      results list — not implemented; only the manual package list and the
-      archive list have this today.
+- [x] Cisco search results filter by filename — added 2026-09-16, same
+      pattern again: `#cisco-results-filter` in
+      `giso-webui/templates/index.html`, shown once a search returns 6+
+      results. Deliberately placed as a sibling *before*
+      `<form id="cisco-results-form">`, not inside it — that form has its
+      own submit button ("Download selected files"), and an `<input
+      type="search">` inside a form submits on Enter by default, which
+      would have made pressing Enter while typing a filter accidentally
+      trigger a download request. Verified by
+      `test_cisco_search_results_support_filtering_by_filename` in
+      `giso-webui/tests/test_build_script.py` (asserts the filter element's
+      position in the raw HTML is before the form's, in addition to the
+      usual source-level function checks), and confirmed live in a browser
+      by injecting 6 fixture results (real Cisco search needs configured
+      API credentials this sandbox doesn't have) and calling the real
+      `applyCiscoResultsFilter()`: filtering by a CSC ID left exactly 1 of
+      6 visible, clearing restored all 6, and the filter element was
+      confirmed to sit outside the form in the live DOM.
+- [ ] Search/filter for the automatic-selection review list — not
+      implemented; the manual package list, archive list and Cisco search
+      results all have this now.

@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-16)
 
 ## Corpus Check
-- 49 files · ~62,998 words
+- 49 files · ~63,249 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 14 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 1)
 
 ## Summary
-- 832 nodes · 1304 edges · 55 communities (38 shown, 11 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 20 edges (avg confidence: 0.88)
+- 834 nodes · 1306 edges · 55 communities (38 shown, 11 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 21 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `3cc42cf1`
+- Built from commit: `9ea70f81`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -73,7 +73,7 @@
 4. `validate_smu_selection()` - 21 edges
 5. `CiscoSoftwareClient` - 19 edges
 6. `AI Master Prompt — Cisco IOS-XR GISO Build Web UI` - 18 edges
-7. `BuildScriptTests` - 16 edges
+7. `BuildScriptTests` - 17 edges
 8. `create_build_plan()` - 15 edges
 9. `recommend_smu_selection()` - 15 edges
 10. `api()` - 15 edges
@@ -249,14 +249,14 @@ Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked cod
 
 ## Knowledge Gaps
 - **229 isolated node(s):** `inputs`, `platformProfiles`, `CONFIDENCE_LABELS`, `READY_CHECK_LABELS`, `drop` (+224 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 442 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 444 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `IsoArchitectureInspectionTests`, `.test_discover_tolerates_file_removed_during_scan`, `.upload`, `dict`, `Path`?**
-  _High betweenness centrality (0.123) - this node is a cross-community bridge._
+  _High betweenness centrality (0.122) - this node is a cross-community bridge._
 - **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `run_cisco_download`, `app.py`?**
   _High betweenness centrality (0.029) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `CiscoDownloadError` (e.g. with `cisco_accept()` and `cisco_config()`) actually correct?**
