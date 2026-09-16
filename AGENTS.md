@@ -4,6 +4,104 @@ Every Codex session reads this file automatically. Follow this protocol before
 changing code. Multiple agents may work in this repository at the same time;
 these rules keep their branches and ownership boundaries explicit.
 
+## CRITICAL: Docker-only execution boundary
+
+This repository has a strict **Docker-only execution policy**.
+
+AI agents, developers, helper scripts, tests, build tools, Graphify, gisobuild,
+Python tooling, linters, package managers, dependency installers, database tools,
+and project automation MUST NOT execute directly on the user's local host OS.
+
+The local computer is only allowed to act as:
+
+- a Docker/Compose host;
+- a Git working-copy host;
+- an editor/client;
+- a browser/client for the Web UI.
+
+Everything that executes project code or project tooling must run inside a
+container.
+
+### Forbidden on the local host
+
+Never run or instruct the user to run project operations such as:
+
+- `python`, `python3`, `pip`, `pipx`, `pytest`, `ruff`, or Python scripts;
+- `npm`, `pnpm`, `yarn`, Node-based project tooling, or frontend build tools;
+- `rpm`, `dnf`, `yum`, `apt`, `apk`, `brew`, or other package installation for
+  project dependencies;
+- `gisobuild.py`, Cisco build tooling, ISO tools, RPM inspection tools, or GISO
+  generation;
+- Graphify or other code-analysis tooling;
+- project database migrations or maintenance commands;
+- project shell scripts whose implementation executes project logic on the host;
+- test suites, staging rehearsals, build validation, or release tooling.
+
+Do not modify host Python, Node, Ruby, Java, system packages, `/usr`, `/opt`,
+`/etc`, shell profiles, environment configuration, or other host state in order
+to make this project work.
+
+Do not use the user's workstation as a temporary substitute when a container is
+missing a dependency. Fix the Docker image instead.
+
+### Allowed host commands
+
+Host-side commands should be limited to container and source-control lifecycle
+operations such as:
+
+```bash
+docker compose build
+docker compose up -d
+docker compose down
+docker compose ps
+docker compose logs
+docker compose run --rm <service> <command>
+docker compose exec <service> <command>
+docker build ...
+docker run ...
+git status
+git diff
+git branch
+git worktree ...
+```
+
+Git/worktree/coordination helpers may run on the host only when they strictly
+perform Git/filesystem coordination and do not execute project runtime code,
+install dependencies, or invoke project tooling. If that separation is unclear,
+run them from a dedicated tooling container instead.
+
+### No host fallback
+
+If a required command cannot currently run in Docker:
+
+1. stop;
+2. treat the missing container capability as a project defect;
+3. update the relevant Dockerfile/Compose/tooling container;
+4. run the command inside Docker;
+5. add regression coverage/documentation so host execution is never required.
+
+Never solve the problem by installing the missing tool on the local machine.
+
+### Docker boundary applies to all environments
+
+The rule applies equally to:
+
+- local development;
+- Codex and Claude Code sessions;
+- tests;
+- Graphify;
+- staging/rehearsal workflows;
+- gisobuild execution;
+- RPM/ISO inspection;
+- frontend builds;
+- migrations;
+- debugging;
+- release preparation.
+
+CI may use its own runner infrastructure, but project build/test commands should
+still execute in the same containerized environment used by the application
+where practical.
+
 ## Mandatory project roadmap and Graphify — read before doing anything
 
 Read `AI-INSTRUCTIONS.md` first, then read `docs/todo/00-MASTER-TODO.md` and every
@@ -12,9 +110,10 @@ architecture changes.
 
 For non-trivial code changes, inspect and use Graphify before editing to understand
 affected modules, callers/callees, dependencies, and architectural relationships.
-Refresh tracked `graphify-out/` after relevant code changes and review the graph
-diff for unexpected impact. If Graphify cannot be run, say so explicitly instead
-of pretending it was refreshed.
+Graphify itself must run in Docker. Refresh tracked `graphify-out/` after relevant
+code changes and review the graph diff for unexpected impact. If Graphify cannot
+be run in the containerized tooling environment, say so explicitly and add/fix
+the missing Docker capability instead of installing Graphify on the host.
 
 The TODO files are living project state. Codex must update the relevant TODO
 files in the same branch/PR whenever implementation status, architecture,
@@ -26,23 +125,21 @@ that leaves `docs/todo/` or relevant Graphify state stale is not complete.
 
 Before editing anything:
 
-1. Check the coordination board with `./scripts/coord.sh status`
-   (PowerShell: `.\scripts\coord.ps1 status`).
-2. Never develop on `main` in the primary checkout. Create a task worktree with
-   `./scripts/worktree.sh new <name>`. It creates `../gisobuild-<name>` on the
-   `codex/<name>` branch. Start Codex in that directory and work only there.
-3. Claim the module before editing it:
-   `./scripts/coord.sh claim <module> "short note"`.
-   If the claim fails, coordinate with its owner or choose another module.
+1. Check the coordination board. Prefer a containerized coordination command.
+   A host helper is allowed only if it is proven to perform Git/filesystem
+   coordination only and executes no project runtime/tooling code.
+2. Never develop on `main` in the primary checkout. Create a task worktree on a
+   `codex/<name>` branch. Git worktree lifecycle commands may run on the host.
+3. Claim the module before editing it.
 4. Stay inside the claimed module. Do not edit files owned by another claim.
-5. When implementation and verification are complete, run
-   `./scripts/coord.sh done <module>`, push the branch, and open a pull request.
-6. After merge, run `./scripts/coord.sh release <module>` from the primary
-   checkout and remove the task worktree with
-   `./scripts/worktree.sh remove <name>`.
+5. When implementation and verification are complete, mark the module done,
+   push the branch, and open a pull request.
+6. After merge, release the module and remove the task worktree.
 
 See [parallel work](docs/parallel-work.md) and
-[coordination](docs/coordination.md) for the complete workflow.
+[coordination](docs/coordination.md) for the complete workflow. If those documents
+contain host-execution examples that violate the Docker-only rule, the Docker-only
+rule in this file wins and the examples must be corrected.
 
 ## Hard rules
 
@@ -55,10 +152,12 @@ See [parallel work](docs/parallel-work.md) and
   matching lab hardware.
 - Do not connect to, upgrade, reload, roll back, or configure a Cisco router
   unless the user explicitly authorizes the exact device and operation.
-- The Web UI controls Docker through `/var/run/docker.sock`. Keep it bound to
-  localhost, preserve host/origin checks, and do not weaken container isolation
-  without an explicit security review. The roadmap intentionally targets removal
-  of this dependency; until that migration is implemented and verified, preserve
+- All application/runtime/build execution must stay inside Docker. Never install
+  project dependencies or invoke project code directly on the user's host.
+- The current Web UI may control Docker through `/var/run/docker.sock`. Keep it
+  bound to localhost, preserve host/origin checks, and do not weaken container
+  isolation without an explicit security review. The roadmap targets removal of
+  this dependency; until that migration is implemented and verified, preserve
   the current security boundary.
 - Preserve the single-build lock, SQLite job history, 30-day archive retention,
   and 50 GiB combined ISO/USB quota unless the task explicitly changes them.
@@ -74,8 +173,8 @@ See [parallel work](docs/parallel-work.md) and
 
 ## Project overview
 
-This repository provides a local Flask Web UI and shell helper around Cisco's
-`ios-xr/gisobuild` project.
+This repository provides a Docker-hosted Web UI and orchestration layer around
+Cisco's `ios-xr/gisobuild` project.
 
 - Web application: `giso-webui/`
 - Platform validation: `giso-webui/platform_validation.py`
@@ -92,8 +191,11 @@ This repository provides a local Flask Web UI and shell helper around Cisco's
 
 ## Required verification
 
-Run checks proportionate to the changed module. Before a pull request that
-touches application or release behavior, run at least:
+Run checks proportionate to the changed module. **Every project command below
+must execute inside Docker.** Host-side Python/test/tool invocations are forbidden.
+
+At minimum, before a pull request that touches application or release behavior,
+use containerized equivalents of:
 
 ```bash
 docker compose -f giso-webui/compose.yaml config -q
@@ -101,20 +203,20 @@ docker compose -f staging/compose.yaml config -q
 docker compose -f giso-webui/compose.yaml build giso-webui
 docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui \
   giso-webui-giso-webui python -B -m unittest discover -s tests -v
-python3 staging/rehearse.py
-git diff --check
 ```
 
-Run the `giso-webui` unit test suite only inside the built `giso-webui-giso-webui`
-container image, as shown above. Never run `python -m unittest` or `pytest`
-directly against the host Python interpreter for this module: the host lacks the
-pinned dependency versions and any OS-level tools (for example `isoinfo`) that
-the container image provides, so a host run can pass or fail for reasons that do
-not reflect CI or production behavior.
+The staging rehearsal, Graphify refresh, Ruff, dependency auditing, Actionlint,
+Hadolint, security checks, frontend tooling, and any other project validation
+must also run inside an appropriate container. If no container exists for a
+required check, create or extend a tooling/test container; do not run it on the
+host as a fallback.
 
-Run Ruff, dependency auditing, Actionlint, Hadolint, and the security checks
-defined in CI when their inputs change. Refresh tracked Graphify outputs after
-code changes, review the Graphify diff for unexpected dependency changes, and
+Run the `giso-webui` unit test suite only inside the built `giso-webui-giso-webui`
+container image. Never run `python -m unittest`, `pytest`, staging Python scripts,
+or similar commands directly against the host Python interpreter.
+
+Refresh tracked Graphify outputs after code changes from a containerized Graphify
+environment, review the Graphify diff for unexpected dependency changes, and
 never allow Cisco input or generated GISO artifacts into the graph.
 
 Before finishing, update every affected file under `docs/todo/` and mark only
@@ -129,9 +231,11 @@ fully implemented and appropriately verified work as complete.
   to ISO metadata.
 - Automatic USB output is not supported for every eXR family. Do not promise a
   USB artifact where upstream `gisobuild` does not create one.
-- Builds run in an `linux/amd64` Cisco container. Apple Silicon relies on Docker
-  emulation and may be significantly slower.
+- Builds run in a `linux/amd64` Cisco-compatible container environment. Apple
+  Silicon relies on Docker emulation and may be significantly slower.
 - Successful builds remove uploaded source and temporary build files only after
   archive copies pass SHA-256 verification.
 - An active build cannot be reattached after a Web UI restart; its persisted job
   is marked `interrupted`.
+- Host execution is never an acceptable workaround for missing container
+  dependencies or broken container tooling.
