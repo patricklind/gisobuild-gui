@@ -1,17 +1,17 @@
-# Graph Report - gisobuild-graphify-ci  (2026-09-15)
+# Graph Report - gisobuild-repo-audit  (2026-09-15)
 
 ## Corpus Check
-- 47 files · ~39,338 words
+- 47 files · ~39,746 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 8, .css 4, .example 1)
 
 ## Summary
-- 643 nodes · 1007 edges · 56 communities (38 shown, 9 thin omitted)
+- 645 nodes · 1009 edges · 56 communities (38 shown, 9 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2d5e39bc`
+- Built from commit: `adccf20b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -174,8 +174,8 @@ Cohesion: 0.83
 Nodes (3): worktree.sh script, usage(), validate()
 
 ### Community 31 - "TODO — Concrete Bug Audit"
-Cohesion: 0.09
-Nodes (21): `/api/inputs` can race cleanup/deletion, Bridge-SMU presence check can produce substring false positives, Cancellation during image pull cannot reliably cancel the build, Cancelled build may still archive output and delete inputs, Filename heuristics can report confidence stronger than the evidence supports, Mandatory Docker pull makes builds depend on registry availability even when the builder image is already cached, Manual package UI collapses duplicate RPM basenames before the operator can inspect them, Multiple ISOs can result in the frontend silently selecting the first ISO (+13 more)
+Cohesion: 0.08
+Nodes (23): `/api/inputs` can race cleanup/deletion, Bridge-SMU presence check can produce substring false positives, Cancellation during image pull cannot reliably cancel the build, Cancelled build may still archive output and delete inputs, CI ran the unit test suite on the GitHub Actions host Python instead of inside the built container, Filename heuristics can report confidence stronger than the evidence supports, Mandatory Docker pull makes builds depend on registry availability even when the builder image is already cached, Manual package UI collapses duplicate RPM basenames before the operator can inspect them (+15 more)
 
 ### Community 32 - "TODO — Self-contained Docker Image"
 Cohesion: 0.12
@@ -246,8 +246,8 @@ Cohesion: 0.29
 Nodes (7): before_request, expire_upload_sessions(), initialize_job_store(), Remove licensed or sensitive artifact names from operator-visible logs., Create the job store and restore safe job history once per process., safe_log_text(), validate_host()
 
 ## Knowledge Gaps
-- **183 isolated node(s):** `inputs`, `platformProfiles`, `drop`, `GitHub Copilot repository instructions`, `Mandatory project roadmap and Graphify — read before doing anything` (+178 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 331 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **184 isolated node(s):** `inputs`, `platformProfiles`, `drop`, `GitHub Copilot repository instructions`, `Mandatory project roadmap and Graphify — read before doing anything` (+179 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 332 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -260,7 +260,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 5 inferred relationships involving `CiscoDownloadError` (e.g. with `cisco_accept()` and `cisco_config()`) actually correct?**
   _`CiscoDownloadError` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inputs`, `platformProfiles`, `drop` to the rest of the system?**
-  _183 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _184 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
   _Cohesion score 0.03278688524590164 - nodes in this community are weakly interconnected._
 - **Should `CiscoDownloadError` be split into smaller, more focused modules?**

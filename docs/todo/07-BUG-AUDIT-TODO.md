@@ -281,6 +281,53 @@ TODO:
 - [x] Fail when `graphify-out/graph.json` is stale.
 - [x] Keep and validate `.graphifyignore` protections for Cisco licensed/sensitive artifacts.
 
+## P2 — CI process fidelity
+
+### CI ran the unit test suite on the GitHub Actions host Python instead of inside the built container
+
+Current behavior (before this fix):
+
+- `AGENTS.md` and `docs/testing.md` both mandate that the `giso-webui` test
+  suite run only inside the built `giso-webui-giso-webui` image, because the
+  host lacks the pinned dependency versions and any OS-level tools the image
+  provides.
+- `.github/workflows/ci.yml` instead installed `giso-webui/requirements.txt`
+  directly on the Actions runner and ran
+  `python -B -m unittest discover -s tests -v` there, *before* the
+  "Build production container" step even executed. CI therefore never proved
+  the tests pass against the actual shipped image, contradicting the
+  project's own documented verification process.
+- Separately, `docs/testing.md` documents `bash -n build-giso.sh
+  scripts/coord.sh scripts/worktree.sh`, but CI only ever ran `bash -n` on
+  `build-giso.sh`.
+- `docs/testing.md` and `AGENTS.md` also say workflow and Dockerfile changes
+  "should also pass Actionlint and Hadolint", but CI had no such step.
+
+Fix:
+
+- [x] Reorder CI so the container image is built first, then tests run via
+      `docker run ... giso-webui-giso-webui python -B -m unittest discover -s
+      tests -v`, matching `docs/testing.md` exactly.
+- [x] Drop the now-unnecessary host install of `giso-webui/requirements.txt`
+      (ruff/pip-audit/graphify don't need the app's runtime deps installed).
+- [x] Extend the shell syntax check to `scripts/coord.sh` and
+      `scripts/worktree.sh`, matching `docs/testing.md`.
+- [x] Add pinned `rhysd/actionlint:1.7.7` and `hadolint/hadolint:2.12.0`
+      steps; verified locally against the current workflow files and both
+      Dockerfiles with zero findings before adding them to CI.
+
+Verification performed locally in this environment (Docker + network
+available): built `giso-webui-giso-webui` from a clean image, ran the 130
+tests in `giso-webui/tests` inside that container (130 passed, 2 skipped —
+`bash` is intentionally absent from the minimal runtime image), ran `ruff`,
+`graphify update`-based freshness check, `staging/rehearse.py`, `actionlint`,
+and `hadolint` against the edited workflow — all clean. `pip-audit` could not
+be exercised locally because this sandbox's host Python is 3.9 and
+`giso-webui/requirements.txt` pins packages requiring 3.10+; CI itself pins
+Python 3.12 via `actions/setup-python`, so this is a local sandbox limitation,
+not a defect in the workflow change. The actual GitHub Actions run of this
+workflow has not been observed — only the equivalent commands run locally.
+
 ## Required regression-test additions
 
 - [x] cancel during builder preparation/pull
