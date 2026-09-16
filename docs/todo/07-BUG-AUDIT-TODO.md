@@ -504,7 +504,22 @@ TODO:
 - [x] Show duplicate basename conflicts explicitly in the UI.
 - [x] Same name + same hash is deduplicated with provenance retained.
 - [x] Same name + different hash is a hard conflict until the unwanted copy is removed.
-- [ ] Add DOM regression tests for both duplicate cases.
+- [x] Add DOM regression tests for both duplicate cases — same
+      live-verification pattern as the two-ISO/target-release items above
+      (no JS/DOM test runner exists in this repo). Confirmed 2026-09-16
+      against an isolated throwaway container: uploaded two TAR bundles each
+      containing an RPM with the same basename but different content
+      (`ncs5500-mgbl-...`), and two more with identical content
+      (`ncs5500-isis-...`), then read the real rendered Manual package list.
+      Different-hash case: both copies rendered as separate options, each
+      `disabled: true`, `class="manual-package-option incompatible"`,
+      reason text "Blocked: another RPM has the same filename but different
+      content. Remove the unwanted copy." naming each one's own source path
+      and hash. Identical-hash case: rendered as one enabled option with
+      "2 identical copies deduplicated; sources: sameA/…, sameB/…" and the
+      shared SHA-256 — matching `test_identical_duplicate_rpms_are_accepted`/
+      `test_different_duplicate_rpms_are_rejected`'s backend expectations,
+      now confirmed in the actual DOM an operator sees.
 
 ### A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16)
 
