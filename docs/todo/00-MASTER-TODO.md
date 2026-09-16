@@ -10,25 +10,61 @@ Core principle:
 
 ## Final operator workflow
 
-- [ ] Start the application with `docker compose up -d`
-- [ ] Upload/select one IOS XR ISO
-- [ ] Upload/select RPM/SMU/TAR files or use Cisco download integration
-- [ ] Automatically inspect ISO metadata
-- [ ] Automatically determine eXR vs LNT
-- [ ] Automatically determine release/platform/capabilities
-- [ ] Automatically extract TAR/TGZ safely
-- [ ] Automatically inspect RPM metadata
-- [ ] Automatically group RPMs by CSC
-- [ ] Automatically exclude incompatible packages with reasons
-- [ ] Automatically generate one authoritative BuildPlan
-- [ ] Show warnings/blockers before build
-- [ ] Build using bundled/pinned upstream gisobuild
-- [ ] Verify output artifacts
-- [ ] Produce checksums and `build-report.json`
-- [ ] Archive verified output
-- [ ] Persist jobs/state across restarts
-- [ ] Run without `/var/run/docker.sock`
-- [ ] Run without an external `.gisobuild-tool` checkout
+- [x] Start the application with `docker compose up -d`
+- [x] Upload/select one IOS XR ISO
+- [x] Upload/select RPM/SMU/TAR files or use Cisco download integration
+- [x] Automatically inspect ISO metadata — `inspect_iso_architecture()`
+      (processor architecture only; platform/release still come from the
+      filename, see the "Confidence display" honesty note in
+      `06-UI-OPERATOR-TODO.md`).
+- [x] Automatically determine eXR vs LNT — `platform_profile()["engine"]`,
+      derived from the detected/selected platform.
+- [x] Automatically determine release/platform/capabilities — filename
+      inference plus `capabilities_for_platform()`; platform/release are
+      `INFERRED`, not upstream-metadata-`VERIFIED` (same honesty note).
+- [x] Automatically extract TAR/TGZ safely — `upload_complete()`'s
+      symlink/hardlink/absolute-path/member-count/size-limit checks.
+- [ ] Automatically inspect RPM metadata — not implemented; RPM
+      architecture/release/CSC are all filename-derived, no RPM header
+      parser exists (tracked as future work in `06-UI-OPERATOR-TODO.md`).
+- [x] Automatically group RPMs by CSC — `package_groups`/`smuGroupCard()`.
+- [x] Automatically exclude incompatible packages with reasons — wrong
+      platform/release/architecture, superseded, and duplicate-conflict all
+      report a specific reason (see "Explain decisions" in
+      `06-UI-OPERATOR-TODO.md`).
+- [x] Automatically generate one authoritative BuildPlan —
+      `create_build_plan()`, checksum-fingerprinted, re-validated against
+      the live inventory at job creation (`confirmed_plan_fingerprint`).
+- [x] Show warnings/blockers before build — fixed 2026-09-16
+      (`recommend_smu_selection()` was silently dropping its own computed
+      `warnings`); still only itemized in full at the final confirmation,
+      not the entire time during Step 2 review (open gap, see
+      `06-UI-OPERATOR-TODO.md`'s Step 2 checklist).
+- [x] Build using bundled/pinned upstream gisobuild — `IMAGE` is pinned to
+      `ciscogisobuild/cisco-xr-gisobuild:2.3.4` by default and validated as
+      a well-formed reference; "bundled" (no external `.gisobuild-tool`
+      checkout) is not done, see below.
+- [x] Verify output artifacts — `giso_artifact_candidates()` plus a
+      byte-for-byte + SHA-256 comparison between source and archived copy
+      before anything is deleted.
+- [ ] Produce checksums and `build-report.json` — `--create-checksum`
+      produces gisobuild's own `checksums.json` as a downloadable artifact;
+      no distinct `build-report.json` (a structured summary of what was
+      included/excluded/why) exists.
+- [x] Archive verified output — `archive_giso_artifacts_and_cleanup()`,
+      with retention/quota enforcement now cross-process-safe (see the
+      2026-09-16 fix in `07-BUG-AUDIT-TODO.md`).
+- [x] Persist jobs/state across restarts — sqlite-backed `jobs`/`activity`
+      tables; a restart marks any active job `"interrupted"` rather than
+      leaving it stuck. Uploads and in-flight Cisco downloads are the
+      remaining process-local-only state (see `04-STATE-SECURITY-OBSERVABILITY-TODO.md`).
+- [ ] Run without `/var/run/docker.sock` — explicitly deferred; requires the
+      security review and self-contained-image rewrite tracked in
+      `03-DOCKER-SELF-CONTAINED-TODO.md`.
+- [ ] Run without an external `.gisobuild-tool` checkout — `build_command()`
+      still runs `/tool/src/gisobuild.py` from the mounted checkout inside
+      the build container rather than a path baked into `IMAGE`; same
+      dependency as above.
 
 ## Major workstreams
 
