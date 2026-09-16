@@ -107,7 +107,17 @@ detailed dependency option enabled by default.
 After a successful build, the application copies the Golden ISO and optional
 USB package into the archive and verifies each copy with SHA-256. Only then does
 it remove the build's source and working files. If no ISO is produced or archive
-verification fails, sources are retained for diagnosis.
+verification fails, sources are retained for diagnosis. A `build-report.json`
+is written into the archive alongside the artifacts — the web UI/gisobuild
+version, exact BuildPlan, generated command, and output checksums — downloadable
+from the GISO Archive's **Build report** link for later audit or reproduction.
+
+Expert settings' xrconfig/ZTP/key-request/ownership file fields each have a
+**Preview** button to inspect the selected file's text content without leaving
+the browser. The manual package list, GISO Archive, and Cisco search results
+all support filtering by filename (or CSC ID for packages) once they hold
+enough items to need it; the manual package list also has **Compatible only**
+and **Selected only** toggles.
 
 The **Clear workspace files** action removes uploaded source files, incomplete
 upload fragments, build work, and raw output. It never removes completed files
