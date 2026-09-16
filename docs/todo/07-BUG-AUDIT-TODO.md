@@ -69,6 +69,37 @@ TODO:
   not just a `source:"tar"` boolean).
 - [x] Add regression test: build A must not delete unrelated inputs for build B.
 
+### Post-build cleanup could delete an unselected duplicate-basename RPM (2026-09-16)
+
+Current behavior (before this fix):
+
+- `create_job()` resolves the operator's package selection by opaque
+  inventory ID (`payload["pkglist"] = [item["id"] for item in
+  plan["selected_packages"]]`), which correctly disambiguates two uploaded
+  RPMs that share a basename but have different content — exactly the
+  "conflict" duplicate case `resolve_rpm_identifiers()` exists to handle.
+- `build_command()` then overwrites `payload["pkglist"]` in place with the
+  resolved *basenames* (`payload["pkglist"] = selected_names`), discarding
+  which specific file (by path/hash) was actually chosen.
+- `build_cleanup_paths()` ran after `build_command()` and re-derived which
+  RPM files to delete by globbing `DATA.rglob("*.rpm")` for a basename match
+  against that now-basename-only `pkglist`. If a second, unselected RPM
+  elsewhere in the workspace happened to share the same filename, it matched
+  too and was scheduled for deletion post-build, even though it was never
+  part of this build.
+
+Fix:
+
+- [x] `build_cleanup_paths()` now takes the already-resolved `selected_rpms`
+      list (the same objects `create_build_plan()` produced via
+      `resolve_rpm_identifiers()`) and cleans up each one's exact
+      `relative_path`, never re-deriving RPM identity from a basename glob.
+
+Verified with `test_cleanup_paths_do_not_include_an_unselected_duplicate_basename`
+in `giso-webui/tests/test_app.py`, which fails against the pre-fix code
+(the unrelated duplicate's path was present in `cleanup_paths`) and passes
+after the fix.
+
 ## P1 — Wrong file/package selection
 
 ### Multiple ISOs can result in the frontend silently selecting the first ISO
@@ -453,8 +484,12 @@ Review BuildPlan step in a real browser.
 - [x] two ISOs never silently choose first candidate
 - [x] wrong RPM CPU architecture is blocked
 - [x] package glob characters cannot select unintended files
-- [ ] duplicate basename / same hash
-- [ ] duplicate basename / different hash
+- [x] duplicate basename / same hash — `test_identical_duplicate_rpms_are_accepted`,
+      `test_identical_duplicate_inventory_keeps_provenance`
+- [x] duplicate basename / different hash — `test_different_duplicate_rpms_are_rejected`,
+      `test_different_duplicate_inventory_is_a_visible_conflict`,
+      `test_inventory_id_selects_exact_rpm`,
+      `test_cleanup_paths_do_not_include_an_unselected_duplicate_basename`
 - [x] upgrade matrix aliases normalize through one resolver
 - [x] bridge-SMU near-match does not count as exact presence
 - [x] discovery vs cleanup race

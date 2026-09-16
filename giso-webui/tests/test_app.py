@@ -1094,6 +1094,36 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
+    def test_cleanup_paths_do_not_include_an_unselected_duplicate_basename(self, _mounts, _run_job):
+        # create_job() resolves pkglist by opaque inventory ID, so two RPMs
+        # with the same basename but different content can coexist and be
+        # selected precisely (resolve_rpm_identifiers()). build_command()
+        # then overwrites payload["pkglist"] with basenames as a side effect;
+        # if build_cleanup_paths() re-derives files to delete by globbing for
+        # that basename across all of DATA, it deletes every file sharing the
+        # name, including one that was never selected for this build.
+        (self.data / "base.iso").write_bytes(b"iso")
+        (self.data / "one").mkdir()
+        (self.data / "two").mkdir()
+        selected_rpm = self.data / "one/package.rpm"
+        other_rpm = self.data / "two/package.rpm"
+        selected_rpm.write_bytes(b"selected content")
+        other_rpm.write_bytes(b"a different upload that happens to share this filename")
+        item = next(entry for entry in module.inventory_files()
+                    if entry["relative_path"] == "one/package.rpm")
+
+        response = self.client.post("/api/jobs", json={
+            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        self.assertEqual(response.status_code, 202)
+        cleanup_paths = {Path(p) for p in module.jobs[response.get_json()["id"]]["cleanup_paths"]}
+        self.assertIn(selected_rpm.resolve(), cleanup_paths)
+        self.assertNotIn(other_rpm.resolve(), cleanup_paths)
+
+    @patch("app.run_job")
+    @patch("app.child_mount_args", return_value=[])
     def test_stale_confirmed_plan_is_rejected_when_inventory_changes(self, _mounts, _run_job):
         (self.data / "base.iso").write_bytes(b"iso")
         rpm = self.data / "package.rpm"

@@ -1219,8 +1219,17 @@ def glob_metacharacters(value: str) -> bool:
     return any(character in value for character in "*?[]")
 
 
-def build_cleanup_paths(payload: dict) -> list[Path]:
-    """Resolve only inputs explicitly owned by this build request."""
+def build_cleanup_paths(payload: dict, selected_rpms: list[dict]) -> list[Path]:
+    """Resolve only inputs explicitly owned by this build request.
+
+    RPMs must come from selected_rpms (resolve_rpm_identifiers()'s output),
+    not by globbing payload["pkglist"] for a basename match: two uploads can
+    share a basename with different content (see the duplicate-inventory
+    handling in resolve_rpm_identifiers()), and by the time this runs
+    build_command() has already overwritten payload["pkglist"] with
+    basenames, so a glob-by-basename here would schedule every file sharing
+    that name for deletion, not just the one actually used in this build.
+    """
     paths: set[Path] = set()
     for key in PATH_OPTIONS:
         value = payload.get(key)
@@ -1229,11 +1238,8 @@ def build_cleanup_paths(payload: dict) -> list[Path]:
     for key in ("repo", "bridging_fixes"):
         for value in payload.get(key) or []:
             paths.add(safe_data_path(value))
-    for package in payload.get("pkglist") or []:
-        if Path(package).name != package or glob_metacharacters(package):
-            raise ValueError(f"RPM package must be an exact filename: {package!r}")
-        matches = [path for path in DATA.rglob("*.rpm") if path.name == package]
-        paths.update(matches)
+    for package in selected_rpms:
+        paths.add(safe_data_path(package["relative_path"]))
     return sorted(paths, key=str)
 
 
@@ -2051,7 +2057,7 @@ def create_job():
                             "plan_fingerprint": plan["fingerprint"], "build_plan": plan}
         try:
             command = build_command(payload, job_id)
-            cleanup_paths = build_cleanup_paths(payload)
+            cleanup_paths = build_cleanup_paths(payload, plan["selected_packages"])
         except ValueError as exc:
             with job_lock:
                 jobs.pop(job_id, None)
