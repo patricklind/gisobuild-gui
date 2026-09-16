@@ -70,11 +70,31 @@ Keep advanced controls, but:
 
 Every exclusion must explain why:
 
-- [ ] wrong release
-- [ ] wrong platform
-- [ ] wrong architecture
-- [ ] superseded
-- [x] duplicate
+- [x] wrong release — `recommend_smu_selection()` reports `"Different IOS XR
+      release"` per excluded RPM (`giso-webui/platform_validation.py`),
+      rendered per-item in the Review BuildPlan excluded-packages list
+      (`giso-webui/static/app.js`). Verified by
+      `test_automatic_selection_keeps_matching_repository_and_excludes_mismatches`.
+- [x] wrong platform — same mechanism, reason `"Different platform"`.
+      Verified by the same test.
+- [x] wrong architecture — same mechanism, reason `"Processor architecture
+      does not match the base ISO"`. Verified by
+      `test_automatic_selection_excludes_wrong_architecture_rpms`.
+- [x] superseded — `add_superseded_exclusions()` in `giso-webui/app.py`
+      explains RPMs `active_rpm_names()` already dropped from the automatic
+      candidate list, with reason `"Superseded by a newer fix per Cisco
+      supersedence notes"`, wired into `discover()`, `/api/smu/recommendation`,
+      and `create_build_plan()`'s automatic-selection path. Before this fix,
+      `active_rpm_names()` silently filtered these files out and
+      `data.superseded` from `/api/inputs` was computed but never read by the
+      frontend, so a superseded SMU just vanished with no explanation.
+      Verified by `test_superseded_rpm_is_excluded_with_a_reason_not_silently_dropped`
+      and `test_build_plan_automatic_selection_explains_superseded_exclusions`
+      in `giso-webui/tests/test_app.py`, and confirmed live in a browser
+      against the running container.
+- [x] duplicate — `inventory_files()` tags each file `duplicate`/
+      `duplicate_kind`/`provenance`, surfaced in
+      `giso-webui/static/manual-packages.js`.
 - [ ] malformed metadata
 - [ ] ambiguous metadata
 

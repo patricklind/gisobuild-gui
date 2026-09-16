@@ -729,9 +729,11 @@ def create_build_plan(payload: dict) -> dict:
         # second, later gate.
         iso_architectures = inspect_iso_architecture(safe_data_path(iso["relative_path"]))
         if payload.get("automatic_smu_selection"):
+            candidates, superseded = active_rpm_names()
             recommendation = recommend_smu_selection(
-                iso_name, active_rpm_names()[0], iso_architectures=iso_architectures
+                iso_name, candidates, iso_architectures=iso_architectures
             )
+            recommendation = add_superseded_exclusions(recommendation, superseded)
             if recommendation.get("ready"):
                 identifiers = recommendation["selected"]
             else:
@@ -1004,6 +1006,30 @@ def expire_upload_sessions() -> None:
                 pass
 
 
+def rpm_is_superseded(rpm: Path, superseded: set[str]) -> bool:
+    """A package's containing directory names the Cisco supersedence identifier it belongs to."""
+    return any(rpm.parent.name.startswith(identifier) for identifier in superseded)
+
+
+def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dict:
+    """Explain, rather than silently drop, RPMs active_rpm_names() already filtered out.
+
+    active_rpm_names() removes superseded packages from the candidate list
+    before automatic selection ever sees them, so without this they never
+    appear in "excluded" and the operator has no way to know they exist.
+    """
+    names = sorted({rpm.name for rpm in DATA.rglob("*.rpm") if rpm_is_superseded(rpm, superseded)})
+    if names:
+        recommendation["excluded"] = sorted(
+            recommendation.get("excluded", []) + [
+                {"name": name, "reason": "Superseded by a newer fix per Cisco supersedence notes"}
+                for name in names
+            ],
+            key=lambda item: item["name"],
+        )
+    return recommendation
+
+
 def active_rpm_names() -> tuple[list[str], set[str]]:
     superseded: set[str] = set()
     inspected_bytes = 0
@@ -1018,8 +1044,7 @@ def active_rpm_names() -> tuple[list[str], set[str]]:
         except OSError:
             pass
     candidates = [
-        rpm.name for rpm in DATA.rglob("*.rpm")
-        if not any(rpm.parent.name.startswith(identifier) for identifier in superseded)
+        rpm.name for rpm in DATA.rglob("*.rpm") if not rpm_is_superseded(rpm, superseded)
     ]
     return candidates, superseded
 
@@ -1047,6 +1072,7 @@ def discover() -> dict:
     else:
         recommendation = {"ready": False, "selected": [], "excluded": [],
                           "message": "Upload one base ISO before SMUs can be selected"}
+    recommendation = add_superseded_exclusions(recommendation, superseded)
     recommendation["confidence"] = confidence_report(
         resolved_platform=recommendation.get("platform"),
         platform_manual=False,
@@ -1459,9 +1485,10 @@ def smu_recommendation():
         iso_path = safe_data_path(iso)
         if iso_path.suffix.lower() != ".iso" or not iso_path.is_file():
             raise ValueError("Select an uploaded base ISO")
-        packages, _ = active_rpm_names()
+        packages, superseded = active_rpm_names()
         iso_architectures = inspect_iso_architecture(iso_path)
         recommendation = recommend_smu_selection(iso, packages, iso_architectures=iso_architectures)
+        recommendation = add_superseded_exclusions(recommendation, superseded)
         recommendation["confidence"] = confidence_report(
             resolved_platform=recommendation.get("platform"),
             platform_manual=False,

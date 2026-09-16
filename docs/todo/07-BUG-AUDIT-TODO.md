@@ -412,6 +412,39 @@ Python 3.12 via `actions/setup-python`, so this is a local sandbox limitation,
 not a defect in the workflow change. The actual GitHub Actions run of this
 workflow has not been observed — only the equivalent commands run locally.
 
+### Superseded RPMs were silently dropped instead of being explained (2026-09-16)
+
+`active_rpm_names()` in `giso-webui/app.py` reads Cisco supersedence readmes
+and removes any RPM whose containing directory matches a superseded
+identifier from the automatic-selection candidate list *before*
+`recommend_smu_selection()` ever sees it. That meant a superseded SMU never
+appeared in `selected` or `excluded` — it just vanished. `discover()` did
+return the raw `superseded` identifier set as `data.superseded`, but
+`giso-webui/static/app.js` never read that field, so the operator had no way
+to learn a file they uploaded was excluded, let alone why.
+
+Fix:
+
+- [x] Add `add_superseded_exclusions()`, appending a
+      `{"name": ..., "reason": "Superseded by a newer fix per Cisco
+      supersedence notes"}` entry per dropped RPM to the `excluded` list.
+- [x] Wire it into `discover()` (`/api/inputs`), `/api/smu/recommendation`,
+      and `create_build_plan()`'s automatic-selection branch — the three
+      places `active_rpm_names()`'s filtered candidate list reaches an
+      operator-facing response.
+- [x] No frontend change was needed: the excluded-packages list in
+      `giso-webui/static/app.js` already renders `name — reason` for every
+      entry generically.
+
+Verified by `test_superseded_rpm_is_excluded_with_a_reason_not_silently_dropped`
+and `test_build_plan_automatic_selection_explains_superseded_exclusions` in
+`giso-webui/tests/test_app.py` (both fail against the pre-fix code — the
+superseded RPM was absent from `excluded` entirely), and confirmed live: built
+the image, ran it, placed a base ISO plus a current and a superseded RPM in
+the container's upload volume, and saw "ncs5500-bgp-1.0.0.1-r2612.CSCold00001
+... — Superseded by a newer fix per Cisco supersedence notes" render in the
+Review BuildPlan step in a real browser.
+
 ## Required regression-test additions
 
 - [x] cancel during builder preparation/pull

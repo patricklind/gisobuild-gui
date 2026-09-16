@@ -730,6 +730,32 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.get_json()["selected"], [matching])
         self.assertEqual(response.get_json()["excluded"][0]["name"], wrong_release)
 
+    def test_superseded_rpm_is_excluded_with_a_reason_not_silently_dropped(self):
+        # active_rpm_names() already removes superseded RPMs from the
+        # automatic candidate list before selection ever runs. Without
+        # add_superseded_exclusions() they simply vanished from the response
+        # instead of appearing in "excluded" with a reason, leaving the
+        # operator unable to tell an SMU was superseded rather than just
+        # missing from the upload.
+        (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
+        current = "ncs5500-bgp-2.0.0.1-r2612.CSCnew00001.x86_64.rpm"
+        (self.data / current).write_bytes(b"new")
+        old_dir = self.data / "ncs5500-bgp-1.0.0.1.CSCold00001"
+        old_dir.mkdir()
+        old_rpm = old_dir / "ncs5500-bgp-1.0.0.1-r2612.CSCold00001.x86_64.rpm"
+        old_rpm.write_bytes(b"old")
+        (self.data / "supersedence-notes.txt").write_text(
+            "ncs5500-bgp-1.0.0.1.CSCold00001 Full\n"
+        )
+
+        response = self.client.get("/api/inputs")
+
+        recommendation = response.get_json()["recommendation"]
+        self.assertIn(current, recommendation["selected"])
+        excluded_by_name = {item["name"]: item["reason"] for item in recommendation["excluded"]}
+        self.assertIn(old_rpm.name, excluded_by_name)
+        self.assertIn("Superseded", excluded_by_name[old_rpm.name])
+
     def test_oversized_text_is_not_loaded_as_supersedence_metadata(self):
         rpm = "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"
         (self.data / rpm).write_bytes(b"rpm")
@@ -959,6 +985,33 @@ class GisoWebTests(unittest.TestCase):
         confidence = response.get_json()["confidence"]
         self.assertEqual(confidence["platform"]["value"], "INFERRED")
         self.assertEqual(confidence["platform"]["source"], "operator-selected")
+
+    def test_build_plan_automatic_selection_explains_superseded_exclusions(self):
+        # create_build_plan()'s automatic_smu_selection path pulls candidates
+        # straight from active_rpm_names(), which already drops superseded
+        # RPMs - without add_superseded_exclusions() they disappeared from
+        # excluded_packages entirely instead of being explained.
+        (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
+        current = "ncs5500-bgp-2.0.0.1-r2612.CSCnew00001.x86_64.rpm"
+        (self.data / current).write_bytes(b"new")
+        old_dir = self.data / "ncs5500-bgp-1.0.0.1.CSCold00001"
+        old_dir.mkdir()
+        old_rpm = old_dir / "ncs5500-bgp-1.0.0.1-r2612.CSCold00001.x86_64.rpm"
+        old_rpm.write_bytes(b"old")
+        (self.data / "supersedence-notes.txt").write_text(
+            "ncs5500-bgp-1.0.0.1.CSCold00001 Full\n"
+        )
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": "ncs5500-mini-x-26.1.2.iso", "pkglist": [],
+            "automatic_smu_selection": True, "auto_repo": True,
+        })
+
+        plan = response.get_json()
+        self.assertTrue(plan["ready"], plan)
+        excluded_by_name = {item["name"]: item["reason"] for item in plan["excluded_packages"]}
+        self.assertIn(old_rpm.name, excluded_by_name)
+        self.assertIn("Superseded", excluded_by_name[old_rpm.name])
 
     @unittest.skipUnless(
         ISOINFO_AVAILABLE,
