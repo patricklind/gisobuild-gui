@@ -740,6 +740,23 @@ function renderBuildReport(job) {
   }
 }
 
+function renderMissingDependencies(job) {
+  const panel = $('#missing-dependencies');
+  const missing = job.missing_dependencies || [];
+  if (!missing.length) { panel.hidden = true; panel.replaceChildren(); return; }
+  panel.hidden = false;
+  const heading = document.createElement('h4'); heading.textContent = 'Missing dependencies found by gisobuild';
+  const intro = document.createElement('p');
+  intro.textContent = 'The build failed its RPM dependency check. This usually means an additional Cisco SMU/fix package providing one of these is missing from your repository:';
+  const list = document.createElement('ul');
+  missing.forEach(({requirement, required_by}) => {
+    const item = document.createElement('li');
+    item.textContent = `${requirement} — required by ${required_by}`;
+    list.appendChild(item);
+  });
+  panel.replaceChildren(heading, intro, list);
+}
+
 async function poll() {
   if (!currentJob) return;
   clearTimeout(activityTimer);
@@ -766,6 +783,7 @@ async function poll() {
       cancelling: 'Stopping the build. This can take a few seconds while the build container shuts down.',
     };
     $('#friendly-status').textContent = friendlyStatusByJobStatus[job.status] || 'The build is running. You may leave this page open or return later.';
+    renderMissingDependencies(job);
     const artifacts = $('#artifacts'); artifacts.replaceChildren();
     job.artifacts.forEach(artifact => {
       const link = document.createElement('a'); link.href = artifact.url || `/download/${encodeURIComponent(job.id)}/${artifact.path.split('/').map(encodeURIComponent).join('/')}`;

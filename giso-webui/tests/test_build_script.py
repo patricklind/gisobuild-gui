@@ -112,6 +112,17 @@ class BuildScriptTests(unittest.TestCase):
         self.assertNotIn("function renderManualPackages", app_script)
         self.assertNotIn('name="pkglist_override" rows=', template)
 
+    def test_missing_dependencies_panel_is_rendered_on_poll(self):
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        template = (Path(__file__).parents[1] / "templates" / "index.html").read_text()
+        self.assertIn('id="missing-dependencies"', template)
+        self.assertIn("function renderMissingDependencies(job)", script)
+        self.assertIn("renderMissingDependencies(job)", script[script.index("async function poll()"):])
+        panel_fn = script[script.index("function renderMissingDependencies(job)"):]
+        panel_fn = panel_fn[:panel_fn.index("\n}\n")]
+        self.assertIn("job.missing_dependencies", panel_fn)
+        self.assertIn("required_by", panel_fn)
+
     def test_start_build_button_names_exactly_what_is_missing(self):
         # Previously the disabled hint always said "Waiting for an ISO and a
         # customization", even once one of those two was already satisfied -

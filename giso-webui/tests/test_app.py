@@ -758,6 +758,65 @@ class GisoWebTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "MAX_ARCHIVE_BYTES must be a positive number"):
                 module.validate_max_archive_bytes(value)
 
+    def test_parse_missing_dependencies_extracts_real_gisobuild_failure_format(self):
+        # Verbatim excerpt from a genuine failed build (RPM's own "Failed
+        # dependencies" transaction-check format inside a real gisobuild.log,
+        # timestamp prefix included exactly as gisobuild writes it - not a
+        # cleaned-up guess at the format).
+        log = (
+            "2026-09-16 16:21:16::  error: Failed dependencies:\n"
+            "2026-09-16 16:21:16::  \tncs5500-dpa = 1.0.0.5 is needed by ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64\n"
+            "2026-09-16 16:21:16::  \tncs5500-dpa-fwding = 1.0.0.2 is needed by ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64\n"
+            "2026-09-16 16:21:16::  \tncs5500-os = 1.0.0.1 is needed by ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64\n"
+            "2026-09-16 16:21:16::  \tncs5500-dpa = 1.0.0.5 is needed by ncs5500-infra-1.0.0.8-r2512.CSCwu13268.x86_64\n"
+            "2026-09-16 16:21:17::  \n"
+            "\t...RPM compatibility check [FAIL]\n"
+        )
+        found = module.parse_missing_dependencies(log)
+        self.assertEqual(len(found), 4)
+        self.assertIn(
+            {"requirement": "ncs5500-dpa = 1.0.0.5",
+             "required_by": "ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64"},
+            found,
+        )
+        self.assertIn(
+            {"requirement": "ncs5500-os = 1.0.0.1",
+             "required_by": "ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64"},
+            found,
+        )
+        self.assertIn(
+            {"requirement": "ncs5500-dpa = 1.0.0.5",
+             "required_by": "ncs5500-infra-1.0.0.8-r2512.CSCwu13268.x86_64"},
+            found,
+        )
+        # None of the timestamp prefix leaked into a captured requirement.
+        self.assertTrue(all("2026" not in item["requirement"] for item in found))
+
+    def test_parse_missing_dependencies_deduplicates_repeated_lines(self):
+        log = "pkg-a is needed by pkg-b\npkg-a is needed by pkg-b\n"
+        self.assertEqual(len(module.parse_missing_dependencies(log)), 1)
+
+    def test_parse_missing_dependencies_ignores_unrelated_log_lines(self):
+        log = "Scanning repository [/work/job/repo]...\nBuilding Golden ISO...\n"
+        self.assertEqual(module.parse_missing_dependencies(log), [])
+
+    def test_failed_job_exposes_missing_dependencies_via_the_api(self):
+        module.jobs["job"] = {
+            "id": "job", "status": "failed", "created": time.time(), "artifacts": [],
+            "log": "pkg-a = 1.0 is needed by pkg-b-1.0-r1.x86_64\n",
+        }
+        response = self.client.get("/api/jobs/job")
+        self.assertEqual(response.get_json()["missing_dependencies"],
+                         [{"requirement": "pkg-a = 1.0", "required_by": "pkg-b-1.0-r1.x86_64"}])
+
+    def test_running_job_does_not_compute_missing_dependencies(self):
+        module.jobs["job"] = {
+            "id": "job", "status": "running", "created": time.time(), "artifacts": [],
+            "log": "pkg-a = 1.0 is needed by pkg-b-1.0-r1.x86_64\n",
+        }
+        response = self.client.get("/api/jobs/job")
+        self.assertNotIn("missing_dependencies", response.get_json())
+
     def test_log_is_bounded(self):
         module.jobs["job"] = {"log": "", "updated": 0, "progress": 0, "phase": ""}
         with patch.object(module, "MAX_LOG_BYTES", 32):

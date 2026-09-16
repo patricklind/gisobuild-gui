@@ -281,6 +281,31 @@ Every exclusion must explain why:
       `giso-webui/static/manual-packages.js`.
 - [ ] malformed metadata
 - [ ] ambiguous metadata
+- [x] gisobuild's own RPM dependency-check failures — added 2026-09-16 after
+      a real production build failed with a genuine missing-dependency error
+      (Cisco's own GISO documentation: "the child RPM is dependent on the
+      parent RPM. If only the child RPM is included, the Golden ISO build
+      fails."). gisobuild's compatibility check runs RPM's own dependency
+      resolution and reports unmet requirements as
+      "`<requirement> is needed by <package>`" lines — RPM's standard
+      transaction-check format (`.gisobuild-tool`'s own
+      `gisobuild_exr_engine.py`/`_pkgchecks.py` look for this exact marker).
+      Before this fix an operator had to open the raw build log and find
+      these lines themselves. `parse_missing_dependencies()` in
+      `giso-webui/app.py` extracts them (robust to the real
+      `"YYYY-MM-DD HH:MM:SS::  \t"` log-line prefix, verified against a real
+      1442-line failed-build log, not a synthetic guess) and `public_job()`
+      exposes them as `missing_dependencies` on a failed job; the UI renders
+      a dedicated "Missing dependencies found by gisobuild" panel above the
+      technical log. This does not predict or prevent a failure — only
+      gisobuild's real check against the actual base image can determine
+      that — it only makes an already-real failure legible. Verified by five
+      tests in `giso-webui/tests/test_app.py` (including one using the
+      verbatim real log excerpt) and one in
+      `giso-webui/tests/test_build_script.py`, and confirmed by parsing the
+      complete real 1442-line `gisobuild.log` end-to-end (15 unique missing
+      dependencies extracted correctly) and by injecting the resulting data
+      into the real page in a browser.
 
 ## Confidence display
 

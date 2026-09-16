@@ -286,6 +286,44 @@ def safe_log_text(text: str) -> str:
     return ARTIFACT_TOKEN.sub("[artifact]", text)
 
 
+# gisobuild's compatibility check runs RPM's own dependency resolution inside
+# the build container and surfaces unmet requirements as
+# "<requirement> is needed by <package>" lines - RPM's standard transaction-
+# check output format (see .gisobuild-tool src/exrmod/gisobuild_exr_engine.py
+# and src/lnt/builder/_pkgchecks.py, both of which look for this exact
+# "is needed by" marker themselves). Real log lines carry a
+# "YYYY-MM-DD HH:MM:SS::  \t" prefix before the actual message, so this is
+# deliberately *not* anchored to the start of the line - <requirement> only
+# accepts identifier/version characters, which cannot span the "::" in the
+# timestamp, so re.finditer naturally skips the prefix and locks onto the
+# real "<name>[ <op> <version>] is needed by <package>" text wherever it
+# starts. <requirement> is a bare package name or a version-constrained one
+# ("pkg = 1.2.3", "pkg >= 1.2.3"); neither form nor <package> (gisobuild
+# always renders it without a ".rpm" suffix here) matches ARTIFACT_TOKEN, so
+# this text is never redacted from job logs.
+MISSING_DEPENDENCY_PATTERN = re.compile(
+    r"(?P<requirement>[\w.+-]+(?:\s*(?:>=|<=|=|>|<)\s*[\w.+-]+)?)\s+is needed by\s+(?P<required_by>\S+)"
+)
+
+
+def parse_missing_dependencies(log: str) -> list[dict]:
+    """Extract gisobuild's own RPM dependency-check failures from a job's log.
+
+    This does not predict or prevent a dependency failure - only gisobuild's
+    real RPM transaction check, against the actual base image's own package
+    set, can determine that. It only makes an already-real, already-visible
+    failure legible without an operator having to search the raw build log
+    for it.
+    """
+    seen: dict[tuple[str, str], dict[str, str]] = {}
+    for match in MISSING_DEPENDENCY_PATTERN.finditer(log):
+        requirement = match.group("requirement").strip()
+        required_by = match.group("required_by").strip()
+        seen.setdefault((requirement, required_by),
+                        {"requirement": requirement, "required_by": required_by})
+    return list(seen.values())
+
+
 def append_activity(text: str) -> None:
     timestamp = time.strftime("%H:%M:%S")
     entry = f"[{timestamp}] {safe_log_text(text).strip()}"
@@ -306,7 +344,10 @@ def append_activity(text: str) -> None:
 
 def public_job(job: dict, *, include_log: bool = True) -> dict:
     private = PRIVATE_JOB_FIELDS | (set() if include_log else {"log"})
-    return {key: value for key, value in job.items() if key not in private}
+    result = {key: value for key, value in job.items() if key not in private}
+    if job.get("status") == "failed":
+        result["missing_dependencies"] = parse_missing_dependencies(job.get("log", ""))
+    return result
 
 
 def initialize_job_store() -> None:

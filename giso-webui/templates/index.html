@@ -117,6 +117,7 @@
         <div class="step-heading"><span class="step-number">3</span><div><h2>Build and download</h2><p>Follow the progress here. A download link appears when the image is ready.</p></div><span id="job-status" class="pill neutral">Not started</span></div>
         <div class="progress-panel"><div class="progress-label"><b id="build-phase">Ready to start</b><span id="build-percent">0%</span></div><progress id="build-progress" aria-labelledby="build-phase build-percent" max="100" value="0"></progress><small id="elapsed-time">Elapsed time: 0:00</small></div>
         <div id="friendly-status" class="friendly-status" role="status" aria-live="polite">Start when a base ISO and at least one customization are selected, or use a YAML build file.</div>
+        <div id="missing-dependencies" class="missing-dependencies" hidden></div>
         <button id="cancel-build" class="danger" type="button" hidden>Stop current build</button>
         <div id="artifacts" class="artifacts" aria-live="polite"></div>
         <details id="build-report" class="build-report" hidden><summary>Show build report</summary><div id="build-report-body"></div></details>
