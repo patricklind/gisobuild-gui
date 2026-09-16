@@ -638,6 +638,20 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("upload", response.get_json()["error"])
 
+    def test_cleanup_rejects_running_build(self):
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1, "updated": 1}
+        response = self.client.post("/api/cleanup")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("build is running", response.get_json()["error"])
+
+    def test_cleanup_rejects_active_cisco_download(self):
+        module.cisco_download_jobs["job"] = {
+            "id": "job", "status": "downloading", "progress": 10, "created": time.time(),
+        }
+        response = self.client.post("/api/cleanup")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Cisco download", response.get_json()["error"])
+
     def test_docker_image_reference_cannot_be_an_option(self):
         with self.assertRaisesRegex(RuntimeError, "Docker image reference"):
             module.validate_image_reference("--privileged")

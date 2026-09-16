@@ -338,6 +338,46 @@ TODO:
 - [x] Preserve explicit manual override only when intentionally selected.
 - [ ] Add browser regression test switching between two releases.
 
+### Archive maintenance runs in a separate process with no cross-process lock (2026-09-16)
+
+Current behavior:
+
+- `enforce_archive_policy()` and `archive_giso_artifacts_and_cleanup()` in
+  `giso-webui/app.py` synchronize with each other only via `archive_lock`, a
+  `threading.RLock()` — mutual exclusion within one Python process only.
+- `giso-webui/maintenance.py` (run as the separate `archive-maintenance`
+  container in `giso-webui/compose.yaml`) imports and calls the very same
+  `enforce_archive_policy()` on an hourly loop, against the same `ARCHIVE`
+  volume, from a completely different OS process. `archive_lock` there is a
+  different lock object in different process memory; it provides no
+  coordination whatsoever with the webui process's own `archive_lock`.
+- `archive_download()`, `archive_checksums()`, and `archive_delete()` read
+  `ARCHIVE` without taking any lock a separate process would ever see.
+
+Concretely, the maintenance container's retention/quota sweep can run at the
+same moment the webui process is archiving a just-finished build, or a
+browser is mid-download of an existing archive file, with no coordination
+between the two processes. The realistic failure mode is a corrupted or
+truncated download, or an eviction decision computed from a torn directory
+listing — not corruption of an already-archived file's *contents* (each file
+is written once, verified by checksum, and only then exposed).
+
+TODO:
+
+- [ ] Replace `archive_lock` (or supplement it) with a lock both processes
+      actually observe, e.g. `fcntl.flock()` on a file inside the shared
+      `ARCHIVE` volume, taken by `enforce_archive_policy()`,
+      `archive_giso_artifacts_and_cleanup()`, `archive_download()`,
+      `archive_checksums()`, and `archive_delete()`. Note `archive_lock` is
+      currently reentrant (`archive_giso_artifacts_and_cleanup()` calls
+      `enforce_archive_policy()` while already holding it) — `flock()` is
+      not reentrant across independently opened file descriptors, so the
+      lock boundary would need to move to the outermost call in each of
+      these entry points, not be taken again at every nesting level.
+- [ ] Add a regression test that proves the fix actually blocks a concurrent
+      cross-process (not just cross-thread) access — a same-process
+      `threading` test would not have caught this bug.
+
 ### Mandatory Docker pull makes builds depend on registry availability even when the builder image is already cached
 
 Current behavior:
@@ -475,6 +515,45 @@ the image, ran it, placed a base ISO plus a current and a superseded RPM in
 the container's upload volume, and saw "ncs5500-bgp-1.0.0.1-r2612.CSCold00001
 ... — Superseded by a newer fix per Cisco supersedence notes" render in the
 Review BuildPlan step in a real browser.
+
+## P3 — Cisco download hardening (residual, deferred)
+
+### DNS-rebinding TOCTOU in the Cisco download SSRF guard (2026-09-16)
+
+Current behavior:
+
+`CiscoSoftwareClient._validate_download_url()` in `giso-webui/cisco_download.py`
+resolves the download host and requires every resolved address to be a
+global (non-private/non-loopback/non-link-local) IP before allowing the
+request — a real, tested control (`test_cisco_download.py` injects a
+resolver returning `127.0.0.1` and confirms rejection). But the actual HTTP
+request that follows is made by `urllib.request`, which performs its own,
+independent DNS resolution when it opens the connection. Between the
+validation resolve and the connect, nothing pins the connection to the
+address that was actually checked, so a host that resolves differently
+between those two calls (classic DNS rebinding) could in principle bypass
+the check.
+
+Why this is deferred rather than fixed now: the URL being validated is not
+attacker-supplied in the ordinary sense — it comes from Cisco's own
+authenticated API response, already scoped to `cisco.com`-suffixed hosts.
+The realistic threat this control defends against is a malformed or
+unexpected URL in Cisco's own response, not an actively adversarial DNS
+answer from Cisco's infrastructure. A correct fix means connecting directly
+to the already-resolved IP with the original hostname preserved only for TLS
+SNI/hostname verification (not simply "resolve then hope the same address is
+used"), which is a non-trivial change to code that also has to keep working
+through the existing redirect-following loop (up to 6 hops, each re-running
+`_validate_download_url()`). Given the low realistic exploitability and the
+size of a correct fix, this is recorded here rather than attempted under
+these constraints — the pattern this session used to defer
+`03-DOCKER-SELF-CONTAINED-TODO.md`.
+
+TODO:
+
+- [ ] If this trust model ever changes (e.g. download URLs sourced from
+      somewhere less trusted than Cisco's own API), connect by IP with
+      explicit SNI/hostname verification instead of resolve-then-request.
 
 ## Required regression-test additions
 
