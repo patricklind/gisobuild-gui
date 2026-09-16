@@ -415,7 +415,7 @@ async function loadArchive() {
   try {
     const items = await api('/api/archive');
     const list = $('#archive-list'); list.replaceChildren();
-    if (!items.length) { const empty=document.createElement('p'); empty.className='empty'; empty.textContent='No archived GISO images yet.'; list.appendChild(empty); return; }
+    if (!items.length) { const empty=document.createElement('p'); empty.className='empty'; empty.textContent='No archived GISO images yet. Completed Golden ISO and USB boot artifacts appear here automatically after a successful build.'; list.appendChild(empty); return; }
     items.forEach(item => {
       const row=document.createElement('div'); row.className='archive-row';
       const link=document.createElement('a'); link.href=item.url;
@@ -650,7 +650,15 @@ async function poll() {
     $('#build-phase').textContent = job.phase || 'Working';
     const seconds = Math.max(0, Math.floor(((job.finished || Date.now()/1000) - job.created)));
     $('#elapsed-time').textContent = `Elapsed time: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
-    $('#friendly-status').textContent = job.status === 'success' ? 'Your new image is ready. Download it using the green link below.' : job.status === 'failed' ? 'The build could not be completed. Open the technical details to see why.' : job.status === 'interrupted' ? 'The web service restarted before this build completed. Check Docker and the technical log before starting another build.' : job.status === 'cancelled' ? 'The build was stopped. Your uploaded files are still saved.' : 'The build is running. You may leave this page open or return later.';
+    const friendlyStatusByJobStatus = {
+      success: 'Your new image is ready. Download it using the green link below.',
+      failed: 'The build could not be completed. Open the technical details to see why.',
+      interrupted: 'The web service restarted before this build completed. Check Docker and the technical log before starting another build.',
+      cancelled: 'The build was stopped. Your uploaded files are still saved.',
+      queued: 'Waiting for the current build slot to free up. Only one build can run at a time.',
+      cancelling: 'Stopping the build. This can take a few seconds while the build container shuts down.',
+    };
+    $('#friendly-status').textContent = friendlyStatusByJobStatus[job.status] || 'The build is running. You may leave this page open or return later.';
     const artifacts = $('#artifacts'); artifacts.replaceChildren();
     job.artifacts.forEach(artifact => {
       const link = document.createElement('a'); link.href = artifact.url || `/download/${encodeURIComponent(job.id)}/${artifact.path.split('/').map(encodeURIComponent).join('/')}`;
