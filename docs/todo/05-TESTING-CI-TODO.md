@@ -124,8 +124,19 @@ Mandatory regression coverage for:
       `giso-webui/tests/test_app.py` to pin the backend half of that split
       responsibility, since nothing did before.
 - [x] CSC group selection mismatch — same gap as "incomplete CSC" above, now fixed; see that entry.
-- [ ] "No RPM packages uploaded" despite inventory containing compatible
-      RPMs — no regression test pins this specific historical wording bug.
+- [x] "No RPM packages uploaded" despite inventory containing compatible
+      RPMs — verified 2026-09-16, not a live bug: `templates/index.html`'s
+      static "No RPM packages uploaded." text is only ever a pre-JS
+      placeholder — `renderInputs()` unconditionally calls
+      `renderManualPackages()` on every `/api/inputs` load regardless of
+      whether Manual mode is even selected, and that function's own
+      empty-state gate is "zero RPM files of any kind" (`!rpms.length`),
+      never a "zero compatible RPMs" check — a workspace with RPMs that are
+      merely wrong-platform/wrong-release/excluded still renders them
+      (disabled, with a reason), it never falls back to an empty-state
+      message. Added `test_manual_package_summary_never_gets_stuck_on_the_static_placeholder`
+      in `giso-webui/tests/test_build_script.py` to pin this, since nothing
+      did before.
 - [x] NCS-57C3 SKU normalization (`test_ncs57c3_inventory_sku_normalizes_to_ncs57`,
       `test_ncs57c3_filename_is_inferred_as_ncs57`)
 - [x] cancel during builder preparation/pull

@@ -112,6 +112,32 @@ class BuildScriptTests(unittest.TestCase):
         self.assertNotIn("function renderManualPackages", app_script)
         self.assertNotIn('name="pkglist_override" rows=', template)
 
+    def test_manual_package_summary_never_gets_stuck_on_the_static_placeholder(self):
+        # 05-TESTING-CI-TODO.md flagged a historical bug: "No RPM packages
+        # uploaded" shown despite the inventory containing compatible RPMs.
+        # Verified here, not fixed: templates/index.html's static
+        # "No RPM packages uploaded." text is only ever a pre-JS placeholder
+        # - renderInputs() unconditionally calls renderManualPackages() on
+        # every /api/inputs load (regardless of whether Manual mode is even
+        # selected), and that function's own empty-state gate is
+        # `!rpms.length` (zero RPM files of any kind), never a
+        # "zero compatible RPMs" check - so a workspace with RPMs that are
+        # merely wrong-platform/wrong-release/excluded still renders them
+        # (disabled, with a reason), never falls back to an empty-state
+        # message at all.
+        web_root = Path(__file__).parents[1]
+        app_script = (web_root / "static" / "app.js").read_text()
+        manual_script = (web_root / "static" / "manual-packages.js").read_text()
+        template = (web_root / "templates" / "index.html").read_text()
+
+        self.assertIn("No RPM packages uploaded.", template)
+        render_inputs = app_script[app_script.index("function renderInputs(data)"):]
+        render_inputs = render_inputs[:render_inputs.index("\n}\n")]
+        self.assertIn("renderManualPackages(data, plan)", render_inputs)
+        render_manual = manual_script[manual_script.index("function renderManualPackages(data, plan)"):]
+        render_manual = render_manual[:render_manual.index("if (!rpms.length)")]
+        self.assertIn("logicalRpms(data.files)", render_manual)
+
     def test_missing_dependencies_panel_is_rendered_on_poll(self):
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
         template = (Path(__file__).parents[1] / "templates" / "index.html").read_text()
