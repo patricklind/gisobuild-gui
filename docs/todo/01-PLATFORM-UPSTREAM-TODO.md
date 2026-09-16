@@ -6,12 +6,46 @@ Support **everything that the pinned upstream `ios-xr/gisobuild` revision suppor
 
 The application must distinguish:
 
-- [ ] Physical PID / SKU
-- [ ] Marketing family
-- [ ] Upstream gisobuild platform identifier
+- [x] Physical PID / SKU — fixed 2026-09-16: `ALIASES` already routed an
+      exact PID spelling (`ncs-57c3-mod-sys`, …) to its marketing family
+      (`ncs57`), but discarded the spelling itself, so an operator could not
+      tell "we matched your exact NCS-57C3-MOD-SYS" from "we guessed the NCS
+      5700 family". Added `infer_platform_pid()` in
+      `giso-webui/platform_validation.py`, which returns the literal alias
+      token matched (or `None` when the filename matched a canonical
+      platform ID directly — then the family name *is* what was in the
+      filename, and there is no separate SKU to report). Surfaced as a new
+      `pid` field on `confidence_report()`'s platform entry, and appended to
+      that entry's `detail` text ("Matched hardware PID/SKU spelling: …"),
+      which the existing confidence badge already renders as its tooltip —
+      no new UI element needed. Wired into all three `confidence_report()`
+      call sites (`create_build_plan()`, `discover()`,
+      `/api/smu/recommendation`). Honest limitation, documented in the
+      function's own docstring: `ALIASES` also holds alternate marketing
+      digit-spellings that are not distinct physical SKUs (`asr9k-x64`,
+      `8800`), and this reports those too — separating "true PID" from
+      "family nickname" would need a distinction upstream does not track
+      either. Verified by
+      `test_hardware_pid_is_reported_separately_from_the_marketing_family`
+      in `giso-webui/tests/test_platform_compatibility.py`.
+- [x] Marketing family — `platform_profile()["label"]` (e.g. "NCS 5700 /
+      NCS 57C3"), shown in the platform dropdown, the Step 2 flow row, and
+      the build report.
+- [x] Upstream gisobuild platform identifier — `platform_profile()["id"]`
+      (e.g. `ncs57`, `ncs5500`, `exr-generic`), the exact string
+      `normalize_platform()` resolves to and `validate_platform_options()`
+      passes through as `payload["platform"]`; shown directly (uppercased)
+      in the same flow row as "Platform".
 - [x] Build engine (`eXR` / `LNT`)
-- [ ] IOS XR release
-- [ ] CPU architecture
+- [x] IOS XR release — `release` field throughout (confidence report,
+      BuildPlan, build report), extracted from the ISO filename independent
+      of platform detection — confirmed live it is populated correctly even
+      for an unrecognized/generic platform (see "Unknown-but-valid
+      platforms" below).
+- [x] CPU architecture — `iso_architecture`/`package_architecture` are
+      separate fields in `confidence_report()`, and `iso_architectures`
+      (read from the ISO's own contents via `inspect_iso_architecture()`)
+      gates RPM architecture matching independently of platform/release.
 - [x] Feature/capability support
 
 ## Upstream-first model
@@ -194,36 +228,72 @@ required-binary checks) remains open.
 
 ## Representative eXR families
 
-Do not hardcode these as the only supported platforms.
+Do not hardcode these as the only supported platforms — see
+`test_exr_platform_list_matches_the_pinned_upstream_engine`, which proves
+this exact list is not just "present" but *identical* to what the pinned
+`.gisobuild-tool`'s own engine actually enforces (`Giso.SUPPORTED_PLATFORMS`).
 
-- [ ] ASR 9000
-- [ ] NCS 1K
-- [ ] NCS 1001
-- [ ] NCS 1004
-- [ ] NCS 5K
-- [ ] NCS 540
-- [ ] NCS 5500
-- [ ] NCS 560
-- [ ] NCS 6000
-- [ ] XRv9K
-- [ ] IOS XR whitebox variants
+- [x] ASR 9000 (`asr9k`)
+- [x] NCS 1K (`ncs1k`)
+- [x] NCS 1001 (`ncs1001`)
+- [x] NCS 1004 (`ncs1004`)
+- [x] NCS 5K (`ncs5k`)
+- [x] NCS 540 (`ncs540`)
+- [x] NCS 5500 (`ncs5500`)
+- [x] NCS 560 (`ncs560`)
+- [x] NCS 6000 (`ncs6k`)
+- [x] XRv9K (`xrv9k`)
+- [x] IOS XR whitebox variants (`iosxrwb`, `iosxrwbd`)
 
 ## LNT
 
-- [ ] Detect LNT support from the pinned upstream code
-- [ ] Do not assume current local mappings are complete
-- [ ] Ensure Cisco 8000-class and NCS57xx-class images are handled generically when upstream supports them
+- [x] Detect LNT support from the pinned upstream code — confirmed by direct
+      source inspection: LNT has no fixed platform whitelist upstream at
+      all (unlike eXR's `SUPPORTED_PLATFORMS`) — `find_platform_object()` in
+      `.gisobuild-tool/src/lnt/image.py` determines platform from the ISO's
+      own metadata, not a hardcoded list. This app's LNT entries in
+      `PLATFORMS` are marketing/capability presentation only, matching that
+      upstream reality — there was nothing to "detect" as a list because
+      upstream itself does not gate LNT by one.
+- [x] Do not assume current local mappings are complete — the `lnt-generic`
+      fallback (see "Unknown-but-valid platforms" below) is exactly this:
+      an LNT image whose marketing name this app does not recognize can
+      still be built, in Manual package list mode, via an explicit generic
+      override rather than being blocked because the local LNT map is
+      incomplete.
+- [x] Ensure Cisco 8000-class and NCS57xx-class images are handled
+      generically when upstream supports them — both are named `PLATFORMS`
+      entries (`8000`, `ncs57`) with the same generic capability-driven
+      model every other platform uses (no `8000`- or `ncs57`-specific
+      branching anywhere — confirmed by grep: the only per-platform
+      conditionals in the whole codebase are `PLATFORM_CAPABILITY_OVERRIDES`
+      for `asr9k`/`xrv9k`'s genuine eXR-only quirks), and an
+      NCS57-class image whose exact PID the local `ALIASES` map does not
+      yet know (e.g. a future variant) falls through to `lnt-generic`
+      rather than being rejected.
 - [x] Ensure LNT-only options are capability driven
 
 ## Hardware aliases
 
-Create a data-only alias layer, e.g. `hardware_aliases.yaml`.
+Create a data-only alias layer, e.g. `hardware_aliases.yaml` — not literally
+built as a separate YAML file, but `ALIASES` in
+`giso-webui/platform_validation.py` already *is* exactly this: a flat,
+data-only `dict[str, str]` with no branching logic attached to any entry,
+which is the substantive requirement ("must not become the source of truth
+for software support" — aliases only ever resolve to a `PLATFORMS` key,
+never independently grant or deny build support). Splitting it into a
+separate file is a packaging preference, not a functional gap, so not done
+purely for that reason.
 
-- [ ] `NCS-57C3-MODS-SYS`
-- [ ] `NCS-57C3-MOD-SYS`
-- [ ] `NCS57C3`
-- [ ] `NCS-57C3`
-- [ ] other known PID spelling variations
+- [x] `NCS-57C3-MODS-SYS` (`ncs-57c3-mods-sys`/`ncs57c3modssys`)
+- [x] `NCS-57C3-MOD-SYS` (`ncs-57c3-mod-sys`/`ncs57c3modsys`)
+- [x] `NCS57C3` (`ncs57c3`)
+- [x] `NCS-57C3` (`ncs-57c3`)
+- [ ] other known PID spelling variations — open-ended by nature (this can
+      never be "complete", only "extensible"); the alias mechanism itself
+      is proven correct (word-boundary matched, not loose substring —
+      `test_alias_matching_does_not_produce_false_positives_on_substrings`)
+      and adding a new spelling is a one-line dict entry, not a design gap.
 - [x] normalize dash/underscore/case safely (verified:
       `normalize_platform()` strips non-`[a-z0-9-]` characters before alias
       lookup, so underscore/dash/case variants of the same SKU already
@@ -276,9 +346,17 @@ container image (146/146 tests pass).
       `exr-generic` with manual package selection, and got
       `POST /api/build-plan` → `"ready": true` — a build that was previously
       impossible to start at all.
-- [ ] Show upstream identifier
-- [ ] Show engine
-- [ ] Show release
+- [x] Show upstream identifier — confirmed live for the generic-platform
+      case: `POST /api/build-plan` with `platform: "exr-generic"` returns
+      `"platform": "exr-generic"` directly (the real `normalize_platform()`
+      result, not a translated label), rendered uppercased in the Step 2/
+      build-report flow row exactly as any named platform's `id` is.
+- [x] Show engine — same response, `"engine": "exr"`; rendered in the same
+      flow row.
+- [x] Show release — same response, `"release": "30.1.1"` (from a synthetic
+      `mystery-30.1.1.iso` test upload) — release detection reads the ISO
+      filename independently of platform recognition, so it is unaffected
+      by the platform being unknown/generic.
 - [x] Show marketing name as unknown — the generic fallback's own label
       ("Other eXR platform (manual override)") already communicates this;
       no separate marketing-name field needed for the fallback case itself.
@@ -352,8 +430,17 @@ if capabilities.optimize:
 
 ## Tests
 
-- [ ] generic eXR workflow
-- [ ] generic LNT workflow
+- [x] generic eXR workflow — `test_build_recalculates_automatic_smu_selection_server_side`
+      in `giso-webui/tests/test_app.py` exercises the full
+      discover-through-`build_command()` pipeline (automatic selection,
+      wrong-release exclusion, real generated command) for an eXR platform
+      (`ncs5500`).
+- [x] generic LNT workflow — added 2026-09-16:
+      `test_build_recalculates_automatic_smu_selection_server_side_for_lnt_platforms`,
+      the same pipeline for an LNT platform (`ncs57`/`ncs5700`-named files) —
+      previously LNT's only `build_command()` coverage was narrower
+      option-passthrough checks (`--verbose-dep-check`, ownership fields),
+      not automatic-selection recalculation through the real command.
 - [x] eXR-only option rejection on LNT — added 2026-09-16
       (`test_adapter_rejects_exr_only_capability_on_lnt_platform`); until
       then only the reverse direction had a test.

@@ -9,6 +9,7 @@ from platform_validation import (
     capabilities_for_platform,
     check_upgrade_matrix,
     infer_platform,
+    infer_platform_pid,
     normalize_platform,
     recommend_smu_selection,
     validate_platform_options,
@@ -92,6 +93,20 @@ class PlatformCompatibilityTests(unittest.TestCase):
         })
         self.assertEqual(lnt_profile["architecture"], "lnt")
         self.assertTrue(lnt_profile["capabilities"]["remove_packages"])
+
+    def test_hardware_pid_is_reported_separately_from_the_marketing_family(self):
+        # 01-PLATFORM-UPSTREAM-TODO.md's "The application must distinguish"
+        # list asked for Physical PID / SKU as its own fact. ALIASES already
+        # routed an exact SKU spelling to the right family, but the SKU
+        # itself was discarded - an operator could not tell "we matched your
+        # exact NCS-57C3-MOD-SYS" from "we guessed the NCS 5700 family".
+        self.assertEqual(infer_platform("NCS-57C3-MOD-SYS-25.1.2.iso"), "ncs57")
+        self.assertEqual(infer_platform_pid("NCS-57C3-MOD-SYS-25.1.2.iso"), "ncs-57c3-mod-sys")
+        # A filename that matches a canonical platform ID directly carries no
+        # separate SKU spelling - the family name *is* what was in the name.
+        self.assertEqual(infer_platform("ncs5500-mini-x-25.1.2.iso"), "ncs5500")
+        self.assertIsNone(infer_platform_pid("ncs5500-mini-x-25.1.2.iso"))
+        self.assertIsNone(infer_platform_pid("mystery-platform-30.1.1.iso"))
 
     def test_generic_platform_fallbacks_are_never_inferred_from_a_filename(self):
         # These two IDs exist only as an explicit manual escape hatch: a

@@ -1029,6 +1029,30 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn(wrong_release, command[pkglist_index + 1:])
 
     @patch("app.child_mount_args", return_value=[])
+    def test_build_recalculates_automatic_smu_selection_server_side_for_lnt_platforms(self, _mounts):
+        # 01-PLATFORM-UPSTREAM-TODO.md's "Tests" section asked for a
+        # "generic LNT workflow" test alongside the eXR one directly above -
+        # the full discover-through-build_command pipeline had only ever
+        # been exercised end-to-end for an eXR platform (ncs5500); LNT's
+        # only build_command() coverage was narrower option-passthrough
+        # checks (--verbose-dep-check, ownership fields), not automatic
+        # selection recalculation through the real command.
+        iso = "ncs5700-mini-x-26.1.2.iso"
+        matching = "ncs5700-bgp-1.0.0.1-r2612.CSCtest00003.x86_64.rpm"
+        wrong_release = "ncs5700-isis-1.0.0.1-r2512.CSCtest00004.x86_64.rpm"
+        for name in (iso, matching, wrong_release):
+            (self.data / name).write_bytes(b"input")
+
+        command = module.build_command({
+            "iso": iso, "pkglist": [wrong_release], "automatic_smu_selection": True,
+            "auto_repo": True,
+        }, "automatic-lnt")
+
+        pkglist_index = command.index("--pkglist")
+        self.assertIn(matching, command[pkglist_index + 1:])
+        self.assertNotIn(wrong_release, command[pkglist_index + 1:])
+
+    @patch("app.child_mount_args", return_value=[])
     def test_manual_selection_of_a_partial_multi_component_bundle_is_rejected(self, _mounts):
         # CSCtest00001 is a multi-component fix requiring all 3 RPMs
         # together (see recommend_smu_selection()'s own "keep these RPMs
@@ -1221,11 +1245,12 @@ class GisoWebTests(unittest.TestCase):
         })
 
         confidence = response.get_json()["confidence"]
-        self.assertEqual(confidence["platform"], {
-            "value": "INFERRED",
-            "source": "iso-filename-pattern",
-            "detail": confidence["platform"]["detail"],
-        })
+        self.assertEqual(confidence["platform"]["value"], "INFERRED")
+        self.assertEqual(confidence["platform"]["source"], "iso-filename-pattern")
+        # "asr9k-x64" is an ALIASES key, so it is reported as the matched
+        # PID/SKU spelling - see infer_platform_pid()'s docstring on why
+        # alternate family spellings land here too, not only true SKUs.
+        self.assertEqual(confidence["platform"]["pid"], "asr9k-x64")
         self.assertEqual(confidence["release"]["value"], "INFERRED")
         self.assertEqual(confidence["release"]["source"], "iso-filename-pattern")
         self.assertEqual(confidence["package_architecture"]["value"], "INFERRED")

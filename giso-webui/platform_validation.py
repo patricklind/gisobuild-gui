@@ -166,6 +166,27 @@ def infer_platform(filename: str) -> str | None:
     return None
 
 
+def infer_platform_pid(filename: str) -> str | None:
+    """Return the exact hardware PID/SKU spelling matched from ALIASES, if any.
+
+    Distinct from infer_platform(): that resolves straight to the marketing
+    family (e.g. "ncs57"); this preserves which literal alias token was
+    actually recognized in the filename, so "we matched your exact
+    NCS-57C3-MOD-SYS" can be shown separately from "we guessed NCS 5700
+    family". Honest limitation: ALIASES also holds alternate marketing
+    digit-spellings that are not distinct physical SKUs at all (e.g.
+    "asr9000"/"8800" are just other ways of writing the same family, not a
+    different piece of hardware) - this returns whatever token matched,
+    without trying to separate "genuine PID" from "family nickname" within
+    ALIASES, since that distinction is not tracked anywhere upstream either.
+    """
+    name = filename.lower()
+    for alias in sorted(ALIASES, key=len, reverse=True):
+        if re.search(rf"(^|[^a-z0-9]){re.escape(alias)}([^a-z0-9]|$)", name):
+            return alias
+    return None
+
+
 def _bundle_files_by_csc(
     packages: list[str], iso_platform: str | None, expected_tag: str
 ) -> dict[str, set[str]]:

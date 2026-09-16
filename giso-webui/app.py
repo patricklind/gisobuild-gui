@@ -32,6 +32,7 @@ from platform_validation import (
     PLATFORMS,
     RPM_ARCHITECTURE,
     check_upgrade_matrix,
+    infer_platform_pid,
     normalize_architecture,
     platform_profile,
     recommend_smu_selection,
@@ -730,7 +731,8 @@ def current_inventory_revision(items: list[dict] | None = None) -> str:
 
 def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
                       release: str | None, iso_architectures: frozenset[str],
-                      package_groups: list, has_rpm_selection: bool) -> dict:
+                      package_groups: list, has_rpm_selection: bool,
+                      matched_pid: str | None = None) -> dict:
     """Report how each detected fact was derived, never presenting a guess as verified.
 
     Only iso_architecture is read from the artifact's own contents (see
@@ -756,11 +758,14 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
                        else "INFERRED" if resolved_platform else "UNKNOWN"),
             "source": ("operator-selected" if platform_manual
                        else "iso-filename-pattern" if resolved_platform else "none"),
+            "pid": matched_pid,
             "detail": ("The operator declared a generic engine profile; the real platform "
                        "identity is unverified and no platform-specific capabilities apply."
                        if platform_is_generic else
                        "Not cross-checked against ISO metadata; select it manually in Expert "
-                       "settings if the filename guess is wrong."),
+                       "settings if the filename guess is wrong."
+                       + (f" Matched hardware PID/SKU spelling: {matched_pid.upper()}."
+                          if matched_pid else "")),
         },
         "release": {
             "value": "INFERRED" if release else "UNKNOWN",
@@ -872,6 +877,7 @@ def create_build_plan(payload: dict) -> dict:
         package_groups=recommendation["package_groups"],
         has_rpm_selection=any(item.get("basename", "").lower().endswith(".rpm")
                               for item in selected),
+        matched_pid=infer_platform_pid(iso_name) if iso_name else None,
     )
 
     option_keys = sorted(set(BOOL_OPTIONS) | set(PATH_OPTIONS) | set(LIST_OPTIONS) |
@@ -1260,6 +1266,7 @@ def discover() -> dict:
         iso_architectures=iso_architectures,
         package_groups=recommendation.get("package_groups", []),
         has_rpm_selection=bool(recommendation.get("selected")),
+        matched_pid=infer_platform_pid(isos[0]) if len(isos) == 1 else None,
     )
     matrices = [item["path"] for item in files
                 if item["type"] == ".json" and Path(item["path"]).name.startswith("compatibility_matrix_")]
@@ -1795,6 +1802,7 @@ def smu_recommendation():
             iso_architectures=iso_architectures,
             package_groups=recommendation.get("package_groups", []),
             has_rpm_selection=bool(recommendation.get("selected")),
+            matched_pid=infer_platform_pid(iso),
         )
         return jsonify(recommendation)
     except (OSError, TypeError, ValueError) as exc:
