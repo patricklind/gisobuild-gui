@@ -526,12 +526,52 @@ function updateRollbackWorkflow() {
   }
 }
 
+const READY_CHECK_LABELS = {
+  docker: 'Docker is unavailable',
+  tool: 'the gisobuild engine checkout is missing',
+  storage: 'a required storage directory is missing',
+  database: 'the job database is unavailable',
+  disk: 'disk space is critically low',
+};
+
 async function health() {
+  const pill = $('#health');
   try {
-    const state = await api('/api/health');
-    $('#health').textContent = state.ok ? '✓ System ready' : 'System is not ready';
-    $('#health').className = `pill ${state.ok ? 'ok' : 'bad'}`;
-  } catch { $('#health').textContent = 'System unavailable'; $('#health').className = 'pill bad'; }
+    // /api/health only proves the process itself is responding; /api/ready
+    // (the same check the container's own HEALTHCHECK uses) also confirms
+    // Docker, the mounted gisobuild checkout, storage, the job database and
+    // disk space are actually usable - showing "System ready" from the
+    // weaker check would be a false all-clear on a deployment that can
+    // never actually complete a build. Fetched directly rather than through
+    // api(): /api/ready legitimately answers "not ready" with HTTP 503 and
+    // a body explaining why, but api() treats any non-2xx as a transport
+    // failure and throws away the body - which would collapse every "not
+    // ready" reason into the same generic "System unavailable".
+    const state = await (await fetch('/api/ready')).json();
+    if (state.ok) {
+      pill.textContent = '✓ System ready';
+      pill.className = 'pill ok';
+      pill.removeAttribute('title');
+      pill.removeAttribute('aria-label');
+    } else {
+      const failing = Object.entries(READY_CHECK_LABELS)
+        .filter(([key]) => state[key] === false)
+        .map(([, label]) => label);
+      pill.textContent = failing.length === 1 ? `⚠ ${failing[0]}` : `⚠ System not ready (${failing.length} checks failing)`;
+      pill.className = 'pill bad';
+      // A hover title alone would hide the specific reasons from touch and
+      // screen-reader users; aria-label gives them the same full list as
+      // the sighted hover tooltip, on the same role="status" element that
+      // already announces the pill's text on change.
+      if (failing.length > 1) {
+        pill.title = failing.join('; ');
+        pill.setAttribute('aria-label', `System not ready: ${failing.join('; ')}`);
+      } else {
+        pill.removeAttribute('title');
+        pill.removeAttribute('aria-label');
+      }
+    }
+  } catch { pill.textContent = 'System unavailable'; pill.className = 'pill bad'; }
 }
 
 async function loadVersion() {

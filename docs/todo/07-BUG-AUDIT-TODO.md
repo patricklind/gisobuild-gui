@@ -2,6 +2,61 @@
 
 This file tracks concrete bugs found in the current implementation. These are not merely architectural improvements. Each item should receive a regression test before or with the fix.
 
+## P1 — Misleading UI status
+
+### The header "System ready" pill checked only bare liveness, not actual readiness (2026-09-16)
+
+Current behavior (before this fix):
+
+`health()` in `giso-webui/static/app.js` called `GET /api/health`, which
+only proves the Flask process itself is responding (`{"ok": true}` — see
+`app.py`, no dependency checks at all). The container's own `HEALTHCHECK`
+in `giso-webui/Dockerfile` calls a *different*, deeper endpoint,
+`GET /api/ready`, which also verifies Docker, the mounted `.gisobuild-tool`
+checkout, all required storage directories, the job database, and free
+disk space — but that endpoint was never called from the UI at all. An
+operator could stare at a reassuring green "✓ System ready" pill while
+Docker was unreachable, the tool checkout was missing, or a storage volume
+had failed to mount — exactly the deployment states where every build
+attempt would fail — with no visible signal until they tried a build and
+read the failure, or dug into logs. This directly contradicts this
+project's own "honest confidence/warning display" standard applied
+everywhere else (confidence badges, BuildPlan warnings, the ownership
+voucher/certificate warning, etc.).
+
+TODO:
+
+- [x] Make the header status pill call the same deep readiness check the
+      container's own health check uses, not just bare liveness.
+- [x] When not ready, show which specific check(s) are failing rather than
+      a generic "not ready" message.
+- [x] Make the failure detail available to touch and screen-reader users,
+      not only as a mouse-hover tooltip.
+
+Fix: `health()` now fetches `/api/ready` directly (not through the generic
+`api()` helper, which throws away the response body on any non-2xx status
+— and `/api/ready` legitimately answers "not ready" with HTTP 503). When
+`ok` is false, it maps each failing check (`docker`/`tool`/`storage`/
+`database`/`disk`) to a plain-English reason via `READY_CHECK_LABELS` and
+shows it directly in the pill text (or "N checks failing" plus a `title`
+tooltip and matching `aria-label` when more than one check fails), instead
+of a static "System is not ready".
+
+Verified by `test_system_status_pill_uses_the_deep_readiness_check` in
+`giso-webui/tests/test_build_script.py` (source-level assertion, matching
+this repo's existing JS-testing convention — no DOM/JS runner exists yet,
+tracked separately in `05-TESTING-CI-TODO.md`), and confirmed live in a
+browser against an isolated throwaway container (its own temp
+`DATA_ROOT`/etc., docker socket and `.gisobuild-tool` deliberately not
+mounted) — the pill correctly showed "⚠ System not ready (3 checks
+failing)" with `title`/`aria-label` both reading "Docker is unavailable;
+the gisobuild engine checkout is missing; a required storage directory is
+missing". Full suite green (200 tests); ruff and Graphify clean. Caught and
+fixed a second bug while verifying the first: the initial version called
+`/api/ready` through `api()`, which meant the 503 response was thrown away
+before any of this new detail could render, collapsing every failure back
+into the old generic message — only actually testing it live surfaced this.
+
 ## P0/P1 — Build lifecycle and destructive cleanup
 
 ### Cancellation during image pull cannot reliably cancel the build

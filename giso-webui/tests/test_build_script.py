@@ -44,6 +44,22 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("result.cleared_artifacts", cleanup_handler)
         self.assertIn("currentJob = null", cleanup_handler)
 
+    def test_system_status_pill_uses_the_deep_readiness_check(self):
+        # /api/health only proves the Flask process is responding; it does
+        # not check Docker, the mounted gisobuild checkout, storage, the job
+        # database or disk space the way /api/ready (and the container's own
+        # HEALTHCHECK) does. Showing "System ready" from the weaker check
+        # would be a false all-clear on a deployment that can never actually
+        # complete a build.
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        health_fn = script[script.index("async function health()"):]
+        health_fn = health_fn[:health_fn.index("\n}\n")]
+        self.assertIn("fetch('/api/ready')", health_fn)
+        self.assertNotIn("api('/api/health')", health_fn)
+        self.assertNotIn("api('/api/ready')", health_fn)
+        for check in ("docker", "tool", "storage", "database", "disk"):
+            self.assertIn(f"{check}:", script[:script.index("async function health()")])
+
     def test_manual_package_mode_renders_uploaded_rpms_as_choices(self):
         # renderManualPackages()/selectedManualPackages()/syncManualPackageValue()
         # used to be defined in app.js too, with an older implementation that
