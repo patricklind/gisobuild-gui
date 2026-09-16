@@ -187,9 +187,10 @@ Run (`.github/workflows/ci.yml`):
 - [x] lint — `ruff check` step, now running a pinned `ruff==0.16.7` from
       `docker/tooling.Dockerfile` (fixed 2026-09-16; previously an unpinned
       `pip install ruff` — see "`ruff` is installed unpinned in CI" in
-      `07-BUG-AUDIT-TODO.md`). Still uses ruff's default rule set (no
-      `pyproject.toml`/`ruff.toml`) — the version is now reproducible, the
-      rule *selection* is not yet.
+      `07-BUG-AUDIT-TODO.md`), against an explicit rule selection pinned in
+      the repo-root `ruff.toml` (also fixed 2026-09-16, see the same
+      `07-BUG-AUDIT-TODO.md` entry) — both the ruff *version* and the rule
+      *selection* it runs are now reproducible.
 - [ ] formatting check — ruff lints but nothing runs `ruff format --check`
       or an equivalent formatter gate.
 - [ ] static security checks — no bandit/semgrep-equivalent step; ruff's
