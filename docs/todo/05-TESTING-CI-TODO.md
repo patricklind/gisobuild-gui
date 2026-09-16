@@ -4,30 +4,59 @@
 
 Cover:
 
-- [ ] platform alias normalization
+- [x] platform alias normalization (`test_ncs57c3_inventory_sku_normalizes_to_ncs57`,
+      `test_ncs57c3_filename_is_inferred_as_ncs57`,
+      `test_alias_matching_does_not_produce_false_positives_on_substrings`,
+      `test_exr_arm_variant_token_normalizes_to_aarch64`,
+      `test_upgrade_matrix_uses_canonical_platform_normalization` — covers
+      both correct resolution and the false-positive-avoidance direction)
 - [x] eXR capability discovery
 - [x] LNT capability discovery
-- [ ] ISO metadata detection
-- [ ] filename fallback detection
-- [ ] RPM metadata parsing
-- [ ] CSC grouping
+- [x] ISO metadata detection (`IsoArchitectureInspectionTests` in
+      `test_app.py`: `test_detects_dual_arch_exr_image_from_metadata`,
+      `test_detects_x86_64_only_exr_image_from_metadata`)
+- [x] filename fallback detection (`test_falls_back_to_rpm_repository_listing_for_lnt_image`,
+      `test_unreadable_iso_reports_unknown_rather_than_raising`)
+- [ ] RPM metadata parsing — genuinely not implemented: RPM architecture is
+      read from the filename suffix, not a real RPM header parser (see the
+      "Confidence display" honesty note in `06-UI-OPERATOR-TODO.md`), so
+      there is nothing here to test yet.
+- [x] CSC grouping (`test_csc_package_groups_show_components_that_belong_together`,
+      `test_overlapping_csc_fixes_are_explained`,
+      `test_multiple_fixes_for_same_component_require_supersedence_data`,
+      `test_multiple_versions_of_same_component_and_fix_are_rejected`)
 - [x] duplicate checksums
 - [x] same filename/different content
-- [ ] release mismatch
+- [x] release mismatch (`test_mixed_release_is_rejected` and the
+      `"Different IOS XR release"` exclusion-reason tests)
 - [x] architecture mismatch (`test_rpm_architecture_mismatched_with_iso_is_rejected`,
       `test_rpm_architecture_matching_iso_is_accepted`,
       `test_unknown_iso_architecture_does_not_block_selection`; this was
       already implemented and tested by the merged ISO/RPM architecture
       change, just left unchecked here)
-- [ ] incomplete CSC
-- [ ] supersedence
-- [ ] BuildPlan generation
-- [ ] BuildPlan fingerprint
-- [ ] inventory revision invalidation
-- [ ] command generation
-- [ ] artifact verification
-- [ ] cleanup
-- [ ] restart recovery
+- [ ] incomplete CSC — genuinely not implemented: nothing cross-checks a
+      manually-selected subset of a multi-RPM CSC bundle against the *full*
+      bundle known to exist in inventory and warns/blocks on a partial
+      selection; `manual-packages.js`'s indeterminate group checkbox is a
+      visual hint only, not a validated check.
+- [x] supersedence (`test_superseded_rpm_is_excluded_with_a_reason_not_silently_dropped`,
+      `test_build_plan_automatic_selection_explains_superseded_exclusions`,
+      `test_oversized_text_is_not_loaded_as_supersedence_metadata`)
+- [x] BuildPlan generation (`test_build_plan_is_backend_owned_and_checksum_fingerprinted`,
+      `test_created_job_records_authoritative_build_plan`)
+- [x] BuildPlan fingerprint (same tests; fingerprint changes when inventory
+      content changes)
+- [x] inventory revision invalidation (`test_stale_confirmed_plan_is_rejected_when_inventory_changes`,
+      `test_confirmed_plan_matching_current_inventory_is_accepted`)
+- [x] command generation (`test_platform_is_inferred_and_invalid_option_rejected`,
+      `test_build_recalculates_automatic_smu_selection_server_side`,
+      `test_package_glob_characters_cannot_select_unintended_files`, and
+      others in the `build_command()` test group)
+- [x] artifact verification (`test_success_archive_is_verified_before_sources_are_removed`
+      — checksum comparison between source and archived copy)
+- [x] cleanup (extensive coverage — see "Regression tests" below)
+- [x] restart recovery (`test_active_job_is_marked_interrupted_after_restart`,
+      `test_expired_orphan_partial_upload_is_removed_after_restart`)
 - [x] malicious paths (TAR traversal/symlink/hardlink/absolute-path members,
       `safe_data_path` traversal, and archive-delete traversal — see
       Security tests below for the specific tests)
@@ -53,16 +82,25 @@ Use synthetic/mocked fixtures, not licensed Cisco artifacts.
 
 Mandatory regression coverage for:
 
-- [ ] manual RPM path vs basename bug
-- [ ] manual mode empty-selection bug
-- [ ] CSC group selection mismatch
-- [ ] "No RPM packages uploaded" despite inventory containing compatible RPMs
-- [ ] NCS-57C3 SKU normalization
+- [x] manual RPM path vs basename bug (`test_inventory_id_selects_exact_rpm`,
+      `test_manual_package_ui_uses_ids_and_renders_duplicate_conflicts` —
+      manual selection submits opaque inventory IDs, never a bare basename
+      that could collide with a duplicate)
+- [ ] manual mode empty-selection bug — no dedicated test for submitting a
+      build with manual mode selected and zero packages checked.
+- [ ] CSC group selection mismatch — same gap as "incomplete CSC" above.
+- [ ] "No RPM packages uploaded" despite inventory containing compatible
+      RPMs — no regression test pins this specific historical wording bug.
+- [x] NCS-57C3 SKU normalization (`test_ncs57c3_inventory_sku_normalizes_to_ncs57`,
+      `test_ncs57c3_filename_is_inferred_as_ncs57`)
 - [x] cancel during builder preparation/pull
 - [x] cancel during finalization
 - [x] successful build preserves unrelated workspace inputs
-- [ ] two uploaded ISOs never silently select the first candidate
-- [ ] RPM CPU architecture must match the selected ISO/build architecture
+- [x] two uploaded ISOs never silently select the first candidate
+      (`test_discover_pauses_automatic_selection_when_multiple_isos_exist`)
+- [x] RPM CPU architecture must match the selected ISO/build architecture
+      (`test_build_plan_blocks_rpm_architecture_mismatch_against_real_iso`,
+      `test_rpm_architecture_mismatched_with_iso_is_rejected`)
 - [x] package names containing glob metacharacters cannot select unintended files
 - [x] duplicate basename + same hash is deterministic and keeps provenance
 - [x] duplicate basename + different hash is a blocking conflict
@@ -135,23 +173,39 @@ upload
 
 ## CI pipeline
 
-Run:
+Run (`.github/workflows/ci.yml`):
 
-- [ ] Python tests
-- [ ] JS/DOM tests
-- [ ] lint
-- [ ] formatting check
-- [ ] static security checks
-- [ ] Docker build
-- [ ] synthetic eXR integration
-- [ ] synthetic LNT integration
-- [ ] SBOM generation
+- [x] Python tests — "Run tests inside the built container" step
+      (`giso-webui/tests` via `unittest discover`, matching `docs/testing.md`).
+- [ ] JS/DOM tests — no JS test runner exists in this repo at all; the
+      "Browser/DOM tests" list below is entirely aspirational.
+- [x] lint — `ruff check` step, though note it runs with ruff's default
+      rule set (no pinned `pyproject.toml`/`ruff.toml`), which is its own
+      tracked risk — see "`ruff` is installed unpinned in CI" in
+      `07-BUG-AUDIT-TODO.md`.
+- [ ] formatting check — ruff lints but nothing runs `ruff format --check`
+      or an equivalent formatter gate.
+- [ ] static security checks — no bandit/semgrep-equivalent step; ruff's
+      default rule set is not the same as an explicit security ruleset.
+- [x] Docker build — "Build production container" step
+      (`docker compose build giso-webui`).
+- [ ] synthetic eXR integration — no test actually drives a (mocked)
+      `gisobuild` invocation end-to-end; `staging/rehearse.py` exercises the
+      IOS XR CLI install/rollback simulator, which is a different thing.
+- [ ] synthetic LNT integration — same gap.
+- [ ] SBOM generation — not implemented.
 - [x] Graphify freshness validation for code-changing PRs
+
+Steps that exist but weren't listed here at all: `actionlint` (workflow
+linting), `hadolint` (both Dockerfiles), `docker compose config -q`
+(compose file validation, both `giso-webui` and `staging`), and
+`bash -n` syntax-checking the shell scripts.
 
 Optional:
 
 - [ ] Trivy image scan
-- [ ] dependency vulnerability scan
+- [x] dependency vulnerability scan — `pip-audit -r giso-webui/requirements.txt`
+      runs on every CI invocation, not gated behind an opt-in flag.
 
 ## Graphify CI guard
 
