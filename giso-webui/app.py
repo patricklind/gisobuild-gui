@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import hashlib
 import json
 import os
@@ -75,6 +77,9 @@ iso_architecture_cache: dict[tuple[str, int, int], frozenset[str]] = {}
 job_lock = threading.RLock()
 upload_lock = threading.Lock()
 archive_lock = threading.RLock()
+archive_file_lock_handle = None
+archive_file_lock_path: Path | None = None
+archive_file_lock_depth = 0
 checksum_lock = threading.Lock()
 operation_lock = threading.Lock()
 store_lock = threading.Lock()
@@ -826,11 +831,51 @@ def archive_timestamp(path: Path) -> float:
     return max((item.stat().st_mtime for item in artifacts), default=path.stat().st_mtime)
 
 
+@contextlib.contextmanager
+def cross_process_archive_lock():
+    """Serialize ARCHIVE access across processes, not just threads.
+
+    archive_lock (a threading.RLock) only ever protected this process's own
+    threads. The separate archive-maintenance container imports and calls
+    enforce_archive_policy() too, on the same ARCHIVE volume, from a
+    different OS process that has its own independent archive_lock object -
+    which gives it zero coordination with this one. An flock() on a file
+    inside ARCHIVE is the only lock primitive both processes actually share.
+
+    flock() is not reentrant across independently opened file descriptors
+    (man 2 flock), unlike archive_lock, so this keeps a single persistent
+    file handle per process and only actually flocks/unflocks at the
+    outermost nesting level (depth 0->1 and back), tracked under archive_lock
+    exactly the way archive_lock's own reentrancy already works - every
+    caller below still holds archive_lock for the full duration, so only one
+    thread in this process can be inside this block at a time regardless of
+    nesting.
+    """
+    global archive_file_lock_handle, archive_file_lock_path, archive_file_lock_depth
+    with archive_lock:
+        if archive_file_lock_depth == 0:
+            ARCHIVE.mkdir(parents=True, exist_ok=True)
+            lock_path = ARCHIVE / ".lock"
+            if archive_file_lock_handle is None or archive_file_lock_path != lock_path:
+                if archive_file_lock_handle is not None:
+                    archive_file_lock_handle.close()
+                archive_file_lock_handle = open(lock_path, "w")  # noqa: SIM115 - kept open for process lifetime
+                archive_file_lock_path = lock_path
+            fcntl.flock(archive_file_lock_handle, fcntl.LOCK_EX)
+        archive_file_lock_depth += 1
+        try:
+            yield
+        finally:
+            archive_file_lock_depth -= 1
+            if archive_file_lock_depth == 0:
+                fcntl.flock(archive_file_lock_handle, fcntl.LOCK_UN)
+
+
 def enforce_archive_policy(*, protected_job_id: str | None = None) -> list[str]:
     """Remove expired archive jobs, then oldest jobs until the archive fits its quota."""
     removed: list[str] = []
     cutoff = time.time() - ARCHIVE_RETENTION_DAYS * 86400
-    with archive_lock:
+    with cross_process_archive_lock():
         if not ARCHIVE.exists():
             return removed
         job_dirs = [path for path in ARCHIVE.iterdir() if path.is_dir()]
@@ -879,7 +924,7 @@ def archive_giso_artifacts_and_cleanup(
         raise RuntimeError("The completed GISO artifacts exceed the archive's total size limit; source files were kept")
     archive_dir = ARCHIVE / job_id
     archived = []
-    with archive_lock:
+    with cross_process_archive_lock():
         archive_dir.mkdir(parents=True, exist_ok=False)
         try:
             for source in candidates:
@@ -1747,7 +1792,7 @@ def cisco_download_status(job_id: str):
 def archive_list():
     enforce_archive_policy()
     items = []
-    with archive_lock:
+    with cross_process_archive_lock():
         if ARCHIVE.exists():
             paths = [path for path in ARCHIVE.glob("*/*")
                      if path.is_file() and path.suffix.lower() in {".iso", ".zip"}]
@@ -1765,7 +1810,7 @@ def archive_checksums(job_id: str, name: str):
     path = (archive_dir / name).resolve()
     if ARCHIVE not in archive_dir.parents or archive_dir not in path.parents:
         abort(404)
-    with archive_lock:
+    with cross_process_archive_lock():
         if not path.is_file() or path.suffix.lower() not in {".iso", ".zip"}:
             abort(404)
         return jsonify(name=name, size=path.stat().st_size, **file_checksums(path))
@@ -2159,7 +2204,7 @@ def archive_delete(job_id: str, name: str):
     path = (archive_dir / name).resolve()
     if ARCHIVE not in archive_dir.parents or archive_dir not in path.parents:
         abort(404)
-    with archive_lock:
+    with cross_process_archive_lock():
         if not path.is_file() or path.suffix.lower() not in {".iso", ".zip"}:
             abort(404)
         size = path.stat().st_size

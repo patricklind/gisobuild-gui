@@ -100,27 +100,23 @@ Guarantee:
       job is in `ACTIVE_JOB_STATUSES`, an upload is in progress, or a Cisco
       download is running. Verified by `test_cleanup_rejects_active_upload`,
       `test_cleanup_rejects_running_build`.
-- [ ] archive maintenance cannot delete active artifact — **not actually
-      guaranteed; still open.** `enforce_archive_policy()` and
-      `archive_giso_artifacts_and_cleanup()` synchronize against each other
-      only via `archive_lock`, an in-process `threading.RLock()`. But
-      `docker-compose.yaml` runs a second, separate OS process/container
-      (`archive-maintenance`, `giso-webui/maintenance.py`) that imports and
-      calls the same `enforce_archive_policy()` against the same `ARCHIVE`
-      volume — a `threading.RLock()` provides zero mutual exclusion between
-      two different processes. `archive_download()` (streaming a file to a
-      browser) and `archive_checksums()`/`archive_delete()` also touch
-      `ARCHIVE` without any lock a separate process would respect. In
-      practice this means the maintenance container's hourly quota/retention
-      sweep can run concurrently with the webui process archiving a
-      just-finished build or a browser mid-download, with no coordination
-      between them. The realistic failure mode is a corrupted/partial
-      download or an eviction decision made from a torn directory listing,
-      not silent data corruption of a completed archive file itself (writes
-      only ever happen once, at archive time, before the file is exposed).
-      A real fix needs a lock primitive both processes actually share (e.g.
-      an `fcntl.flock()` on a file inside the shared `ARCHIVE` volume), which
-      has not been implemented.
+- [x] archive maintenance cannot delete active artifact — fixed 2026-09-16.
+      `cross_process_archive_lock()` in `giso-webui/app.py` takes an
+      `fcntl.flock()` on `ARCHIVE/.lock`, a file on the volume both the
+      `giso-webui` and `archive-maintenance` containers actually mount, and
+      wraps `enforce_archive_policy()`, `archive_giso_artifacts_and_cleanup()`,
+      `archive_list()`, `archive_checksums()`, and `archive_delete()`.
+      `maintenance.py` needed no changes since it only calls
+      `enforce_archive_policy()`, which now takes the lock internally.
+      `archive_download()` (the byte-streaming response) is deliberately
+      left unlocked — see the dated entry in `07-BUG-AUDIT-TODO.md` for why
+      locking a large in-flight download would be a worse regression than
+      the risk it removes. Verified by
+      `test_cross_process_archive_lock_blocks_a_separate_os_process`, which
+      spawns a real second OS process to prove this (a same-process
+      threading test could not have caught the original bug), and by running
+      the actual `docker compose` stack with both containers live against
+      the shared volume.
 - [x] Cisco download cannot collide with cleanup — `cleanup()` and
       `create_job()`/`upload_init()` all check `cisco_download_running()`
       first; `cisco_download_start()` itself checks `uploads` and active

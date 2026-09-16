@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
@@ -1247,6 +1248,35 @@ class GisoWebTests(unittest.TestCase):
         log = "\n".join(captured.output)
         self.assertIn("endpoint=inputs", log)
         self.assertIn("request_id=request-123", log)
+
+    def test_cross_process_archive_lock_blocks_a_separate_os_process(self):
+        # archive_lock is a threading.RLock, which only ever coordinates
+        # threads inside this one Python process. The archive-maintenance
+        # container calls enforce_archive_policy() from a genuinely separate
+        # OS process on the same ARCHIVE volume, so only a real cross-process
+        # primitive (flock on a shared file) can prove this actually works -
+        # a same-process threading test would pass even with no fix at all.
+        module.ARCHIVE.mkdir(parents=True, exist_ok=True)
+        lock_path = module.ARCHIVE / ".lock"
+        script = (
+            "import fcntl, sys, time\n"
+            "handle = open(sys.argv[1], 'w')\n"
+            "fcntl.flock(handle, fcntl.LOCK_EX)\n"
+            "print('locked', flush=True)\n"
+            "time.sleep(1.5)\n"
+        )
+        proc = subprocess.Popen([sys.executable, "-c", script, str(lock_path)],
+                                stdout=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(proc.stdout.readline().strip(), "locked")
+            start = time.monotonic()
+            with module.cross_process_archive_lock():
+                elapsed = time.monotonic() - start
+            self.assertGreater(elapsed, 1.0,
+                              "cross_process_archive_lock() did not wait for the other process")
+        finally:
+            proc.wait(timeout=5)
+            proc.stdout.close()
 
     def test_success_archive_is_verified_before_sources_are_removed(self):
         (self.data / "source.rpm").write_bytes(b"source")

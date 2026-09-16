@@ -354,29 +354,54 @@ Current behavior:
 - `archive_download()`, `archive_checksums()`, and `archive_delete()` read
   `ARCHIVE` without taking any lock a separate process would ever see.
 
-Concretely, the maintenance container's retention/quota sweep can run at the
-same moment the webui process is archiving a just-finished build, or a
-browser is mid-download of an existing archive file, with no coordination
-between the two processes. The realistic failure mode is a corrupted or
-truncated download, or an eviction decision computed from a torn directory
-listing — not corruption of an already-archived file's *contents* (each file
-is written once, verified by checksum, and only then exposed).
+Concretely, the maintenance container's retention/quota sweep could run at
+the same moment the webui process was archiving a just-finished build, with
+no coordination between the two processes on the mutating operations. The
+realistic failure mode was a torn directory listing during an eviction
+decision or a `mkdir(..., exist_ok=False)`/`rmtree()` collision — not
+corruption of an already-archived file's *contents* (each file is written
+once, verified by checksum, and only then exposed).
 
-TODO:
+Fix (2026-09-16):
 
-- [ ] Replace `archive_lock` (or supplement it) with a lock both processes
-      actually observe, e.g. `fcntl.flock()` on a file inside the shared
-      `ARCHIVE` volume, taken by `enforce_archive_policy()`,
-      `archive_giso_artifacts_and_cleanup()`, `archive_download()`,
-      `archive_checksums()`, and `archive_delete()`. Note `archive_lock` is
-      currently reentrant (`archive_giso_artifacts_and_cleanup()` calls
-      `enforce_archive_policy()` while already holding it) — `flock()` is
-      not reentrant across independently opened file descriptors, so the
-      lock boundary would need to move to the outermost call in each of
-      these entry points, not be taken again at every nesting level.
-- [ ] Add a regression test that proves the fix actually blocks a concurrent
-      cross-process (not just cross-thread) access — a same-process
-      `threading` test would not have caught this bug.
+- [x] Added `cross_process_archive_lock()` in `giso-webui/app.py`: an
+      `fcntl.flock()` on `ARCHIVE/.lock`, a file on the shared volume both
+      processes actually mount, wrapping `enforce_archive_policy()`,
+      `archive_giso_artifacts_and_cleanup()`, `archive_list()`,
+      `archive_checksums()`, and `archive_delete()` — every place that
+      previously took `archive_lock` directly. `maintenance.py` needed no
+      changes: it calls `enforce_archive_policy()`, which now takes the file
+      lock internally.
+- [x] Handled `archive_lock`'s existing reentrancy (`archive_giso_artifacts_
+      and_cleanup()` calls `enforce_archive_policy()` while already holding
+      it): `cross_process_archive_lock()` keeps one persistent file handle
+      per process and only actually flocks/unflocks at depth 0, with the
+      depth counter itself protected by the pre-existing `archive_lock`
+      (still held for the whole nested duration, exactly as before, so
+      in-process thread-safety is unchanged).
+- [x] Deliberately did **not** lock `archive_download()` (the byte-streaming
+      response) — an exclusive flock held for an entire large-file download
+      would serialize unrelated concurrent downloads against each other and
+      against the maintenance sweep, a worse regression than the risk being
+      fixed. A file already open for reading keeps working under POSIX even
+      if unlinked/rmtree'd concurrently, so at worst a download in progress
+      during eviction sees a directory entry disappear, not corrupted bytes.
+      This residual gap is intentional, not an oversight.
+- [x] Regression test: `test_cross_process_archive_lock_blocks_a_separate_os_process`
+      in `giso-webui/tests/test_app.py` spawns a real second OS process (via
+      `subprocess.Popen`) that holds the flock for 1.5s, then proves
+      `cross_process_archive_lock()` in the test's own process actually
+      blocks for that long before proceeding — a same-process `threading`
+      test would have passed even with the old, unfixed code, so this
+      specifically exercises the cross-process path.
+
+Verified: full suite green (168 tests) inside the built container; also ran
+the real `docker compose` stack with both `giso-webui` and
+`archive-maintenance` containers up simultaneously against the shared
+`giso-archive` volume, confirmed `archive-maintenance`'s log shows a clean
+policy check with no errors, `/api/archive` responds normally, and
+`ARCHIVE/.lock` is created on the writable volume without tripping the
+`read_only: true` root filesystem hardening on either container.
 
 ### Mandatory Docker pull makes builds depend on registry availability even when the builder image is already cached
 
