@@ -292,6 +292,42 @@ TODO:
 
 ## P1/P2 — Platform and compatibility validation
 
+### Ownership vouchers/certificate could be submitted one without the other with no warning (2026-09-16)
+
+Current behavior (before this fix):
+
+`--ownership-vouchers` and `--ownership-certificate` were two independent
+`PATH_OPTIONS` with no relationship check between them.
+`.gisobuild-tool/src/lnt/builder/_coordinate.py:_validate_ovs_and_oc()`
+confirms upstream's real rule: "Check that the input ISO either contains
+both OVs and an OC, or neither" — raising `OVOCMismatchError` and failing
+the build if violated. An operator supplying only one would get no signal
+from `giso-webui` until the actual build failed.
+
+Fix:
+
+- [x] `create_build_plan()` in `giso-webui/app.py` now adds a warning
+      (`"Ownership vouchers and an ownership certificate are normally
+      supplied together..."`) whenever exactly one of the two payload
+      fields is set, shown in the Review BuildPlan step via the same
+      warnings-surfacing fix from earlier this session.
+- [x] Deliberately a **warning, not a blocker**: upstream's check is against
+      the *final image's* package groups, which can already contain one of
+      the two from the base ISO before this build ever runs. `giso-webui`
+      has no ISO-content inspection for existing ownership package groups
+      (same `isols.py`/`image.py` dependency noted in
+      `02-AUTOMATION-BUILDPLAN-TODO.md`'s ISO-inspection section), so a hard
+      block here would produce false positives for a legitimate
+      add-the-other-one-to-an-already-provisioned-ISO build — exactly the
+      "do not invent a stricter interpretation than upstream" principle in
+      `docs/AI-MASTER-PROMPT.md` section 1.
+
+Verified by `test_build_plan_warns_when_only_ownership_vouchers_are_set`,
+`test_build_plan_warns_when_only_ownership_certificate_is_set`, and
+`test_build_plan_does_not_warn_when_both_or_neither_ownership_fields_are_set`
+in `giso-webui/tests/test_app.py`. 180 tests pass, ruff clean, Graphify
+refreshed.
+
 ### Upgrade-matrix platform normalization is inconsistent
 
 Current behavior:

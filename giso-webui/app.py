@@ -715,6 +715,21 @@ def create_build_plan(payload: dict) -> dict:
     revision = current_inventory_revision(inventory)
     blockers: list[str] = []
     warnings: list[str] = []
+    if bool(payload.get("ownership_vouchers")) != bool(payload.get("ownership_certificate")):
+        # Mirrors _validate_ovs_and_oc() in .gisobuild-tool/src/lnt/builder/_coordinate.py:
+        # gisobuild requires both an ownership certificate and ownership
+        # vouchers to be present in the final image, or neither. This is a
+        # warning, not a blocker, because the base ISO may already carry the
+        # other one from an earlier build - giso-webui cannot see the ISO's
+        # existing package groups without real ISO content inspection (see
+        # the isols.py investigation in 02-AUTOMATION-BUILDPLAN-TODO.md), so
+        # flatly rejecting one-without-the-other here would produce false
+        # positives gisobuild itself would have accepted.
+        warnings.append(
+            "Ownership vouchers and an ownership certificate are normally supplied "
+            "together; gisobuild rejects one without the other unless the base ISO "
+            "already carries the missing one from an earlier build."
+        )
     iso_name = payload.get("iso", "")
     iso = next((item for item in inventory
                 if item["type"] == ".iso" and item["relative_path"] == iso_name), None)

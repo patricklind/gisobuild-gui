@@ -72,9 +72,9 @@ against the actual upstream source rather than assumption.
 | `--image-script` (LNT) | hidden upstream | internal; correctly not exposed |
 | `--only-support-pids` (LNT) | yes | `LIST_OPTIONS["only_support_pids"]`, but see PID-selection UX gap in `02-AUTOMATION-BUILDPLAN-TODO.md` — currently a free-text field, not a picklist of the ISO's actual supported PIDs |
 | `--clear-key-request` (LNT) | yes | `BOOL_OPTIONS["clear_key_request"]` |
-| `--ownership-vouchers` (LNT) | yes | `PATH_OPTIONS["ownership_vouchers"]` |
+| `--ownership-vouchers` (LNT) | yes | `PATH_OPTIONS["ownership_vouchers"]`; warns when supplied without `--ownership-certificate` (2026-09-16, see below) |
 | `--clear-ownership-vouchers` (LNT) | yes | `BOOL_OPTIONS["clear_ownership_vouchers"]` |
-| `--ownership-certificate` (LNT) | yes | `PATH_OPTIONS["ownership_certificate"]` |
+| `--ownership-certificate` (LNT) | yes | `PATH_OPTIONS["ownership_certificate"]`; warns when supplied without `--ownership-vouchers` |
 | `--clear-ownership-certificate` (LNT) | yes | `BOOL_OPTIONS["clear_ownership_certificate"]` |
 | `--no-buildinfo` (LNT) | yes | `BOOL_OPTIONS["no_buildinfo"]` |
 | `--version` | **fixed 2026-09-16** | `giso-webui` now surfaces the pinned engine's own version/commit via `GET /api/version`, shown in the page header ("Web UI 0.0.1 · Build engine ciscogisobuild/cisco-xr-gisobuild:2.3.4 @ 0388af2"). See "Upstream version detection" below. |

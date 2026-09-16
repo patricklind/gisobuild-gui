@@ -1086,6 +1086,44 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(confidence["platform"]["value"], "INFERRED")
         self.assertEqual(confidence["platform"]["source"], "operator-selected")
 
+    def test_build_plan_warns_when_only_ownership_vouchers_are_set(self):
+        # Mirrors _validate_ovs_and_oc() in gisobuild's own _coordinate.py:
+        # it rejects a final image carrying one of ownership vouchers/
+        # certificate without the other. A warning, not a blocker, since the
+        # base ISO might already carry the missing one from an earlier build.
+        (self.data / "base.iso").write_bytes(b"iso")
+        response = self.client.post("/api/build-plan", json={
+            "iso": "base.iso", "platform": "8000", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+            "ownership_vouchers": "vouchers.tar",
+        })
+        warnings = response.get_json()["warnings"]
+        self.assertTrue(any("ownership" in warning.lower() for warning in warnings), warnings)
+
+    def test_build_plan_warns_when_only_ownership_certificate_is_set(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+        response = self.client.post("/api/build-plan", json={
+            "iso": "base.iso", "platform": "8000", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+            "ownership_certificate": "certificate.pem",
+        })
+        warnings = response.get_json()["warnings"]
+        self.assertTrue(any("ownership" in warning.lower() for warning in warnings), warnings)
+
+    def test_build_plan_does_not_warn_when_both_or_neither_ownership_fields_are_set(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+        neither = self.client.post("/api/build-plan", json={
+            "iso": "base.iso", "platform": "8000", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+        }).get_json()
+        both = self.client.post("/api/build-plan", json={
+            "iso": "base.iso", "platform": "8000", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+            "ownership_vouchers": "vouchers.tar", "ownership_certificate": "certificate.pem",
+        }).get_json()
+        self.assertFalse(any("ownership" in w.lower() for w in neither["warnings"]), neither["warnings"])
+        self.assertFalse(any("ownership" in w.lower() for w in both["warnings"]), both["warnings"])
+
     def test_build_plan_automatic_selection_explains_superseded_exclusions(self):
         # create_build_plan()'s automatic_smu_selection path pulls candidates
         # straight from active_rpm_names(), which already drops superseded
