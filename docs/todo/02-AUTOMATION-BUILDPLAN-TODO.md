@@ -7,10 +7,21 @@ Create one canonical inventory model.
 - [x] every ready file receives a stable path-and-checksum ID
 - [x] basename
 - [x] relative path
-- [ ] absolute path
+- [ ] absolute path — deliberately not exposed: `inventory_id()`/`rel_data()`
+      only ever return the checksum-based ID and the path relative to
+      `DATA`, so the browser never learns the container's real filesystem
+      layout. Treat this as intentionally out of scope, not an oversight.
 - [x] size
 - [x] SHA-256
-- [ ] source (`upload`, `tar`, `cisco-download`)
+- [ ] source (`upload`, `tar`, `cisco-download`) — partially implemented:
+      `inventory_files()` only distinguishes `"tar"` (inside an extracted
+      directory) from `"upload"` (a direct child of `DATA`). A
+      Cisco-downloaded file also lands as a direct child of `DATA`
+      (`run_cisco_download()`'s `target = DATA / name`), so it is
+      indistinguishable from a manual upload today — there is no persistent
+      record of which files came from a Cisco download. Low priority: no
+      frontend code reads this field at all yet, so nothing currently
+      depends on the distinction.
 - [x] metadata source/confidence (currently explicit low-confidence filename metadata)
 - [ ] lifecycle state
 
