@@ -118,6 +118,60 @@ TODO:
 - [x] Build button must stay blocked while base ISO identity is ambiguous.
 - [ ] Add browser regression test with two uploaded ISOs.
 
+### app.js and manual-packages.js both defined the manual-package-list logic, one of them dead (2026-09-16)
+
+Current behavior (before this fix):
+
+- `giso-webui/static/app.js` defined its own top-level `renderManualPackages()`,
+  `selectedManualPackages()`, and `syncManualPackageValue()` functions.
+- `giso-webui/static/manual-packages.js` (loaded via a second `<script>` tag
+  right after `app.js` in `templates/index.html`) defined its own
+  `window.renderManualPackages`/`window.selectedManualPackages`/
+  `window.syncManualPackageValue` — the real fix for the "manual RPM path vs
+  basename bug" (opaque inventory IDs, duplicate-conflict grouping via
+  `logicalRpms()`).
+- Because both are plain, non-module `<script>` tags, top-level function
+  declarations in `app.js` and the `window.x = ...` assignments in
+  `manual-packages.js` write to the *same* global object. Loading second,
+  `manual-packages.js` always overwrote `app.js`'s versions before anything
+  ever called them — so `app.js`'s copies were 100% dead code, never
+  executed, no matter what they contained. Every call site in `app.js` calls
+  these functions by bare name at runtime (inside `renderInputs()`'s async
+  callback and a change-event listener), which resolves dynamically to
+  whatever the global currently is — always `manual-packages.js`'s version.
+- The dead `app.js` copy of `renderManualPackages()` still used
+  `box.value = file.path` — a raw workspace path, exactly the bug class
+  `manual-packages.js` was written to fix. It never ran, so it was not an
+  active bug, but it was a landmine: reordering the `<script>` tags, or
+  `manual-packages.js` ever failing to load, would have silently reactivated
+  the old, buggy behavior.
+- Worse: `giso-webui/tests/test_build_script.py`'s
+  `test_manual_package_mode_renders_uploaded_rpms_as_choices` asserted on
+  literal source substrings (`"data.files.filter(file=>file.type === '.rpm')"`,
+  `"box.type='checkbox'"`) that only existed in the *dead* `app.js` copy —
+  the test passed by checking inert code, proving nothing about the code
+  that actually runs in a browser.
+
+Fix:
+
+- [x] Deleted the dead `renderManualPackages()`/`selectedManualPackages()`/
+      `syncManualPackageValue()` definitions from `app.js`, leaving a comment
+      pointing to `manual-packages.js` and explaining why. Call sites in
+      `app.js` are unchanged and now resolve to the only remaining
+      definition.
+- [x] Rewrote `test_manual_package_mode_renders_uploaded_rpms_as_choices` to
+      assert on `manual-packages.js` (the file that actually runs) instead
+      of `app.js`, and added `assertNotIn("function renderManualPackages",
+      app_script)` so a future re-introduction of the duplicate would fail
+      the test immediately.
+
+Verified: 175 tests pass inside the built container (unchanged behavior —
+this was a no-op at runtime by construction), ruff clean, Graphify
+refreshed, and confirmed live in a browser: uploaded two RPMs, switched to
+manual mode, saw "2 of 2 RPM packages selected", unchecked one, saw it
+update to "1 of 2" — identical to pre-fix behavior, now backed by a test
+that actually exercises the live code.
+
 ### RPM processor architecture is not checked against the selected ISO
 
 Fixed. `giso-webui/app.py:inspect_iso_architecture()` shells out to `isoinfo`

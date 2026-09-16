@@ -190,40 +190,14 @@ function applySmuRecommendation(plan) {
   updateBuildAvailability();
 }
 
-function selectedManualPackages() {
-  return [...document.querySelectorAll('#manual-package-list input:checked')].map(box => box.value);
-}
-
-function syncManualPackageValue() {
-  $('[name=pkglist_override]').value=selectedManualPackages().join('\n');
-  const count=selectedManualPackages().length;
-  $('#manual-package-summary').textContent=`${count} of ${document.querySelectorAll('#manual-package-list input').length} RPM packages selected.`;
-  updateBuildAvailability();
-}
-
-function renderManualPackages(data, plan) {
-  const list=$('#manual-package-list');
-  const previous=new Set(lines($('[name=pkglist_override]').value));
-  const recommended=new Set(plan.selected || data.recommended || []);
-  const excluded=new Map((plan.excluded || []).map(item=>[item.name,item.reason]));
-  const rpms=data.files.filter(file=>file.type === '.rpm');
-  list.replaceChildren();
-  if (!rpms.length) {
-    const empty=document.createElement('p'); empty.className='manual-package-empty'; empty.textContent='Upload RPM or SMU files to choose packages manually.'; list.appendChild(empty);
-    $('#manual-package-summary').textContent='No RPM packages uploaded.';
-    $('[name=pkglist_override]').value='';
-    return;
-  }
-  rpms.forEach((file,index)=>{
-    const label=document.createElement('label'); label.className=`manual-package-option${excluded.has(file.path) || excluded.has(file.path.split('/').pop()) ? ' incompatible' : ''}`;
-    const box=document.createElement('input'); box.type='checkbox'; box.value=file.path; box.id=`manual-package-${index}`;
-    box.checked=packageListEdited ? previous.has(file.path) : recommended.has(file.path) || recommended.has(file.path.split('/').pop());
-    const copy=document.createElement('span'); const name=document.createElement('b'); name.textContent=file.path;
-    const reason=document.createElement('small'); reason.textContent=excluded.get(file.path) || excluded.get(file.path.split('/').pop()) || 'Matches the automatic platform and release check';
-    copy.append(name,reason); label.append(box,copy); list.appendChild(label);
-  });
-  syncManualPackageValue();
-}
+// selectedManualPackages(), syncManualPackageValue(), and renderManualPackages()
+// are defined in manual-packages.js (loaded after this file) and attached to
+// window, so calls to them below resolve there. That file's version is the
+// only one that has ever executed: it uses opaque inventory IDs and groups
+// duplicate basenames safely, unlike an earlier version of this logic that
+// lived here and used box.value = file.path - a raw workspace path, exactly
+// the "manual RPM path vs basename bug" this file's duplicate-handling
+// regression tests exist to prevent. That dead code has been removed.
 
 function smuGroupCard(group) {
   const card=document.createElement('article'); card.className=`csc-card ${group.count > 1 ? 'linked' : ''}`;

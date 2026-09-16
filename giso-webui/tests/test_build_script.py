@@ -45,14 +45,27 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("currentJob = null", cleanup_handler)
 
     def test_manual_package_mode_renders_uploaded_rpms_as_choices(self):
+        # renderManualPackages()/selectedManualPackages()/syncManualPackageValue()
+        # used to be defined in app.js too, with an older implementation that
+        # used box.value = file.path (a raw workspace path). manual-packages.js
+        # (loaded after app.js) always overwrote those globals before they
+        # were ever called, so that copy was dead code - but this test used to
+        # assert on literal source substrings that only existed in the dead
+        # copy, meaning it verified nothing about what actually runs. The dead
+        # code has been removed from app.js; this now checks the real,
+        # executing implementation in manual-packages.js.
         web_root = Path(__file__).parents[1]
-        script = (web_root / "static" / "app.js").read_text()
+        app_script = (web_root / "static" / "app.js").read_text()
+        manual_script = (web_root / "static" / "manual-packages.js").read_text()
         template = (web_root / "templates" / "index.html").read_text()
 
         self.assertIn('id="manual-package-list"', template)
-        self.assertIn("data.files.filter(file=>file.type === '.rpm')", script)
-        self.assertIn("box.type='checkbox'", script)
-        self.assertIn("syncManualPackageValue", script)
+        self.assertIn("files.filter(file => file.type === '.rpm')", manual_script)
+        self.assertIn("box.type = 'checkbox';", manual_script)
+        self.assertIn("box.value = file.id;", manual_script)
+        self.assertIn("syncManualPackageValue", app_script)
+        self.assertIn("window.syncManualPackageValue", manual_script)
+        self.assertNotIn("function renderManualPackages", app_script)
         self.assertNotIn('name="pkglist_override" rows=', template)
 
     def test_lnt_only_defaults_do_not_block_exr_builds(self):
