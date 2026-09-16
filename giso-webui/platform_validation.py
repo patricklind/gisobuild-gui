@@ -166,8 +166,35 @@ def infer_platform(filename: str) -> str | None:
     return None
 
 
+def _bundle_files_by_csc(
+    packages: list[str], iso_platform: str | None, expected_tag: str
+) -> dict[str, set[str]]:
+    """Map each CSC bug ID to every candidate filename belonging to it.
+
+    Mirrors validate_smu_selection()'s own per-package platform/release
+    matching so "full bundle size" and "selected bundle size" are computed
+    the same way - a candidate whose platform or release does not match the
+    base ISO was never part of this bundle to begin with.
+    """
+    bundles: dict[str, set[str]] = {}
+    for package in packages:
+        name = Path(package).name
+        package_platform = infer_platform(name)
+        if iso_platform and package_platform and package_platform != iso_platform:
+            continue
+        rpm_release = RPM_RELEASE.search(name)
+        if expected_tag and (not rpm_release or rpm_release.group("release") != expected_tag):
+            continue
+        component = RPM_COMPONENT.search(name)
+        if component:
+            bug = f"CSC{component.group('bug')}".upper()
+            bundles.setdefault(bug, set()).add(name)
+    return bundles
+
+
 def validate_smu_selection(
-    iso: str, packages: list[str], iso_architectures: frozenset[str] | None = None
+    iso: str, packages: list[str], iso_architectures: frozenset[str] | None = None,
+    full_candidate_packages: list[str] | None = None,
 ) -> dict:
     """Check deterministic filename compatibility before upstream dependency resolution.
 
@@ -176,6 +203,17 @@ def validate_smu_selection(
     in app.py); pass None or an empty set when detection was not run or was
     inconclusive so an upstream-valid image is never blocked on that basis
     alone.
+
+    ``full_candidate_packages`` is the complete uploaded RPM inventory (not
+    just what is selected) - pass it (from active_rpm_names(), matching what
+    automatic selection itself considers) whenever the operator can select
+    RPMs individually, e.g. Manual package list mode. Automatic selection
+    can never produce a partial multi-component bundle on its own (it
+    includes every matching file for a bug or none), but a manual pick can,
+    e.g. two of a three-RPM "keep these together" fix - a real, silent
+    "will fail" case (or at best get a materially different, unintended
+    Golden ISO) this cannot detect without knowing what the full bundle was
+    supposed to contain. Without this argument, that case is invisible.
     """
     iso_name = Path(iso).name
     release_match = ISO_RELEASE.search(iso_name)
@@ -240,6 +278,20 @@ def validate_smu_selection(
             warnings.append(
                 f"{component} is changed by {', '.join(sorted(bugs))}; Cisco supersedence data is required to choose between them"
             )
+    if full_candidate_packages is not None:
+        full_bundles = _bundle_files_by_csc(full_candidate_packages, iso_platform, expected_tag)
+        for bug, bundle in sorted(bundles.items()):
+            if len(bundle["components"]) <= 1:
+                continue
+            full_files = full_bundles.get(bug, bundle["files"])
+            missing = sorted(full_files - bundle["files"])
+            if missing:
+                issues.append(
+                    f"{bug} is a multi-component fix; {len(bundle['files'])} of "
+                    f"{len(full_files)} required RPMs are selected (missing "
+                    f"{', '.join(missing)}) - include the rest or exclude "
+                    f"{', '.join(sorted(bundle['files']))} too"
+                )
     if checked:
         warnings.append(
             "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs the authoritative dependency check"

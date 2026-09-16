@@ -1029,6 +1029,48 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn(wrong_release, command[pkglist_index + 1:])
 
     @patch("app.child_mount_args", return_value=[])
+    def test_manual_selection_of_a_partial_multi_component_bundle_is_rejected(self, _mounts):
+        # CSCtest00001 is a multi-component fix requiring all 3 RPMs
+        # together (see recommend_smu_selection()'s own "keep these RPMs
+        # together" relationship text). Manually selecting only 2 of the 3
+        # was previously invisible to validate_smu_selection() - it had no
+        # way to know a third file existed at all - so this could reach a
+        # real build with no warning and no block.
+        iso = "ncs5500-mini-x-26.1.2.iso"
+        bundle = [
+            "ncs5500-infra-1.0.0.8-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-iosxr-fwding-1.0.0.4-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-routing-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
+        ]
+        for name in (iso, *bundle):
+            (self.data / name).write_bytes(b"input")
+
+        with self.assertRaisesRegex(ValueError, "CSCTEST00001"):
+            module.build_command({
+                "iso": iso, "pkglist": bundle[:2], "automatic_smu_selection": False,
+                "auto_repo": True,
+            }, "partial-bundle")
+
+    def test_build_plan_flags_a_partial_multi_component_bundle_as_a_blocker(self):
+        iso = "ncs5500-mini-x-26.1.2.iso"
+        bundle = [
+            "ncs5500-infra-1.0.0.8-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-iosxr-fwding-1.0.0.4-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-routing-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
+        ]
+        for name in (iso, *bundle):
+            (self.data / name).write_bytes(b"input")
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": iso, "pkglist": bundle[:2], "automatic_smu_selection": False,
+            "auto_repo": True,
+        })
+
+        plan = response.get_json()
+        self.assertFalse(plan["ready"], plan)
+        self.assertTrue(any("CSCTEST00001" in blocker for blocker in plan["blockers"]), plan["blockers"])
+
+    @patch("app.child_mount_args", return_value=[])
     def test_unknown_iso_requires_platform_selection(self, _mounts):
         (self.data / "base.iso").write_bytes(b"iso")
         with self.assertRaisesRegex(ValueError, "Select the platform"):

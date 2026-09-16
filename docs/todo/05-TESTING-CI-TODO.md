@@ -34,11 +34,32 @@ Cover:
       `test_unknown_iso_architecture_does_not_block_selection`; this was
       already implemented and tested by the merged ISO/RPM architecture
       change, just left unchecked here)
-- [ ] incomplete CSC — genuinely not implemented: nothing cross-checks a
-      manually-selected subset of a multi-RPM CSC bundle against the *full*
-      bundle known to exist in inventory and warns/blocks on a partial
-      selection; `manual-packages.js`'s indeterminate group checkbox is a
-      visual hint only, not a validated check.
+- [x] incomplete CSC — fixed 2026-09-16: `validate_smu_selection()` in
+      `giso-webui/platform_validation.py` gained an optional
+      `full_candidate_packages` parameter (the complete uploaded RPM
+      inventory, not just the selection) — when a multi-component CSC bundle
+      in the selection is missing one or more of its own files from that
+      full inventory, it is now a blocking issue naming exactly which
+      file(s) are missing, not just `manual-packages.js`'s pre-existing
+      indeterminate-checkbox *visual* hint. Wired into all three real
+      compatibility gates: `create_build_plan()` (`/api/build-plan`),
+      `build_command()`'s final pre-execution re-check, and
+      `/api/compatibility` (the manual "Check compatibility" tool).
+      Automatic selection cannot trigger this by construction (it always
+      selects a bundle's matching files completely or not at all), so this
+      only ever fires for Manual package list mode — exactly where the gap
+      was real. Verified by `test_partial_multi_component_bundle_selection_is_rejected`,
+      `test_complete_multi_component_bundle_selection_is_accepted`, and
+      `test_bundle_completeness_is_not_checked_without_full_candidate_packages`
+      in `giso-webui/tests/test_platform_compatibility.py` (unit level), and
+      `test_manual_selection_of_a_partial_multi_component_bundle_is_rejected`
+      / `test_build_plan_flags_a_partial_multi_component_bundle_as_a_blocker`
+      in `giso-webui/tests/test_app.py` (integration level, through the real
+      endpoints). Confirmed live end-to-end: uploaded a real ISO and a real
+      3-RPM "keep together" bundle through the actual upload API to an
+      isolated throwaway container, submitted `/api/build-plan` with only 2
+      of the 3 selected → `"ready": false` naming the missing file; all 3
+      selected → `"ready": true`.
 - [x] supersedence (`test_superseded_rpm_is_excluded_with_a_reason_not_silently_dropped`,
       `test_build_plan_automatic_selection_explains_superseded_exclusions`,
       `test_oversized_text_is_not_loaded_as_supersedence_metadata`)
@@ -88,7 +109,7 @@ Mandatory regression coverage for:
       that could collide with a duplicate)
 - [ ] manual mode empty-selection bug — no dedicated test for submitting a
       build with manual mode selected and zero packages checked.
-- [ ] CSC group selection mismatch — same gap as "incomplete CSC" above.
+- [x] CSC group selection mismatch — same gap as "incomplete CSC" above, now fixed; see that entry.
 - [ ] "No RPM packages uploaded" despite inventory containing compatible
       RPMs — no regression test pins this specific historical wording bug.
 - [x] NCS-57C3 SKU normalization (`test_ncs57c3_inventory_sku_normalizes_to_ncs57`,

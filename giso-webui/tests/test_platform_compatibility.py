@@ -233,6 +233,54 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertTrue(result["compatible"])
         self.assertTrue(any("supersedence data" in warning for warning in result["warnings"]))
 
+    def test_partial_multi_component_bundle_selection_is_rejected(self):
+        # A real gap: CSCtest00001 is a multi-component fix requiring 3 RPMs
+        # ("keep these RPMs together"). manual-packages.js's indeterminate
+        # checkbox only *visually* hints that a group is partially selected -
+        # nothing server-side ever validated it, so a manual selection of 2
+        # of the 3 could reach gisobuild and produce an unintended (or
+        # failing) Golden ISO with no warning at all.
+        full_bundle = [
+            "ncs5500-infra-1.0.0.8-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-iosxr-fwding-1.0.0.4-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-routing-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
+        ]
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso", full_bundle[:2],
+            full_candidate_packages=full_bundle,
+        )
+        self.assertFalse(result["compatible"])
+        issue = next(i for i in result["issues"] if "CSCTEST00001" in i)
+        self.assertIn("2 of 3", issue)
+        self.assertIn("ncs5500-routing-1.0.0.2-r2612.CSCtest00001.x86_64.rpm", issue)
+
+    def test_complete_multi_component_bundle_selection_is_accepted(self):
+        full_bundle = [
+            "ncs5500-infra-1.0.0.8-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-iosxr-fwding-1.0.0.4-r2612.CSCtest00001.x86_64.rpm",
+            "ncs5500-routing-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
+        ]
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso", full_bundle,
+            full_candidate_packages=full_bundle,
+        )
+        self.assertTrue(result["compatible"])
+
+    def test_bundle_completeness_is_not_checked_without_full_candidate_packages(self):
+        # Automatic selection (recommend_smu_selection()'s own internal call)
+        # always passes the same set as both "selected" and "full", so this
+        # can never fire there by construction - but callers that genuinely
+        # don't have the full inventory available must not get a false
+        # positive from an argument they never passed.
+        result = validate_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            [
+                "ncs5500-infra-1.0.0.8-r2612.CSCtest00001.x86_64.rpm",
+                "ncs5500-iosxr-fwding-1.0.0.4-r2612.CSCtest00001.x86_64.rpm",
+            ],
+        )
+        self.assertTrue(result["compatible"])
+
     def test_multiple_versions_of_same_component_and_fix_are_rejected(self):
         result = validate_smu_selection(
             "ncs5500-mini-x-26.1.2.iso",

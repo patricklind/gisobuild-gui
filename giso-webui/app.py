@@ -834,8 +834,8 @@ def create_build_plan(payload: dict) -> dict:
         # agree on whether a build is ready, not just build_command() as a
         # second, later gate.
         iso_architectures = inspect_iso_architecture(safe_data_path(iso["relative_path"]))
+        candidates, superseded = active_rpm_names()
         if payload.get("automatic_smu_selection"):
-            candidates, superseded = active_rpm_names()
             recommendation = recommend_smu_selection(
                 iso_name, candidates, iso_architectures=iso_architectures
             )
@@ -850,6 +850,7 @@ def create_build_plan(payload: dict) -> dict:
             compatibility = validate_smu_selection(
                 iso_name, [item["basename"] for item in selected],
                 iso_architectures=iso_architectures,
+                full_candidate_packages=candidates,
             )
             blockers.extend(compatibility["issues"])
             warnings.extend(compatibility["warnings"])
@@ -1345,9 +1346,10 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             raise ValueError("Select an ISO, or provide a YAML file")
         iso_path = safe_data_path(iso)
         iso_architectures = inspect_iso_architecture(iso_path)
+        candidates = active_rpm_names()[0]
         if payload.get("automatic_smu_selection"):
             package_plan = recommend_smu_selection(
-                iso, active_rpm_names()[0], iso_architectures=iso_architectures
+                iso, candidates, iso_architectures=iso_architectures
             )
             if not package_plan["ready"]:
                 raise ValueError(package_plan["message"])
@@ -1357,7 +1359,10 @@ def build_command(payload: dict, job_id: str) -> list[str]:
         selected_rpms = resolve_rpm_identifiers(payload.get("pkglist", []))
         selected_names = [item["basename"] for item in selected_rpms]
         payload["pkglist"] = selected_names
-        smu_check = validate_smu_selection(iso, selected_names, iso_architectures=iso_architectures)
+        smu_check = validate_smu_selection(
+            iso, selected_names, iso_architectures=iso_architectures,
+            full_candidate_packages=candidates,
+        )
         if smu_check["issues"]:
             raise ValueError("SMU compatibility check failed: " + "; ".join(smu_check["issues"]))
         command += ["--iso", str(iso_path)]
@@ -1814,7 +1819,10 @@ def compatibility():
         except ValueError:
             iso_architectures = frozenset()
         result = {
-            "smu": validate_smu_selection(iso, package_names, iso_architectures=iso_architectures),
+            "smu": validate_smu_selection(
+                iso, package_names, iso_architectures=iso_architectures,
+                full_candidate_packages=active_rpm_names()[0],
+            ),
             "upgrade": None,
         }
         matrix_name = body.get("matrix", "")
