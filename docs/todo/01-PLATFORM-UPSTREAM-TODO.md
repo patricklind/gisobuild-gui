@@ -63,12 +63,12 @@ against the actual upstream source rather than assumption.
 | `--remove-packages` (LNT) | yes | `LIST_OPTIONS["remove_packages"]` |
 | `--skip-usb-image` (LNT) | yes | `BOOL_OPTIONS["skip_usb_image"]` |
 | `--skip-dep-check` (LNT) | hidden upstream | internal; correctly not exposed |
-| `--copy-dir` (LNT) | **no — genuine gap** | copies built artifacts to an operator-chosen directory. giso-webui's own archive step (`archive_giso_artifacts_and_cleanup()`) already serves this need for a normal workflow, so this is low priority, but it is a real missing pass-through, not an intentional omission. |
+| `--copy-dir` (LNT) | **no — deliberately not exposed** | copies built artifacts to an operator-chosen directory. Revisited 2026-09-16: `child_mount_args()` only shares `/uploads`, `/output`, `/tool`, `/work` into the build container — there is no mechanism today to write into an arbitrary operator-supplied host path safely, and building one (validating/scoping an arbitrary destination path) is real design work, not a quick pass-through. `archive_giso_artifacts_and_cleanup()` already serves the normal "get my artifacts" need. Documented here rather than implemented unsafely. |
 | `--clear-bridging-fixes` (LNT) | yes | `BOOL_OPTIONS["clear_bridging_fixes"]` |
 | `--verbose-dep-check` (LNT) | yes | `BOOL_OPTIONS["verbose_dep_check"]` |
 | `--buildinfo` (LNT) | hidden upstream | internal; correctly not exposed |
 | `--debug` (LNT) | yes | `BOOL_OPTIONS["debug"]` |
-| `--isoinfo` (LNT) | **no — genuine gap** | lets the operator point gisobuild at a different `isoinfo` binary. Niche (giso-webui already bundles its own pinned `isoinfo` via `cdrkit` for its *own* inspection use, a separate concern from what gisobuild uses internally), but a real missing pass-through. |
+| `--isoinfo` (LNT) | **no — deliberately not exposed, security** | lets gisobuild use a caller-specified `isoinfo` *executable* instead of its bundled one. Revisited 2026-09-16: this is meant for a trusted deployer to point at a specific vetted binary already present in the build environment, not a per-build choice for a web operator — accepting an operator-supplied executable path here (or, worse, an uploaded binary) would mean the privileged build process executes something the operator chose, which is a code-execution risk, not a missing convenience. Not implemented, and should not be, in this trust model. |
 | `--image-script` (LNT) | hidden upstream | internal; correctly not exposed |
 | `--only-support-pids` (LNT) | yes | `LIST_OPTIONS["only_support_pids"]`, but see PID-selection UX gap in `02-AUTOMATION-BUILDPLAN-TODO.md` — currently a free-text field, not a picklist of the ISO's actual supported PIDs |
 | `--clear-key-request` (LNT) | yes | `BOOL_OPTIONS["clear_key_request"]` |
@@ -77,12 +77,14 @@ against the actual upstream source rather than assumption.
 | `--ownership-certificate` (LNT) | yes | `PATH_OPTIONS["ownership_certificate"]` |
 | `--clear-ownership-certificate` (LNT) | yes | `BOOL_OPTIONS["clear_ownership_certificate"]` |
 | `--no-buildinfo` (LNT) | yes | `BOOL_OPTIONS["no_buildinfo"]` |
-| `--version` | **no — genuine gap** | prints gisobuild's own version/commit; giso-webui only ever surfaces its *own* `APP_VERSION`, never the pinned tool's. See "Upstream version detection" below. |
+| `--version` | **fixed 2026-09-16** | `giso-webui` now surfaces the pinned engine's own version/commit via `GET /api/version`, shown in the page header ("Web UI 0.0.1 · Build engine ciscogisobuild/cisco-xr-gisobuild:2.3.4 @ 0388af2"). See "Upstream version detection" below. |
 
-Result: **31 of 34 non-hidden, non-architecturally-excluded upstream options
-are exposed** (`--copy-dir`, `--isoinfo`, `--version`/version-surfacing are
-the real gaps; `--docker`/`--use-container` is deliberately excluded, not
-missing).
+Result: **32 of 34 non-hidden, non-architecturally-excluded upstream options
+are exposed.** `--copy-dir` and `--isoinfo` are deliberately not exposed
+(no safe arbitrary-write mechanism / operator-supplied-executable
+code-execution risk, respectively — see their rows above), not missing by
+oversight; `--docker`/`--use-container` is separately excluded as
+architecturally incompatible.
 
 ### A capability giso-webui cannot currently verify: `--optimize`/`--full-iso` gating
 
@@ -106,16 +108,34 @@ against the pinned image and caching which flags it actually registers, or
 Cisco documentation confirming `/exr` is always present in the published
 `cisco-xr-gisobuild` image — neither was available in this pass.
 
-### Upstream version detection (not implemented)
+### Upstream version detection (fixed 2026-09-16)
 
-`giso-webui` exposes its own `APP_VERSION` (`giso-webui/app.py`) but never
-the pinned gisobuild tool's own version or commit. `gisobuild.py --version`
-prints a static `"1.0"` string today (`__version__` in the pinned checkout)
-with no git commit info exposed by the script itself; the commit actually
-in use would have to come from the `.gisobuild-tool` checkout's own git
-metadata (not currently read by `giso-webui` at all) or from labeling on
-the pinned `IMAGE` tag. See `docs/AI-MASTER-PROMPT.md` section 18/37 for the
-"GISO Build Engine version" and admin/system-page asks this would feed.
+`giso-webui` used to expose only its own `APP_VERSION`, never the pinned
+gisobuild tool's own version or commit. `gisobuild.py --version` prints a
+static `"1.0"` string (`__version__` in the pinned checkout, not
+per-release), so the meaningful signal is which *commit* of
+`.gisobuild-tool` is actually mounted, not that string.
+
+Added `gisobuild_commit()` and `GET /api/version` in `giso-webui/app.py`:
+reads `git -C <TOOL> rev-parse --short HEAD` against the mounted
+`.gisobuild-tool` checkout, degrading to `null` (never raising) when `TOOL`
+isn't a git checkout — version info is diagnostic, never load-bearing.
+Required adding a pinned `git` package to `giso-webui/Dockerfile`
+(`git=2.54.0-r0`, matching the pinned Alpine base image). Surfaced in the
+page header via `loadVersion()` in `giso-webui/static/app.js`.
+
+Verified: `test_version_reports_none_commit_when_tool_is_not_a_git_checkout`
+and `test_version_reports_the_real_commit_of_a_git_checkout` (the latter
+points `TOOL` at this repository's own mounted checkout and asserts a real
+commit hash comes back, proving the happy path, not just graceful failure)
+in `giso-webui/tests/test_app.py`; confirmed live against the real
+container — `/api/version` returned the actual pinned
+`.gisobuild-tool` commit, and the header showed "Web UI 0.0.1 · Build
+engine ciscogisobuild/cisco-xr-gisobuild:2.3.4 @ 0388af2" in a browser.
+
+This answers `docs/AI-MASTER-PROMPT.md` section 18's "GISO Build Engine
+version" ask directly; the fuller section 37 admin/system page (build
+worker status, storage usage, required-binary checks) remains open.
 
 ## Representative eXR families
 

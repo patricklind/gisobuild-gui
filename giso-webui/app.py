@@ -1518,6 +1518,38 @@ def ready():
     return jsonify(ok=is_ready, **checks), 200 if is_ready else 503
 
 
+def gisobuild_commit() -> str | None:
+    """Best-effort short git commit of the mounted .gisobuild-tool checkout.
+
+    Returns None (never raises) when TOOL isn't a git checkout or git isn't
+    available - version info is diagnostic, never load-bearing.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(TOOL), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    commit = result.stdout.strip()
+    return commit if result.returncode == 0 and commit else None
+
+
+@app.get("/api/version")
+def version():
+    """Surface which pinned gisobuild build engine this deployment actually runs.
+
+    APP_VERSION is this web UI's own version; gisobuild_image/gisobuild_commit
+    identify the separate, upstream build engine - see AI-MASTER-PROMPT.md
+    section 18 ("Upstream version detection").
+    """
+    return jsonify(
+        app_version=APP_VERSION,
+        gisobuild_image=IMAGE,
+        gisobuild_commit=gisobuild_commit(),
+    )
+
+
 @app.get("/api/inputs")
 def inputs():
     return jsonify(discover())

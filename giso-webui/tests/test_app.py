@@ -62,6 +62,27 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return self.client.post(f"/api/uploads/{upload_id}/complete")
 
+    def test_version_reports_none_commit_when_tool_is_not_a_git_checkout(self):
+        with patch.object(module, "TOOL", Path(self.temp.name)):  # not a git repo
+            response = self.client.get("/api/version")
+        body = response.get_json()
+        self.assertEqual(body["app_version"], module.APP_VERSION)
+        self.assertEqual(body["gisobuild_image"], module.IMAGE)
+        self.assertIsNone(body["gisobuild_commit"])
+
+    def test_version_reports_the_real_commit_of_a_git_checkout(self):
+        # Point TOOL at this very repository (mounted read-only into the test
+        # container) to prove gisobuild_commit() actually reads a real git
+        # commit rather than always degrading to None.
+        repo_root = Path(module.__file__).resolve().parents[1]
+        if not (repo_root / ".git").exists():
+            self.skipTest("test container was not given a git checkout")
+        with patch.object(module, "TOOL", repo_root):
+            response = self.client.get("/api/version")
+        commit = response.get_json()["gisobuild_commit"]
+        self.assertIsNotNone(commit)
+        self.assertRegex(commit, r"^[0-9a-f]{7,40}$")
+
     @patch.dict(os.environ, {"CISCO_CLIENT_ID": "id", "CISCO_CLIENT_SECRET": "secret"})
     def test_cisco_config_only_exposes_availability(self):
         response = self.client.get("/api/cisco/config")

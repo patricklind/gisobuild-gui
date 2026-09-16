@@ -521,6 +521,14 @@ async function health() {
   } catch { $('#health').textContent = 'System unavailable'; $('#health').className = 'pill bad'; }
 }
 
+async function loadVersion() {
+  try {
+    const info = await api('/api/version');
+    const engine = `${info.gisobuild_image}${info.gisobuild_commit ? ` @ ${info.gisobuild_commit}` : ''}`;
+    $('#version-info').textContent = `Web UI ${info.app_version} · Build engine ${engine}`;
+  } catch { /* Version info is diagnostic only; a missing line is not an error. */ }
+}
+
 document.querySelectorAll('[name=mode]').forEach(radio => radio.addEventListener('change', event => {
   const yaml = event.target.value === 'yaml';
   $('#form-mode').hidden = yaml; $('#yaml-mode').hidden = !yaml;
@@ -785,4 +793,4 @@ updateCompatibilityMode();
 updatePackageSelectionMode();
 
 api('/api/cisco/config').then(config => { $('#cisco-download').hidden = !config.enabled; }).catch(() => {});
-health(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();
+health(); loadVersion(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();
