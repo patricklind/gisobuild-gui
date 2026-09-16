@@ -107,8 +107,22 @@ Mandatory regression coverage for:
       `test_manual_package_ui_uses_ids_and_renders_duplicate_conflicts` —
       manual selection submits opaque inventory IDs, never a bare basename
       that could collide with a duplicate)
-- [ ] manual mode empty-selection bug — no dedicated test for submitting a
-      build with manual mode selected and zero packages checked.
+- [x] manual mode empty-selection bug — verified 2026-09-16, not a bug:
+      `create_build_plan()` correctly returns `ready: true` for a manual
+      build with an empty `pkglist` and no other customization, since
+      gisobuild itself does not require `--pkglist` at all (relabeling the
+      ISO, or only adding a config file, are real use cases upstream
+      supports) — inventing a backend restriction upstream doesn't have
+      would repeat exactly the "independent support matrix" mistake this
+      project's own `AI-INSTRUCTIONS.md` warns against. The actual guard
+      against an accidental no-op submission is client-side and already
+      existed: `updateBuildAvailability()` in `giso-webui/static/app.js`
+      disables "Start build" until at least one package or other
+      customization is present (already covered by
+      `test_start_build_button_names_exactly_what_is_missing`). Added
+      `test_manual_mode_with_zero_packages_is_a_valid_ready_plan` in
+      `giso-webui/tests/test_app.py` to pin the backend half of that split
+      responsibility, since nothing did before.
 - [x] CSC group selection mismatch — same gap as "incomplete CSC" above, now fixed; see that entry.
 - [ ] "No RPM packages uploaded" despite inventory containing compatible
       RPMs — no regression test pins this specific historical wording bug.

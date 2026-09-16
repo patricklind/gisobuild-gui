@@ -1070,6 +1070,30 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(plan["ready"], plan)
         self.assertTrue(any("CSCTEST00001" in blocker for blocker in plan["blockers"]), plan["blockers"])
 
+    def test_manual_mode_with_zero_packages_is_a_valid_ready_plan(self):
+        # 05-TESTING-CI-TODO.md flagged this as an untested, unclear case
+        # ("manual mode empty-selection bug"). Verified here, not fixed: a
+        # manual build with an empty pkglist and no other customization is
+        # not actually invalid - gisobuild itself does not require --pkglist
+        # at all (a build that only relabels the ISO, or only adds a config
+        # file, is a real use case), so create_build_plan() correctly does
+        # not invent a restriction upstream doesn't have. The one real guard
+        # against an accidental no-op submission is client-side:
+        # updateBuildAvailability() in app.js already disables "Start build"
+        # until at least one package or other customization is present -
+        # this test pins the backend half of that split responsibility.
+        (self.data / "base.iso").write_bytes(b"iso")
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": "base.iso", "platform": "ncs5500", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        plan = response.get_json()
+        self.assertTrue(plan["ready"], plan)
+        self.assertEqual(plan["selected_packages"], [])
+        self.assertEqual(plan["blockers"], [])
+
     @patch("app.child_mount_args", return_value=[])
     def test_unknown_iso_requires_platform_selection(self, _mounts):
         (self.data / "base.iso").write_bytes(b"iso")
