@@ -28,6 +28,7 @@ from flask import (
     send_from_directory,
 )
 from platform_validation import (
+    GENERIC_PLATFORM_IDS,
     PLATFORMS,
     RPM_ARCHITECTURE,
     check_upgrade_matrix,
@@ -737,14 +738,29 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     release, RPM architecture and CSC grouping are all read from filenames,
     so they stay INFERRED even when the operator picked the platform
     manually; dependency closure is never computed here at all.
+
+    A platform of exr-generic/lnt-generic is a third case, distinct from
+    both: it is not a filename guess (INFERRED) and not a real, named
+    platform the operator confirmed (which would still show INFERRED,
+    since even a manual pick of a *known* platform isn't independently
+    verified against the ISO's own metadata) - it is the operator
+    explicitly declaring "I know this is eXR/LNT, I cannot name the exact
+    platform," which is a fundamentally different kind of uncertainty and
+    must not be shown identically to a filename match that merely happens
+    to be correct.
     """
+    platform_is_generic = resolved_platform in GENERIC_PLATFORM_IDS
     return {
         "platform": {
-            "value": "INFERRED" if resolved_platform else "UNKNOWN",
+            "value": ("MANUAL" if platform_is_generic
+                       else "INFERRED" if resolved_platform else "UNKNOWN"),
             "source": ("operator-selected" if platform_manual
                        else "iso-filename-pattern" if resolved_platform else "none"),
-            "detail": "Not cross-checked against ISO metadata; select it manually in Expert "
-                      "settings if the filename guess is wrong.",
+            "detail": ("The operator declared a generic engine profile; the real platform "
+                       "identity is unverified and no platform-specific capabilities apply."
+                       if platform_is_generic else
+                       "Not cross-checked against ISO metadata; select it manually in Expert "
+                       "settings if the filename guess is wrong."),
         },
         "release": {
             "value": "INFERRED" if release else "UNKNOWN",

@@ -1178,6 +1178,29 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(confidence["platform"]["value"], "INFERRED")
         self.assertEqual(confidence["platform"]["source"], "operator-selected")
 
+    def test_build_plan_confidence_marks_generic_platform_fallback_as_manual(self):
+        # A manual pick of a *named* platform (asr9k, above) still shows
+        # INFERRED, since even an operator-confirmed platform isn't
+        # independently verified against the ISO's own metadata - the manual
+        # act only changes "source", not "value". A generic eXR/LNT fallback
+        # is different in kind, not just in degree: the operator isn't
+        # confirming a real platform identity at all, only declaring an
+        # engine. Presenting that identically to INFERRED would hide exactly
+        # the uncertainty this field exists to surface honestly.
+        (self.data / "unknown-platform.iso").write_bytes(b"iso")
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": "unknown-platform.iso", "platform": "exr-generic", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+            "skip_usb_image": True,
+        })
+
+        body = response.get_json()
+        self.assertTrue(body["ready"], body)
+        confidence = body["confidence"]
+        self.assertEqual(confidence["platform"]["value"], "MANUAL")
+        self.assertEqual(confidence["platform"]["source"], "operator-selected")
+
     def test_build_plan_warns_when_only_ownership_vouchers_are_set(self):
         # Mirrors _validate_ovs_and_oc() in gisobuild's own _coordinate.py:
         # it rejects a final image carrying one of ownership vouchers/

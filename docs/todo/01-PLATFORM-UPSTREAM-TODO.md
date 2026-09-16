@@ -255,18 +255,32 @@ container image (146/146 tests pass).
 - [x] Show marketing name as unknown — the generic fallback's own label
       ("Other eXR platform (manual override)") already communicates this;
       no separate marketing-name field needed for the fallback case itself.
-- [ ] Preserve an explicit confidence/source field — `confidence_report()`'s
-      platform entry currently reports `value: "INFERRED"` even when the
-      operator picked `exr-generic`/`lnt-generic`, which reads as a filename
-      guess rather than "operator declared this is a generic engine
-      profile, real platform unverified." `source: "operator-selected"` is
-      already correct and distinguishes it from a filename match, but a
-      genuine third confidence tier (something like `MANUAL`/`UNVERIFIED`,
-      distinct from `INFERRED`/`VERIFIED`) would need updating
-      `CONFIDENCE_LABELS`/the confidence badge CSS/existing tests
-      everywhere they assume two tiers — not done here to avoid a
-      half-finished ripple through code this pass didn't have room to
-      verify end-to-end.
+- [x] Preserve an explicit confidence/source field — fixed 2026-09-16:
+      `confidence_report()`'s platform entry previously reported
+      `value: "INFERRED"` even when the operator picked
+      `exr-generic`/`lnt-generic`, reading as a filename guess rather than
+      "operator declared this is a generic engine profile, real platform
+      unverified." Added a genuine third tier, `MANUAL`, returned only when
+      `resolved_platform in GENERIC_PLATFORM_IDS`; `source: "operator-selected"`
+      was already correct and unchanged. Added the matching
+      `.confidence-badge.manual` CSS rule (blue, distinct from
+      verified/inferred/unknown's green/amber/gray) and extended the
+      confidence-note explanation text. Separately found and fixed while
+      verifying this: `renderBuildReport()` (the permanent Step 3 record of
+      a completed build) never rendered `plan.confidence` at all, even
+      though `create_build_plan()` has always computed it and Step 2's live
+      review already shows the same data via the same `confidenceGrid()`
+      helper — the one place an operator could look back at *how sure* the
+      system was about a build's platform/release/architecture (including
+      this new MANUAL case) after the fact showed nothing. Now rendered
+      there too. Verified by
+      `test_build_plan_confidence_marks_generic_platform_fallback_as_manual`
+      in `giso-webui/tests/test_app.py` and
+      `test_build_report_shows_the_confidence_grid` in
+      `giso-webui/tests/test_build_script.py`; confirmed live by invoking
+      the real `renderBuildReport()` in a browser with a build plan carrying
+      a MANUAL platform confidence entry and reading back the rendered
+      badge's class (`confidence-badge manual`), text and tooltip.
 
 ## Capability-driven UI
 

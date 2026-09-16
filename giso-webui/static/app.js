@@ -310,7 +310,7 @@ function confidenceGrid(confidence) {
   });
   section.appendChild(grid);
   const note=document.createElement('p'); note.className='confidence-note';
-  note.textContent='VERIFIED means it was read from the file itself; INFERRED means it was guessed from a filename; UNKNOWN means it could not be determined here.';
+  note.textContent='VERIFIED means it was read from the file itself; INFERRED means it was guessed from a filename; MANUAL means the operator explicitly declared it without confirming the exact platform; UNKNOWN means it could not be determined here.';
   section.appendChild(note);
   return section;
 }
@@ -780,6 +780,14 @@ function renderBuildReport(job) {
   const meta=document.createElement('p'); meta.className='build-report-meta';
   meta.textContent=`Inventory revision ${plan.inventory_revision} · BuildPlan fingerprint ${plan.fingerprint.slice(0,16)}…`;
   body.appendChild(meta);
+
+  // create_build_plan() has always computed plan.confidence (the same shape
+  // Step 2's live review shows via confidenceGrid()), but nothing here ever
+  // rendered it - the one permanent record of a completed build showed
+  // every other confidence-bearing fact except how sure the system actually
+  // was about them, including whether the platform was a real filename
+  // match or an operator-declared generic eXR/LNT fallback (MANUAL).
+  if (plan.confidence) body.appendChild(confidenceGrid(plan.confidence));
 
   if (plan.iso?.sha256 || plan.selected_packages?.length) {
     const checksums=document.createElement('details');

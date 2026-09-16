@@ -162,6 +162,18 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("addEventListener('change', refreshExpectedOutput)", script)
         self.assertIn("refreshExpectedOutput()", script[script.index("$('[name=platform]').addEventListener"):])
 
+    def test_build_report_shows_the_confidence_grid(self):
+        # create_build_plan() has always computed a full confidence report
+        # (including, as of 2026-09-16, a MANUAL tier for the exr-generic/
+        # lnt-generic fallback platforms), but renderBuildReport() - the one
+        # permanent record of a completed build - never rendered it, even
+        # though Step 2's live review (applySmuRecommendation()) already
+        # does via the same confidenceGrid() helper.
+        script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
+        report_fn = script[script.index("function renderBuildReport(job)"):
+                            script.index("function renderMissingDependencies(job)")]
+        self.assertIn("confidenceGrid(plan.confidence)", report_fn)
+
     def test_disk_estimate_is_shown_during_review_and_uses_already_loaded_data(self):
         # "free disk estimate" was previously not implemented anywhere - no
         # endpoint returned a projected build-output size versus available
