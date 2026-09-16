@@ -493,6 +493,47 @@ policy check with no errors, `/api/archive` responds normally, and
 `ARCHIVE/.lock` is created on the writable volume without tripping the
 `read_only: true` root filesystem hardening on either container.
 
+### A single failed archive-policy cycle crashed the maintenance daemon entirely (2026-09-16)
+
+Current behavior (before this fix):
+
+- `maintenance.py`'s `main()` calls `enforce_archive_policy()` in a bare
+  `while True:` loop with no exception handling around the call.
+- `archive-maintenance` in `compose.yaml` has `healthcheck: disable: true`
+  and `restart: unless-stopped` — a crash is silently retried by Docker with
+  no external signal that anything is wrong beyond the container's own
+  restart count.
+
+Risk: any transient `OSError` from `enforce_archive_policy()` — a
+permission hiccup, disk pressure, a flaky network-backed volume, a job
+directory removed out from under `shutil.rmtree()` by something else on the
+same host — kills the whole daemon for that cycle. If the underlying cause
+is persistent rather than transient, the container crash-loops indefinitely
+and archive retention/quota enforcement silently stops running, with
+nothing but a rising restart count to notice it by.
+
+TODO:
+
+- [x] Catch `OSError` around the `enforce_archive_policy()` call, log it,
+      and continue to the next interval instead of crashing the process.
+- [x] Add a regression test proving one failed cycle doesn't stop the loop
+      from reaching the next one.
+
+Fix: wrapped the call in `maintenance.py:main()` in `try`/`except OSError`;
+a failed cycle now prints `"Archive policy check failed, will retry next
+interval: <error>"` and sleeps for the normal interval before trying again,
+exactly like a successful "no files removed" cycle. `enforce_archive_policy()`
+itself is unchanged — this only stops one bad cycle from taking down every
+future cycle with it.
+
+Verified by two new tests in `giso-webui/tests/test_maintenance.py`:
+`test_transient_os_error_does_not_crash_the_loop` (asserts
+`enforce_archive_policy()` is called again on the next interval after an
+`OSError`, using a `time.sleep` side effect list to break out of the
+infinite loop deterministically) and
+`test_successful_cycle_reports_removed_jobs`. Full suite green (198 tests)
+inside the built container; ruff and Graphify clean.
+
 ### Mandatory Docker pull makes builds depend on registry availability even when the builder image is already cached
 
 Current behavior:
