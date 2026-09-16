@@ -128,8 +128,10 @@ if capabilities.optimize:
 
 - [ ] generic eXR workflow
 - [ ] generic LNT workflow
-- [ ] eXR-only option rejection on LNT
-- [ ] LNT-only option rejection on eXR
+- [x] eXR-only option rejection on LNT — added 2026-09-16
+      (`test_adapter_rejects_exr_only_capability_on_lnt_platform`); until
+      then only the reverse direction had a test.
+- [x] LNT-only option rejection on eXR (`test_adapter_rejects_capability_not_supported_by_engine`)
 - [ ] unknown/future upstream-supported platform
 - [x] NCS-57C3 alias normalization (`test_ncs57c3_filename_is_inferred_as_ncs57`,
       `test_ncs57c3_inventory_sku_normalizes_to_ncs57`, both pre-existing and
