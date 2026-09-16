@@ -47,10 +47,12 @@ Core principle:
 - [x] Verify output artifacts — `giso_artifact_candidates()` plus a
       byte-for-byte + SHA-256 comparison between source and archived copy
       before anything is deleted.
-- [ ] Produce checksums and `build-report.json` — `--create-checksum`
+- [x] Produce checksums and `build-report.json` — `--create-checksum`
       produces gisobuild's own `checksums.json` as a downloadable artifact;
-      no distinct `build-report.json` (a structured summary of what was
-      included/excluded/why) exists.
+      a separate `build-report.json` (web UI/gisobuild version, exact
+      BuildPlan, generated command, output checksums) is now written into
+      the archive alongside the ISO on every successful build — see
+      `06-UI-OPERATOR-TODO.md`.
 - [x] Archive verified output — `archive_giso_artifacts_and_cleanup()`,
       with retention/quota enforcement now cross-process-safe (see the
       2026-09-16 fix in `07-BUG-AUDIT-TODO.md`).

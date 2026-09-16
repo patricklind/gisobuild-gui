@@ -175,6 +175,42 @@ Show:
       `DETAILS` elements, and each expands/collapses independently on
       click.
 
+- [x] persist a `build-report.json` next to each archived artifact
+      (`docs/AI-MASTER-PROMPT.md` "Artifacts and reproducibility": "every
+      build should record" web UI/gisobuild version, all input/output
+      checksums, the exact BuildPlan and the generated CLI) — added
+      2026-09-16. The "Show build report" UI already rendered this
+      information for a *running* job from in-memory state, but nothing
+      persisted it once the job aged out of job history and the archive was
+      all that remained. `build_report()` in `giso-webui/app.py` composes a
+      plain JSON document (job id/label/timestamps, `web_ui_version`,
+      `gisobuild_image`/`gisobuild_commit`, the safe `command_preview` as
+      `generated_command`, the full `build_plan`, and `output_artifacts`),
+      and `write_build_report()` writes it to
+      `ARCHIVE/<job_id>/build-report.json` right after
+      `archive_giso_artifacts_and_cleanup()` succeeds in `run_job()` — a
+      write failure is swallowed (it's a convenience record, not something
+      that should fail an otherwise-successful build). `archive_giso_artifacts_and_cleanup()`
+      now also returns each artifact's `sha256` (reusing the digest already
+      computed for archive-copy verification, no extra hashing pass) so the
+      report's output checksums are real, not recomputed separately.
+      `GET /api/archive` reports a new `has_report` flag per item (checked
+      once, cheaply, by testing whether the file exists) and the archive
+      list in `giso-webui/static/app.js` shows a "Build report" download
+      link next to the ISO row when it's true — never for a job archived
+      before this feature existed, so the UI never links to a 404. Verified
+      by `test_archived_artifacts_report_their_sha256`,
+      `test_build_report_captures_version_plan_and_output_checksums`,
+      `test_write_build_report_persists_json_next_to_archived_artifacts`,
+      `test_write_build_report_does_not_raise_when_archive_dir_is_missing`,
+      and `test_archive_list_reports_has_report_only_when_the_file_exists`
+      in `giso-webui/tests/test_app.py`, and confirmed live end-to-end
+      (archive a fake artifact, write its report, then fetch both
+      `/api/archive` and `/archive/<job>/build-report.json` over HTTP, and
+      see the "Build report" link render in the browser) against a
+      throwaway, isolated container — its own temp `DATA_ROOT`/etc., never
+      the shared persistent volumes.
+
 ## Automatic by default
 
 Do not ask for these unless ambiguous:

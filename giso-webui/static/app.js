@@ -436,6 +436,9 @@ async function loadArchive() {
       name.textContent=`${isIso ? 'Golden ISO' : 'USB boot image'} · ${item.name}`;
       const guide=document.createElement('button'); guide.type='button'; guide.className='secondary small'; guide.textContent='Upgrade guide';
       guide.hidden=!isIso; guide.onclick=()=>openUpgradeGuide(item.name);
+      const report=document.createElement('a'); report.className='secondary small'; report.textContent='Build report';
+      report.href=`/archive/${encodeURIComponent(item.job_id)}/build-report.json`;
+      report.hidden=!(isIso && item.has_report);
       const checksums=document.createElement('div'); checksums.className='checksums';
       const showChecksums=document.createElement('button'); showChecksums.type='button'; showChecksums.className='secondary small'; showChecksums.textContent='Show MD5 / SHA-256';
       showChecksums.onclick=async()=>{
@@ -451,7 +454,7 @@ async function loadArchive() {
         try { await api(`/api/archive/${encodeURIComponent(item.job_id)}/${encodeURIComponent(item.name)}`,{method:'DELETE'}); await loadArchive(); }
         catch(error){ await showNotice('Could not delete artifact', error.message); }
       };
-      const actions=document.createElement('div'); actions.className='archive-actions'; actions.append(guide,showChecksums,remove);
+      const actions=document.createElement('div'); actions.className='archive-actions'; actions.append(guide,report,showChecksums,remove);
       link.append(name,meta); row.append(link,actions,checksums); list.appendChild(row);
     });
   } catch (error) { $('#archive-list').textContent=error.message; }

@@ -1461,6 +1461,53 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse((self.data / "source.rpm").exists())
         self.assertFalse(job_dir.exists())
 
+    def test_archived_artifacts_report_their_sha256(self):
+        job_dir = self.output / "job"
+        job_dir.mkdir()
+        (job_dir / "router-goldenk9.iso").write_bytes(b"golden image")
+        artifacts = module.archive_golden_iso_and_cleanup("job", job_dir, [])
+        self.assertEqual(artifacts[0]["sha256"], hashlib.sha256(b"golden image").hexdigest())
+
+    def test_build_report_captures_version_plan_and_output_checksums(self):
+        job = {
+            "id": "job-1", "created": 100.0, "finished": 200.0,
+            "payload": {"label": "my-build"},
+            "command_preview": "gisobuild.py --iso base.iso",
+            "build_plan": {"fingerprint": "abc123", "platform": "ncs5500"},
+        }
+        artifacts = [{"path": "golden.iso", "size": 5, "sha256": "deadbeef"}]
+        with patch.object(module, "gisobuild_commit", return_value="cafef00d"):
+            report = module.build_report(job, artifacts)
+        self.assertEqual(report["job_id"], "job-1")
+        self.assertEqual(report["label"], "my-build")
+        self.assertEqual(report["web_ui_version"], module.APP_VERSION)
+        self.assertEqual(report["gisobuild_image"], module.IMAGE)
+        self.assertEqual(report["gisobuild_commit"], "cafef00d")
+        self.assertEqual(report["generated_command"], "gisobuild.py --iso base.iso")
+        self.assertEqual(report["build_plan"], job["build_plan"])
+        self.assertEqual(report["output_artifacts"], artifacts)
+
+    def test_write_build_report_persists_json_next_to_archived_artifacts(self):
+        (module.ARCHIVE / "job-2").mkdir(parents=True)
+        job = {"id": "job-2", "payload": {}, "build_plan": {}}
+        module.write_build_report("job-2", job, [{"path": "golden.iso"}])
+        report = json.loads((module.ARCHIVE / "job-2" / "build-report.json").read_text())
+        self.assertEqual(report["job_id"], "job-2")
+
+    def test_write_build_report_does_not_raise_when_archive_dir_is_missing(self):
+        module.write_build_report("missing-job", {"id": "missing-job", "payload": {}}, [])
+
+    def test_archive_list_reports_has_report_only_when_the_file_exists(self):
+        job_dir = self.output / "job"
+        job_dir.mkdir()
+        (job_dir / "router-goldenk9.iso").write_bytes(b"golden image")
+        module.archive_golden_iso_and_cleanup("job", job_dir, [])
+        without_report = self.client.get("/api/archive").get_json()
+        self.assertFalse(without_report[0]["has_report"])
+        (module.ARCHIVE / "job" / "build-report.json").write_text("{}")
+        with_report = self.client.get("/api/archive").get_json()
+        self.assertTrue(with_report[0]["has_report"])
+
     def test_successful_build_preserves_inputs_not_owned_by_job(self):
         owned = self.data / "selected.rpm"
         unrelated = self.data / "future-build.iso"

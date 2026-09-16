@@ -950,10 +950,11 @@ def archive_giso_artifacts_and_cleanup(
                 # The archive retention clock starts when the verified build is archived,
                 # not when an old source file happened to be created.
                 shutil.copyfile(source, destination)
-                if source.stat().st_size != destination.stat().st_size or file_sha256(source) != file_sha256(destination):
+                digest = file_sha256(destination)
+                if source.stat().st_size != destination.stat().st_size or file_sha256(source) != digest:
                     raise RuntimeError(f"Archive verification failed for {source.name}")
                 archived.append({"path": source.name, "size": destination.stat().st_size,
-                                 "url": f"/archive/{job_id}/{source.name}"})
+                                 "sha256": digest, "url": f"/archive/{job_id}/{source.name}"})
             enforce_archive_policy(protected_job_id=job_id)
             if not archive_dir.is_dir():
                 raise RuntimeError("The completed GISO archive could not be retained")
@@ -984,6 +985,38 @@ def archive_giso_artifacts_and_cleanup(
     shutil.rmtree(WORK / job_id, ignore_errors=True)
     shutil.rmtree(job_dir, ignore_errors=True)
     return archived
+
+
+def build_report(job: dict, artifacts: list[dict]) -> dict:
+    """Structured, offline-readable record of one successful build.
+
+    AI-MASTER-PROMPT.md "Artifacts and reproducibility" asks every build to
+    record the web UI/gisobuild version, every input/output checksum, the
+    exact BuildPlan and the generated CLI. The "Show build report" UI already
+    renders this same data for a running job from live job state; this
+    persists it as a plain JSON file next to the archived artifacts so it
+    survives after the job record itself ages out of job history.
+    """
+    return {
+        "job_id": job["id"],
+        "label": (job.get("payload") or {}).get("label") or None,
+        "created": job.get("created"),
+        "finished": job.get("finished"),
+        "web_ui_version": APP_VERSION,
+        "gisobuild_image": IMAGE,
+        "gisobuild_commit": gisobuild_commit(),
+        "generated_command": job.get("command_preview", ""),
+        "build_plan": job.get("build_plan"),
+        "output_artifacts": artifacts,
+    }
+
+
+def write_build_report(job_id: str, job: dict, artifacts: list[dict]) -> None:
+    try:
+        report_path = ARCHIVE / job_id / "build-report.json"
+        report_path.write_text(json.dumps(build_report(job, artifacts), indent=2, sort_keys=True))
+    except OSError:
+        pass  # The report is a convenience artifact; a write failure must not fail the build.
 
 
 # Backwards-compatible name for callers outside the web application.
@@ -1412,7 +1445,10 @@ def run_job(job_id: str, command: list[str]) -> None:
                                     updated=time.time(),
                                     progress=100 if success else jobs[job_id].get("progress", 0),
                                     phase="Complete" if success else "Build failed")
+            job_snapshot = dict(jobs[job_id])
         persist_job(job_id)
+        if success:
+            write_build_report(job_id, job_snapshot, artifacts)
         log_event("build_finished", exit_code=code, job_id=job_id,
                   status="success" if success else "failed")
     except BuildCancelled:
@@ -1915,7 +1951,8 @@ def archive_list():
                 stat = path.stat()
                 items.append({"job_id": path.parent.name, "name": path.name,
                               "size": stat.st_size, "created": stat.st_mtime,
-                              "url": f"/archive/{path.parent.name}/{path.name}"})
+                              "url": f"/archive/{path.parent.name}/{path.name}",
+                              "has_report": (path.parent / "build-report.json").is_file()})
     return jsonify(items)
 
 
