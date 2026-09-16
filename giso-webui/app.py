@@ -652,6 +652,58 @@ def current_inventory_revision(items: list[dict] | None = None) -> str:
     return hashlib.sha256(json.dumps(state, sort_keys=True).encode()).hexdigest()[:24]
 
 
+def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
+                      release: str | None, iso_architectures: frozenset[str],
+                      package_groups: list, has_rpm_selection: bool) -> dict:
+    """Report how each detected fact was derived, never presenting a guess as verified.
+
+    Only iso_architecture is read from the artifact's own contents (see
+    inspect_iso_architecture) and can honestly be called VERIFIED. Platform,
+    release, RPM architecture and CSC grouping are all read from filenames,
+    so they stay INFERRED even when the operator picked the platform
+    manually; dependency closure is never computed here at all.
+    """
+    return {
+        "platform": {
+            "value": "INFERRED" if resolved_platform else "UNKNOWN",
+            "source": ("operator-selected" if platform_manual
+                       else "iso-filename-pattern" if resolved_platform else "none"),
+            "detail": "Not cross-checked against ISO metadata; select it manually in Expert "
+                      "settings if the filename guess is wrong.",
+        },
+        "release": {
+            "value": "INFERRED" if release else "UNKNOWN",
+            "source": "iso-filename-pattern",
+            "detail": "Read from the ISO filename's release tag; not parsed from ISO metadata.",
+        },
+        "iso_architecture": {
+            "value": "VERIFIED" if iso_architectures else "UNKNOWN",
+            "source": "iso-contents" if iso_architectures else "none",
+            "detail": "Read directly from the ISO's own metadata/RPM listing."
+                      if iso_architectures else
+                      "Could not be determined from the ISO's contents (isoinfo unavailable, "
+                      "unreadable image, or no recognizable architecture markers).",
+        },
+        "package_architecture": {
+            "value": "INFERRED" if has_rpm_selection else "UNKNOWN",
+            "source": "rpm-filename-suffix",
+            "detail": "Read from each RPM filename's architecture suffix; not parsed from the "
+                      "RPM header.",
+        },
+        "csc_groups": {
+            "value": "INFERRED" if package_groups else "UNKNOWN",
+            "source": "rpm-filename-pattern",
+            "detail": "CSC identifiers and component grouping are read from RPM filenames.",
+        },
+        "dependency_closure": {
+            "value": "UNKNOWN",
+            "source": "none",
+            "detail": "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs "
+                      "the authoritative dependency check during the build.",
+        },
+    }
+
+
 def create_build_plan(payload: dict) -> dict:
     """Create one immutable, backend-owned build decision from current inventory."""
     inventory = inventory_files()
@@ -668,6 +720,7 @@ def create_build_plan(payload: dict) -> dict:
                       "component_conflicts": []}
     selected: list[dict] = []
     profile = None
+    iso_architectures: frozenset[str] = frozenset()
     if iso:
         identifiers = payload.get("pkglist", [])
         # Same check discover(), /api/smu-recommendation, /api/compatibility, and
@@ -698,6 +751,20 @@ def create_build_plan(payload: dict) -> dict:
         except ValueError as exc:
             blockers.append(str(exc))
 
+    release = recommendation.get("release") or (
+        validate_smu_selection(iso_name, [])["iso_release"] if iso else None
+    )
+    resolved_platform = (profile["id"] if profile else None) or recommendation.get("platform")
+    confidence = confidence_report(
+        resolved_platform=resolved_platform,
+        platform_manual=bool(payload.get("platform")),
+        release=release,
+        iso_architectures=iso_architectures,
+        package_groups=recommendation["package_groups"],
+        has_rpm_selection=any(item.get("basename", "").lower().endswith(".rpm")
+                              for item in selected),
+    )
+
     option_keys = sorted(set(BOOL_OPTIONS) | set(PATH_OPTIONS) | set(LIST_OPTIONS) |
                          {"label", "platform", "auto_repo", "automatic_smu_selection"})
     options = {key: payload[key] for key in option_keys if key in payload}
@@ -719,15 +786,14 @@ def create_build_plan(payload: dict) -> dict:
         "iso": iso,
         "engine": profile["engine"] if profile else None,
         "platform": profile["id"] if profile else None,
-        "release": recommendation.get("release") or (
-            validate_smu_selection(iso_name, [])["iso_release"] if iso else None
-        ),
+        "release": release,
         "capabilities": profile["capabilities"] if profile else {},
         "selected_packages": selected,
         "selected_csc_groups": recommendation["package_groups"],
         "excluded_packages": recommendation["excluded"],
         "component_conflicts": recommendation["component_conflicts"],
         "options": options,
+        "confidence": confidence,
         "blockers": sorted(set(blockers)),
         "warnings": sorted(set(warnings)),
         "expected_outputs": {
@@ -968,6 +1034,7 @@ def discover() -> dict:
             dirs.append(rel_data(root_path))
     candidates, superseded = active_rpm_names()
     isos = [item["path"] for item in files if item["type"] == ".iso"]
+    iso_architectures: frozenset[str] = frozenset()
     if len(isos) == 1:
         try:
             iso_architectures = inspect_iso_architecture(safe_data_path(isos[0]))
@@ -980,6 +1047,14 @@ def discover() -> dict:
     else:
         recommendation = {"ready": False, "selected": [], "excluded": [],
                           "message": "Upload one base ISO before SMUs can be selected"}
+    recommendation["confidence"] = confidence_report(
+        resolved_platform=recommendation.get("platform"),
+        platform_manual=False,
+        release=recommendation.get("release"),
+        iso_architectures=iso_architectures,
+        package_groups=recommendation.get("package_groups", []),
+        has_rpm_selection=bool(recommendation.get("selected")),
+    )
     matrices = [item["path"] for item in files
                 if item["type"] == ".json" and Path(item["path"]).name.startswith("compatibility_matrix_")]
     return {"files": sorted(files, key=lambda x: x["path"]), "dirs": sorted(dirs),
@@ -1386,7 +1461,16 @@ def smu_recommendation():
             raise ValueError("Select an uploaded base ISO")
         packages, _ = active_rpm_names()
         iso_architectures = inspect_iso_architecture(iso_path)
-        return jsonify(recommend_smu_selection(iso, packages, iso_architectures=iso_architectures))
+        recommendation = recommend_smu_selection(iso, packages, iso_architectures=iso_architectures)
+        recommendation["confidence"] = confidence_report(
+            resolved_platform=recommendation.get("platform"),
+            platform_manual=False,
+            release=recommendation.get("release"),
+            iso_architectures=iso_architectures,
+            package_groups=recommendation.get("package_groups", []),
+            has_rpm_selection=bool(recommendation.get("selected")),
+        )
+        return jsonify(recommendation)
     except (OSError, TypeError, ValueError) as exc:
         return jsonify(error=str(exc)), 400
 

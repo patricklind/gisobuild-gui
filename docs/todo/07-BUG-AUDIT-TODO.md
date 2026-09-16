@@ -255,9 +255,25 @@ TODO:
 
 Current platform/release/CSC checks are largely filename based. This is already covered by the metadata-first architecture TODO, but it is also a current correctness risk.
 
+**2026-09-16 update:** `create_build_plan()`, `discover()`, and
+`/api/smu/recommendation` now all return a `confidence` block (via the shared
+`confidence_report()` in `giso-webui/app.py`) labeling platform, release, ISO
+architecture, RPM architecture, CSC grouping, and dependency closure as
+`VERIFIED` / `INFERRED` / `UNKNOWN`, and the Review BuildPlan step in
+`giso-webui/static/app.js` renders it as a badge grid
+(`confidenceGrid()`/`.confidence-badge` in `giso-webui/static/upload.css`).
+Verified by the four `test_build_plan_confidence_*` tests in
+`giso-webui/tests/test_app.py`. Note: `docs/todo/06-UI-OPERATOR-TODO.md`'s
+original examples claimed platform/release/RPM-architecture would be
+`VERIFIED from ISO metadata` / `VERIFIED from RPM header` — that was
+aspirational and not what the codebase does; those fields are filename-based
+and are honestly reported as `INFERRED`. Only ISO architecture
+(`inspect_iso_architecture()`, reading the ISO's own contents) earns
+`VERIFIED` today.
+
 TODO:
 
-- [ ] Label filename-only results as `INFERRED`, never `VERIFIED`.
+- [x] Label filename-only results as `INFERRED`, never `VERIFIED`.
 - [ ] Do not block an upstream-valid platform solely because the local filename parser does not recognize it.
 - [ ] Add unknown/future-platform regression fixture.
 

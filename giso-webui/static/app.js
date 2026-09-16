@@ -158,6 +158,7 @@ function applySmuRecommendation(plan) {
       const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label; const strong=document.createElement('b'); strong.textContent=value; step.append(small,strong); flow.appendChild(step);
     });
     details.appendChild(flow);
+    if (plan.confidence) details.appendChild(confidenceGrid(plan.confidence));
     if (plan.package_groups?.length) {
       const groups=document.createElement('section'); groups.className='smu-groups';
       const heading=document.createElement('h4'); heading.textContent='SMU packages that belong together'; groups.appendChild(heading);
@@ -223,6 +224,31 @@ function smuGroupCard(group) {
   const files=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`Show ${group.files.length} RPM filename${group.files.length === 1 ? '' : 's'}`;
   const list=document.createElement('ul'); group.files.forEach(name=>{const item=document.createElement('li'); item.textContent=name; list.appendChild(item);}); files.append(summary,list);
   card.append(title,status,components,files); return card;
+}
+
+const CONFIDENCE_LABELS = {
+  platform: 'Platform', release: 'IOS XR release', iso_architecture: 'ISO architecture',
+  package_architecture: 'RPM architecture', csc_groups: 'CSC grouping',
+  dependency_closure: 'Dependency closure',
+};
+
+function confidenceGrid(confidence) {
+  const section=document.createElement('section'); section.className='confidence-section';
+  const heading=document.createElement('h4'); heading.textContent='How sure are we?'; section.appendChild(heading);
+  const grid=document.createElement('div'); grid.className='confidence-grid';
+  Object.entries(CONFIDENCE_LABELS).forEach(([key,label])=>{
+    const entry=confidence[key]; if (!entry) return;
+    const badge=document.createElement('div'); badge.className=`confidence-badge ${entry.value.toLowerCase()}`;
+    badge.title=entry.detail;
+    const name=document.createElement('small'); name.textContent=label;
+    const value=document.createElement('b'); value.textContent=entry.value;
+    badge.append(name,value); grid.appendChild(badge);
+  });
+  section.appendChild(grid);
+  const note=document.createElement('p'); note.className='confidence-note';
+  note.textContent='VERIFIED means it was read from the file itself; INFERRED means it was guessed from a filename; UNKNOWN means it could not be determined here.';
+  section.appendChild(note);
+  return section;
 }
 
 async function refreshSmuRecommendation() {

@@ -909,6 +909,84 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(response.get_json()["ready"])
         self.assertIn("current inventory", response.get_json()["blockers"][0])
 
+    def test_build_plan_confidence_is_unknown_when_no_iso_is_selected(self):
+        # Nothing has been detected yet, so every confidence entry must say so
+        # rather than defaulting to a value that looks like a real answer.
+        response = self.client.post("/api/build-plan", json={
+            "iso": "missing.iso", "platform": "", "pkglist": [],
+        })
+
+        confidence = response.get_json()["confidence"]
+        self.assertEqual(confidence["platform"]["value"], "UNKNOWN")
+        self.assertEqual(confidence["release"]["value"], "UNKNOWN")
+        self.assertEqual(confidence["iso_architecture"]["value"], "UNKNOWN")
+        self.assertEqual(confidence["dependency_closure"]["value"], "UNKNOWN")
+
+    def test_build_plan_confidence_marks_filename_derived_fields_as_inferred(self):
+        # Platform, release and CSC grouping all come from filename regexes,
+        # not from parsing the artifact itself, so none of them may be
+        # reported as VERIFIED - only genuine content inspection earns that.
+        (self.data / "asr9k-x64-7.3.2.iso").write_bytes(b"iso")
+        rpm = self.data / "asr9k-x64-routing-1.0.0.1-r732.CSCtest00001.x86_64.rpm"
+        rpm.write_bytes(b"rpm")
+        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": "asr9k-x64-7.3.2.iso", "platform": "", "pkglist": [item["id"]],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        confidence = response.get_json()["confidence"]
+        self.assertEqual(confidence["platform"], {
+            "value": "INFERRED",
+            "source": "iso-filename-pattern",
+            "detail": confidence["platform"]["detail"],
+        })
+        self.assertEqual(confidence["release"]["value"], "INFERRED")
+        self.assertEqual(confidence["release"]["source"], "iso-filename-pattern")
+        self.assertEqual(confidence["package_architecture"]["value"], "INFERRED")
+        self.assertEqual(confidence["csc_groups"]["value"], "INFERRED")
+        self.assertEqual(confidence["dependency_closure"]["value"], "UNKNOWN")
+
+    def test_build_plan_confidence_marks_manual_platform_as_operator_selected(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": "base.iso", "platform": "asr9k", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        confidence = response.get_json()["confidence"]
+        self.assertEqual(confidence["platform"]["value"], "INFERRED")
+        self.assertEqual(confidence["platform"]["source"], "operator-selected")
+
+    @unittest.skipUnless(
+        ISOINFO_AVAILABLE,
+        "genisoimage and isoinfo are only available inside the giso-webui container image",
+    )
+    def test_build_plan_confidence_reports_verified_iso_architecture_from_real_iso(self):
+        # inspect_iso_architecture() reads the ISO's own contents, so this is
+        # the one field this endpoint can honestly call VERIFIED.
+        source = Path(self.temp.name) / "iso-src-confidence"
+        source.mkdir()
+        (source / "iosxr_image_mdata.yml").write_text(
+            "x86_64 supported arch list: corei7_64\narm supported arch list:\n"
+        )
+        iso_path = self.data / "verified.iso"
+        subprocess.run(
+            ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
+            check=True, capture_output=True,
+        )
+
+        response = self.client.post("/api/build-plan", json={
+            "iso": "verified.iso", "platform": "asr9k", "pkglist": [],
+            "automatic_smu_selection": False, "auto_repo": True,
+        })
+
+        confidence = response.get_json()["confidence"]
+        self.assertEqual(confidence["iso_architecture"]["value"], "VERIFIED")
+        self.assertEqual(confidence["iso_architecture"]["source"], "iso-contents")
+
     @unittest.skipUnless(
         ISOINFO_AVAILABLE,
         "genisoimage and isoinfo are only available inside the giso-webui container image",
