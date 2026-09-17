@@ -256,6 +256,47 @@ class OperatorFlowTests(unittest.TestCase):
         expect(self.rpm_box(self.ROUTING)).not_to_be_checked()
         expect(self.rpm_box(self.BGP)).to_be_checked()
 
+    def test_upload_retries_a_dropped_chunk_and_finishes(self):
+        self.open()
+        puts = []
+
+        def flaky(route):
+            puts.append(route.request.url)
+            if len(puts) == 1:
+                route.abort("connectionreset")  # the network drops the first chunk
+            else:
+                route.continue_()
+
+        self.page.route("**/api/uploads/*?offset=*", flaky)
+        self.page.set_input_files("#file-upload", files=[{
+            "name": "router.cfg", "mimeType": "text/plain", "buffer": b"hostname r1\n"}])
+        expect(self.page.locator(".upload-row.done")).to_have_count(1, timeout=15000)
+        self.assertGreaterEqual(len(puts), 2)
+        self.assertEqual((module.DATA / "router.cfg").read_bytes(), b"hostname r1\n")
+
+    def test_selecting_the_same_file_again_resumes_where_the_server_stopped(self):
+        self.open()
+        started = self.page.evaluate("""async () => {
+          const init = await fetch('/api/uploads/init', {method: 'POST',
+            headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: 'resume.cfg', size: 8})});
+          const {id} = await init.json();
+          await fetch(`/api/uploads/${id}?offset=0`, {method: 'PUT', body: 'host'});
+          return id;
+        }""")
+        offsets = []
+        self.page.route("**/api/uploads/*?offset=*",
+                        lambda route: (offsets.append(route.request.url.split("offset=")[1]), route.continue_()))
+        # Same name, size and modification time as the interrupted upload.
+        self.page.evaluate("""async id => {
+          const file = new File(['hostname'], 'resume.cfg', {lastModified: 1000});
+          localStorage.setItem('giso-upload:resume.cfg:8:1000', id);
+          await uploadFiles([file]);
+        }""", started)
+        expect(self.page.locator(".upload-row.done")).to_have_count(1)
+        self.assertEqual(offsets, ["4"])  # only the missing half was sent
+        self.assertEqual((module.DATA / "resume.cfg").read_bytes(), b"hostname")
+        self.assertIsNone(self.page.evaluate("() => localStorage.getItem('giso-upload:resume.cfg:8:1000')"))
+
     def test_manual_to_automatic(self):
         for name in (self.ISO, self.ROUTING, self.BGP, self.OSPF):
             self.write(name)

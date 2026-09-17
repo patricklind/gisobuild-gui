@@ -1050,6 +1050,43 @@ async function restoreJob() {
 }
 
 const CHUNK = 16 * 1024 * 1024;
+const UPLOAD_RETRIES = 8;
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// A session id per file (name, size, modification time), so selecting the same
+// file again after a reload or a service restart continues where the server
+// stopped instead of sending gigabytes again. Browser storage is only a hint:
+// the server's own status decides where to continue.
+const uploadResumeKey = file => `giso-upload:${file.name}:${file.size}:${file.lastModified}`;
+function recallUpload(file) { try { return localStorage.getItem(uploadResumeKey(file)); } catch { return null; } }
+function rememberUpload(file, id) { try { localStorage.setItem(uploadResumeKey(file), id); } catch { /* optional */ } }
+function forgetUpload(file) { try { localStorage.removeItem(uploadResumeKey(file)); } catch { /* optional */ } }
+
+// null when the session is gone; undefined when the server could not be asked.
+async function uploadStatus(id) {
+  try {
+    const response = await fetch(`/api/uploads/${encodeURIComponent(id)}`);
+    if (response.status === 404) return null;
+    return response.ok ? await response.json() : undefined;
+  } catch { return undefined; }
+}
+
+// Resolves to the server's received byte count. Network failures and 5xx are
+// transient (retried by the caller); an offset mismatch reports where the
+// server really is; any other refusal is final.
+async function sendChunk(id, offset, blob) {
+  let response;
+  try {
+    response = await fetch(`/api/uploads/${encodeURIComponent(id)}?offset=${offset}`, {method:'PUT', body:blob});
+  } catch (error) { const transient = new Error('Connection lost'); transient.transient = true; throw transient; }
+  const body = await response.json().catch(() => ({}));
+  if (response.ok) return body.received;
+  if (response.status === 409 && Number.isInteger(body.expected)) return body.expected;
+  const error = new Error(body.human_message || body.error || `HTTP ${response.status}`);
+  error.transient = response.status >= 500;
+  throw error;
+}
+
 async function uploadFile(file) {
   currentJob = null; pollActivity();
   const row = document.createElement('div'); row.className = 'upload-row';
@@ -1058,22 +1095,56 @@ async function uploadFile(file) {
   progress.setAttribute('aria-label', `Upload progress for ${file.name}`);
   const status = document.createElement('small'); status.textContent = 'Starting…'; row.append(name, progress, status); $('#upload-list').appendChild(row);
   let upload = null;
+  let keepSession = false;
   try {
-    upload = await api('/api/uploads/init', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:file.name,size:file.size})});
     let offset = 0;
+    const previous = recallUpload(file);
+    if (previous) {
+      const state = await uploadStatus(previous);
+      if (state && state.size === file.size && state.name === file.name) {
+        upload = {id: previous}; offset = state.received;
+        status.textContent = `Resuming at ${Math.round(offset / file.size * 100)}%`;
+      } else if (state === null) {
+        forgetUpload(file);
+      }
+    }
+    if (!upload) {
+      upload = await api('/api/uploads/init', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:file.name,size:file.size})});
+      rememberUpload(file, upload.id);
+    }
+    let failures = 0;
     while (offset < file.size) {
       const blob = file.slice(offset, Math.min(offset + CHUNK, file.size));
-      await api(`/api/uploads/${upload.id}?offset=${offset}`, {method:'PUT', body:blob}); offset += blob.size;
-      const percent = Math.round(offset / file.size * 100); progress.value = percent; status.textContent = `${percent}%`;
+      try {
+        offset = await sendChunk(upload.id, offset, blob);
+        failures = 0;
+        const percent = Math.round(offset / file.size * 100); progress.value = percent; status.textContent = `${percent}%`;
+      } catch (error) {
+        if (!error.transient) throw error;
+        failures += 1;
+        if (failures > UPLOAD_RETRIES) {
+          keepSession = true;
+          throw new Error('Upload paused: the server could not be reached. Select the same file again to resume.');
+        }
+        status.textContent = `Connection problem, retrying (${failures} of ${UPLOAD_RETRIES})…`;
+        await sleep(Math.min(30000, 1000 * 2 ** (failures - 1)));
+        const state = await uploadStatus(upload.id);
+        if (state === null) throw new Error('The upload session expired on the server; upload the file again.');
+        if (state) offset = state.received;
+      }
     }
     const done = await api(`/api/uploads/${upload.id}/complete`, {method:'POST'});
+    forgetUpload(file);
     row.classList.add('done'); status.textContent = done.extracted ? `Ready – ${done.extracted} files extracted` : 'Ready and saved';
     // Not resetting packageListEdited here: in manual mode that flag is what
     // keeps the operator's own ticks across the re-render this upload causes
     // (new RPMs appear unticked); in automatic mode it is already false.
     await loadInputs();
   } catch (error) {
-    if (upload) fetch(`/api/uploads/session/${upload.id}`, {method:'DELETE'}).catch(() => {});
+    if (upload && !keepSession) {
+      forgetUpload(file);
+      fetch(`/api/uploads/session/${upload.id}`, {method:'DELETE'}).catch(() => {});
+    }
     row.classList.add('upload-error'); status.textContent = error.message;
   }
 }

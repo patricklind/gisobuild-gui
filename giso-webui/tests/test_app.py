@@ -820,10 +820,40 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(module.jobs["job"]["status"], "cancelled")
 
     def test_cleanup_rejects_active_upload(self):
-        module.uploads["active"] = {"name": "x.rpm", "size": 3, "received": 0}
+        module.uploads["active"] = {"name": "x.rpm", "size": 3, "received": 0, "updated": time.time()}
         response = self.client.post("/api/cleanup")
         self.assertEqual(response.status_code, 409)
         self.assertIn("upload", response.get_json()["error"])
+
+    def test_upload_session_survives_a_restart_and_resumes_at_the_bytes_on_disk(self):
+        response = self.client.post("/api/uploads/init", json={"name": "base.iso", "size": 10})
+        upload_id = response.get_json()["id"]
+        self.assertEqual(self.client.put(f"/api/uploads/{upload_id}?offset=0", data=b"12345").status_code, 200)
+        partial = self.data / ".parts" / f"{upload_id}.part"
+        partial.write_bytes(b"123456")  # the process died after writing one more byte
+
+        module.uploads.clear()           # restart: memory is gone
+        module.store_initialized = False
+        status = self.client.get(f"/api/uploads/{upload_id}").get_json()
+        self.assertEqual((status["received"], status["size"]), (6, 10))
+        self.assertIn("can be resumed", self.client.get("/api/activity").get_json()["log"])
+        self.assertEqual(self.client.put(f"/api/uploads/{upload_id}?offset=6", data=b"7890").status_code, 200)
+        done = self.client.post(f"/api/uploads/{upload_id}/complete")
+        self.assertEqual(done.status_code, 200, done.get_json())
+        self.assertEqual((self.data / "base.iso").read_bytes(), b"1234567890")
+        with sqlite3.connect(module.JOB_DB) as database:
+            self.assertEqual(database.execute("SELECT count(*) FROM upload_sessions").fetchone()[0], 0)
+        self.assertEqual(self.client.get(f"/api/uploads/{upload_id}").status_code, 404)
+
+    def test_idle_upload_session_does_not_block_and_is_dropped_by_cleanup(self):
+        upload_id = self.client.post("/api/uploads/init", json={"name": "base.iso", "size": 10}).get_json()["id"]
+        module.uploads[upload_id]["updated"] = time.time() - module.UPLOAD_ACTIVE_SECONDS - 1
+        with module.upload_lock:
+            self.assertFalse(module.uploads_in_progress())
+        self.assertEqual(self.client.post("/api/cleanup").status_code, 200)
+        self.assertNotIn(upload_id, module.uploads)
+        with sqlite3.connect(module.JOB_DB) as database:
+            self.assertEqual(database.execute("SELECT count(*) FROM upload_sessions").fetchone()[0], 0)
 
     def test_cleanup_rejects_running_build(self):
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1, "updated": 1}
@@ -2069,7 +2099,7 @@ class GisoWebTests(unittest.TestCase):
         payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": []}
         self.assertTrue(self.client.post("/api/build-plan", json=payload).get_json()["ready"])
 
-        module.uploads["pending"] = {"name": "x.rpm"}
+        module.uploads["pending"] = {"name": "x.rpm", "updated": time.time()}
         module.jobs["other"] = {"status": "running"}
         try:
             with patch("app.cisco_download_running", return_value=True):

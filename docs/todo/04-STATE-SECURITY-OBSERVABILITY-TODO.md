@@ -49,15 +49,23 @@ Persist:
       `test_active_job_is_marked_interrupted_after_restart` and
       `test_expired_orphan_partial_upload_is_removed_after_restart` in
       `giso-webui/tests/test_app.py`.
-- [ ] no critical state only in Python globals — still partially true:
-      `uploads`, `cisco_searches` and `cisco_download_jobs` live in memory
-      and cannot be resumed after a restart. Since 2026-09-17 they no longer
-      vanish silently: on startup `report_interrupted_transfers()` finds
-      what survives on disk (upload partials in `.parts`, Cisco `.<name>.part`
-      files), records "N upload(s)/Cisco download(s) were interrupted by a
-      service restart" in the activity log, and removes the unresumable Cisco
-      partials (`test_restart_reports_interrupted_uploads_and_cisco_downloads`).
-      Resumable uploads/downloads remain open.
+- [ ] no critical state only in Python globals — uploads fixed, Cisco
+      downloads still open. 2026-09-17: browser upload sessions are persisted
+      (job store schema version 3, `upload_sessions`) and restored on startup
+      with the byte count read from the partial file, so an upload survives a
+      restart; `GET /api/uploads/<id>` reports where it stands, and the page
+      retries dropped chunks with backoff from the server's offset and resumes
+      the same session when the same file is selected again. A session idle
+      for `UPLOAD_ACTIVE_SECONDS` (600) no longer blocks builds/cleanup and is
+      dropped by cleanup. Tests:
+      `test_upload_session_survives_a_restart_and_resumes_at_the_bytes_on_disk`,
+      `test_idle_upload_session_does_not_block_and_is_dropped_by_cleanup`,
+      browser `test_upload_retries_a_dropped_chunk_and_finishes`,
+      `test_selecting_the_same_file_again_resumes_where_the_server_stopped`.
+      Live: 3 MB upload, half sent, `docker restart`, status reported
+      1 500 000 bytes, second half completed, SHA-256 identical.
+      Still in memory only: `cisco_searches` and `cisco_download_jobs`
+      (a restart is recorded and the partial removed, not resumed).
 
 ## Job model
 

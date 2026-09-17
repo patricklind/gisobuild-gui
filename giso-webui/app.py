@@ -124,7 +124,18 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
          "(relative_path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, source TEXT NOT NULL, "
          "recorded REAL NOT NULL)"),
     )),
+    # Browser upload sessions, so a restart does not throw away gigabytes
+    # already received; the byte count is re-read from the partial file.
+    (3, (
+        ("CREATE TABLE IF NOT EXISTS upload_sessions "
+         "(id TEXT PRIMARY KEY, name TEXT NOT NULL, size INTEGER NOT NULL, "
+         "temp TEXT NOT NULL, updated REAL NOT NULL)"),
+    )),
 )
+# An upload session that has not received a chunk for this long no longer
+# blocks builds, cleanup or Cisco downloads; it stays resumable until
+# UPLOAD_SESSION_TTL removes it.
+UPLOAD_ACTIVE_SECONDS = int(os.environ.get("UPLOAD_ACTIVE_SECONDS", "600"))
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1][0]
 store_schema_problem: str | None = None
 archive_policy_checked = 0.0
@@ -555,6 +566,66 @@ def apply_schema_migrations(database: sqlite3.Connection) -> str | None:
     return None
 
 
+def save_upload_session(upload_id: str, item: dict) -> None:
+    if store_schema_problem:
+        return
+    with store_lock, sqlite3.connect(JOB_DB) as database:
+        database.execute(
+            "INSERT INTO upload_sessions (id, name, size, temp, updated) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET updated = excluded.updated",
+            (upload_id, item["name"], int(item["size"]), item["temp"], float(item["updated"])),
+        )
+
+
+def forget_upload_session(upload_id: str) -> None:
+    if store_schema_problem:
+        return
+    with store_lock, sqlite3.connect(JOB_DB) as database:
+        database.execute("DELETE FROM upload_sessions WHERE id = ?", (upload_id,))
+
+
+def restore_upload_sessions() -> int:
+    """Bring back upload sessions whose partial file survived a restart.
+
+    `received` is the partial file's real size (never more than declared),
+    which is exactly where the browser must continue, even if the process
+    died in the middle of writing a chunk. Sessions whose file is gone are
+    forgotten.
+    """
+    if store_schema_problem or not JOB_DB.exists():
+        return 0
+    with store_lock, sqlite3.connect(JOB_DB) as database:
+        rows = database.execute("SELECT id, name, size, temp, updated FROM upload_sessions").fetchall()
+    restored, gone = 0, []
+    parts = (DATA / ".parts").resolve()
+    for upload_id, name, size, temp, updated in rows:
+        path = Path(temp)
+        try:
+            valid = path.resolve().parent == parts and path.is_file()
+            received = min(path.stat().st_size, int(size)) if valid else 0
+        except OSError:
+            valid = False
+        if not valid:
+            gone.append(upload_id)
+            continue
+        with upload_lock:
+            uploads.setdefault(upload_id, {"id": upload_id, "name": name, "size": int(size),
+                                           "received": received,
+                                           "temp": temp, "updated": float(updated),
+                                           "restored": True})
+        restored += 1
+    for upload_id in gone:
+        forget_upload_session(upload_id)
+    return restored
+
+
+def uploads_in_progress() -> bool:
+    """Whether an upload is actively receiving data. Caller holds upload_lock."""
+    cutoff = time.time() - UPLOAD_ACTIVE_SECONDS
+    return any(item.get("completing") or item.get("updated", 0) >= cutoff
+               for item in uploads.values())
+
+
 def report_interrupted_transfers() -> None:
     """Record uploads and Cisco downloads that a restart cut off, once at startup.
 
@@ -564,7 +635,14 @@ def report_interrupted_transfers() -> None:
     hidden ".<name>.part" next to the target. A Cisco partial cannot be
     resumed and is removed; upload partials keep their normal expiry.
     """
-    uploads_cut = len(list((DATA / ".parts").glob("*.part"))) if (DATA / ".parts").is_dir() else 0
+    resumable = restore_upload_sessions()
+    with upload_lock:
+        tracked = {Path(item["temp"]).name for item in uploads.values() if item.get("temp")}
+    uploads_cut = (len([p for p in (DATA / ".parts").glob("*.part") if p.name not in tracked])
+                   if (DATA / ".parts").is_dir() else 0)
+    if resumable:
+        append_activity(f"{resumable} upload(s) were interrupted by a service restart and can be "
+                        "resumed: select the same file again.")
     cisco_cut = 0
     if DATA.is_dir():
         for partial in DATA.glob(".*.part"):
@@ -579,8 +657,9 @@ def report_interrupted_transfers() -> None:
     if cisco_cut:
         append_activity(f"{cisco_cut} Cisco download(s) were interrupted by a service restart; "
                         "start the download again.")
-    if uploads_cut or cisco_cut:
-        log_event("interrupted_transfers_found", uploads=uploads_cut, cisco_downloads=cisco_cut)
+    if uploads_cut or cisco_cut or resumable:
+        log_event("interrupted_transfers_found", uploads=uploads_cut, cisco_downloads=cisco_cut,
+                  resumable_uploads=resumable)
 
 
 def initialize_job_store() -> None:
@@ -1701,7 +1780,7 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
     if cisco_download_running():
         blockers.append("Wait for the Cisco download to finish before starting a build")
     with upload_lock:
-        if uploads:
+        if uploads_in_progress():
             blockers.append("Wait for all uploads to finish before starting the build")
     with job_lock:
         if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
@@ -2229,6 +2308,8 @@ def expire_upload_sessions() -> None:
                 expired.append(uploads.pop(upload_id))
     for item in expired:
         Path(item["temp"]).unlink(missing_ok=True)
+        if item.get("id"):
+            forget_upload_session(item["id"])
     parts = DATA / ".parts"
     tracked = {Path(item["temp"]).resolve() for item in uploads.values() if item.get("temp")}
     if parts.is_dir():
@@ -3111,6 +3192,7 @@ EXPECTED_TABLE_COLUMNS = {
     "jobs": {"id", "data", "updated"},
     "activity": {"id", "created", "text"},
     "file_provenance": {"relative_path", "sha256", "source", "recorded"},
+    "upload_sessions": {"id", "name", "size", "temp", "updated"},
 }
 startup_self_test_logged = False
 
@@ -3545,7 +3627,7 @@ def cisco_download_start():
     job_id = uuid.uuid4().hex
     with operation_lock:
         with upload_lock:
-            if uploads:
+            if uploads_in_progress():
                 return jsonify(error="Wait for the current upload to finish"), 409
         with job_lock:
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
@@ -3676,8 +3758,13 @@ def cleanup():
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
                 return jsonify(error="Temporary files cannot be cleaned while a build is running"), 409
         with upload_lock:
-            if uploads:
+            if uploads_in_progress():
                 return jsonify(error="Temporary files cannot be cleaned while an upload is active"), 409
+            # Idle, resumable sessions lose their partial files below; drop them too.
+            idle_sessions = list(uploads)
+            uploads.clear()
+        for upload_id in idle_sessions:
+            forget_upload_session(upload_id)
         if docker_build_running():
             return jsonify(error="Temporary files cannot be cleaned while a Docker build is running"), 409
         removed_bytes = 0
@@ -3768,8 +3855,9 @@ def upload_init():
             parts.mkdir(parents=True, exist_ok=True)
             temp = parts / f"{upload_id}.part"
             temp.touch()
-            uploads[upload_id] = {"name": name, "size": size, "received": 0,
+            uploads[upload_id] = {"id": upload_id, "name": name, "size": size, "received": 0,
                                   "temp": str(temp), "updated": time.time()}
+            save_upload_session(upload_id, uploads[upload_id])
     log_event("upload_started", bytes=size, upload_id=upload_id)
     append_activity(f"Upload started: {size} bytes expected.")
     return jsonify(id=upload_id)
@@ -3796,6 +3884,9 @@ def upload_chunk(upload_id: str):
             handle.write(chunk)
         item["received"] += len(chunk)
         item["updated"] = time.time()
+        if item["updated"] - item.get("saved", 0) >= 30:
+            item["saved"] = item["updated"]
+            save_upload_session(upload_id, item)
         percent = item["received"] * 100 // item["size"]
         previous = item.get("reported_percent", -10)
         if percent >= previous + 10 or item["received"] == item["size"]:
@@ -3808,6 +3899,16 @@ def upload_chunk(upload_id: str):
         return jsonify(received=item["received"], size=item["size"])
 
 
+@app.get("/api/uploads/<upload_id>")
+def upload_status(upload_id: str):
+    """Where an upload stands, so a client can resume at the right byte."""
+    with upload_lock:
+        item = uploads.get(upload_id)
+        if not item:
+            abort(404)
+        return jsonify(received=item["received"], size=item["size"], name=item["name"])
+
+
 @app.delete("/api/uploads/session/<upload_id>")
 def cancel_upload(upload_id: str):
     with upload_lock:
@@ -3818,6 +3919,7 @@ def cancel_upload(upload_id: str):
             return jsonify(error="Upload is already being completed"), 409
         uploads.pop(upload_id)
     Path(item["temp"]).unlink(missing_ok=True)
+    forget_upload_session(upload_id)
     log_event("upload_cancelled", received_bytes=item["received"], upload_id=upload_id)
     append_activity(f"Upload cancelled after {item['received']} bytes.")
     return jsonify(ok=True)
@@ -3878,6 +3980,7 @@ def upload_complete(upload_id: str):
     finally:
         with upload_lock:
             uploads.pop(upload_id, None)
+        forget_upload_session(upload_id)
     log_event("upload_completed", bytes=target.stat().st_size, extracted_files=extracted,
               upload_id=upload_id)
     if extracted:
@@ -3926,7 +4029,7 @@ def create_job():
         if cisco_download_running():
             return jsonify(error="Wait for the Cisco download to finish before starting a build"), 409
         with upload_lock:
-            if uploads:
+            if uploads_in_progress():
                 return jsonify(error="Wait for all uploads to finish before starting the build"), 409
         if docker_build_running():
             return jsonify(error="A Docker build is already running"), 409
