@@ -2603,7 +2603,7 @@ class GisoWebTests(unittest.TestCase):
         job_dir = self.output / "job"
         job_dir.mkdir()
         (job_dir / "router-golden.iso").write_bytes(b"golden image")
-        build = SimpleNamespace(pid=123, stdout=[], wait=lambda: 0)
+        build = SimpleNamespace(pid=123, stdout=io.StringIO(""), wait=lambda: 0)
         popen.side_effect = [pull, build]
         module.jobs["job"] = {"id": "job", "status": "running", "created": time.time(),
                               "updated": time.time(), "log": "", "progress": 3,
@@ -2660,7 +2660,7 @@ class GisoWebTests(unittest.TestCase):
     def test_zero_exit_without_iso_is_not_reported_complete(self, popen):
         pull = MagicMock(returncode=0, args=[module.DOCKER_BIN, "pull"])
         pull.communicate.return_value = ("", None)
-        build = SimpleNamespace(pid=123, stdout=[], wait=lambda: 0)
+        build = SimpleNamespace(pid=123, stdout=io.StringIO(""), wait=lambda: 0)
         popen.side_effect = [pull, build]
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
                               "updated": 1, "log": "", "progress": 3,
