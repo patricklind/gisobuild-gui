@@ -14,8 +14,10 @@ credentials, logs, or customer information.
 ## Deployment boundary
 
 This application is designed for trusted, local operation and binds to
-`127.0.0.1` by default. It has access to the Docker socket, which is equivalent
-to administrative access to the Docker host. Do not expose it to an untrusted
+`127.0.0.1` by default. The default deployment has access to the Docker socket,
+which is equivalent to administrative access to the Docker host; the
+self-contained deployment (`giso-webui/compose.selfcontained.yaml`) has no
+socket and runs read-only with only the `SYS_CHROOT` capability. Do not expose it to an untrusted
 network or deploy it as a multi-user service without adding authentication,
 authorization, TLS, and stronger workload isolation.
 

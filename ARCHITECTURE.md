@@ -33,12 +33,34 @@ flowchart LR
 ```
 
 The browser uploads files in bounded chunks. Flask validates and stores them in
-the upload volume, constructs an argument-vector command, and asks the Docker
+the upload volume, reads each ISO's and RPM's own metadata (ISO 9660 signature
+and `iosxr_image_mdata.yml`, RPM headers and signature key IDs, Cisco SMU
+README manifests), builds one BuildPlan that leaves out or blocks what is proven
+unable to install, constructs an argument-vector command, and asks the Docker
 daemon to run an ephemeral Cisco build container. Successful ISO and USB outputs
 are copied into the archive, verified with SHA-256, and exposed for download.
 Before constructing the child-container command, a platform validator rejects
 unsupported family/architecture option combinations. Cisco's tool remains the
 source of truth for the contents and metadata of the actual ISO.
+
+### Self-contained variant (no Docker socket)
+
+`docker/selfcontained.Dockerfile` with `giso-webui/compose.selfcontained.yaml`
+bundles gisobuild at a pinned, verified commit and sets `GISO_RUNNER=local`:
+gisobuild runs as a child process of the web app with a minimal environment,
+its temporary files on the work volume, and process-group cancellation. There
+is no Docker socket, no second container and no registry pull; the container
+runs read-only as root with every capability dropped except `SYS_CHROOT`,
+which gisobuild's eXR engine needs (non-root cannot hold it; see
+`docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md`).
+
+```mermaid
+flowchart LR
+    U["Local browser"] -->|"HTTP on 127.0.0.1"| W["Flask and Gunicorn"]
+    W -->|"child process"| G["Pinned gisobuild (same image)"]
+    W --> V["uploads / work / output / archive / state volumes"]
+    G --> V
+```
 
 ## Data lifecycle
 
@@ -49,10 +71,12 @@ source of truth for the contents and metadata of the actual ISO.
 | Raw output | `giso-output` volume | Moved to the verified archive after success |
 | ISO/USB archive | `giso-archive` volume | 30 days and 50 GiB combined by default |
 | Job history and logs | `giso-state` SQLite volume | Bounded to 100 jobs by default |
+| Upload sessions, file provenance, large-file checksums | `giso-state` SQLite volume | Versioned schema (`PRAGMA user_version`) |
 
-Incomplete upload sessions are process-local and expire after 24 hours by
-default. Expiration removes the associated partial file so an abandoned browser
-upload cannot block later builds indefinitely.
+Incomplete upload sessions are persisted, so an upload can resume after a
+dropped connection or a restart, and expire after 24 hours by default.
+Expiration removes the associated partial file; a session idle for 10 minutes
+no longer blocks builds or cleanup.
 
 ## What is working well
 
@@ -76,16 +100,16 @@ upload cannot block later builds indefinitely.
 
 ## Risks and recommendations
 
-### High: Docker socket is a host-administration boundary
+### High: Docker socket is a host-administration boundary (default deployment)
 
 Anyone who can control this application can indirectly ask a privileged Docker
 daemon to create containers. Localhost binding and host/origin checks reduce
 exposure, but they are not authentication.
 
-**Recommendation:** Keep the current local-only deployment. If remote or
-multi-user access becomes a requirement, place builds behind an authenticated
-job service and use a restricted worker runtime instead of mounting the Docker
-socket in the web process. TLS and role-based authorization alone do not remove
+**Recommendation:** Keep the current local-only deployment, or use the
+self-contained variant, which has no socket. If remote or multi-user access
+becomes a requirement, place builds behind an authenticated job service and a
+restricted worker runtime. TLS and role-based authorization alone do not remove
 the socket risk.
 
 ### Medium: Running builds cannot resume after a web-service restart
