@@ -83,11 +83,14 @@ The application must distinguish:
 
       **Considered and deliberately deferred (2026-09-16): full runtime
       discovery.** Designed this out before writing code: `PLATFORMS` also
-      carries marketing label and `usb` capability per platform, neither of
-      which exists in gisobuild's own source (there is no per-platform USB
-      flag anywhere in `.gisobuild-tool` — confirmed by direct source
-      inspection while investigating a since-disproven `--skip-usb-image`
-      concern, see `07-BUG-AUDIT-TODO.md`), so a discovered ID with no local
+      carries a marketing label per platform, which does not exist in
+      gisobuild's own source. (**Correction 2026-09-17:** this note also said
+      upstream has no per-platform USB flag. It does, for eXR:
+      `src/exrmod/usb_zip/platform_scripts.yaml` lists the platforms that get
+      a USB zip, and `ncs1001` was wrongly marked USB-capable locally. Fixed,
+      and now pinned by
+      `test_exr_usb_support_matches_the_pinned_upstream_usb_scripts`; see
+      `07-BUG-AUDIT-TODO.md`.) So a discovered ID with no local
       entry can only ever get a synthetic, unnamed, conservative profile —
       exactly `exr-generic`'s shape, just keyed by a real ID instead of a
       placeholder. Building that means either mutating the module-level

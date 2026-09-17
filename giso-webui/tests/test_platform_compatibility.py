@@ -18,6 +18,22 @@ from platform_validation import (
 
 
 class PlatformCompatibilityTests(unittest.TestCase):
+    def test_exr_usb_support_matches_the_pinned_upstream_usb_scripts(self):
+        # Upstream's eXR engine builds a USB boot zip exactly for the platforms
+        # listed in src/exrmod/usb_zip/platform_scripts.yaml; PLATFORMS' "usb"
+        # flag drives the plan's expected outputs, so it must not drift. (ncs1001
+        # once claimed USB support upstream never had.)
+        scripts = (Path(__file__).parents[2]
+                   / ".gisobuild-tool/src/exrmod/usb_zip/platform_scripts.yaml")
+        if not scripts.exists():
+            self.skipTest("pinned gisobuild checkout is not mounted")
+        upstream = {line.split(":", 1)[0].strip() for line in scripts.read_text().splitlines()
+                    if line.strip() and not line.lstrip().startswith("#") and ":" in line}
+        local = {key for key, profile in PLATFORMS.items()
+                 if profile["architecture"] == "exr" and profile["usb"]
+                 and key not in GENERIC_PLATFORM_IDS}
+        self.assertEqual(local, upstream)
+
     def test_exr_platform_list_matches_the_pinned_upstream_engine(self):
         # PLATFORMS in platform_validation.py is a locally maintained copy of
         # the eXR platform whitelist upstream gisobuild actually enforces
