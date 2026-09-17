@@ -1129,6 +1129,26 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     }
 
 
+ISO9660_SIGNATURE_OFFSET = 16 * 2048 + 1  # first volume descriptor's "CD001" identifier
+
+
+def is_iso9660_image(path: Path) -> bool:
+    """Whether a file carries the ISO 9660 primary volume descriptor signature.
+
+    Every IOS XR base image - eXR and LNT, plain or hybrid-bootable - is an
+    ISO 9660 filesystem, which always has "CD001" at byte 32769. Checking
+    five bytes costs nothing and turns "renamed a tarball to .iso" from a
+    build that fails minutes into gisobuild into a blocker before it starts.
+    Unreadable counts as not valid: the build could not read it either.
+    """
+    try:
+        with path.open("rb") as handle:
+            handle.seek(ISO9660_SIGNATURE_OFFSET)
+            return handle.read(5) == b"CD001"
+    except OSError:
+        return False
+
+
 def gisobuild_tool_available() -> bool:
     """The pinned gisobuild checkout build_command() mounts into the builder."""
     return (TOOL / "src/gisobuild.py").is_file()
@@ -1212,6 +1232,11 @@ def create_build_plan(payload: dict) -> dict:
         # agree on whether a build is ready, not just build_command() as a
         # second, later gate.
         iso_path = safe_data_path(iso["relative_path"])
+        if not is_iso9660_image(iso_path):
+            blockers.append(
+                f"{iso['relative_path']} is not an ISO 9660 image (no CD001 volume descriptor); "
+                "upload the Cisco base ISO itself, not an archive or a renamed file"
+            )
         iso_architectures = inspect_iso_architecture(iso_path)
         identity_name, identity_from_metadata = iso_identity(iso_path)
         candidates, superseded = active_rpm_names()

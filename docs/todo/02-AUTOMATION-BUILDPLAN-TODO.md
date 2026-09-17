@@ -428,10 +428,16 @@ ISO, no Cisco content): without `/tool` mounted the plan returned exactly
 `["gisobuild is not available (/tool/src/gisobuild.py is missing)"]`; with the
 repo's `.gisobuild-tool` mounted it returned no blockers.
 
-- [ ] base image valid - only "exists in inventory as `.iso`" is enforced.
-      `iso_identity()` reads `iosxr_image_mdata.yml` when present, but a file
-      that is not an ISO at all still passes; gisobuild rejects it at build
-      time.
+- [x] base image valid - fixed 2026-09-17: besides existing in inventory,
+      the file must carry the ISO 9660 `CD001` volume descriptor
+      (`is_iso9660_image()`), else a blocker names it. Tests:
+      `test_build_plan_blocks_a_base_image_that_is_not_an_iso`,
+      `test_real_iso9660_image_passes_the_signature_check` (genisoimage).
+      Live, inside a `--rm` container (no host copy): the operator's real
+      `ncs5500-mini-x-25.1.2.iso` (2 204 729 344 bytes) returned `True`; the
+      first 64 KiB of the Cisco `.tar` saved as `.iso` returned `False`.
+      This proves "is an ISO filesystem", not "is a bootable IOS XR image" -
+      gisobuild still validates the image contents.
 - [x] engine known - `validate_platform_options()` raises for an unresolved
       platform, which becomes a blocker.
 - [ ] release known - not a blocker. An unknown release only degrades

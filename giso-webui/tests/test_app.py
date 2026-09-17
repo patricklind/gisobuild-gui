@@ -46,11 +46,16 @@ class GisoWebTests(unittest.TestCase):
         self.docker_running.start()
         self.tool_available = patch("app.gisobuild_tool_available", return_value=True)
         self.tool_available.start()
+        # Most tests use tiny placeholder ISOs; the signature check has its
+        # own tests against a real genisoimage-built image.
+        self.iso_signature = patch("app.is_iso9660_image", return_value=True)
+        self.iso_signature.start()
         self.disk_usage = patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=100 * 1024**3))
         self.disk_usage.start()
         self.client = module.app.test_client()
 
     def tearDown(self):
+        self.iso_signature.stop()
         self.tool_available.stop()
         self.disk_usage.stop()
         self.docker_running.stop()
@@ -1719,6 +1724,36 @@ class GisoWebTests(unittest.TestCase):
         excluded_by_name = {item["name"]: item["reason"] for item in plan["excluded_packages"]}
         self.assertIn(old_rpm.name, excluded_by_name)
         self.assertIn("Superseded", excluded_by_name[old_rpm.name])
+
+    def test_build_plan_blocks_a_base_image_that_is_not_an_iso(self):
+        (self.data / "renamed.iso").write_bytes(b"\x1f\x8b" + b"\0" * 40000)
+        self.iso_signature.stop()
+        try:
+            plan = self.client.post("/api/build-plan", json={
+                "iso": "renamed.iso", "platform": "asr9k", "pkglist": [],
+            }).get_json()
+        finally:
+            self.iso_signature.start()
+        self.assertFalse(plan["ready"])
+        self.assertTrue(any("not an ISO 9660 image" in b for b in plan["blockers"]), plan["blockers"])
+
+    @unittest.skipUnless(
+        ISOINFO_AVAILABLE,
+        "genisoimage and isoinfo are only available inside the giso-webui container image",
+    )
+    def test_real_iso9660_image_passes_the_signature_check(self):
+        source = Path(self.temp.name) / "iso-src-signature"
+        source.mkdir()
+        (source / "README").write_text("synthetic")
+        iso_path = self.data / "real.iso"
+        subprocess.run(["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
+                       check=True, capture_output=True)
+        self.iso_signature.stop()
+        try:
+            self.assertTrue(module.is_iso9660_image(iso_path))
+            self.assertFalse(module.is_iso9660_image(self.data / "does-not-exist.iso"))
+        finally:
+            self.iso_signature.start()
 
     @unittest.skipUnless(
         ISOINFO_AVAILABLE,
