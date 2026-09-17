@@ -2748,6 +2748,40 @@ class GisoWebTests(unittest.TestCase):
                              for entry in result.values()), result)
         self.assertFalse(result["isoinfo"]["required"])
 
+    def test_legacy_job_store_is_adopted_and_versioned_without_losing_jobs(self):
+        module.STATE.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(module.JOB_DB) as database:  # the pre-versioning layout
+            database.execute("CREATE TABLE jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)")
+            database.execute("CREATE TABLE activity (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                             "created REAL NOT NULL, text TEXT NOT NULL)")
+            database.execute("INSERT INTO jobs VALUES (?, ?, ?)",
+                             ("old", json.dumps({"status": "success", "log": ""}), 1.0))
+        module.initialize_job_store()
+        with sqlite3.connect(module.JOB_DB) as database:
+            self.assertEqual(database.execute("PRAGMA user_version").fetchone()[0], module.SCHEMA_VERSION)
+        self.assertEqual(module.jobs["old"]["status"], "success")
+        self.assertIsNone(module.store_schema_problem)
+        self.assertEqual(self.client.get("/api/version").get_json()["schema_version"], module.SCHEMA_VERSION)
+
+    def test_newer_job_store_blocks_builds_instead_of_being_rewritten(self):
+        module.STATE.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(module.JOB_DB) as database:
+            database.execute("CREATE TABLE jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)")
+            database.execute("INSERT INTO jobs VALUES (?, ?, ?)",
+                             ("future", json.dumps({"status": "running", "log": ""}), 1.0))
+            database.execute(f"PRAGMA user_version = {module.SCHEMA_VERSION + 1}")
+        try:
+            module.initialize_job_store()
+            self.assertNotIn("future", module.jobs)  # not restored, not marked interrupted
+            with sqlite3.connect(module.JOB_DB) as database:
+                row = database.execute("SELECT data FROM jobs WHERE id='future'").fetchone()
+            self.assertEqual(json.loads(row[0])["status"], "running")
+            blockers, _ = module.build_environment_blockers()
+            self.assertTrue(any("job store cannot be used" in b for b in blockers), blockers)
+            self.assertEqual(module.classify_error(blockers[0])["code"], "ENVIRONMENT_ERROR")
+        finally:
+            module.store_schema_problem = None
+
     def test_storage_reports_real_disk_and_archive_usage(self):
         archive_dir = module.ARCHIVE / "job-1"
         archive_dir.mkdir(parents=True)

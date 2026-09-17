@@ -257,7 +257,8 @@ Return:
 - [x] gisobuild commit
 - [ ] gisobuild version - upstream has no version string beyond the commit
 - [x] image version (`app_version` = image version label; `runner`)
-- [ ] schema version - no versioned schema exists for the job store yet
+- [x] schema version - `/api/version.schema_version` (job store schema,
+      see "schema migrations" in `04-STATE-SECURITY-OBSERVABILITY-TODO.md`)
 
 ## Reproducibility
 

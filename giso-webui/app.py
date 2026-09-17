@@ -106,6 +106,20 @@ operation_lock = threading.Lock()
 store_lock = threading.Lock()
 cisco_lock = threading.RLock()
 store_initialized = False
+# Versioned schema of the job store, tracked in SQLite's own PRAGMA
+# user_version. Append a step to add a migration; never edit a shipped one.
+# Version 1 is the original layout, and its IF NOT EXISTS makes it adopt a
+# pre-versioning database unchanged.
+SCHEMA_MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
+    (1, (
+        ("CREATE TABLE IF NOT EXISTS jobs "
+         "(id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"),
+        ("CREATE TABLE IF NOT EXISTS activity "
+         "(id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL NOT NULL, text TEXT NOT NULL)"),
+    )),
+)
+SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1][0]
+store_schema_problem: str | None = None
 archive_policy_checked = 0.0
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024**3)))
 MAX_EXTRACTED_BYTES = int(os.environ.get("MAX_EXTRACTED_BYTES", str(16 * 1024**3)))
@@ -427,7 +441,7 @@ ERROR_TAXONOMY: tuple[tuple[str, re.Pattern, bool, str, str], ...] = tuple(
         ("STORAGE_ERROR", r"Not enough free (disk )?space",
          True, "There is not enough free disk space for this build.",
          "Free space (clear the workspace or old archives) or enlarge the named volume."),
-        ("ENVIRONMENT_ERROR", r"gisobuild is not available|Docker CLI|interpreter for gisobuild|SYS_CHROOT|already running|Wait for|could not be pulled",
+        ("ENVIRONMENT_ERROR", r"gisobuild is not available|job store cannot be used|Docker CLI|interpreter for gisobuild|SYS_CHROOT|already running|Wait for|could not be pulled",
          True, "The build service is not ready to run this build right now.",
          "Wait for the running activity to finish, or fix the service setup named in the message."),
     )
@@ -484,22 +498,37 @@ def public_job(job: dict, *, include_log: bool = True) -> dict:
     return result
 
 
+def apply_schema_migrations(database: sqlite3.Connection) -> str | None:
+    """Bring the job store to SCHEMA_VERSION; return a problem instead if it is newer."""
+    current = database.execute("PRAGMA user_version").fetchone()[0]
+    if current > SCHEMA_VERSION:
+        return (f"the job store has schema version {current}, newer than this release's "
+                f"{SCHEMA_VERSION}")
+    for version, statements in SCHEMA_MIGRATIONS:
+        if version <= current:
+            continue
+        for statement in statements:
+            database.execute(statement)
+        database.execute(f"PRAGMA user_version = {int(version)}")
+        log_event("job_store_migrated", schema_version=version)
+    return None
+
+
 def initialize_job_store() -> None:
     """Create the job store and restore safe job history once per process."""
-    global store_initialized
+    global store_initialized, store_schema_problem
     with store_lock:
         if store_initialized:
             return
         STATE.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(JOB_DB) as database:
-            database.execute(
-                "CREATE TABLE IF NOT EXISTS jobs "
-                "(id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"
-            )
-            database.execute(
-                "CREATE TABLE IF NOT EXISTS activity "
-                "(id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL NOT NULL, text TEXT NOT NULL)"
-            )
+            store_schema_problem = apply_schema_migrations(database)
+            if store_schema_problem:
+                # Written by a newer release: reading or rewriting it with this
+                # layout could corrupt it. Serve, but block builds and say why.
+                log_event("job_store_schema_unsupported", detail=store_schema_problem)
+                store_initialized = True
+                return
             rows = database.execute(
                 "SELECT id, data FROM jobs ORDER BY updated DESC LIMIT ?", (MAX_JOB_HISTORY,)
             )
@@ -1362,6 +1391,8 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
     """
     blockers: list[str] = []
     warnings: list[str] = []
+    if store_schema_problem:
+        blockers.append(f"The job store cannot be used: {store_schema_problem}")
     if not gisobuild_tool_available():
         blockers.append(f"gisobuild is not available ({TOOL / 'src/gisobuild.py'} is missing)")
     if GISO_RUNNER == "local":
@@ -2723,7 +2754,11 @@ def startup_self_test() -> dict[str, dict]:
                 found = {row[1] for row in database.execute(f"PRAGMA table_info({table})")}
                 if not columns <= found:
                     problems.append(f"{table} lacks {', '.join(sorted(columns - found))}")
-        record("database_schema", not problems, "; ".join(problems) or "jobs, activity")
+            version = database.execute("PRAGMA user_version").fetchone()[0]
+            if version != SCHEMA_VERSION:
+                problems.append(f"schema version {version}, expected {SCHEMA_VERSION}")
+        record("database_schema", not problems,
+               "; ".join(problems) or f"jobs, activity (schema version {SCHEMA_VERSION})")
     except sqlite3.Error as exc:
         record("database_schema", False, type(exc).__name__)
 
@@ -2866,6 +2901,7 @@ def version():
         source_revision=os.environ.get("SOURCE_REVISION") or None,
         build_date=os.environ.get("BUILD_DATE") or None,
         runner=GISO_RUNNER,
+        schema_version=SCHEMA_VERSION,
         gisobuild_repository=os.environ.get("GISOBUILD_REPOSITORY") or None,
         gisobuild_image=IMAGE if GISO_RUNNER == "docker" else None,
         gisobuild_commit=gisobuild_commit(),

@@ -31,9 +31,17 @@ Persist:
       (`current_inventory_revision()`) and persisted per-job as
       `job["inventory_revision"]` once a build starts.
 
-- [ ] schema migrations — the `jobs`/`activity` tables are created with
-      `CREATE TABLE IF NOT EXISTS` and never altered; there is no migration
-      mechanism, so a future schema change would need one.
+- [x] schema migrations — 2026-09-17: `SCHEMA_MIGRATIONS` + SQLite
+      `PRAGMA user_version`, applied in order by `apply_schema_migrations()`.
+      Version 1 is the existing layout, so a pre-versioning store is adopted
+      unchanged. A store from a *newer* release is neither restored nor
+      rewritten; builds are blocked ("The job store cannot be used…",
+      `ENVIRONMENT_ERROR`) and the self-test reports it. Tests:
+      `test_legacy_job_store_is_adopted_and_versioned_without_losing_jobs`,
+      `test_newer_job_store_blocks_builds_instead_of_being_rewritten`.
+      Live: a copy of this machine's real `giso-webui_giso-state` volume
+      went from `user_version` 0 to 1 with all 4 historic jobs restored
+      (copy in a throwaway volume, deleted; original untouched).
 - [x] restart recovery — `initialize_job_store()` marks any job restored
       from `JOB_DB` in an `ACTIVE_JOB_STATUSES` state as `"interrupted"`,
       redacts its log, and persists that transition, so no job is silently
