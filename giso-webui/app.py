@@ -5,6 +5,7 @@ import fcntl
 import hashlib
 import json
 import os
+import platform as host_platform
 import re
 import shlex
 import shutil
@@ -29,6 +30,7 @@ from flask import (
     send_from_directory,
 )
 from platform_validation import (
+    ALIASES,
     GENERIC_PLATFORM_IDS,
     ISO_RELEASE,
     PLATFORMS,
@@ -2648,6 +2650,7 @@ def validate_host():
                     else uuid.uuid4().hex[:12])
     g.request_started = time.monotonic()
     initialize_job_store()
+    log_startup_self_test_once()
     expire_upload_sessions()
     host = request.host.split(":", 1)[0].strip("[]")
     if host not in ALLOWED_HOSTS:
@@ -2676,6 +2679,101 @@ def health():
     here made every dependency hiccup look like a crashed process.
     """
     return jsonify(ok=True), 200
+
+
+EXPECTED_TABLE_COLUMNS = {
+    "jobs": {"id", "data", "updated"},
+    "activity": {"id", "created", "text"},
+}
+startup_self_test_logged = False
+
+
+def startup_self_test() -> dict[str, dict]:
+    """Everything a build depends on that can be checked without starting one.
+
+    Each entry is {"ok": bool, "required": bool, "detail": str}. Required
+    failures make /api/ready report not ready; optional ones (the read-only
+    metadata tools) only degrade inspection to filename inference. Nothing
+    here raises: a broken deployment must still answer and say why.
+    """
+    results: dict[str, dict] = {}
+
+    def record(name: str, ok: bool, detail: str, required: bool = True) -> None:
+        results[name] = {"ok": bool(ok), "required": required, "detail": detail}
+
+    # Details name things, never absolute paths: /api/ready is reachable from
+    # the browser, which must not learn the container's filesystem layout.
+    def presence(ok: bool) -> str:
+        return "present" if ok else "missing"
+
+    found = (TOOL / "src/gisobuild.py").is_file()
+    record("gisobuild", found, f"gisobuild.py {presence(found)}")
+    runner_binary = GISOBUILD_PYTHON if GISO_RUNNER == "local" else DOCKER_BIN
+    found = os.access(runner_binary, os.X_OK)
+    record("runner_binary", found,
+           f"{'gisobuild Python' if GISO_RUNNER == 'local' else 'Docker CLI'} {presence(found)}")
+    for label, binary in (("isoinfo", ISOINFO_BIN), ("rpm", RPM_BIN)):
+        found = os.access(binary, os.X_OK)
+        record(label, found, f"{label} {presence(found)}", required=False)
+
+    try:
+        with sqlite3.connect(JOB_DB, timeout=5) as database:
+            problems = []
+            for table, columns in EXPECTED_TABLE_COLUMNS.items():
+                found = {row[1] for row in database.execute(f"PRAGMA table_info({table})")}
+                if not columns <= found:
+                    problems.append(f"{table} lacks {', '.join(sorted(columns - found))}")
+        record("database_schema", not problems, "; ".join(problems) or "jobs, activity")
+    except sqlite3.Error as exc:
+        record("database_schema", False, type(exc).__name__)
+
+    unwritable = []
+    for label, directory in (("uploads", DATA), ("output", OUTPUT), ("work", WORK),
+                             ("archive", ARCHIVE), ("state", STATE)):
+        probe = directory / f".self-test-{uuid.uuid4().hex[:8]}"
+        try:
+            probe.write_bytes(b"")
+            probe.unlink()
+        except OSError:
+            unwritable.append(label)
+    record("writable_directories", not unwritable,
+           "not writable: " + ", ".join(unwritable) if unwritable else "all writable")
+
+    config_problems = [f"alias {alias!r} -> unknown platform {target!r}"
+                       for alias, target in ALIASES.items() if target not in PLATFORMS]
+    config_problems += [f"{name}: architecture {profile.get('architecture')!r}"
+                        for name, profile in PLATFORMS.items()
+                        if profile.get("architecture") not in {"exr", "lnt"}]
+    codes = [entry[0] for entry in ERROR_TAXONOMY]
+    if len(codes) != len(set(codes)):
+        config_problems.append("duplicate error taxonomy codes")
+    record("configuration", not config_problems, "; ".join(config_problems) or "consistent")
+
+    try:
+        free = shutil.disk_usage(DATA).free
+        record("free_storage", free >= MIN_FREE_BYTES,
+               f"{free // 1024**2} MiB free, {MIN_FREE_BYTES // 1024**2} MiB minimum")
+    except OSError as exc:
+        record("free_storage", False, type(exc).__name__)
+
+    # gisobuild and Cisco images are x86_64. In local mode gisobuild runs in
+    # this process's own architecture; in Docker mode the builder container
+    # is started with --platform linux/amd64, so any host architecture works.
+    machine = host_platform.machine().lower()
+    record("architecture", GISO_RUNNER != "local" or machine in {"x86_64", "amd64"},
+           f"{machine} ({GISO_RUNNER} runner)")
+    return results
+
+
+def log_startup_self_test_once() -> None:
+    global startup_self_test_logged
+    if startup_self_test_logged:
+        return
+    startup_self_test_logged = True
+    for name, result in startup_self_test().items():
+        if not result["ok"]:
+            log_event("startup_self_test_failed", check=name, required=result["required"],
+                      detail=result["detail"])
 
 
 @app.get("/api/ready")
@@ -2710,8 +2808,10 @@ def ready():
         "database": db_ok,
         "disk": disk_ok,
     }
-    is_ready = all(checks.values())
-    return jsonify(ok=is_ready, **checks), 200 if is_ready else 503
+    self_test = startup_self_test()
+    is_ready = all(checks.values()) and all(
+        result["ok"] for result in self_test.values() if result["required"])
+    return jsonify(ok=is_ready, self_test=self_test, **checks), 200 if is_ready else 503
 
 
 @app.get("/api/storage")

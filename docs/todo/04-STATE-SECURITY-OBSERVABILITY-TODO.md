@@ -347,19 +347,36 @@ unavailable).
 - [x] DB/state (`SELECT 1` against `JOB_DB`)
 - [x] free disk (`shutil.disk_usage(DATA).free >= MIN_FREE_BYTES`, the same
       threshold already used before uploads/extraction)
-- [ ] no fatal startup error (there is no dedicated startup-error flag to
-      report yet; a truly fatal startup error currently prevents the process
-      from serving requests at all, so `/api/ready` never gets called at all)
+- [x] no fatal startup error - 2026-09-17: `/api/ready` now includes
+      `self_test` (see below) and is not ready while any required check
+      fails; configuration errors that do not stop the process are reported
+      there instead of only surfacing when a build runs. (A crash during
+      import still prevents serving, as before - that stays visible as the
+      container failing its healthcheck.)
 
 ## Startup self-test
 
-- [ ] gisobuild exists
-- [ ] required binaries exist
-- [ ] DB schema valid
-- [ ] writable directories
-- [ ] alias/config data valid
-- [ ] minimum free storage
-- [ ] architecture supported
+Implemented 2026-09-17 as `startup_self_test()`: run and logged once
+(`event=startup_self_test_failed check=… required=…`) on the first request -
+the container healthcheck makes that immediate - and re-evaluated on every
+`/api/ready`. Details name components, never absolute paths. Tests:
+`test_ready_includes_a_startup_self_test_that_names_each_failure`,
+`test_self_test_reports_unwritable_directories_and_a_bad_schema`. Live in
+the self-contained image (read-only root, SYS_CHROOT only): every check `ok`,
+`ready` 200, nothing logged.
+
+- [x] gisobuild exists (`gisobuild`)
+- [x] required binaries exist (`runner_binary`: Docker CLI or gisobuild's
+      Python per runner; `isoinfo`/`rpm` reported as optional)
+- [x] DB schema valid (`database_schema`: expected columns of `jobs` and
+      `activity` via `PRAGMA table_info`)
+- [x] writable directories (`writable_directories`: a probe file in uploads,
+      output, work, archive, state)
+- [x] alias/config data valid (`configuration`: every alias targets a known
+      platform, every platform is exr/lnt, taxonomy codes unique)
+- [x] minimum free storage (`free_storage`, same `MIN_FREE_BYTES`)
+- [x] architecture supported (`architecture`: local runner requires x86_64;
+      Docker runner starts the builder as linux/amd64 on any host)
 
 ## Caching
 

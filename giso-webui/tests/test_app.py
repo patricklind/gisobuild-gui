@@ -3,6 +3,7 @@ import io
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tarfile
@@ -2708,6 +2709,44 @@ class GisoWebTests(unittest.TestCase):
         payload = response.get_json()
         self.assertIn("database", payload)
         self.assertIn("disk", payload)
+
+    def test_ready_includes_a_startup_self_test_that_names_each_failure(self):
+        module.initialize_job_store()
+        with patch.object(module, "GISO_RUNNER", "local"), \
+                patch.object(module, "GISOBUILD_PYTHON", sys.executable), \
+                patch.object(module, "TOOL", Path(self.temp.name)), \
+                patch.object(module.host_platform, "machine", return_value="x86_64"):
+            (Path(self.temp.name) / "src").mkdir()
+            (Path(self.temp.name) / "src" / "gisobuild.py").write_text("")
+            healthy = self.client.get("/api/ready")
+            with patch.object(module.host_platform, "machine", return_value="aarch64"), \
+                    patch.dict(module.ALIASES, {"bogus": "no-such-platform"}):
+                broken = self.client.get("/api/ready").get_json()
+        body = healthy.get_json()
+        self.assertEqual(healthy.status_code, 200, body)
+        for name in ("gisobuild", "runner_binary", "database_schema", "writable_directories",
+                     "configuration", "free_storage", "architecture"):
+            self.assertTrue(body["self_test"][name]["ok"], (name, body["self_test"][name]))
+        self.assertFalse(broken["ok"])
+        self.assertFalse(broken["self_test"]["architecture"]["ok"])
+        self.assertIn("no-such-platform", broken["self_test"]["configuration"]["detail"])
+
+    def test_self_test_reports_unwritable_directories_and_a_bad_schema(self):
+        module.initialize_job_store()
+        with sqlite3.connect(module.JOB_DB) as database:
+            database.execute("DROP TABLE activity")
+            database.execute("CREATE TABLE activity (id INTEGER PRIMARY KEY)")
+        missing = Path(self.temp.name) / "does-not-exist"
+        with patch.object(module, "WORK", missing):
+            result = module.startup_self_test()
+        self.assertFalse(result["database_schema"]["ok"])
+        self.assertIn("activity lacks created, text", result["database_schema"]["detail"])
+        self.assertFalse(result["writable_directories"]["ok"])
+        self.assertEqual(result["writable_directories"]["detail"], "not writable: work")
+        # No absolute paths in anything the browser can read.
+        self.assertFalse(any(self.temp.name in entry["detail"] or "/usr/" in entry["detail"]
+                             for entry in result.values()), result)
+        self.assertFalse(result["isoinfo"]["required"])
 
     def test_storage_reports_real_disk_and_archive_usage(self):
         archive_dir = module.ARCHIVE / "job-1"
