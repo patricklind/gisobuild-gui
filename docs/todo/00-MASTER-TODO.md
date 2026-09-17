@@ -135,6 +135,8 @@ See `07-BUG-AUDIT-TODO.md` for detailed scenarios and required regression tests.
 - [x] Phase 5 — GisoBuildRunner abstraction
 - [x] Phase 6 — self-contained Docker image (real build proven)
 - [ ] Phase 7 — remove Docker socket/nested builder — possible and proven; the socket deployment is still the default
+      (to do: make our own image the default instead of
+      `ciscogisobuild/cisco-xr-gisobuild:2.3.4` - see `03-DOCKER-SELF-CONTAINED-TODO.md`)
 - [ ] Phase 8 — persistent state/inventory DB
 - [ ] Phase 9 — UI simplification
 - [ ] Phase 10 — security/observability hardening

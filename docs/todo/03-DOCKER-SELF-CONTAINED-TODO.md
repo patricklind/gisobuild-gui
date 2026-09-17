@@ -31,6 +31,44 @@ Status 2026-09-17: available as `docker/selfcontained.Dockerfile` +
 original `compose.yaml` (socket + child builder) still exists and is still
 the documented default; switching the default is left to the maintainer.
 
+- [ ] **Make our own image the default instead of
+      `GISO_IMAGE=ciscogisobuild/cisco-xr-gisobuild:2.3.4`** (raised by the
+      maintainer 2026-09-17: "why don't we use our own Docker image?").
+      Today `compose.yaml` / `.env.example` still start a child container from
+      Cisco's image through the Docker socket. Inspection of that image shows
+      it contains only the runtime (Python + gisobuild's OS dependencies), not
+      gisobuild: the code is the host `.gisobuild-tool` checkout mounted at
+      `/tool`. So the default deployment (a) needs `/var/run/docker.sock`
+      (host-admin equivalent), (b) runs whatever commit that checkout is on,
+      not a pin, and (c) references a mutable tag, not a digest. Our
+      self-contained image fixes all three (pinned commit + SHA-256 manifest,
+      no socket, read-only, only `SYS_CHROOT`), is proven by real NCS5500
+      25.1.2 builds, and is already published per release as
+      `<version>-selfcontained`. Merely pointing `GISO_IMAGE` at our image is
+      not the fix: the socket and the unpinned `/tool` mount would remain.
+      To do:
+      - [ ] make `giso-webui/compose.yaml` the self-contained deployment and
+            keep the socket variant as an explicit alternative (e.g.
+            `compose.socket.yaml`), or drop it
+      - [ ] `.env.example`: remove `GISO_IMAGE`/`GISO_PULL_TIMEOUT_SECONDS`
+            from the default path (keep them documented for the alternative)
+      - [ ] if the socket variant stays: pin `GISO_IMAGE` by digest and stop
+            mounting an unpinned host checkout (use the gisobuild bundled in
+            our image, or verify the checkout against the same commit/SHA-256)
+      - [ ] CI "Validate Compose configuration", staging, release workflow,
+            browser/integration tests and `docs/testing.md` smoke test follow
+            the new default
+      - [ ] README, web UI guide, operations, architecture, security,
+            AGENTS.md and GISO guide describe the self-contained deployment
+            first
+      - [ ] upgrade note for existing installs (volume names, the
+            `.gisobuild-tool` checkout no longer needed)
+      - [ ] verify: full unit/integration/browser suites, clean-machine run
+            and a real licensed eXR build with `docker compose up -d` on the
+            new default
+      - [ ] open risk: LNT is unexercised in the self-contained image (no LNT
+            image available); Apple Silicon still uses amd64 emulation
+
 **Real-build evidence** (throwaway container and Docker volumes on this Mac,
 amd64 emulation; licensed content only inside those volumes, all removed
 afterwards): the self-contained image, run `--read-only`, `--cap-drop ALL
