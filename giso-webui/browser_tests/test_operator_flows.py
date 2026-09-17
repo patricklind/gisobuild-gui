@@ -147,6 +147,26 @@ class OperatorFlowTests(unittest.TestCase):
             "download Cisco SMU asr9k-x64-7.3.2.CSCtest00099 (listed as a prerequisite by "
             "asr9k-x64-7.3.2.CSCtest00001)")
 
+    def test_build_report_shows_a_cached_builder_fallback(self):
+        self.write(self.ISO)
+        module.jobs["done"] = {
+            "id": "done", "status": "success", "created": 1, "updated": 2, "finished": 2,
+            "progress": 100, "phase": "Complete", "log": "", "artifacts": [],
+            "builder_image": {"reference": "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
+                              "id": "sha256:" + "be" * 32, "source": "cache"},
+            "build_plan": {"iso": {"relative_path": self.ISO, "sha256": "0" * 64},
+                           "platform": "asr9k", "engine": "exr", "release": "7.3.2",
+                           "selected_packages": [], "inventory_revision": "rev",
+                           "fingerprint": "f" * 64},
+        }
+        self.open()
+        report = self.page.locator("#build-report")
+        expect(report).to_be_visible()
+        report.locator("summary").first.click()
+        expect(report).to_contain_text(
+            "Builder ciscogisobuild/cisco-xr-gisobuild:2.3.4 · cached copy on this host "
+            "(registry unreachable) · sha256:bebebebebebe")
+
     def test_manual_csc_selection(self):
         for name in (self.ISO, self.ROUTING, self.BGP, self.OSPF):
             self.write(name)

@@ -191,7 +191,10 @@ Mandatory regression coverage for:
       `test_registry_outage_without_a_cached_image_fails_clearly`. Checked
       against the real Docker daemon: the cached
       `ciscogisobuild/cisco-xr-gisobuild:2.3.4` resolves to
-      `sha256:be282c7a76b0…` and a missing reference to `None`.
+      `sha256:be282c7a76b0…` and a missing reference to `None`. The build
+      report in the UI shows the builder reference, whether it was pulled or
+      the cached copy, and its ID
+      (`test_build_report_shows_a_cached_builder_fallback`, browser).
 
 See `07-BUG-AUDIT-TODO.md` for the implementation details and failure scenarios behind these tests.
 

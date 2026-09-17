@@ -849,6 +849,15 @@ function renderBuildReport(job) {
   const meta=document.createElement('p'); meta.className='build-report-meta';
   meta.textContent=`Inventory revision ${plan.inventory_revision} · BuildPlan fingerprint ${plan.fingerprint.slice(0,16)}…`;
   body.appendChild(meta);
+  if (job.builder_image) {
+    // Which builder actually ran: a registry pull, or the host's cached copy
+    // because the registry could not be reached (see run_job()).
+    const builder=document.createElement('p'); builder.className='build-report-meta';
+    const origin=job.builder_image.source === 'cache' ? 'cached copy on this host (registry unreachable)' : 'pulled from the registry';
+    builder.textContent=`Builder ${job.builder_image.reference} · ${origin}`
+      + (job.builder_image.id ? ` · ${job.builder_image.id.slice(0,19)}…` : '');
+    body.appendChild(builder);
+  }
 
   // create_build_plan() has always computed plan.confidence (the same shape
   // Step 2's live review shows via confidenceGrid()), but nothing here ever
