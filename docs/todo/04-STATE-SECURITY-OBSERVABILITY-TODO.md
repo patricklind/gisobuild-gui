@@ -15,9 +15,15 @@ Persist:
       a form of correctness (no cached copy can go stale relative to the
       files an operator actually uploaded/deleted). Genuinely no separate
       inventory index exists, so a restart cost is a rescan, not data loss.
-- [ ] metadata cache — `checksum_cache` and `iso_architecture_cache` are
-      in-memory dicts only; lost on restart and rebuilt lazily on next
-      access (a cost, not a correctness bug).
+- [x] metadata cache — 2026-09-17: checksums of files of 1 MiB or more are
+      persisted (job store schema version 4, `file_checksums`, keyed by path,
+      size and mtime in nanoseconds exactly like the in-memory cache; capped
+      at 10 000 rows). ISO architecture, ISO metadata and RPM header caches
+      stay in memory: they are cheap to rebuild compared with hashing
+      images. Test: `test_large_file_checksums_survive_a_restart_but_not_a_change`.
+      Live with the real 2.2 GiB NCS5500 ISO: first `/api/inputs` after
+      start 4.98 s, after `docker restart` 0.03 s. Archive verification
+      still hashes freshly (`file_sha256`), never from this cache.
 - [ ] BuildPlans — a plan attached to a started job is persisted as part of
       that job's record (see "jobs" above); a plan reviewed via
       `/api/build-plan` but never submitted as a job is not persisted

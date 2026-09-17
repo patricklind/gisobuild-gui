@@ -870,6 +870,19 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("must wait for the running Docker build container", busy["error"])
         self.assertEqual(allowed.status_code, 200)
 
+    def test_large_file_checksums_survive_a_restart_but_not_a_change(self):
+        module.initialize_job_store()
+        image = self.data / "base.iso"
+        image.write_bytes(b"x" * module.PERSISTED_CHECKSUM_MIN_BYTES)
+        first = module.file_checksums(image)
+        module.checksum_cache.clear()  # restart: memory is gone
+        with patch("app.hashlib.sha256", side_effect=AssertionError("re-hashed")):
+            self.assertEqual(module.file_checksums(image), first)
+        image.write_bytes(b"y" * module.PERSISTED_CHECKSUM_MIN_BYTES)
+        os.utime(image, ns=(time.time_ns() + 10**9, time.time_ns() + 10**9))
+        module.checksum_cache.clear()
+        self.assertNotEqual(module.file_checksums(image)["sha256"], first["sha256"])
+
     def test_cleanup_rejects_running_build(self):
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1, "updated": 1}
         response = self.client.post("/api/cleanup")

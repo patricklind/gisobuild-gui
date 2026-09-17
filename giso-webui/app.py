@@ -131,6 +131,13 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
          "(id TEXT PRIMARY KEY, name TEXT NOT NULL, size INTEGER NOT NULL, "
          "temp TEXT NOT NULL, updated REAL NOT NULL)"),
     )),
+    # Checksums keyed like the in-memory cache (path, size, mtime in ns), so a
+    # restart does not re-hash every multi-GiB image on the first page load.
+    (4, (
+        ("CREATE TABLE IF NOT EXISTS file_checksums "
+         "(path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL, "
+         "md5 TEXT NOT NULL, sha256 TEXT NOT NULL, recorded REAL NOT NULL)"),
+    )),
 )
 # An upload session that has not received a chunk for this long no longer
 # blocks builds, cleanup or Cisco downloads; it stays resumable until
@@ -837,12 +844,54 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+PERSISTED_CHECKSUM_MIN_BYTES = 1024 * 1024
+PERSISTED_CHECKSUM_ROWS = 10000
+
+
+def persisted_checksums(key: tuple[str, int, int]) -> dict[str, str] | None:
+    """A checksum recorded by an earlier process for exactly this path, size and mtime."""
+    if store_schema_problem or not store_initialized or not JOB_DB.exists():
+        return None
+    try:
+        with store_lock, sqlite3.connect(JOB_DB) as database:
+            row = database.execute(
+                "SELECT md5, sha256 FROM file_checksums WHERE path = ? AND size = ? AND mtime_ns = ?",
+                key).fetchone()
+    except sqlite3.Error:
+        return None
+    return {"md5": row[0], "sha256": row[1]} if row else None
+
+
+def persist_checksums(key: tuple[str, int, int], result: dict[str, str]) -> None:
+    if store_schema_problem or not store_initialized or not JOB_DB.exists():
+        return
+    try:
+        with store_lock, sqlite3.connect(JOB_DB) as database:
+            database.execute(
+                "INSERT INTO file_checksums (path, size, mtime_ns, md5, sha256, recorded) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(path) DO UPDATE SET size = excluded.size, "
+                "mtime_ns = excluded.mtime_ns, md5 = excluded.md5, sha256 = excluded.sha256, "
+                "recorded = excluded.recorded",
+                (*key, result["md5"], result["sha256"], time.time()))
+            database.execute(
+                "DELETE FROM file_checksums WHERE path NOT IN "
+                "(SELECT path FROM file_checksums ORDER BY recorded DESC LIMIT ?)",
+                (PERSISTED_CHECKSUM_ROWS,))
+    except sqlite3.Error:
+        pass
+
+
 def file_checksums(path: Path) -> dict[str, str]:
     with checksum_lock:
         stat = path.stat()
         key = (str(path), stat.st_size, stat.st_mtime_ns)
         if key in checksum_cache:
             return checksum_cache[key]
+        persisted = (persisted_checksums(key)
+                     if stat.st_size >= PERSISTED_CHECKSUM_MIN_BYTES else None)
+        if persisted:
+            checksum_cache[key] = persisted
+            return persisted
         md5 = hashlib.md5(usedforsecurity=False)
         sha256 = hashlib.sha256()
         with path.open("rb") as handle:
@@ -853,6 +902,8 @@ def file_checksums(path: Path) -> dict[str, str]:
         if len(checksum_cache) >= 4096:
             checksum_cache.pop(next(iter(checksum_cache)))
         checksum_cache[key] = result
+        if stat.st_size >= PERSISTED_CHECKSUM_MIN_BYTES:
+            persist_checksums(key, result)
         return result
 
 
@@ -3208,6 +3259,7 @@ EXPECTED_TABLE_COLUMNS = {
     "activity": {"id", "created", "text"},
     "file_provenance": {"relative_path", "sha256", "source", "recorded"},
     "upload_sessions": {"id", "name", "size", "temp", "updated"},
+    "file_checksums": {"path", "size", "mtime_ns", "md5", "sha256", "recorded"},
 }
 startup_self_test_logged = False
 
