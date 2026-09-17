@@ -286,7 +286,7 @@ this session was retained afterward per `SECURITY.md`.
       reason. 0.47 s cold including MD5s.
       Still out of scope: a loose RPM uploaded *without* its README has no
       manifest, so nothing is claimed about it. README `Pre-requisites:` are
-      not enforced yet.
+      not a blocker on their own (see "Supersedence" for how they are used).
 - [x] show components — each `package_groups` entry lists its member
       component names (confirmed live: `CSCwu13268` showed `ncs5500-infra`,
       `ncs5500-iosxr-fwding`, `ncs5500-routing`).
@@ -320,8 +320,29 @@ this session was retained afterward per `SECURITY.md`.
 
 Create an explicit supersedence model.
 
-- [ ] bundle metadata
-- [ ] RPM metadata
+- [ ] bundle metadata - partly. Each SMU README's `RPMS:` manifest (members
+      + MD5) is used for completeness and integrity (see "CSC grouping"),
+      and since 2026-09-17 its `Pre-requisites:` (SMU level and the
+      per-package `CSCxxxxx <package> pkg` lines under CONSTITUENT SMU
+      DETAILS) are parsed by `smu_readme_prerequisites()`. They are used to
+      *name* the SMU to download in a dependency blocker
+      (`explain_with_prerequisites()`), never as a blocker by themselves:
+      the same READMEs list a prerequisite they also partially supersede,
+      so "prerequisite absent" alone does not prove a failure. Live on the
+      real NCS5500 25.1.2 set: all 5 real dependency blockers now say
+      "download Cisco SMU ncs5500-25.1.2.CSCwt13701, which the README of
+      ncs5500-25.1.2.CSCwu13268 lists as its prerequisite for <package>" -
+      the exact five packages that README attributes to CSCwt13701. Test:
+      `test_dependency_blocker_names_the_prerequisite_smu_from_the_readme`.
+      README "Partial" supersedence is still not modelled.
+- [ ] RPM metadata - delegated, not reimplemented. Upstream gisobuild
+      already resolves version supersedence among supplied RPMs itself
+      (eXR: `rpm_db.filter_superseded_rpms()` in
+      `.gisobuild-tool/src/exrmod/gisobuild_exr.py:316`; LNT: highest
+      version per package in `.gisobuild-tool/src/lnt/builder/_pkgpicker.py`).
+      This app does not duplicate that ordering (see the
+      `_version_satisfies()` rationale); it stays open because no explicit
+      model in this app records the outcome before the build.
 - [x] README metadata — `active_rpm_names()` parses each uploaded SMU's own
       `README.txt`-style file for Cisco's own supersedence notation
       (`<identifier> Full`) and excludes the packages it names. Verified

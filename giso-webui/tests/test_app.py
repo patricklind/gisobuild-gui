@@ -1495,6 +1495,36 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("failed its README checksum", problems[good])
         self.assertEqual(module.active_rpm_names()[0], [])
 
+    def test_dependency_blocker_names_the_prerequisite_smu_from_the_readme(self):
+        smu = "ncs5500-25.1.2.CSCtest00005"
+        rpm = "ncs5500-infra-1.0.0.8-r2512.CSCtest00005.x86_64.rpm"
+        directory = self.data / smu
+        directory.mkdir()
+        (directory / rpm).write_bytes(b"rpm")
+        # Layout of a real Cisco README: SMU-level prerequisites, then per
+        # package under CONSTITUENT SMU DETAILS.
+        (directory / f"{smu}.txt").write_text(
+            self._smu_readme(smu, {rpm: hashlib.md5(b"rpm").hexdigest()})
+            + "          ncs5500-25.1.2.CSCtest00099\n\n"
+            "Supercedes:              \n          ncs5500-25.1.2.CSCtest00099   Partial\n\n"
+            "CONSTITUENT SMU DETAILS:\n\nSource Packages:         ncs5500-infra\n"
+            "Pre-requisites:          \n    CSCtest00099 ncs5500-dpa pkg\n"
+            "SMU Tar Contents:    \n"
+        )
+        selected = [{"relative_path": f"{smu}/{rpm}", "basename": rpm}]
+        metadata = {"requires": [("ncs5500-dpa", "1.0.0.5"), ("ncs5500-os", "1.0.0.1")],
+                    "provides": []}
+        with patch("app.rpm_dependency_metadata", return_value=metadata):
+            missing = module.missing_package_dependencies(
+                selected, {"ncs5500-dpa": "1.0.0.0", "ncs5500-os": "1.0.0.0"})
+        by_requirement = {entry["requirement"]: entry for entry in missing}
+        dpa = by_requirement["ncs5500-dpa = 1.0.0.5"]
+        self.assertEqual(dpa["prerequisite_smu"], "ncs5500-25.1.2.CSCtest00099")
+        self.assertEqual(dpa["listed_by"], smu)
+        self.assertIn("download Cisco SMU ncs5500-25.1.2.CSCtest00099", module.dependency_blocker_text(dpa))
+        # No README claim for ncs5500-os: keep the generic advice, never guess.
+        self.assertNotIn("prerequisite_smu", by_requirement["ncs5500-os = 1.0.0.1"])
+
     def test_complete_fix_matching_its_readme_stays_selectable(self):
         smu = "ncs5500-25.1.2.CSCtest00003"
         names = [f"ncs5500-{component}-1.0.0.4-r2512.CSCtest00003.x86_64.rpm"

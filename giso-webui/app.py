@@ -771,7 +771,9 @@ def missing_package_dependencies(
             entry["required_by"].append(required_by)
     for entry in missing.values():
         entry["required_by"].sort()
-    return sorted(missing.values(), key=lambda entry: entry["requirement"])
+    return explain_with_prerequisites(
+        sorted(missing.values(), key=lambda entry: entry["requirement"])
+    )
 
 
 def iso_architectures_from_listing(text: str) -> frozenset[str]:
@@ -918,11 +920,17 @@ def iso_identity(iso_path: Path) -> tuple[str, bool]:
 
 def dependency_blocker_text(entry: dict) -> str:
     """One operator-facing line per unsatisfiable requirement, shared by every gate."""
+    action = (
+        f"download Cisco SMU {entry['prerequisite_smu']}, which the README of "
+        f"{entry['listed_by']} lists as its prerequisite for "
+        f"{entry['requirement'].split(' = ')[0]}"
+        if entry.get("prerequisite_smu")
+        else f"download the Cisco SMU that provides {entry['requirement']}"
+    )
     return (
         f"{entry['requirement']} is required by {', '.join(entry['required_by'])}, "
         f"but the base image ships {entry['requirement'].split(' = ')[0]} "
-        f"{entry['base_image_has']} and no selected package provides it — "
-        f"download the Cisco SMU that provides {entry['requirement']}"
+        f"{entry['base_image_has']} and no selected package provides it — {action}"
     )
 
 
@@ -1808,6 +1816,71 @@ def smu_readme_manifests(texts: list[str]) -> dict[str, dict[str, str]]:
         if rpms:
             manifests.setdefault(name.group("name"), {}).update(rpms)
     return manifests
+
+
+SMU_README_PREREQ_BLOCK = re.compile(
+    r"^Pre-requisites:[ \t]*\n(?P<body>(?:[ \t]+\S.*\n)+)", re.MULTILINE
+)
+SMU_README_PREREQ_SMU = re.compile(r"^[ \t]+(?P<smu>\S+\.(?P<csc>CSC[A-Za-z0-9]+))[ \t]*$")
+SMU_README_PREREQ_PACKAGE = re.compile(
+    r"^[ \t]+(?P<csc>CSC[A-Za-z0-9]+)[ \t]+(?P<package>\S+)[ \t]+pkg[ \t]*$"
+)
+
+
+def smu_readme_prerequisites(texts: list[str]) -> dict[str, dict[str, str]]:
+    """{SMU name: {package name: prerequisite SMU name}} from each README.
+
+    A Cisco SMU README names its prerequisite SMUs, and under "CONSTITUENT
+    SMU DETAILS" which package each prerequisite supplies
+    (``CSCwt13701 ncs5500-dpa pkg``). Only packages whose CSC also appears in
+    the SMU-level list are kept, so the full SMU name is Cisco's, not built
+    here.
+    """
+    prerequisites: dict[str, dict[str, str]] = {}
+    for text in texts:
+        name = SMU_README_NAME.search(text)
+        if not name:
+            continue
+        smu_by_csc: dict[str, str] = {}
+        packages: dict[str, str] = {}
+        for block in SMU_README_PREREQ_BLOCK.finditer(text):
+            for line in block.group("body").splitlines():
+                smu = SMU_README_PREREQ_SMU.match(line)
+                if smu:
+                    smu_by_csc[smu.group("csc")] = smu.group("smu")
+                package = SMU_README_PREREQ_PACKAGE.match(line)
+                if package:
+                    packages[package.group("package")] = package.group("csc")
+        resolved = {package: smu_by_csc[csc] for package, csc in packages.items() if csc in smu_by_csc}
+        if resolved:
+            prerequisites.setdefault(name.group("name"), {}).update(resolved)
+    return prerequisites
+
+
+def explain_with_prerequisites(entries: list[dict]) -> list[dict]:
+    """Name the Cisco SMU that supplies each unsatisfiable requirement, when a README says.
+
+    Adds ``prerequisite_smu`` (and ``listed_by``) to an entry only when an
+    SMU that requires the package lists, in its own README, a prerequisite
+    SMU for exactly that package. The block itself never depends on this -
+    it only turns "download the SMU that provides X" into its actual name.
+    """
+    if not entries:
+        return entries
+    texts = smu_readme_texts()
+    manifests = smu_readme_manifests(texts)
+    prerequisites = smu_readme_prerequisites(texts)
+    smu_by_rpm = {rpm: smu for smu, rpms in manifests.items() for rpm in rpms}
+    for entry in entries:
+        package = entry["requirement"].split(" = ")[0]
+        for rpm in entry["required_by"]:
+            smu = smu_by_rpm.get(rpm)
+            prerequisite = prerequisites.get(smu or "", {}).get(package)
+            if prerequisite:
+                entry["prerequisite_smu"] = prerequisite
+                entry["listed_by"] = smu
+                break
+    return entries
 
 
 def smu_manifest_problems(available: list[str], texts: list[str] | None = None) -> dict[str, str]:

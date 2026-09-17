@@ -906,11 +906,12 @@ function dependencyPanel(heading, intro, entries) {
   const title = document.createElement('h4'); title.textContent = heading;
   const lead = document.createElement('p'); lead.textContent = intro;
   const list = document.createElement('ul');
-  entries.forEach(({requirement, required_by, base_image_has}) => {
+  entries.forEach(({requirement, required_by, base_image_has, prerequisite_smu, listed_by}) => {
     const item = document.createElement('li');
     const needed = Array.isArray(required_by) ? summarizeNames(required_by) : required_by;
     item.textContent = `${requirement} — required by ${needed}`
-      + (base_image_has ? `; the base image ships ${base_image_has}` : '');
+      + (base_image_has ? `; the base image ships ${base_image_has}` : '')
+      + (prerequisite_smu ? `. Download ${prerequisite_smu} (listed as a prerequisite by ${listed_by})` : '');
     if (Array.isArray(required_by) && required_by.length > 2) item.title = required_by.join('\n');
     list.appendChild(item);
   });
