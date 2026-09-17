@@ -10,14 +10,17 @@ from pathlib import Path
 # src/utils/gisoglobals.py. LNT uses metadata-driven validation upstream, so
 # its public product families are represented explicitly here for UI checks.
 COMMON_CAPABILITIES = {
-    "repo", "pkglist", "xrconfig", "ztp", "create_checksum", "skip_usb_image",
+    "repo", "pkglist", "xrconfig", "ztp", "create_checksum",
     "label", "no_label", "debug",
 }
 EXR_CAPABILITIES = COMMON_CAPABILITIES | {
     "script", "optimize", "x86_only", "bridging_fixes",
 }
+# skip_usb_image is LNT-only: upstream's EXR_CLI_DICT_MAP maps it to None and
+# the eXR engine builds a USB zip on its own whenever the platform has a USB
+# script (src/exrmod/usb_zip/platform_scripts.yaml), skipping it otherwise.
 LNT_CAPABILITIES = COMMON_CAPABILITIES | {
-    "remove_packages", "only_support_pids", "verbose_dependency_check",
+    "skip_usb_image", "remove_packages", "only_support_pids", "verbose_dependency_check",
     "bridging_fixes", "clear_bridging_fixes", "ownership_vouchers",
     "ownership_certificate", "clear_ownership_vouchers",
     "clear_ownership_certificate", "key_request", "clear_key_request", "no_buildinfo",
@@ -29,7 +32,8 @@ LNT_CAPABILITIES = COMMON_CAPABILITIES | {
 PLATFORMS = {
     "asr9k": {"label": "ASR 9000", "architecture": "exr", "usb": True},
     "ncs1k": {"label": "NCS 1000", "architecture": "exr", "usb": True},
-    "ncs1001": {"label": "NCS 1001", "architecture": "exr", "usb": True},
+    # No USB script upstream for ncs1001 (src/exrmod/usb_zip/platform_scripts.yaml).
+    "ncs1001": {"label": "NCS 1001", "architecture": "exr", "usb": False},
     "ncs1004": {"label": "NCS 1004", "architecture": "exr", "usb": True},
     "ncs5k": {"label": "NCS 5000", "architecture": "exr", "usb": False},
     "ncs540": {"label": "NCS 540 (eXR)", "architecture": "exr", "usb": True},
@@ -541,7 +545,9 @@ def validate_platform_options(payload: dict) -> dict:
         errors.append(
             f"{', '.join(unsupported)} not supported by the {profile['label']} {architecture.upper()} build engine"
         )
-    if not profile["usb"] and not payload.get("skip_usb_image"):
+    # Only LNT can be told to skip USB, and only LNT would try and fail; the
+    # eXR engine simply produces no USB zip for a platform without a script.
+    if architecture == "lnt" and not profile["usb"] and not payload.get("skip_usb_image"):
         errors.append(f"Automatic USB output is not supported for {profile['label']}; enable Skip USB image")
     if errors:
         raise ValueError("; ".join(errors))

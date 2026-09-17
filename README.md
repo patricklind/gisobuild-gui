@@ -137,10 +137,32 @@ rehearsal, Ruff, `pip-audit`, Actionlint, Hadolint, Compose validation, shell
 syntax validation, and an application container build for every pull request.
 See the [release process](docs/releasing.md) for versioned GHCR publication.
 
+## Self-contained deployment (no Docker socket)
+
+`docker/selfcontained.Dockerfile` bundles the web app with
+[`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at a pinned, verified
+commit on upstream's own AlmaLinux 8.10 base. Builds run as child processes of
+the web app: no Docker socket, no second builder container, no builder image
+pull and no host `.gisobuild-tool` checkout.
+
+```bash
+cd giso-webui
+docker compose -f compose.selfcontained.yaml up -d --build
+curl --fail http://127.0.0.1:8080/api/ready
+```
+
+The container runs as root with a read-only root filesystem, `no-new-privileges`
+and every Linux capability dropped except `SYS_CHROOT`, which gisobuild's eXR
+engine needs to inspect RPMs inside the extracted image. Without it the build
+plan is blocked with an explanation. `/api/version` reports `runner: local` and
+the bundled gisobuild commit. A real NCS5500 25.1.2 Golden ISO has been built
+this way; LNT images have not yet been exercised in this deployment.
+
 ## Security
 
-The service binds only to localhost because the web container has access to the
-Docker socket. Do not expose port 8080 to an untrusted network. See
+The default `compose.yaml` deployment binds only to localhost because the web
+container has access to the Docker socket (the self-contained deployment above
+has none). Do not expose port 8080 to an untrusted network. See
 [`SECURITY.md`](SECURITY.md) for the deployment boundary and reporting process.
 
 ## Operational limitations

@@ -428,6 +428,7 @@ class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
         self.assertTrue((module.ARCHIVE / job_id / "ncs5500-golden-x-25.1.2-LOCAL.iso").exists())
         version = self.client.get("/api/version").get_json()
         self.assertEqual((version["runner"], version["gisobuild_image"]), ("local", None))
+        self.assertEqual(version["gisobuild_commit"], "0388af2989bb")
 
     def test_cancelling_a_local_build_leaves_no_orphan_processes(self):
         iso = self.write(self.ISO)

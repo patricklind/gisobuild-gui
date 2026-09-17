@@ -52,7 +52,10 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    cap_add: []
+    # The only capability gisobuild needs: its eXR engine chroots into the
+    # extracted image to query RPMs. Verified with a real NCS5500 build.
+    cap_add:
+      - SYS_CHROOT
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777

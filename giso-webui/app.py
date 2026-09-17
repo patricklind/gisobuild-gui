@@ -1231,6 +1231,20 @@ def is_iso9660_image(path: Path) -> bool:
         return False
 
 
+CAP_SYS_CHROOT = 18  # linux/capability.h
+
+
+def process_has_capability(bit: int) -> bool | None:
+    """Whether this process's effective capability set has `bit`; None if unknowable."""
+    try:
+        for line in Path("/proc/self/status").read_text().splitlines():
+            if line.startswith("CapEff:"):
+                return bool(int(line.split()[1], 16) >> bit & 1)
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
 def gisobuild_tool_available() -> bool:
     """The pinned gisobuild checkout build_command() mounts into the builder."""
     return (TOOL / "src/gisobuild.py").is_file()
@@ -1363,6 +1377,19 @@ def create_build_plan(payload: dict) -> dict:
         )
         blockers.extend(dependency_blocker_text(entry) for entry in unsatisfied)
 
+    # The eXR engine runs `chroot <extracted image> rpm -qp ...` for every RPM.
+    # Without CAP_SYS_CHROOT each call fails, gisobuild logs it, finds "0 RPMs"
+    # and exits 0 with "Nothing to do" - minutes of work that can never
+    # produce an image. In local mode that capability belongs to this very
+    # process, so it can be checked before starting; a builder container gets
+    # Docker's default set and is not affected.
+    if (GISO_RUNNER == "local" and profile and profile["engine"] == "exr"
+            and process_has_capability(CAP_SYS_CHROOT) is False):
+        blockers.append(
+            "gisobuild's eXR engine needs the SYS_CHROOT capability, which this container "
+            "does not have; add it (compose: cap_add: [SYS_CHROOT]) and restart"
+        )
+
     # The estimate the Step 2 UI already showed (base ISO + selected RPMs) is
     # the best lower bound available for what this build has to write, so use
     # the same figure for the real gate rather than inventing a second one.
@@ -1439,7 +1466,8 @@ def create_build_plan(payload: dict) -> dict:
         "expected_outputs": {
             "iso": True,
             "usb": bool(profile and profile["capabilities"].get("usb_image")
-                        and not payload.get("skip_usb_image")),
+                        and not (profile["capabilities"].get("skip_usb_image")
+                                 and payload.get("skip_usb_image"))),
         },
         "estimated_output_bytes": estimated_output_bytes,
         "volume_free_bytes": build_volume_free_bytes(),
@@ -2205,6 +2233,9 @@ def build_command(payload: dict, job_id: str) -> list[str]:
                 raise ValueError("Label may contain only letters, numbers and underscore")
             command += ["--label", payload["label"]]
         for key, option in BOOL_OPTIONS.items():
+            # eXR ignores --skip-usb-image; passing it would only suggest otherwise.
+            if key == "skip_usb_image" and not profile["capabilities"].get("skip_usb_image"):
+                continue
             if payload.get(key):
                 command.append(option)
     # The child container sees OUTPUT at /output; a local process sees it as is.
@@ -2641,6 +2672,7 @@ def version():
         source_revision=os.environ.get("SOURCE_REVISION") or None,
         build_date=os.environ.get("BUILD_DATE") or None,
         runner=GISO_RUNNER,
+        gisobuild_repository=os.environ.get("GISOBUILD_REPOSITORY") or None,
         gisobuild_image=IMAGE if GISO_RUNNER == "docker" else None,
         gisobuild_commit=gisobuild_commit(),
     )

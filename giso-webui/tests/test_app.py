@@ -935,6 +935,15 @@ class GisoWebTests(unittest.TestCase):
                                         "skip_usb_image": True}, "xrv")
         self.assertIn("--optimize", command)
         self.assertIn("--full-iso", command)
+        # eXR ignores --skip-usb-image upstream, so it is not forwarded.
+        self.assertNotIn("--skip-usb-image", command)
+
+    @patch("app.child_mount_args", return_value=[])
+    def test_lnt_skip_usb_image_is_forwarded(self, _mounts):
+        (self.data / "base.iso").write_bytes(b"iso")
+        command = module.build_command({"iso": "base.iso", "platform": "8000", "pkglist": [],
+                                        "skip_usb_image": True}, "lnt")
+        self.assertIn("--skip-usb-image", command)
 
     def test_platform_matrix_is_exposed(self):
         response = self.client.get("/api/platforms")
@@ -1843,6 +1852,32 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("uploads to finish", text)
         self.assertIn("A build is already running", text)
         self.assertIn("Cisco download", text)
+
+    def test_local_exr_plan_requires_sys_chroot_before_starting(self):
+        (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
+        payload = {"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500", "pkglist": [],
+                   "xrconfig": "", "automatic_smu_selection": True}
+        message = "needs the SYS_CHROOT capability"
+        with patch.object(module, "GISO_RUNNER", "local"), \
+                patch("app.build_environment_blockers", side_effect=lambda: ([], [])):
+            with patch("app.process_has_capability", return_value=False):
+                blocked = self.client.post("/api/build-plan", json=payload).get_json()
+                lnt = self.client.post("/api/build-plan", json={
+                    **payload, "iso": "ncs5500-x64-25.1.2.iso", "platform": "8000"}).get_json()
+            with patch("app.process_has_capability", return_value=True):
+                allowed = self.client.post("/api/build-plan", json=payload).get_json()
+        with patch("app.process_has_capability", return_value=False):
+            docker_mode = self.client.post("/api/build-plan", json=payload).get_json()
+        self.assertTrue(any(message in b for b in blocked["blockers"]), blocked["blockers"])
+        self.assertFalse(any(message in b for b in allowed["blockers"]))
+        self.assertFalse(any(message in b for b in lnt["blockers"]))
+        self.assertFalse(any(message in b for b in docker_mode["blockers"]))
+
+    def test_capability_is_read_from_the_effective_set(self):
+        status = "Name:\tpython\nCapEff:\t0000000000040000\n"
+        with patch.object(module.Path, "read_text", return_value=status):
+            self.assertTrue(module.process_has_capability(module.CAP_SYS_CHROOT))
+            self.assertFalse(module.process_has_capability(0))
 
     def test_build_plan_is_blocked_when_gisobuild_or_docker_is_unavailable(self):
         (self.data / "base.iso").write_bytes(b"iso")

@@ -32,6 +32,9 @@ EXR = [
     ("iosxrwbd", "iosxrwbd-mini-x-7.3.2.iso", "732", None),
     ("xrv9k", "xrv9k-fullk9-x-7.11.2.iso", "7112", "full_iso"),
 ]
+# src/exrmod/usb_zip/platform_scripts.yaml at the pinned gisobuild commit.
+UPSTREAM_EXR_USB = {"ncs5500", "ncs540", "ncs1004", "ncs1k", "asr9k", "ncs560", "iosxrwbd"}
+
 LNT = [
     ("8000", "8000-x64-24.3.1.iso"),
     ("ncs1010", "ncs1010-x64-24.3.1.iso"),
@@ -86,9 +89,9 @@ class PlatformFixtureTests(unittest.TestCase):
                 foreign_platform = "ncs5500" if platform != "ncs5500" else "asr9k"
                 foreign = f"{foreign_platform}-routing-1.0.0.1-r{tag}.CSCtest00002.x86_64.rpm"
                 self.workspace(iso, rpm, foreign)
-                # The page ticks "Skip USB image" itself for a platform without
-                # automatic USB output; without it the plan rightly blocks.
-                plan = self.automatic_plan(iso, skip_usb_image=not module.PLATFORMS[platform]["usb"])
+                # eXR needs no "Skip USB image": upstream's engine builds a USB
+                # zip only where the platform has a USB script.
+                plan = self.automatic_plan(iso)
 
                 self.assertTrue(plan["ready"], plan["blockers"])
                 self.assertEqual(plan["platform"], platform)
@@ -98,11 +101,8 @@ class PlatformFixtureTests(unittest.TestCase):
                 self.assertEqual(excluded[foreign], "Different platform")
                 self.assertEqual(plan["expected_outputs"]["usb"],
                                  module.PLATFORMS[platform]["usb"])
-                if not module.PLATFORMS[platform]["usb"]:
-                    blocked = self.automatic_plan(iso)
-                    self.assertIn(f"Automatic USB output is not supported for "
-                                  f"{module.PLATFORMS[platform]['label']}; enable Skip USB image",
-                                  blocked["blockers"])
+                self.assertEqual(module.PLATFORMS[platform]["usb"], platform in UPSTREAM_EXR_USB)
+                self.assertFalse(plan["capabilities"]["skip_usb_image"])
                 self.assertTrue(plan["capabilities"]["script"])
                 self.assertFalse(plan["capabilities"]["only_support_pids"])
                 if special:
@@ -129,6 +129,9 @@ class PlatformFixtureTests(unittest.TestCase):
                 self.assertTrue(plan["capabilities"]["remove_packages"])
                 self.assertFalse(plan["capabilities"]["script"])
                 self.assertEqual(plan["release"], "24.3.1")
+                self.assertTrue(plan["capabilities"]["skip_usb_image"])
+                skipped = self.automatic_plan(iso, skip_usb_image=True)
+                self.assertFalse(skipped["expected_outputs"]["usb"])
 
     def test_lnt_packages_built_for_another_release_block_a_manual_selection(self):
         iso = "8000-x64-24.3.1.iso"

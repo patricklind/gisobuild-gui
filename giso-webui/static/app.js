@@ -181,7 +181,9 @@ function updateAutomaticTargetRelease(release) {
 function expectedOutputText(platformId) {
   const profile=platformProfiles.find(item=>item.id === platformId);
   if (!profile) return '—';
-  const usb=Boolean(profile.capabilities?.usb_image) && !$('[name=skip_usb_image]').checked;
+  // Only LNT honours "Skip USB image"; eXR follows the platform's USB support.
+  const skipped=Boolean(profile.capabilities?.skip_usb_image) && $('[name=skip_usb_image]').checked;
+  const usb=Boolean(profile.capabilities?.usb_image) && !skipped;
   return usb ? 'ISO + USB' : 'ISO only';
 }
 
@@ -550,7 +552,7 @@ function updatePlatformControls() {
     clear_bridging_fixes:'clear_bridging_fixes',ownership_vouchers:'ownership_vouchers',
     ownership_certificate:'ownership_certificate',clear_ownership_vouchers:'clear_ownership_vouchers',
     clear_ownership_certificate:'clear_ownership_certificate',key_request:'key_request',
-    clear_key_request:'clear_key_request',no_buildinfo:'no_buildinfo'
+    clear_key_request:'clear_key_request',no_buildinfo:'no_buildinfo',skip_usb_image:'skip_usb_image'
   };
   Object.entries(capabilityNames).forEach(([name,capability])=>{
     const control=$(`[name=${name}]`); if (!control) return;
@@ -561,7 +563,7 @@ function updatePlatformControls() {
     if (!supported) control.type === 'checkbox' ? control.checked=false : control.value='';
   });
   const skipUsb=$('[name=skip_usb_image]');
-  if (profile && !profile.capabilities?.usb_image) skipUsb.checked=true;
+  if (profile && profile.capabilities?.skip_usb_image && !profile.capabilities?.usb_image) skipUsb.checked=true;
   updateBuildAvailability();
 }
 

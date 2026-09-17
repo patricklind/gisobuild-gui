@@ -1350,6 +1350,33 @@ each test failed before its fix:
       says "Waiting for an ISO…". Tests: `test_build_button_enable_disable`,
       `test_multiple_iso_ambiguity_blocks_build`.
 
+## P1/P2 — Found by the first real self-contained build (2026-09-17)
+
+- [x] "Skip USB image" was treated as a common option, but upstream's
+      `EXR_CLI_DICT_MAP` maps `skip_usb_image` to `None`: the eXR engine
+      ignores it and builds a USB zip whenever the platform has a script in
+      `src/exrmod/usb_zip/platform_scripts.yaml`. Proven by the real
+      NCS5500 build, which passed `--skip-usb-image` and still produced
+      `ncs5500-usb_boot-25.1.2-SELFCONTAINED.zip`. So the plan's
+      `expected_outputs.usb` was wrong for eXR, eXR platforms without USB
+      were *blocked* until the operator ticked an option that does nothing,
+      and `ncs1001` claimed USB support it does not have upstream. Now
+      `skip_usb_image` is an LNT-only capability (hidden for eXR in the UI,
+      not forwarded to eXR), the "enable Skip USB image" blocker applies only
+      to LNT, and `ncs1001` is `usb: False`. Tests:
+      `test_every_exr_platform` (USB set equals upstream's script list),
+      `test_every_lnt_platform`, `test_exr_xrv9k_options_are_forwarded`,
+      `test_lnt_skip_usb_image_is_forwarded`.
+- [x] An RPM the service could not read was still offered by automatic
+      selection (the inventory silently skipped it), so the plan failed with
+      "RPM … was not found". Seen with real files whose extracted ownership
+      and `0750` mode made them unreadable under `cap_drop: ALL`. Unreadable
+      RPMs are now excluded with "The service cannot read this file…".
+      Test: `test_unreadable_rpm_is_excluded_with_a_reason_instead_of_breaking_the_plan`.
+- [x] Local eXR builds without `CAP_SYS_CHROOT` ran for minutes and did
+      nothing (gisobuild exit 0, "Nothing to do"). The plan now blocks it
+      before starting; see `03-DOCKER-SELF-CONTAINED-TODO.md`.
+
 ## Required regression-test additions
 
 - [x] cancel during builder preparation/pull
