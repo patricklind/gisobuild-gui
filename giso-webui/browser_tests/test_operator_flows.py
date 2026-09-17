@@ -9,6 +9,7 @@ backend code, and every assertion is on what the page actually renders.
 """
 
 import hashlib
+import json
 import os
 import shutil
 import tempfile
@@ -196,6 +197,19 @@ class OperatorFlowTests(unittest.TestCase):
         self.page.locator("#start-build").click()
         expect(self.page.locator("#error")).to_contain_text(
             "A selected input is not in the workspace. Check files again and reselect the base ISO")
+
+    def test_readiness_badge_names_a_failing_self_test_check(self):
+        self.write(self.ISO)
+        ready = {"ok": False, "docker": True, "tool": True, "storage": True, "database": True,
+                 "disk": True, "self_test": {
+                     "database_schema": {"ok": False, "required": True,
+                                         "detail": "schema version 3, expected 2"},
+                     "isoinfo": {"ok": False, "required": False, "detail": "isoinfo missing"}}}
+        self.page.route("**/api/ready", lambda route: route.fulfill(
+            status=503, content_type="application/json", body=json.dumps(ready)))
+        self.open()
+        expect(self.page.locator("#health")).to_have_text(
+            "⚠ the job database schema is not usable (schema version 3, expected 2)")
 
     def test_manual_csc_selection(self):
         for name in (self.ISO, self.ROUTING, self.BGP, self.OSPF):

@@ -706,6 +706,14 @@ const READY_CHECK_LABELS = {
   database: 'the job database is unavailable',
   disk: 'disk space is critically low',
 };
+// Startup self-test checks not already covered by the keys above.
+const SELF_TEST_LABELS = {
+  runner_binary: 'the build runner is not installed',
+  database_schema: 'the job database schema is not usable',
+  writable_directories: 'a storage directory is not writable',
+  configuration: 'the platform configuration is inconsistent',
+  architecture: 'this CPU architecture cannot run gisobuild here',
+};
 
 async function health() {
   const pill = $('#health');
@@ -729,7 +737,11 @@ async function health() {
     } else {
       const failing = Object.entries(READY_CHECK_LABELS)
         .filter(([key]) => state[key] === false)
-        .map(([, label]) => label);
+        .map(([, label]) => label)
+        .concat(Object.entries(SELF_TEST_LABELS)
+          .filter(([key]) => state.self_test?.[key]?.required && state.self_test[key].ok === false)
+          .map(([key, label]) => `${label} (${state.self_test[key].detail})`));
+      if (!failing.length) failing.push('a readiness check failed');
       pill.textContent = failing.length === 1 ? `⚠ ${failing[0]}` : `⚠ System not ready (${failing.length} checks failing)`;
       pill.className = 'pill bad';
       // A hover title alone would hide the specific reasons from touch and
