@@ -754,7 +754,16 @@ $('#build-form').addEventListener('submit', async event => {
   const button = $('#start-build'); button.disabled = true; button.textContent = 'Starting…';
   try {
     const plan = await api('/api/build-plan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-    if (!plan.ready) throw new Error(`BuildPlan is blocked: ${plan.blockers.join('; ')}`);
+    renderUnsatisfiedDependencies(plan);
+    if (!plan.ready) {
+      // A dependency problem gets the dedicated panel above (which names each
+      // package and what the base image ships) rather than being flattened
+      // into one long error line with everything else.
+      if (plan.unsatisfied_dependencies?.length) {
+        throw new Error('This build cannot succeed - see the missing dependencies listed above.');
+      }
+      throw new Error(`BuildPlan is blocked: ${plan.blockers.join('; ')}`);
+    }
     const usbText = plan.expected_outputs.usb ? 'A USB boot image is expected.' : 'No USB boot image is expected for these settings.';
     const overrideWarnings = [];
     if (!payload.automatic_smu_selection) overrideWarnings.push('Manual package selection is active: automatic supersedence and CSC-group matching were bypassed for the packages you chose.');
@@ -843,21 +852,38 @@ function renderBuildReport(job) {
   }
 }
 
-function renderMissingDependencies(job) {
+function dependencyPanel(heading, intro, entries) {
   const panel = $('#missing-dependencies');
-  const missing = job.missing_dependencies || [];
-  if (!missing.length) { panel.hidden = true; panel.replaceChildren(); return; }
+  if (!entries.length) { panel.hidden = true; panel.replaceChildren(); return; }
   panel.hidden = false;
-  const heading = document.createElement('h4'); heading.textContent = 'Missing dependencies found by gisobuild';
-  const intro = document.createElement('p');
-  intro.textContent = 'The build failed its RPM dependency check. This usually means an additional Cisco SMU/fix package providing one of these is missing from your repository:';
+  const title = document.createElement('h4'); title.textContent = heading;
+  const lead = document.createElement('p'); lead.textContent = intro;
   const list = document.createElement('ul');
-  missing.forEach(({requirement, required_by}) => {
+  entries.forEach(({requirement, required_by, base_image_has}) => {
     const item = document.createElement('li');
-    item.textContent = `${requirement} — required by ${required_by}`;
+    const needed = Array.isArray(required_by) ? required_by.join(', ') : required_by;
+    item.textContent = `${requirement} — required by ${needed}`
+      + (base_image_has ? `; the base image ships ${base_image_has}` : '');
     list.appendChild(item);
   });
-  panel.replaceChildren(heading, intro, list);
+  panel.replaceChildren(title, lead, list);
+}
+
+function renderMissingDependencies(job) {
+  dependencyPanel(
+    'Missing dependencies found by gisobuild',
+    'The build failed its RPM dependency check. This usually means an additional Cisco SMU/fix package providing one of these is missing from your repository:',
+    job.missing_dependencies || []);
+}
+
+function renderUnsatisfiedDependencies(plan) {
+  // The same panel, used one step earlier: these are read from the selected
+  // RPMs' own headers against the base image's own package list, so they are
+  // known before gisobuild runs rather than reported by it afterwards.
+  dependencyPanel(
+    'Missing dependencies — this build cannot succeed',
+    'A selected package needs another package version that neither the base image nor your selection provides. Download the Cisco SMU that supplies each of these, or remove the package that needs it:',
+    plan.unsatisfied_dependencies || []);
 }
 
 async function poll() {

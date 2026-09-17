@@ -54,6 +54,7 @@ DOCKER_BIN = os.environ.get("DOCKER_BIN", "/usr/bin/docker")
 if not Path(DOCKER_BIN).is_absolute():
     raise RuntimeError("DOCKER_BIN must be an absolute path")
 ISOINFO_BIN = os.environ.get("ISOINFO_BIN", "/usr/bin/isoinfo")
+RPM_BIN = os.environ.get("RPM_BIN", "/usr/bin/rpm")
 if not Path(ISOINFO_BIN).is_absolute():
     raise RuntimeError("ISOINFO_BIN must be an absolute path")
 DATA = Path(os.environ.get("DATA_ROOT", "/data")).resolve()
@@ -76,6 +77,7 @@ cisco_download_jobs: dict[str, dict] = {}
 cisco_api_client: CiscoSoftwareClient | None = None
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
 iso_architecture_cache: dict[tuple[str, int, int], frozenset[str]] = {}
+iso_package_cache: dict[tuple[str, int, int], dict[str, str]] = {}
 job_lock = threading.RLock()
 upload_lock = threading.Lock()
 archive_lock = threading.RLock()
@@ -99,6 +101,7 @@ MAX_ISO_INSPECTION_OUTPUT_BYTES = 8 * 1024**2
 MAX_FILE_PREVIEW_BYTES = 64 * 1024
 ISO_MDATA_TIMEOUT_SECONDS = 30
 ISO_LISTING_TIMEOUT_SECONDS = 60
+RPM_QUERY_TIMEOUT_SECONDS = 15
 MAX_JOB_HISTORY = int(os.environ.get("MAX_JOB_HISTORY", "100"))
 
 
@@ -566,6 +569,155 @@ def iso_architectures_from_mdata(text: str) -> frozenset[str]:
     return frozenset(architectures)
 
 
+# Each "rpms in <type> ISO:" key lists the packages that ISO section ships, as
+# space-separated "<name>-<version>-r<release>" tokens which YAML may wrap onto
+# following indented lines. Validated 2026-09-17 against a real licensed
+# NCS5500 25.1.2 image - see 07-BUG-AUDIT-TODO.md, "The base ISO already tells
+# us which packages/versions it ships".
+ISO_MDATA_SHIPPED_RPMS = re.compile(
+    r"^\s*rpms in \S+ ISO:\s*(?P<value>\S.*(?:\n\s{2,}\S.*)*)$", re.IGNORECASE | re.MULTILINE
+)
+SHIPPED_RPM_TOKEN = re.compile(
+    r"^(?P<name>[A-Za-z][\w.+-]*?)-(?P<version>\d[\w.]*)-r(?P<release>\d{3,6})(?P<suffix>\.\w+)?$"
+)
+
+
+def iso_shipped_packages_from_mdata(text: str) -> dict[str, str]:
+    """Map package name -> version for everything the base ISO itself ships.
+
+    Read from the same ``iosxr_image_mdata.yml`` the architecture keys come
+    from, so this is VERIFIED data out of the image, not a filename guess.
+    A later, unequal entry never overwrites an earlier one silently: the
+    first version seen for a name wins and any conflict is simply ignored,
+    because this is an informational inventory of the image, not a decision
+    input on its own.
+
+    Same narrow-key approach as iso_architectures_from_mdata(): no full YAML
+    parse of untrusted ISO content.
+    """
+    shipped: dict[str, str] = {}
+    for block in ISO_MDATA_SHIPPED_RPMS.finditer(text):
+        for token in block.group("value").split():
+            match = SHIPPED_RPM_TOKEN.match(token.strip())
+            if match:
+                shipped.setdefault(match.group("name"), match.group("version"))
+    return shipped
+
+
+RPM_DEPENDENCY_LINE = re.compile(
+    r"^(?P<name>[A-Za-z][\w.+-]*)\s*(?P<operator>[<>=]+)\s*(?P<version>\S+)\s*$"
+)
+
+
+def rpm_dependency_metadata(rpm_path: Path) -> dict[str, list[tuple[str, str]]]:
+    """Read one RPM's own Requires/Provides from its header.
+
+    Uses `rpm -qp --nosignature`, which only *reads* the file - it never
+    installs anything and never touches an RPM database. Returns
+    {"requires": [(name, version)], "provides": [(name, version)]} holding
+    only exact-version ("=") entries, because those are the only ones this
+    app acts on (see missing_package_dependencies()).
+
+    Returns empty lists on any failure - a package whose metadata cannot be
+    read must never be treated as "has no dependencies" *or* as broken; the
+    caller simply has no ground truth for it and leaves it alone.
+    """
+    result: dict[str, list[tuple[str, str]]] = {"requires": [], "provides": []}
+    for kind, flag in (("requires", "--requires"), ("provides", "--provides")):
+        try:
+            completed = subprocess.run(
+                [RPM_BIN, "-qp", flag, "--nosignature", str(rpm_path)],
+                capture_output=True, text=True, timeout=RPM_QUERY_TIMEOUT_SECONDS, check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return {"requires": [], "provides": []}
+        if completed.returncode != 0:
+            return {"requires": [], "provides": []}
+        for line in completed.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES].splitlines():
+            match = RPM_DEPENDENCY_LINE.match(line.strip())
+            # Only "=" constraints: a bare name, ">=" or "<=" cannot be
+            # proven unsatisfiable from the facts available here.
+            if match and match.group("operator") == "=" and ":" not in match.group("version"):
+                result[kind].append((match.group("name"), match.group("version")))
+    return result
+
+
+def _version_satisfies(provided: str, required: str) -> bool:
+    """True when a Provides version answers an exact "= required" requirement.
+
+    RPM compares only as far as the requirement specifies, so a requirement
+    of "1.0.0.2" is satisfied by a provide of "1.0.0.2-r2512.CSCxxxxx" - the
+    release suffix is not part of the comparison when the requirement omits
+    it. Deliberately string-based rather than a reimplementation of RPM's
+    version ordering: this only ever answers "equal (ignoring release)",
+    never "newer than", so there is no ordering to get wrong.
+    """
+    return provided == required or provided.startswith(f"{required}-")
+
+
+def missing_package_dependencies(
+    selected: list[dict], iso_shipped: dict[str, str]
+) -> list[dict[str, str]]:
+    """Find requirements that provably cannot be satisfied, before the build runs.
+
+    This is the pre-build counterpart to parse_missing_dependencies(), which
+    only explains the same failure *after* gisobuild reports it. It is
+    deliberately narrow, because a false "this will fail" is worse than a
+    missed prediction - it would block a build that actually works. A
+    requirement is only reported when all of these hold:
+
+      1. It carries an exact "=" version constraint (a bare name or a ">="
+         range cannot be disproven from this data).
+      2. Its name is one the base ISO's own metadata says the image ships,
+         so there is VERIFIED ground truth about it. Anything else - file
+         paths, shared libraries, optional packages the image never mentions
+         - is out of scope and ignored.
+      3. The version the base image ships is not the version required.
+      4. No selected RPM Provides that name at that version.
+
+    Under those four conditions the conclusion is not a guess: the image has
+    the package at one version, something needs a different one, and nothing
+    in the selection supplies it - exactly what RPM's own transaction check
+    reports as "<requirement> is needed by <package>".
+    """
+    if not iso_shipped:
+        return []
+    provided: dict[str, set[str]] = {
+        name: {version} for name, version in iso_shipped.items()
+    }
+    requirements: list[tuple[str, str, str]] = []
+    for item in selected:
+        try:
+            metadata = rpm_dependency_metadata(safe_data_path(item["relative_path"]))
+        except (OSError, ValueError):
+            continue
+        for name, version in metadata["provides"]:
+            provided.setdefault(name, set()).add(version)
+        for name, version in metadata["requires"]:
+            requirements.append((name, version, item["basename"]))
+
+    missing: dict[tuple[str, str], dict] = {}
+    for name, version, required_by in requirements:
+        if name not in iso_shipped:
+            continue
+        if any(_version_satisfies(candidate, version)
+               for candidate in provided.get(name, set())):
+            continue
+        entry = missing.setdefault((name, version), {
+            "requirement": f"{name} = {version}",
+            "required_by": [],
+            "base_image_has": iso_shipped[name],
+        })
+        # Every package that needs it, not just the first one found: the
+        # operator has to decide what to remove or fetch, and "three of your
+        # SMUs need this" is a different decision from "one does".
+        if required_by not in entry["required_by"]:
+            entry["required_by"].append(required_by)
+    for entry in missing.values():
+        entry["required_by"].sort()
+    return sorted(missing.values(), key=lambda entry: entry["requirement"])
+
+
 def iso_architectures_from_listing(text: str) -> frozenset[str]:
     """Fall back to the ISO's own RPM repository when no eXR metadata file exists.
 
@@ -624,6 +776,37 @@ def inspect_iso_architecture(iso_path: Path) -> frozenset[str]:
             iso_architecture_cache.pop(next(iter(iso_architecture_cache)))
         iso_architecture_cache[key] = architectures
     return architectures
+
+
+def inspect_iso_shipped_packages(iso_path: Path) -> dict[str, str]:
+    """Package name -> version for what the base ISO itself ships, or {} if unknown.
+
+    Same source and same failure posture as inspect_iso_architecture(): an
+    unreadable image or a missing metadata file yields {}, which every
+    caller must read as "no ground truth", never as "ships nothing".
+    """
+    with checksum_lock:
+        stat = iso_path.stat()
+        key = (str(iso_path), stat.st_size, stat.st_mtime_ns)
+        if key in iso_package_cache:
+            return iso_package_cache[key]
+    shipped: dict[str, str] = {}
+    try:
+        mdata = subprocess.run(
+            [ISOINFO_BIN, "-R", "-i", str(iso_path), "-x", "/iosxr_image_mdata.yml"],
+            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS, check=False,
+        )
+        if mdata.returncode == 0 and mdata.stdout.strip():
+            shipped = iso_shipped_packages_from_mdata(
+                mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES]
+            )
+    except (OSError, subprocess.SubprocessError):
+        shipped = {}
+    with checksum_lock:
+        if len(iso_package_cache) >= 256:
+            iso_package_cache.pop(next(iter(iso_package_cache)))
+        iso_package_cache[key] = shipped
+    return shipped
 
 
 def inventory_id(relative_path: str, sha256: str) -> str:
@@ -865,6 +1048,24 @@ def create_build_plan(payload: dict) -> dict:
         except ValueError as exc:
             blockers.append(str(exc))
 
+    # Dependency pre-check. Only fires on requirements that are provably
+    # unsatisfiable against the base image's own metadata (see
+    # missing_package_dependencies()); anything it cannot prove, gisobuild's
+    # real RPM transaction still checks during the build, and
+    # parse_missing_dependencies() explains the outcome.
+    unsatisfied = []
+    if iso and selected:
+        unsatisfied = missing_package_dependencies(
+            selected, inspect_iso_shipped_packages(safe_data_path(iso["relative_path"]))
+        )
+        blockers.extend(
+            f"{entry['requirement']} is required by {', '.join(entry['required_by'])}, "
+            f"but the base image ships {entry['requirement'].split(' = ')[0]} "
+            f"{entry['base_image_has']} and no selected package provides it — "
+            f"download the Cisco SMU that provides {entry['requirement']}"
+            for entry in unsatisfied
+        )
+
     # The estimate the Step 2 UI already showed (base ISO + selected RPMs) is
     # the best lower bound available for what this build has to write, so use
     # the same figure for the real gate rather than inventing a second one.
@@ -926,6 +1127,7 @@ def create_build_plan(payload: dict) -> dict:
         },
         "estimated_output_bytes": estimated_output_bytes,
         "volume_free_bytes": build_volume_free_bytes(),
+        "unsatisfied_dependencies": unsatisfied,
     }
 
 

@@ -1,6 +1,10 @@
 FROM python:3.12-alpine@sha256:b64631e04e4920160c50fbe8d8df828f7f35f06f425cb44aa09bca53e708a35a
 
-RUN apk add --no-cache docker-cli=29.5.3-r1 cdrkit=1.1.11-r6 git=2.54.0-r0 \
+# rpm is used read-only, via `rpm -qp --requires/--provides --nosignature`, to
+# read an uploaded RPM's own dependency metadata for the pre-build dependency
+# check. No RPM is ever installed, and no RPM database is created in this
+# image - see rpm_dependency_metadata() in app.py.
+RUN apk add --no-cache docker-cli=29.5.3-r1 cdrkit=1.1.11-r6 git=2.54.0-r0 rpm=4.19.1.1-r5 \
     # The mounted .gisobuild-tool checkout is owned by the host user, not
     # this container, so git's "dubious ownership" check refuses to read it
     # for gisobuild_commit() otherwise. This container only ever reads a

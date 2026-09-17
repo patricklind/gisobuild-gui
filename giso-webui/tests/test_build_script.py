@@ -147,7 +147,13 @@ class BuildScriptTests(unittest.TestCase):
         panel_fn = script[script.index("function renderMissingDependencies(job)"):]
         panel_fn = panel_fn[:panel_fn.index("\n}\n")]
         self.assertIn("job.missing_dependencies", panel_fn)
-        self.assertIn("required_by", panel_fn)
+        # The same panel is reused one step earlier for dependencies known
+        # before the build runs, so both paths share one rendering.
+        shared_fn = script[script.index("function dependencyPanel("):]
+        shared_fn = shared_fn[:shared_fn.index("\n}\n")]
+        self.assertIn("required_by", shared_fn)
+        self.assertIn("base_image_has", shared_fn)
+        self.assertIn("renderUnsatisfiedDependencies(plan)", script)
 
     def test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation(self):
         # recommend_smu_selection() (backing /api/smu/recommendation and

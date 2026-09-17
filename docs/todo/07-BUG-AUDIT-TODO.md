@@ -191,7 +191,7 @@ TODO:
 - [x] Update `06-UI-OPERATOR-TODO.md`'s "free disk estimate" entry once this
       lands, since its own scope-limit note references this item — done.
 
-### The base ISO already tells us which packages/versions it ships — we do not read it (found 2026-09-17)
+### The base ISO already tells us which packages/versions it ships (found and fixed 2026-09-17)
 
 Found while validating `iosxr_image_mdata.yml` parsing against a real
 licensed NCS5500 25.1.2 image (see that item below). The same metadata file
@@ -222,19 +222,51 @@ parsing (tracked as "RPM metadata parsing" in `05-TESTING-CI-TODO.md`), which
 
 TODO:
 
-- [ ] Parse the `rpms in <type> ISO:` lists out of `iosxr_image_mdata.yml`
-      alongside the architecture lines, and expose the base image's shipped
-      package set/versions as a first-class fact (it is `VERIFIED` data read
-      from the image itself, unlike everything filename-derived).
-- [ ] Combine that with RPM `Requires` metadata to predict the exact
+- [x] Parse the `rpms in <type> ISO:` lists out of `iosxr_image_mdata.yml`
+      alongside the architecture lines — `iso_shipped_packages_from_mdata()`
+      and the cached `inspect_iso_shipped_packages()` in `giso-webui/app.py`.
+      Validated against the real licensed NCS5500 25.1.2 image: 26 packages
+      read, including all four the operator's build failed on, each at
+      `1.0.0.0`.
+- [x] Combine that with RPM `Requires` metadata to predict the exact
       "<pkg> = <version> is needed by <pkg>" failure class *before* the build
-      runs, rather than only explaining it afterwards — the operator's
-      stated top priority ("never send a package that is already known to
-      fail"). Must stay honest: only assert a missing dependency when both
-      sides are `VERIFIED`, never from filename inference.
-- [ ] Regression test with a synthetic ISO whose mdata ships `pkg-1.0.0.0`
+      runs — `missing_package_dependencies()`, fed by
+      `rpm_dependency_metadata()` (`rpm -qp --requires/--provides
+      --nosignature`; read-only, no install, no RPM database, `rpm` pinned in
+      the Dockerfile). Its blockers flow into `create_build_plan()`, so the
+      Step 2 review, the "Start build" confirmation and `POST /api/jobs` all
+      refuse the build through the one existing gate, and
+      `renderUnsatisfiedDependencies()` shows each one in the dedicated
+      panel naming every package that needs it and what the base image
+      actually ships.
+      **Kept deliberately narrow to avoid false positives** — the reason the
+      earlier "explain only" decision was made. A requirement is reported
+      only when (1) it is an exact `=` constraint, (2) its name is one the
+      base image's own metadata says it ships, (3) the shipped version
+      differs, and (4) no selected RPM `Provides` that version. File paths,
+      shared libraries, `>=` ranges and packages the image never mentions are
+      all out of scope by construction.
+      **Validated in both directions against the operator's own licensed
+      content** (extracted in throwaway containers, ~5 GB deleted
+      immediately, nothing entered the repository):
+      • their real 34-RPM workspace → automatic selection picked the same 24
+        RPMs their UI showed, `ready: false`, and predicted exactly five
+        unsatisfiable requirements (`ncs5500-dpa = 1.0.0.5`,
+        `ncs5500-dpa-fwding = 1.0.0.2`, `ncs5500-fwding = 1.0.0.3`,
+        `ncs5500-os = 1.0.0.1`, `ncs5500-os-support = 1.0.0.2`) — every one
+        of which appears in their real gisobuild failure log. Zero
+        predictions that gisobuild did not also report.
+      • base bundle alone (ISO + its own 12 optional RPMs, a build that
+        should succeed) → `ready: true`, zero unsatisfied dependencies, zero
+        blockers. The check does not block a working build.
+- [x] Regression test with a synthetic ISO whose mdata ships `pkg-1.0.0.0`
       and an RPM requiring `pkg = 1.0.0.5`, proving the build is blocked with
-      the missing version named.
+      the missing version named — plus the three false-positive directions
+      that matter more: `test_shipped_packages_are_read_from_iso_metadata`,
+      `test_unsatisfiable_exact_version_requirement_is_reported`,
+      `test_requirement_satisfied_by_another_selected_rpm_is_not_reported`,
+      `test_requirements_outside_the_base_image_are_never_reported`,
+      `test_dependency_check_is_skipped_when_the_iso_ships_no_known_packages`.
 
 ## P1 — Misconfiguration can silently destroy archived artifacts
 

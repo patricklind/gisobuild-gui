@@ -1176,6 +1176,97 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(recommendation["ready"])
         self.assertIn("More than one base ISO", recommendation["message"])
 
+    def test_shipped_packages_are_read_from_iso_metadata(self):
+        # Key/format validated 2026-09-17 against a real licensed NCS5500
+        # 25.1.2 image: "rpms in <type> ISO:" lists name-version-rRELEASE
+        # tokens, YAML-wrapped onto indented continuation lines.
+        mdata = (
+            "iso_rpms:\n"
+            "- iso_type: xr\n"
+            "  name: ncs5500-xr-25.1.2\n"
+            "  rpms in xr ISO: ncs5500-bgp-1.0.0.0-r2512 ncs5500-dpa-1.0.0.0-r2512\n"
+            "    ncs5500-routing-1.0.0.0-r2512 ncs5500-os-support-1.0.0.0-r2512\n"
+            "- iso_type: host\n"
+            "  rpms in host ISO: ncs5500-sysadmin-hostos-25.1.2-r2512.host\n"
+            "x86_64 supported arch list: x86_64 corei7_64\n"
+        )
+        shipped = module.iso_shipped_packages_from_mdata(mdata)
+        self.assertEqual(shipped["ncs5500-dpa"], "1.0.0.0")
+        self.assertEqual(shipped["ncs5500-routing"], "1.0.0.0")
+        self.assertEqual(shipped["ncs5500-os-support"], "1.0.0.0")
+        self.assertEqual(shipped["ncs5500-sysadmin-hostos"], "25.1.2")
+        self.assertNotIn("x86_64 supported arch list", shipped)
+
+    def test_unsatisfiable_exact_version_requirement_is_reported(self):
+        # The real failure class: an SMU needs a package at a version newer
+        # than the base image ships, and nothing in the selection provides
+        # it. Validated end-to-end against the operator's own licensed
+        # content - see 07-BUG-AUDIT-TODO.md.
+        selected = [{"relative_path": "smu.rpm", "basename": "smu.rpm"}]
+        metadata = {
+            "requires": [("ncs5500-dpa", "1.0.0.5"), ("ncs5500-bgp", "1.0.0.0")],
+            "provides": [("ncs5500-routing", "1.0.0.3-r2512.CSCtest00001")],
+        }
+        shipped = {"ncs5500-dpa": "1.0.0.0", "ncs5500-bgp": "1.0.0.0",
+                   "ncs5500-routing": "1.0.0.0"}
+        with patch("app.rpm_dependency_metadata", return_value=metadata), \
+                patch("app.safe_data_path", side_effect=lambda value: Path(value)):
+            missing = module.missing_package_dependencies(selected, shipped)
+
+        # ncs5500-bgp = 1.0.0.0 is satisfied by the base image and must not
+        # be reported; only the genuinely unsatisfiable one is.
+        self.assertEqual(len(missing), 1, missing)
+        self.assertEqual(missing[0]["requirement"], "ncs5500-dpa = 1.0.0.5")
+        self.assertEqual(missing[0]["required_by"], ["smu.rpm"])
+        self.assertEqual(missing[0]["base_image_has"], "1.0.0.0")
+
+    def test_requirement_satisfied_by_another_selected_rpm_is_not_reported(self):
+        # A valid multi-SMU chain: one SMU needs a version another SMU in the
+        # same selection provides. Reporting this would block a build that
+        # works - the false positive this check must never produce.
+        selected = [
+            {"relative_path": "a.rpm", "basename": "a.rpm"},
+            {"relative_path": "b.rpm", "basename": "b.rpm"},
+        ]
+        metadata = {
+            "a.rpm": {"requires": [("ncs5500-dpa", "1.0.0.5")], "provides": []},
+            # Release suffix on the provide, bare version on the require -
+            # exactly how real Cisco SMUs express this.
+            "b.rpm": {"requires": [],
+                      "provides": [("ncs5500-dpa", "1.0.0.5-r2512.CSCtest00002")]},
+        }
+        with patch("app.rpm_dependency_metadata", side_effect=lambda p: metadata[p.name]), \
+                patch("app.safe_data_path", side_effect=lambda value: Path(value)):
+            missing = module.missing_package_dependencies(
+                selected, {"ncs5500-dpa": "1.0.0.0"}
+            )
+        self.assertEqual(missing, [])
+
+    def test_requirements_outside_the_base_image_are_never_reported(self):
+        # Shared libraries, file paths and packages the image never mentions
+        # are out of scope: there is no ground truth about them here, so
+        # claiming they are missing would be a guess.
+        selected = [{"relative_path": "smu.rpm", "basename": "smu.rpm"}]
+        metadata = {
+            "requires": [("libc.so.6", "2.0"), ("some-third-party-pkg", "9.9.9")],
+            "provides": [],
+        }
+        with patch("app.rpm_dependency_metadata", return_value=metadata), \
+                patch("app.safe_data_path", side_effect=lambda value: Path(value)):
+            missing = module.missing_package_dependencies(
+                selected, {"ncs5500-dpa": "1.0.0.0"}
+            )
+        self.assertEqual(missing, [])
+
+    def test_dependency_check_is_skipped_when_the_iso_ships_no_known_packages(self):
+        # An ISO whose metadata could not be read yields {} - "no ground
+        # truth", never "ships nothing". Blocking on that would reject every
+        # build against an image this app cannot introspect.
+        selected = [{"relative_path": "smu.rpm", "basename": "smu.rpm"}]
+        with patch("app.rpm_dependency_metadata") as query:
+            self.assertEqual(module.missing_package_dependencies(selected, {}), [])
+        query.assert_not_called()
+
     def test_storage_reports_free_space_for_every_build_volume(self):
         response = self.client.get("/api/storage")
         volumes = response.get_json()["volume_free_bytes"]
