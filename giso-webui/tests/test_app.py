@@ -1340,6 +1340,71 @@ class GisoWebTests(unittest.TestCase):
             self.assertEqual(module.missing_package_dependencies(selected, {}), [])
         query.assert_not_called()
 
+    def test_rpm_header_query_parses_identity_and_exact_dependencies(self):
+        rpm = self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
+        rpm.write_bytes(b"not parsed here")
+        output = (
+            "NVRA ncs5500-bgp|1.0.0.1|r2512.CSCtest00001|x86_64\n"
+            "REQ ncs5500-dpa|=|1.0.0.5\n"
+            "REQ /bin/sh||\n"
+            "REQ ncs5500-core|>=|1.0.0.0\n"
+            "REQ ncs5500-epoch|=|1:2.0\n"
+            "PRV ncs5500-bgp|=|1.0.0.1-r2512.CSCtest00001\n"
+        )
+        module.rpm_metadata_cache.clear()
+        completed = SimpleNamespace(returncode=0, stdout=output)
+        with patch("app.subprocess.run", return_value=completed) as run:
+            metadata = module.rpm_dependency_metadata(rpm)
+            # Cached by path, size and mtime: a second read costs no process.
+            module.rpm_dependency_metadata(rpm)
+        run.assert_called_once()
+        self.assertEqual(metadata["identity"], {
+            "name": "ncs5500-bgp", "version": "1.0.0.1",
+            "release": "r2512.CSCtest00001", "arch": "x86_64",
+        })
+        # Only exact, epoch-free constraints are kept.
+        self.assertEqual(metadata["requires"], [("ncs5500-dpa", "1.0.0.5")])
+        self.assertEqual(metadata["provides"], [("ncs5500-bgp", "1.0.0.1-r2512.CSCtest00001")])
+
+    def test_renamed_rpm_is_excluded_with_the_name_its_header_gives(self):
+        # A real Cisco RPM renamed to claim another release: every platform,
+        # release and CSC decision would be made about a package that is not
+        # inside the file. Validated against real content - see
+        # 02-AUTOMATION-BUILDPLAN-TODO.md.
+        renamed = self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"
+        honest = self.data / "ncs5500-dpa-1.0.0.5-r2512.CSCtest00002.x86_64.rpm"
+        renamed.write_bytes(b"x")
+        honest.write_bytes(b"x")
+        identities = {
+            renamed.name: {"name": "ncs5500-bgp", "version": "1.0.0.1",
+                           "release": "r2512.CSCtest00001", "arch": "x86_64"},
+            honest.name: {"name": "ncs5500-dpa", "version": "1.0.0.5",
+                          "release": "r2512.CSCtest00002", "arch": "x86_64"},
+        }
+        with patch("app.rpm_dependency_metadata",
+                   side_effect=lambda p: {"identity": identities[p.name],
+                                          "requires": [], "provides": []}):
+            candidates, _ = module.active_rpm_names()
+            recommendation = module.add_superseded_exclusions({"excluded": []}, set())
+        self.assertEqual(candidates, [honest.name])
+        excluded = {item["name"]: item["reason"] for item in recommendation["excluded"]}
+        self.assertIn(renamed.name, excluded)
+        self.assertIn("ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm", excluded[renamed.name])
+        self.assertNotIn(honest.name, excluded)
+
+    def test_unreadable_rpm_header_and_source_rpms_are_never_excluded_by_name(self):
+        # No ground truth means no claim: a header rpm cannot read is left to
+        # the existing checks, and source RPMs are not matched by name at all.
+        unreadable = self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
+        source = self.data / "ncs5500-bgp-1.0.0.1-r2512.src.rpm"
+        unreadable.write_bytes(b"x")
+        source.write_bytes(b"x")
+        with patch("app.rpm_dependency_metadata",
+                   return_value={"identity": None, "requires": [], "provides": []}) as query:
+            self.assertIsNone(module.rpm_filename_mismatch(unreadable))
+            self.assertIsNone(module.rpm_filename_mismatch(source))
+        query.assert_called_once_with(unreadable)
+
     def test_storage_reports_free_space_for_every_build_volume(self):
         response = self.client.get("/api/storage")
         volumes = response.get_json()["volume_free_bytes"]

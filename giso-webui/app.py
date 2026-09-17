@@ -607,54 +607,84 @@ def iso_shipped_packages_from_mdata(text: str) -> dict[str, str]:
     return shipped
 
 
-RPM_DEPENDENCY_LINE = re.compile(
-    r"^(?P<name>[A-Za-z][\w.+-]*)\s*(?P<operator>[<>=]+)\s*(?P<version>\S+)\s*$"
+RPM_QUERY_FORMAT = (
+    "NVRA %{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}\n"
+    "[REQ %{REQUIRENAME}|%{REQUIREFLAGS:depflags}|%{REQUIREVERSION}\n]"
+    "[PRV %{PROVIDENAME}|%{PROVIDEFLAGS:depflags}|%{PROVIDEVERSION}\n]"
 )
 
 
-def rpm_dependency_metadata(rpm_path: Path) -> dict[str, list[tuple[str, str]]]:
-    """Read one RPM's own Requires/Provides from its header.
+def rpm_dependency_metadata(rpm_path: Path) -> dict:
+    """Read one RPM's own identity and Requires/Provides from its header.
 
-    Uses `rpm -qp --nosignature`, which only *reads* the file - it never
-    installs anything and never touches an RPM database. Returns
-    {"requires": [(name, version)], "provides": [(name, version)]} holding
-    only exact-version ("=") entries, because those are the only ones this
-    app acts on (see missing_package_dependencies()).
+    One `rpm -qp --nosignature --qf ...` call per file, which only *reads* the
+    file - it never installs anything and never touches an RPM database.
+    Returns {"identity": {name, version, release, arch} | None,
+    "requires": [(name, version)], "provides": [(name, version)]}, keeping
+    only exact-version ("=") dependency entries, because those are the only
+    ones this app acts on (see missing_package_dependencies()).
 
-    Returns empty lists on any failure - a package whose metadata cannot be
-    read must never be treated as "has no dependencies" *or* as broken; the
-    caller simply has no ground truth for it and leaves it alone.
+    On any failure identity is None and both lists are empty - a package whose
+    header cannot be read must never be treated as "has no dependencies" *or*
+    as broken; callers simply have no ground truth for it and leave it alone.
     """
+    empty: dict = {"identity": None, "requires": [], "provides": []}
     with checksum_lock:
         try:
             stat = rpm_path.stat()
         except OSError:
-            return {"requires": [], "provides": []}
+            return empty
         key = (str(rpm_path), stat.st_size, stat.st_mtime_ns)
         if key in rpm_metadata_cache:
             return rpm_metadata_cache[key]
-    result: dict[str, list[tuple[str, str]]] = {"requires": [], "provides": []}
-    for kind, flag in (("requires", "--requires"), ("provides", "--provides")):
-        try:
-            completed = subprocess.run(
-                [RPM_BIN, "-qp", flag, "--nosignature", str(rpm_path)],
-                capture_output=True, text=True, timeout=RPM_QUERY_TIMEOUT_SECONDS, check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return {"requires": [], "provides": []}
-        if completed.returncode != 0:
-            return {"requires": [], "provides": []}
-        for line in completed.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES].splitlines():
-            match = RPM_DEPENDENCY_LINE.match(line.strip())
-            # Only "=" constraints: a bare name, ">=" or "<=" cannot be
-            # proven unsatisfiable from the facts available here.
-            if match and match.group("operator") == "=" and ":" not in match.group("version"):
-                result[kind].append((match.group("name"), match.group("version")))
+    try:
+        completed = subprocess.run(
+            [RPM_BIN, "-qp", "--nosignature", "--qf", RPM_QUERY_FORMAT, str(rpm_path)],
+            capture_output=True, text=True, timeout=RPM_QUERY_TIMEOUT_SECONDS, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return empty
+    if completed.returncode != 0:
+        return empty
+    result: dict = {"identity": None, "requires": [], "provides": []}
+    for line in completed.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES].splitlines():
+        tag, _, body = line.partition(" ")
+        fields = body.split("|")
+        if tag == "NVRA" and len(fields) == 4 and all(fields):
+            result["identity"] = dict(zip(("name", "version", "release", "arch"), fields))
+        elif tag in {"REQ", "PRV"} and len(fields) == 3:
+            name, operator, version = (field.strip() for field in fields)
+            # Only "=" constraints: a bare name, ">=" or "<" cannot be proven
+            # unsatisfiable from the facts available here. Epoch-qualified
+            # versions are skipped rather than compared imprecisely.
+            if operator == "=" and version and ":" not in version:
+                result["requires" if tag == "REQ" else "provides"].append((name, version))
     with checksum_lock:
         if len(rpm_metadata_cache) >= 4096:
             rpm_metadata_cache.pop(next(iter(rpm_metadata_cache)))
         rpm_metadata_cache[key] = result
     return result
+
+
+def rpm_filename_mismatch(rpm_path: Path) -> str | None:
+    """The canonical filename an RPM's own header implies, if its real name differs.
+
+    Every automatic decision here - platform, release, architecture, CSC group -
+    is read from the filename, following RPM's standard
+    ``NAME-VERSION-RELEASE.ARCH.rpm`` naming. If a file was renamed (or is a
+    different package than its name claims), all of those decisions are made
+    about a package that is not actually inside it. Returns ``None`` when the
+    name matches, and also when the header cannot be read at all: no ground
+    truth means no claim, never an exclusion.
+    """
+    if rpm_path.name.lower().endswith(".src.rpm"):
+        return None
+    identity = rpm_dependency_metadata(rpm_path).get("identity")
+    if not identity:
+        return None
+    canonical = (f"{identity['name']}-{identity['version']}-"
+                 f"{identity['release']}.{identity['arch']}.rpm")
+    return None if canonical == rpm_path.name else canonical
 
 
 def _version_satisfies(provided: str, required: str) -> bool:
@@ -1584,12 +1614,24 @@ def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dic
     before automatic selection ever sees them, so without this they never
     appear in "excluded" and the operator has no way to know they exist.
     """
-    names = sorted({rpm.name for rpm in DATA.rglob("*.rpm") if rpm_is_superseded(rpm, superseded)})
-    if names:
+    explained: dict[str, str] = {}
+    for rpm in DATA.rglob("*.rpm"):
+        if rpm_is_superseded(rpm, superseded):
+            explained.setdefault(rpm.name, "Superseded by a newer fix per Cisco supersedence notes")
+            continue
+        canonical = rpm_filename_mismatch(rpm)
+        if canonical:
+            # active_rpm_names() also drops these; say why instead of letting
+            # them vanish.
+            explained.setdefault(
+                rpm.name,
+                f"Filename does not match the package inside it (its own metadata says "
+                f"{canonical}); platform, release and CSC checks cannot be trusted for it",
+            )
+    if explained:
         recommendation["excluded"] = sorted(
             recommendation.get("excluded", []) + [
-                {"name": name, "reason": "Superseded by a newer fix per Cisco supersedence notes"}
-                for name in names
+                {"name": name, "reason": reason} for name, reason in sorted(explained.items())
             ],
             key=lambda item: item["name"],
         )
@@ -1610,7 +1652,8 @@ def active_rpm_names() -> tuple[list[str], set[str]]:
         except OSError:
             pass
     candidates = [
-        rpm.name for rpm in DATA.rglob("*.rpm") if not rpm_is_superseded(rpm, superseded)
+        rpm.name for rpm in DATA.rglob("*.rpm")
+        if not rpm_is_superseded(rpm, superseded) and rpm_filename_mismatch(rpm) is None
     ]
     return candidates, superseded
 

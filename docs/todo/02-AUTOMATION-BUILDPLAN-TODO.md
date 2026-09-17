@@ -165,16 +165,45 @@ Return:
 
 Prefer metadata over filename parsing.
 
-- [ ] RPM name
-- [ ] version
-- [ ] release
-- [ ] architecture
-- [ ] provides
-- [ ] requires
-- [ ] signature metadata where available
-- [ ] CSC ID
-- [ ] component
-- [ ] metadata confidence
+Done 2026-09-17: `rpm_dependency_metadata()` reads each RPM's header with one
+read-only `rpm -qp --nosignature --qf` call (pinned `rpm=4.19.1.1-r5` in the
+image, cached by path/size/mtime). `rpm_filename_mismatch()` compares the
+header's `NAME-VERSION-RELEASE.ARCH.rpm` with the real filename; a mismatched
+file is dropped from `active_rpm_names()` and listed in `excluded` with the
+name its header gives, so every filename-based decision downstream is only
+ever made about files whose name is proven to be their content. An unreadable
+header (or a `.src.rpm`) is never excluded on that basis - no ground truth,
+no claim.
+
+Evidence: tests `test_rpm_header_query_parses_identity_and_exact_dependencies`,
+`test_renamed_rpm_is_excluded_with_the_name_its_header_gives`,
+`test_unreadable_rpm_header_and_source_rpms_are_never_excluded_by_name`.
+Live, in a throwaway container against the operator's real NCS5500 25.1.2
+content (extracted to `$TMPDIR`, deleted afterwards): 34 real RPMs, 0 false
+mismatches, 0.62 s cold; the unchanged selection was 24 RPMs with the 5 real
+dependency blockers. Renaming `ncs5500-bgp-...-r2512.CSCwu14807.x86_64.rpm`
+to `...r2612...` dropped the selection to 23 and excluded that file with the
+new reason.
+
+- [x] RPM name (header `NAME`)
+- [x] version (header `VERSION`)
+- [x] release (header `RELEASE`)
+- [x] architecture (header `ARCH`)
+- [x] provides (header `PROVIDENAME/FLAGS/VERSION`, exact `=` entries)
+- [x] requires (header `REQUIRENAME/FLAGS/VERSION`, exact `=` entries)
+- [ ] signature metadata where available - not done. The query deliberately
+      passes `--nosignature`; nothing reads `RSAHEADER`/`SIGPGP` or checks
+      against Cisco's key. gisobuild itself verifies signatures during the
+      build, so this is a pre-build nicety, not a gap in the build's safety.
+- [x] CSC ID - still parsed from the filename, but the filename is now
+      proven identical to the header's `RELEASE` (which carries the
+      `CSCxxxxxxx` suffix) whenever the header is readable.
+- [x] component - same as CSC ID: the header `NAME` equals the filename's
+      component whenever the header is readable.
+- [ ] metadata confidence - not per RPM. The build report's confidence grid
+      is per build; there is no per-package "header-verified vs
+      filename-only" flag exposed to the UI yet (the unreadable-header
+      fallback is silent).
 
 ## TAR/TGZ handling
 
