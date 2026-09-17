@@ -1387,6 +1387,34 @@ each test failed before its fix:
       nothing (gisobuild exit 0, "Nothing to do"). The plan now blocks it
       before starting; see `03-DOCKER-SELF-CONTAINED-TODO.md`.
 
+## P1 — Automatic selection kept packages it had proven cannot install (2026-09-17)
+
+- [x] The dependency pre-check found RPMs whose exact-version requirement
+      nothing provides, but automatic selection still selected them and then
+      blocked the entire plan - against the core rule "never include packages
+      or SMUs the system already knows will fail", and one missing
+      prerequisite SMU stopped every other fix from being built. Now
+      `exclude_unsatisfiable_packages()` leaves such RPMs out of *automatic*
+      selection with the requirement and the Cisco SMU to download, removes
+      the rest of their fix with them, and repeats until nothing unsatisfiable
+      remains; the message says how many were left out and what to download.
+      Manual selection still blocks (an explicit choice is never edited).
+      Tests: `test_automatic_selection_leaves_out_fixes_that_cannot_install`
+      (fix-level and repeated exclusion, manual unaffected),
+      `test_unsatisfiable_fix_is_left_out_and_names_the_smu_to_download`
+      (browser).
+      **Real proof** (self-contained image, throwaway volumes, licensed
+      content removed afterwards): the NCS5500 25.1.2 bundle + 20 SMUs now
+      plan ready with 19 RPMs (12 optional packages, 7 SMUs:
+      CSCwu14807, CSCwv45645, CSCwv19180, CSCwv19173, CSCwu08799, CSCwv40753,
+      CSCwv40741), leaving out 5 RPMs of CSCwu13268/CSCwv36143/CSCwv38342 with
+      "download Cisco SMU ncs5500-25.1.2.CSCwt13701". gisobuild then built it:
+      "Total 19 RPM(s)", signature and compatibility checks PASS, "Golden ISO
+      creation SUCCESS", archived `ncs5500-goldenk9-x-25.1.2-SMUSUBSET.iso`
+      (2 507 741 184 bytes) and USB zip; stages preflight 16.5 s, gisobuild
+      328.6 s, archiving 51.7 s. Before this change the same workspace could
+      not be built at all.
+
 ## Required regression-test additions
 
 - [x] cancel during builder preparation/pull

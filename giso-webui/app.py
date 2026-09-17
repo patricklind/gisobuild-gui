@@ -1149,6 +1149,70 @@ def iso_identity(iso_path: Path) -> tuple[str, bool]:
     return iso_path.name, False
 
 
+CSC_IN_FILENAME = re.compile(r"\.(CSC[A-Za-z0-9]+)\.", re.IGNORECASE)
+
+
+def exclude_unsatisfiable_packages(recommendation: dict, iso_relative_path: str | None,
+                                   identity_name: str,
+                                   iso_architectures: frozenset[str] | None) -> dict:
+    """Leave out of an automatic selection what is proven unable to install.
+
+    Automatic selection used to keep an RPM whose exact-version requirement
+    nothing provides and then block the entire plan, so one missing
+    prerequisite SMU stopped every other fix from being built. Now such an
+    RPM is excluded with the requirement and, when a README says so, the SMU
+    to download; the rest of its fix goes with it (a fix is installed whole
+    or not at all), and the check repeats because removing a package can
+    remove something another one needed. Manual selection is untouched: an
+    operator's explicit choice still blocks instead of being edited.
+    """
+    if not recommendation.get("ready") or not iso_relative_path:
+        return recommendation
+    selected = list(recommendation.get("selected", []))
+    reasons: dict[str, str] = {}
+    left_out: list[dict] = []
+    for _ in range(len(selected) + 1):
+        unsatisfied = unsatisfied_dependencies_for_recommendation(iso_relative_path, selected)
+        if not unsatisfied:
+            break
+        drop: dict[str, str] = {}
+        for entry in unsatisfied:
+            left_out.append(entry)
+            advice = (f"; download Cisco SMU {entry['prerequisite_smu']}"
+                      if entry.get("prerequisite_smu") else "")
+            reason = (f"Needs {entry['requirement']}, which neither the base image "
+                      f"({entry['base_image_has']}) nor any other selected package provides{advice}")
+            for name in entry["required_by"]:
+                drop.setdefault(name, reason)
+        fixes = {match.group(1).upper() for name in drop if (match := CSC_IN_FILENAME.search(name))}
+        for name in selected:
+            match = CSC_IN_FILENAME.search(name)
+            if name not in drop and match and match.group(1).upper() in fixes:
+                drop[name] = (f"Part of {match.group(1).upper()}, left out because another RPM of "
+                              "the same fix cannot be installed")
+        reasons.update(drop)
+        selected = [name for name in selected if name not in drop]
+    if not reasons:
+        return recommendation
+    analysis = validate_smu_selection(identity_name, selected, iso_architectures=iso_architectures)
+    downloads = sorted({entry["prerequisite_smu"] for entry in left_out if entry.get("prerequisite_smu")})
+    recommendation.update(
+        selected=selected,
+        package_groups=analysis["package_groups"],
+        component_conflicts=analysis["component_conflicts"],
+        warnings=analysis["warnings"],
+        blockers=analysis["issues"],
+        excluded=sorted(recommendation.get("excluded", [])
+                        + [{"name": name, "reason": reason} for name, reason in sorted(reasons.items())],
+                        key=lambda item: item["name"]),
+        left_out_for_dependencies=left_out,
+        message=(f"Selected {len(selected)} RPMs that can be installed; {len(reasons)} left out because "
+                 "their dependencies cannot be satisfied"
+                 + (f" (download {', '.join(downloads)} to include them)" if downloads else "")),
+    )
+    return recommendation
+
+
 def dependency_blocker_text(entry: dict) -> str:
     """One operator-facing line per unsatisfiable requirement, shared by every gate."""
     action = (
@@ -1689,8 +1753,13 @@ def create_build_plan(payload: dict) -> dict:
                 identity_name, candidates, iso_architectures=iso_architectures
             )
             recommendation = add_superseded_exclusions(recommendation, superseded)
+            recommendation = exclude_unsatisfiable_packages(
+                recommendation, iso["relative_path"], identity_name, iso_architectures)
             if recommendation.get("ready"):
                 identifiers = recommendation["selected"]
+                if recommendation.get("left_out_for_dependencies") and not identifiers:
+                    blockers.append("Automatic selection left no packages that can be installed; "
+                                    + recommendation["message"])
             else:
                 blockers.append(recommendation["message"])
         try:
@@ -2430,6 +2499,9 @@ def discover() -> dict:
         recommendation = {"ready": False, "selected": [], "excluded": [],
                           "message": "Upload one base ISO before SMUs can be selected"}
     recommendation = add_superseded_exclusions(recommendation, superseded)
+    if len(isos) == 1:
+        recommendation = exclude_unsatisfiable_packages(
+            recommendation, isos[0], identity_name, iso_architectures)
     recommendation["unsatisfied_dependencies"] = (
         unsatisfied_dependencies_for_recommendation(isos[0], recommendation.get("selected", []))
         if len(isos) == 1 else []
@@ -3269,6 +3341,8 @@ def smu_recommendation():
         recommendation = recommend_smu_selection(identity_name, packages, iso_architectures=iso_architectures)
         recommendation["iso"] = iso_path.name
         recommendation = add_superseded_exclusions(recommendation, superseded)
+        recommendation = exclude_unsatisfiable_packages(
+            recommendation, iso, identity_name, iso_architectures)
         recommendation["unsatisfied_dependencies"] = (
             unsatisfied_dependencies_for_recommendation(iso, recommendation.get("selected", []))
         )

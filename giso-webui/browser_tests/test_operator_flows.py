@@ -132,21 +132,32 @@ class OperatorFlowTests(unittest.TestCase):
         self.assertEqual(self.page.input_value("[name=pkglist]").splitlines(),
                          sorted([self.BGP, self.ROUTING]))
 
-    def test_dependency_blocker_names_the_prerequisite_smu(self):
-        for name in (self.ISO, self.ROUTING, self.BGP):
+    def test_unsatisfiable_fix_is_left_out_and_names_the_smu_to_download(self):
+        for name in (self.ISO, self.ROUTING, self.BGP, self.OSPF):
             self.write(name)
-        # RPM headers need the rpm binary, which this image does not carry;
-        # the dependency facts are covered by the unit tests, this checks
-        # what the operator is told.
+        # RPM headers need the rpm binary, which this image does not carry; the
+        # dependency facts are unit-tested, this checks what the operator sees.
         missing = [{"requirement": "asr9k-x64-dpa = 1.0.0.5", "required_by": [self.ROUTING],
                     "base_image_has": "1.0.0.0", "prerequisite_smu": "asr9k-x64-7.3.2.CSCtest00099",
                     "listed_by": "asr9k-x64-7.3.2.CSCtest00001"}]
-        with patch("app.unsatisfied_dependencies_for_recommendation", return_value=missing):
+
+        def unsatisfied(_iso, names):
+            return missing if self.ROUTING in names else []
+
+        with patch("app.unsatisfied_dependencies_for_recommendation", side_effect=unsatisfied):
             self.open()
-        expect(self.page.locator("#smu-plan-state")).to_have_text("Blocked")
-        expect(self.page.locator("#smu-plan-details")).to_contain_text(
-            "download Cisco SMU asr9k-x64-7.3.2.CSCtest00099 (listed as a prerequisite by "
-            "asr9k-x64-7.3.2.CSCtest00001)")
+        expect(self.page.locator("#smu-plan-state")).to_have_text("Calculated")
+        expect(self.page.locator("#smu-auto-plan-title")).to_have_text("1 matching RPM selected")
+        expect(self.page.locator("#smu-plan-message")).to_contain_text(
+            "2 left out because their dependencies cannot be satisfied "
+            "(download asr9k-x64-7.3.2.CSCtest00099 to include them)")
+        self.page.locator("#smu-plan-details details summary", has_text="excluded automatically").click()
+        excluded = self.page.locator(".excluded-package")
+        expect(excluded.filter(has_text=self.ROUTING)).to_contain_text(
+            "download Cisco SMU asr9k-x64-7.3.2.CSCtest00099")
+        expect(excluded.filter(has_text=self.BGP)).to_contain_text(
+            "Part of CSCTEST00001, left out because another RPM of the same fix cannot be installed")
+        expect(self.page.locator("#start-build")).to_be_enabled()
 
     def test_build_report_shows_a_cached_builder_fallback(self):
         self.write(self.ISO)

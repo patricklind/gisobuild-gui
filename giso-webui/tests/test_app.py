@@ -1677,6 +1677,41 @@ class GisoWebTests(unittest.TestCase):
         # No README claim for ncs5500-os: keep the generic advice, never guess.
         self.assertNotIn("prerequisite_smu", by_requirement["ncs5500-os = 1.0.0.1"])
 
+    def test_automatic_selection_leaves_out_fixes_that_cannot_install(self):
+        a = "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"   # needs dpa 1.0.0.5
+        a2 = "ncs5500-infra-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"    # same fix as a
+        b = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"       # needs routing 1.0.0.2 (from a)
+        c = "ncs5500-ospf-1.0.0.1-r2512.CSCtest00003.x86_64.rpm"      # needs nothing missing
+        requires = {a: [("ncs5500-dpa", "1.0.0.5")], b: [("ncs5500-routing", "1.0.0.2")]}
+        provides = {a: [("ncs5500-routing", "1.0.0.2-r2512.CSCtest00001")]}
+
+        def metadata(path):
+            return {"identity": None, "requires": requires.get(path.name, []),
+                    "provides": provides.get(path.name, [])}
+
+        (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
+        for name in (a, a2, b, c):
+            (self.data / name).write_bytes(name.encode())
+        recommendation = {"ready": True, "selected": [a, a2, b, c], "excluded": [],
+                          "package_groups": [], "component_conflicts": [], "warnings": []}
+        with patch("app.rpm_dependency_metadata", side_effect=metadata), \
+                patch("app.inspect_iso_shipped_packages",
+                      return_value={"ncs5500-dpa": "1.0.0.0", "ncs5500-routing": "1.0.0.0"}):
+            result = module.exclude_unsatisfiable_packages(
+                recommendation, "ncs5500-x64-25.1.2.iso", "ncs5500-x64-25.1.2.iso", frozenset())
+            manual = module.create_build_plan({"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500",
+                                               "pkglist": [a], "automatic_smu_selection": False})
+        reasons = {item["name"]: item["reason"] for item in result["excluded"]}
+        self.assertEqual(result["selected"], [c])
+        self.assertIn("Needs ncs5500-dpa = 1.0.0.5", reasons[a])
+        self.assertIn("Part of CSCTEST00001", reasons[a2])
+        # b only became unsatisfiable once a was gone: the check repeats.
+        self.assertIn("Needs ncs5500-routing = 1.0.0.2", reasons[b])
+        self.assertIn("3 left out because their dependencies cannot be satisfied", result["message"])
+        # An operator's explicit choice is blocked, never silently edited.
+        self.assertFalse(manual["ready"])
+        self.assertEqual([p["basename"] for p in manual["selected_packages"]], [a])
+
     def test_complete_fix_matching_its_readme_stays_selectable(self):
         smu = "ncs5500-25.1.2.CSCtest00003"
         names = [f"ncs5500-{component}-1.0.0.4-r2512.CSCtest00003.x86_64.rpm"
