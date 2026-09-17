@@ -1313,7 +1313,50 @@ def inventory_files() -> list[dict]:
                 "conflict" if len(hashes) > 1 else "identical" if len(group) > 1 else None
             )
             item["provenance"] = paths
+    assign_lifecycle(physical)
     return sorted(physical, key=lambda item: item["relative_path"])
+
+
+def assign_lifecycle(items: list[dict]) -> None:
+    """Set each item's lifecycle from what the workspace proves about it.
+
+    INVALID (with `problems`) when the file can never be built as it is: an
+    ISO without an ISO 9660 filesystem, an RPM whose header contradicts its
+    name, a same-name file with different content, or a fix its Cisco README
+    shows incomplete or altered. IN_USE while a running build depends on it.
+    VALID for an ISO or RPM that passed those checks; READY for other inputs,
+    which have no such checks. Superseded RPMs stay VALID: they are skipped by
+    selection, not broken.
+    """
+    manifest_problems = _screened_rpms()[2] if any(i["type"] == ".rpm" for i in items) else {}
+    with job_lock:
+        in_use: set[str] = set()
+        for job in jobs.values():
+            if job.get("status") in ACTIVE_JOB_STATUSES:
+                plan = job.get("build_plan") or {}
+                if plan.get("iso"):
+                    in_use.add(plan["iso"].get("id"))
+                in_use.update(package.get("id") for package in plan.get("selected_packages", []))
+    for item in items:
+        problems = []
+        if item["type"] == ".iso" and not is_iso9660_image(DATA / item["relative_path"]):
+            problems.append("Not an ISO 9660 image")
+        if item["type"] == ".rpm":
+            if item.get("metadata_confidence") == "mismatch":
+                problems.append(f"RPM header says it is {item.get('metadata_name')}")
+            if item.get("duplicate_kind") == "conflict":
+                problems.append("Another file has the same name but different content")
+            if item["basename"] in manifest_problems:
+                problems.append(manifest_problems[item["basename"]])
+        item["problems"] = problems
+        if problems:
+            item["lifecycle"] = "INVALID"
+        elif item["id"] in in_use:
+            item["lifecycle"] = "IN_USE"
+        elif item["type"] in {".iso", ".rpm"}:
+            item["lifecycle"] = "VALID"
+        else:
+            item["lifecycle"] = "READY"
 
 
 def resolve_rpm_identifiers(identifiers: list[str]) -> list[dict]:

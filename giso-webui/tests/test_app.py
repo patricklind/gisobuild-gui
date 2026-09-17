@@ -1106,9 +1106,42 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(first["id"], second["id"])
         self.assertEqual(first["sha256"], hashlib.sha256(b"rpm content").hexdigest())
         self.assertEqual(first["relative_path"], "package.rpm")
-        self.assertEqual(first["lifecycle"], "READY")
+        self.assertEqual(first["lifecycle"], "VALID")
+        self.assertEqual(first["problems"], [])
         self.assertNotIn("absolute_path", first)
         self.assertNotIn(str(self.data), json.dumps(first))
+
+    def test_inventory_lifecycle_reflects_what_the_workspace_proves(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+        (self.data / "notes.yaml").write_text("a: 1\n")
+        (self.data / "one").mkdir()
+        (self.data / "two").mkdir()
+        (self.data / "one/conflict.rpm").write_bytes(b"first")
+        (self.data / "two/conflict.rpm").write_bytes(b"second")
+        (self.data / "good.rpm").write_bytes(b"good")
+        self.iso_signature.stop()
+        try:
+            items = {i["relative_path"]: i for i in module.inventory_files()}
+        finally:
+            self.iso_signature.start()
+        self.assertEqual(items["base.iso"]["lifecycle"], "INVALID")
+        self.assertEqual(items["base.iso"]["problems"], ["Not an ISO 9660 image"])
+        self.assertEqual(items["one/conflict.rpm"]["lifecycle"], "INVALID")
+        self.assertEqual(items["good.rpm"]["lifecycle"], "VALID")
+        self.assertEqual(items["notes.yaml"]["lifecycle"], "READY")
+
+        # A running build marks exactly the files its plan uses.
+        module.jobs["active"] = {"status": "running", "build_plan": {
+            "iso": {"id": items["base.iso"]["id"]},
+            "selected_packages": [{"id": items["good.rpm"]["id"]}]}}
+        before = module.current_inventory_revision()
+        try:
+            items = {i["relative_path"]: i for i in module.inventory_files()}
+            self.assertEqual(items["good.rpm"]["lifecycle"], "IN_USE")
+            self.assertEqual(items["notes.yaml"]["lifecycle"], "READY")
+        finally:
+            module.jobs.clear()
+        self.assertNotEqual(before, module.current_inventory_revision())
 
     def test_identical_duplicate_inventory_keeps_provenance(self):
         for directory in ("one", "two"):

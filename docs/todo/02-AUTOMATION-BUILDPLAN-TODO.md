@@ -26,18 +26,30 @@ Create one canonical inventory model.
 - [x] metadata source/confidence - real per file since 2026-09-17
       (`file_metadata_provenance()`: `rpm-header`, `iso-metadata` or
       `filename`; see "RPM inspection").
-- [ ] lifecycle state
+- [x] lifecycle state — 2026-09-17: `assign_lifecycle()` in `inventory_files()`,
+      with `problems` listing why. Test:
+      `test_inventory_lifecycle_reflects_what_the_workspace_proves`. Real
+      NCS5500 content (`--rm` container): ISO and all 34 RPMs `VALID`,
+      nothing `INVALID`; warm inventory 0.01 s (cold 8.2 s is the existing
+      ISO SHA-256).
 
 Suggested lifecycle:
 
-- [ ] `UPLOADING`
-- [x] `READY`
-- [ ] `ANALYZING`
-- [ ] `VALID`
-- [ ] `INVALID`
-- [ ] `IN_USE`
-- [ ] `ARCHIVED`
-- [ ] `DELETING`
+- [ ] `UPLOADING` - not an inventory state: an in-progress upload is not in
+      the workspace yet (it lives in `.parts`); the page shows its progress
+      from the upload itself.
+- [x] `READY` - inputs with no deeper checks (YAML, configs, archives)
+- [ ] `ANALYZING` - not modelled: analysis is synchronous within the request
+      that reads the inventory, so no request can observe it.
+- [x] `VALID` - ISO/RPM that passed the checks below
+- [x] `INVALID` - ISO without an ISO 9660 filesystem; RPM whose header
+      contradicts its name, same-name file with different content, or a fix
+      its Cisco README shows incomplete or altered
+- [x] `IN_USE` - ISO or RPM in the plan of an active job
+- [ ] `ARCHIVED` - not an inventory state: archived artifacts are a separate
+      listing (`/api/archive`) and never re-enter the workspace.
+- [ ] `DELETING` - not modelled: deletion is synchronous under the
+      operation lock.
 
 ## ISO inspection
 
