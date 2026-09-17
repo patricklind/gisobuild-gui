@@ -208,7 +208,8 @@ function applySmuRecommendation(plan) {
   // capability, not a stale checkbox state left over from a previous plan.
   updatePlatformControls();
   const blockers=plan.blockers || [];
-  const blocked=plan.ready && blockers.length > 0;
+  const blocked=plan.ready
+    && (blockers.length > 0 || (plan.unsatisfied_dependencies || []).length > 0);
   const state=$('#smu-plan-state'); const title=$('#smu-auto-plan-title'); const message=$('#smu-plan-message');
   state.className=`pill ${blocked ? 'bad' : plan.ready ? 'success' : 'running'}`;
   state.textContent=blocked ? 'Blocked' : plan.ready ? 'Calculated' : 'Needs input';
@@ -246,7 +247,14 @@ function applySmuRecommendation(plan) {
       plan.component_conflicts.forEach(item=>{const row=document.createElement('p'); row.textContent=`${item.component}: ${item.cscs.join(' + ')}. ${item.reason}`; conflicts.appendChild(row);});
       details.appendChild(conflicts);
     }
-    const blockerList=compatibilityList('Fix before building', blockers, 'fail');
+    // Dependency problems are proven facts (read from the RPM headers and the
+    // base image's own package list), not filename heuristics, so they lead
+    // the blocker list and say what to do about each one.
+    const dependencyBlockers=(plan.unsatisfied_dependencies || []).map(entry =>
+      `${entry.requirement} is required by ${summarizeNames(entry.required_by || [])}`
+      + (entry.base_image_has ? `, but the base image ships ${entry.base_image_has}` : '')
+      + ' — download the Cisco SMU that provides it, or remove the package that needs it');
+    const blockerList=compatibilityList('Fix before building', [...dependencyBlockers, ...blockers], 'fail');
     if (blockerList) details.appendChild(blockerList);
     if (plan.warnings?.length) {
       const warnings=document.createElement('div'); warnings.className='smu-relationship-warning';
@@ -852,6 +860,15 @@ function renderBuildReport(job) {
   }
 }
 
+function summarizeNames(names) {
+  // A cumulative SMU set often has every selected package declaring the same
+  // requirement, so printing all of them repeats one long list per line and
+  // buries the requirement itself. Two names plus a count stays scannable;
+  // the full list is in the build report.
+  if (names.length <= 2) return names.join(', ');
+  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+}
+
 function dependencyPanel(heading, intro, entries) {
   const panel = $('#missing-dependencies');
   if (!entries.length) { panel.hidden = true; panel.replaceChildren(); return; }
@@ -861,9 +878,10 @@ function dependencyPanel(heading, intro, entries) {
   const list = document.createElement('ul');
   entries.forEach(({requirement, required_by, base_image_has}) => {
     const item = document.createElement('li');
-    const needed = Array.isArray(required_by) ? required_by.join(', ') : required_by;
+    const needed = Array.isArray(required_by) ? summarizeNames(required_by) : required_by;
     item.textContent = `${requirement} — required by ${needed}`
       + (base_image_has ? `; the base image ships ${base_image_has}` : '');
+    if (Array.isArray(required_by) && required_by.length > 2) item.title = required_by.join('\n');
     list.appendChild(item);
   });
   panel.replaceChildren(title, lead, list);

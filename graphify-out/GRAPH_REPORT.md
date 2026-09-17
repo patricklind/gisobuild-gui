@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-17)
 
 ## Corpus Check
-- 49 files · ~77,305 words
+- 49 files · ~77,990 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 14 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 1)
 
 ## Summary
-- 911 nodes · 1445 edges · 57 communities (39 shown, 12 thin omitted)
+- 914 nodes · 1456 edges · 61 communities (39 shown, 16 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 24 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6ca5d92e`
+- Built from commit: `83158bc0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -56,17 +56,21 @@
 - GISOBuild GUI — Master TODO
 - TODO roadmap for AI-assisted development
 - copilot-instructions.md
-- create_build_plan
+- Path
 - app.py
 - RuntimeError
 - maintenance.py
 - build_volume_free_bytes
-- security_headers
-- Path
+- initialize_job_store
+- archive_giso_artifacts_and_cleanup
 - check_graphify_freshness.py
 - find_cisco_images
-- inspect_iso_shipped_packages
+- iso_shipped_packages_from_mdata
 - staging/README.md
+- command_preview
+- inventory_id
+- iso_architectures_from_mdata
+- _version_satisfies
 
 ## God Nodes (most connected - your core abstractions)
 1. `GisoWebTests` - 174 edges
@@ -83,31 +87,31 @@
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `enforce_archive_policy()`  [EXTRACTED]
   giso-webui/maintenance.py → giso-webui/app.py
-- `cisco_config()` --uses--> `CiscoDownloadError`  [INFERRED]
-  giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_search()` --uses--> `CiscoDownloadError`  [INFERRED]
   giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_download_start()` --uses--> `CiscoDownloadError`  [INFERRED]
   giso-webui/app.py → giso-webui/cisco_download.py
 - `cisco_accept()` --uses--> `CiscoDownloadError`  [INFERRED]
   giso-webui/app.py → giso-webui/cisco_download.py
+- `cisco_client()` --calls--> `CiscoSoftwareClient`  [EXTRACTED]
+  giso-webui/app.py → giso-webui/cisco_download.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (57 total, 12 thin omitted)
+## Communities (61 total, 16 thin omitted)
 
 ### Community 0 - "create_job"
-Cohesion: 0.12
-Nodes (36): delete, Exception, append_activity(), append_log(), build_plan(), cancel_job(), cancel_upload(), cancellation_requested() (+28 more)
+Cohesion: 0.13
+Nodes (35): delete, Exception, append_activity(), append_log(), build_plan(), cancel_job(), cancel_upload(), cancellation_requested() (+27 more)
 
 ### Community 2 - "CiscoDownloadError"
-Cohesion: 0.07
-Nodes (11): CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect, Path, RuntimeError, Cisco Automated Software Distribution client with strict download controls., Safe error suitable for returning to the local UI. (+3 more)
+Cohesion: 0.06
+Nodes (12): cisco_config(), CiscoDownloadError, CiscoSoftwareClient, DownloadResult, _NoRedirect, Path, RuntimeError, Cisco Automated Software Distribution client with strict download controls. (+4 more)
 
 ### Community 3 - "app.js"
 Cohesion: 0.07
-Nodes (56): api(), applyArchiveFilter(), applySmuRecommendation(), applySmuReviewFilter(), buildReportField(), checkCompatibility(), checksumRow(), compatibilityList() (+48 more)
+Nodes (57): api(), applyArchiveFilter(), applySmuRecommendation(), applySmuReviewFilter(), buildReportField(), checkCompatibility(), checksumRow(), compatibilityList() (+49 more)
 
 ### Community 4 - "Cisco IOS XR Golden ISO Build and Upgrade Guide"
 Cohesion: 0.08
@@ -225,13 +229,13 @@ Nodes (6): Acceptance criteria, Final operator workflow, GISOBuild GUI — Maste
 Cohesion: 0.50
 Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 
-### Community 45 - "create_build_plan"
-Cohesion: 0.08
-Nodes (39): active_rpm_names(), add_superseded_exclusions(), build_command(), cisco_text(), compatibility(), confidence_report(), create_build_plan(), current_inventory_revision() (+31 more)
+### Community 45 - "Path"
+Cohesion: 0.09
+Nodes (43): active_rpm_names(), add_superseded_exclusions(), archive_source_for_extraction(), build_cleanup_paths(), build_command(), cisco_text(), compatibility(), confidence_report() (+35 more)
 
 ### Community 47 - "app.py"
-Cohesion: 0.10
-Nodes (35): errorhandler, get, activity(), archive_checksums(), archive_delete(), archive_download(), archive_list(), bad_request() (+27 more)
+Cohesion: 0.09
+Nodes (36): after_request, errorhandler, get, activity(), archive_checksums(), archive_download(), archive_list(), bad_request() (+28 more)
 
 ### Community 48 - "RuntimeError"
 Cohesion: 0.20
@@ -241,22 +245,22 @@ Nodes (10): BuildCancelled, child_mount_args(), prepare_destructive_finalization
 Cohesion: 0.29
 Nodes (7): archive_size(), build_space_blockers(), build_volume_free_bytes(), Free space on every volume a build actually touches, not just uploads. Every…, Name every build volume that cannot fit this build, for the pre-build gate.…, Operator-facing storage visibility (AI-MASTER-PROMPT.md section 37/45). A read,…, storage()
 
-### Community 52 - "Path"
-Cohesion: 0.11
-Nodes (25): before_request, archive_giso_artifacts_and_cleanup(), archive_source_for_extraction(), archive_timestamp(), build_cleanup_paths(), command_preview(), enforce_archive_policy(), expire_upload_sessions() (+17 more)
+### Community 51 - "initialize_job_store"
+Cohesion: 0.29
+Nodes (7): before_request, expire_upload_sessions(), initialize_job_store(), Remove licensed or sensitive artifact names from operator-visible logs., Create the job store and restore safe job history once per process., safe_log_text(), validate_host()
+
+### Community 52 - "archive_giso_artifacts_and_cleanup"
+Cohesion: 0.20
+Nodes (11): archive_delete(), archive_giso_artifacts_and_cleanup(), archive_timestamp(), cross_process_archive_lock(), enforce_archive_policy(), file_sha256(), giso_artifact_candidates(), Return output images eligible for verified archival. (+3 more)
 
 ### Community 53 - "check_graphify_freshness.py"
 Cohesion: 0.50
 Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked code graph from tracked files and compare it…, tracked_files(), verify_ignore_policy()
 
-### Community 55 - "inspect_iso_shipped_packages"
-Cohesion: 0.50
-Nodes (4): inspect_iso_shipped_packages(), iso_shipped_packages_from_mdata(), Map package name -> version for everything the base ISO itself ships. Read from…, Package name -> version for what the base ISO itself ships, or {} if unknown.…
-
 ## Knowledge Gaps
 - **234 isolated node(s):** `inputs`, `platformProfiles`, `VOLUME_LABELS`, `CONFIDENCE_LABELS`, `READY_CHECK_LABELS` (+229 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 480 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 481 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -264,14 +268,14 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `IsoArchitectureInspectionTests`, `.test_discover_tolerates_file_removed_during_scan`, `.upload`, `dict`, `Path`?**
   _High betweenness centrality (0.127) - this node is a cross-community bridge._
 - **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `create_job`, `app.py`?**
-  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+  _High betweenness centrality (0.027) - this node is a cross-community bridge._
 - **What connects `inputs`, `platformProfiles`, `VOLUME_LABELS` to the rest of the system?**
   _234 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `create_job` be split into smaller, more focused modules?**
-  _Cohesion score 0.11561561561561562 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1253968253968254 - nodes in this community are weakly interconnected._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
   _Cohesion score 0.018867924528301886 - nodes in this community are weakly interconnected._
 - **Should `CiscoDownloadError` be split into smaller, more focused modules?**
-  _Cohesion score 0.06531204644412192 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06429070580013976 - nodes in this community are weakly interconnected._
 - **Should `app.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.073224043715847 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07244843997884717 - nodes in this community are weakly interconnected._

@@ -78,6 +78,7 @@ cisco_api_client: CiscoSoftwareClient | None = None
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
 iso_architecture_cache: dict[tuple[str, int, int], frozenset[str]] = {}
 iso_package_cache: dict[tuple[str, int, int], dict[str, str]] = {}
+rpm_metadata_cache: dict[tuple[str, int, int], dict[str, list[tuple[str, str]]]] = {}
 job_lock = threading.RLock()
 upload_lock = threading.Lock()
 archive_lock = threading.RLock()
@@ -622,6 +623,14 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict[str, list[tuple[str, str]]]:
     read must never be treated as "has no dependencies" *or* as broken; the
     caller simply has no ground truth for it and leaves it alone.
     """
+    with checksum_lock:
+        try:
+            stat = rpm_path.stat()
+        except OSError:
+            return {"requires": [], "provides": []}
+        key = (str(rpm_path), stat.st_size, stat.st_mtime_ns)
+        if key in rpm_metadata_cache:
+            return rpm_metadata_cache[key]
     result: dict[str, list[tuple[str, str]]] = {"requires": [], "provides": []}
     for kind, flag in (("requires", "--requires"), ("provides", "--provides")):
         try:
@@ -639,6 +648,10 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict[str, list[tuple[str, str]]]:
             # proven unsatisfiable from the facts available here.
             if match and match.group("operator") == "=" and ":" not in match.group("version"):
                 result[kind].append((match.group("name"), match.group("version")))
+    with checksum_lock:
+        if len(rpm_metadata_cache) >= 4096:
+            rpm_metadata_cache.pop(next(iter(rpm_metadata_cache)))
+        rpm_metadata_cache[key] = result
     return result
 
 
@@ -679,6 +692,17 @@ def missing_package_dependencies(
     the package at one version, something needs a different one, and nothing
     in the selection supplies it - exactly what RPM's own transaction check
     reports as "<requirement> is needed by <package>".
+
+    One known imprecision, in "required_by" only, never in whether to block:
+    RPM resolves a transaction to the newest candidate per package name, so a
+    superseded sibling in the same selection (e.g. routing 1.0.0.2 alongside
+    routing 1.0.0.3) never reaches its own dependency evaluation upstream.
+    This lists every selected package that *declares* the requirement, which
+    can therefore name more packages than gisobuild's log does. Modelling
+    RPM's newest-wins selection here would mean reimplementing RPM version
+    ordering - the thing _version_satisfies() deliberately avoids - for a
+    cosmetic gain, so the attribution is deliberately over-inclusive rather
+    than approximated.
     """
     if not iso_shipped:
         return []
@@ -807,6 +831,26 @@ def inspect_iso_shipped_packages(iso_path: Path) -> dict[str, str]:
             iso_package_cache.pop(next(iter(iso_package_cache)))
         iso_package_cache[key] = shipped
     return shipped
+
+
+def unsatisfied_dependencies_for_recommendation(iso_relative_path: str, selected_names: list[str]) -> list[dict]:
+    """Run the pre-build dependency check for a Step 2 preview selection.
+
+    create_build_plan() has resolved inventory records to work with; the live
+    review only has basenames, so resolve them here. Any name that cannot be
+    resolved is skipped rather than guessed at - the authoritative gate in
+    create_build_plan() re-runs this against the real resolved selection
+    before a build can start either way.
+    """
+    if not selected_names:
+        return []
+    try:
+        iso_path = safe_data_path(iso_relative_path)
+    except (OSError, ValueError):
+        return []
+    by_name = {item["basename"]: item for item in inventory_files() if item["type"] == ".rpm"}
+    selected = [by_name[name] for name in selected_names if name in by_name]
+    return missing_package_dependencies(selected, inspect_iso_shipped_packages(iso_path))
 
 
 def inventory_id(relative_path: str, sha256: str) -> str:
@@ -1519,6 +1563,10 @@ def discover() -> dict:
         recommendation = {"ready": False, "selected": [], "excluded": [],
                           "message": "Upload one base ISO before SMUs can be selected"}
     recommendation = add_superseded_exclusions(recommendation, superseded)
+    recommendation["unsatisfied_dependencies"] = (
+        unsatisfied_dependencies_for_recommendation(isos[0], recommendation.get("selected", []))
+        if len(isos) == 1 else []
+    )
     recommendation["confidence"] = confidence_report(
         resolved_platform=recommendation.get("platform"),
         platform_manual=False,
@@ -2056,6 +2104,9 @@ def smu_recommendation():
         iso_architectures = inspect_iso_architecture(iso_path)
         recommendation = recommend_smu_selection(iso, packages, iso_architectures=iso_architectures)
         recommendation = add_superseded_exclusions(recommendation, superseded)
+        recommendation["unsatisfied_dependencies"] = (
+            unsatisfied_dependencies_for_recommendation(iso, recommendation.get("selected", []))
+        )
         recommendation["confidence"] = confidence_report(
             resolved_platform=recommendation.get("platform"),
             platform_manual=False,

@@ -168,7 +168,13 @@ class BuildScriptTests(unittest.TestCase):
         fn = script[script.index("function applySmuRecommendation(plan)"):]
         fn = fn[:fn.index("\nfunction smuGroupCard")]
         self.assertIn("plan.blockers", fn)
-        self.assertIn("compatibilityList('Fix before building', blockers, 'fail')", fn)
+        # Dependency blockers (proven from RPM headers + the base image's own
+        # package list) lead the same list, ahead of the filename-derived ones.
+        self.assertIn(
+            "compatibilityList('Fix before building', [...dependencyBlockers, ...blockers], 'fail')",
+            fn,
+        )
+        self.assertIn("plan.unsatisfied_dependencies", fn)
         self.assertIn("'bad'", fn)
 
     def test_expected_output_is_shown_during_review_not_only_at_final_confirmation(self):
