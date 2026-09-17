@@ -29,6 +29,7 @@ For non-trivial changes they must also inspect/use Graphify and the tracked
 - `04-STATE-SECURITY-OBSERVABILITY-TODO.md` — persistence, jobs, security, health, logging
 - `05-TESTING-CI-TODO.md` — unit/integration/UI/security testing and CI
 - `06-UI-OPERATOR-TODO.md` — operator workflow and UX
+- `07-BUG-AUDIT-TODO.md` — concrete defects found by audits and real builds, each with its regression test
 
 The pinned upstream `ios-xr/gisobuild` revision remains authoritative for actual
 IOS XR build/platform capability support.

@@ -154,11 +154,17 @@ rule in this file wins and the examples must be corrected.
   unless the user explicitly authorizes the exact device and operation.
 - All application/runtime/build execution must stay inside Docker. Never install
   project dependencies or invoke project code directly on the user's host.
-- The current Web UI may control Docker through `/var/run/docker.sock`. Keep it
-  bound to localhost, preserve host/origin checks, and do not weaken container
-  isolation without an explicit security review. The roadmap targets removal of
-  this dependency; until that migration is implemented and verified, preserve
-  the current security boundary.
+- The default deployment (`giso-webui/compose.yaml`) controls Docker through
+  `/var/run/docker.sock`. Keep it bound to localhost, preserve host/origin
+  checks, and do not weaken container isolation without an explicit security
+  review. The self-contained deployment (`giso-webui/compose.selfcontained.yaml`)
+  has no socket and runs read-only with only `SYS_CHROOT`; keep it that way.
+  Which one is the documented default is still an open decision
+  (`docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md`).
+- The bundled gisobuild in the self-contained image is pinned by commit and by
+  a SHA-256 manifest (`GISOBUILD_COMMIT`, `GISOBUILD_SOURCE_SHA256` in
+  `docker/selfcontained.Dockerfile`). Bumping gisobuild means updating both and
+  running the platform drift tests against the new image.
 - Preserve the single-build lock, SQLite job history, 30-day archive retention,
   and 50 GiB combined ISO/USB quota unless the task explicitly changes them.
 - Shared files are conflict magnets: `README.md`, `ARCHITECTURE.md`,
@@ -177,6 +183,8 @@ This repository provides a Docker-hosted Web UI and orchestration layer around
 Cisco's `ios-xr/gisobuild` project.
 
 - Web application: `giso-webui/`
+- Container images: `giso-webui/Dockerfile` (default), `docker/selfcontained.Dockerfile`
+  (web app plus pinned gisobuild), `docker/tooling.Dockerfile`, `docker/browser-tests.Dockerfile`
 - Platform validation: `giso-webui/platform_validation.py`
 - CLI helper: `build-giso.sh`
 - Safe workflow simulator: `staging/`
@@ -211,6 +219,10 @@ must also run inside an appropriate container. If no container exists for a
 required check, create or extend a tooling/test container; do not run it on the
 host as a fallback.
 
+Changes to the operator UI also need the Playwright browser tests, and changes to
+platform handling the upstream drift tests in the self-contained image; both
+commands are in `docs/testing.md`.
+
 Run the `giso-webui` unit test suite only inside the built `giso-webui-giso-webui`
 container image. Never run `python -m unittest`, `pytest`, staging Python scripts,
 or similar commands directly against the host Python interpreter.
@@ -227,8 +239,9 @@ fully implemented and appropriately verified work as complete.
 - The public CI environment has no licensed Cisco ISO, so it cannot replace the
   real acceptance runner.
 - eXR and IOS XR7/LNT options are not interchangeable. Keep the platform matrix
-  synchronized with the checked-out upstream tool and defer exact PID support
-  to ISO metadata.
+  synchronized with the pinned upstream tool (`test_platform_compatibility.py`
+  fails on drift; CI runs it in the self-contained image) and defer exact PID
+  support to ISO metadata.
 - Automatic USB output is not supported for every eXR family. Do not promise a
   USB artifact where upstream `gisobuild` does not create one.
 - Builds run in a `linux/amd64` Cisco-compatible container environment. Apple
@@ -236,6 +249,8 @@ fully implemented and appropriately verified work as complete.
 - Successful builds remove uploaded source and temporary build files only after
   archive copies pass SHA-256 verification.
 - An active build cannot be reattached after a Web UI restart; its persisted job
-  is marked `interrupted`.
+  is marked `interrupted` (with the local runner its work files are removed).
+- eXR builds with the local runner need `CAP_SYS_CHROOT` and therefore root;
+  without it gisobuild exits 0 having built nothing, so the plan blocks it.
 - Host execution is never an acceptable workaround for missing container
   dependencies or broken container tooling.

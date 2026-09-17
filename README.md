@@ -25,24 +25,30 @@ A local Docker-based interface and CLI for building Cisco IOS XR Golden ISO
   and package naming convention.
 - `GISOBUILD-GUIDE.md` — platform-aware build, upgrade, validation, and rollback
   guide for Cisco IOS XR families supported by the upstream GISO tool.
+- `docker/` — the self-contained image (web app plus pinned gisobuild, no Docker
+  socket) and the tooling and browser-test images.
 - `staging/` — isolated upgrade and rollback workflow simulator.
 - `scripts/e2e_real_iso.py` — licensed-ISO end-to-end ISO/USB verification.
 
 See the [documentation index](docs/README.md) for operations, platform support,
 testing, releases, architecture, security, and contribution guidance.
 
-The web process starts an isolated Cisco build container. Input and tool mounts
-are read-only; only dedicated output and working volumes are writable. The web
-container itself uses a read-only root filesystem with all Linux capabilities
-dropped.
+In the default deployment the web process starts an isolated Cisco build
+container. Input and tool mounts are read-only; only dedicated output and
+working volumes are writable. The web container itself uses a read-only root
+filesystem with all Linux capabilities dropped. The
+[self-contained deployment](#self-contained-deployment-no-docker-socket) runs
+gisobuild inside the web container instead, with no Docker socket.
 
 ## Requirements
 
 - Docker Desktop or Docker Engine with Compose v2
 - An x86_64 host, or x86_64 emulation on Apple Silicon
 - Approximately 25 GB of free disk space
-- A local checkout of [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild)
-  at `.gisobuild-tool/`, or permission for `build-giso.sh` to clone it
+- For the default deployment, a local checkout of
+  [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at
+  `.gisobuild-tool/`, or permission for `build-giso.sh` to clone it (the
+  self-contained image bundles a pinned copy)
 - Properly licensed Cisco IOS XR input files
 
 Keep at least 25 GB free beyond the input files. A build temporarily stores the
@@ -71,9 +77,11 @@ Watch upload and build activity with:
 docker compose logs --follow --tail=200 giso-webui archive-maintenance
 ```
 
-The expert form validates the selected platform family and rejects options from
-the wrong eXR or IOS XR7/LNT workflow. The ISO remains the authority for exact
-hardware PIDs and package compatibility.
+The automatic package plan reads each RPM header and Cisco SMU README, leaves
+out with a reason any package it can prove will not install, and names the SMU
+to download. The expert form validates the selected platform family and rejects
+options from the wrong eXR or IOS XR7/LNT workflow. Cisco `gisobuild` and the
+ISO remain the authority for exact hardware PIDs and package compatibility.
 
 Only one build runs at a time. Archived ISO and USB artifacts are retained for
 30 days. If their combined size exceeds 50 GiB, the oldest complete build
@@ -131,6 +139,9 @@ docker compose run --rm --no-deps \
 cd ..
 bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
 ```
+
+Browser tests, lint, dependency audit, Graphify and the self-contained image
+checks are listed in [testing](docs/testing.md#developer-command-reference).
 
 GitHub Actions runs, for every pull request: unit and synthetic integration
 tests inside the built container image, Playwright browser tests, the staging

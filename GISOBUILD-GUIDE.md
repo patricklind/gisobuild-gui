@@ -134,16 +134,25 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
+To avoid the Docker socket and the host checkout, start
+`docker compose -f compose.selfcontained.yaml up -d --build` instead (see the
+[project README](README.md#self-contained-deployment-no-docker-socket)).
+
 Open <http://127.0.0.1:8080>, upload the base ISO and packages, select only the
 options valid for the detected image architecture, and start the build. The UI
 supports ISO and optional USB artifact archiving, SHA-256 verification, a 30-day
 retention period, and a 50 GiB combined archive quota by default.
 
-The default package mode selects only RPMs whose filename proves the same
-platform and release as the base ISO. Expert settings show CSC package groups,
-component overlap, processor architecture, duplicate versions, and optional
-upgrade-matrix bridge SMUs. These deterministic checks catch obvious bad mixes;
-Cisco `gisobuild` remains authoritative for dependencies and supersedence. Use
+The default package mode selects the RPMs for the base ISO's platform and
+release, using the image's own metadata for eXR and filenames for LNT. It reads
+each RPM header and Cisco SMU README and leaves out, with a reason, packages it
+can prove will not install: wrong platform, release or architecture, renamed or
+unreadable files, incomplete or altered fixes, and unmet exact-version
+dependencies (naming the SMU to download). Expert settings show CSC package
+groups, component overlap, processor architecture, duplicate versions, and
+optional upgrade-matrix bridge SMUs; there the same problems block the build
+instead. These checks catch bad mixes early; Cisco `gisobuild` remains
+authoritative for dependencies, supersedence and signatures. Use
 manual package selection only with an approved Cisco package list.
 
 `Clear workspace files` removes uploads, partial uploads, work directories and
@@ -216,7 +225,8 @@ Keep these items in the change record:
 - Packaged RPM/SMU inventory
 - Complete build logs
 - Source and target release information
-- Build tool commit and container image identifier
+- Build tool commit and container image identifier (the archived
+  `build-report.json` records both, plus the exact package plan and command)
 - Change approval, rollback plan, and validation evidence
 
 Do not install when a signature, dependency, compatibility, or checksum check

@@ -46,6 +46,10 @@ invocations.
 Never add Cisco-distributed software, generated images, device configuration,
 credentials, build logs, or customer data to commits or test fixtures.
 
+UI changes also need the Playwright browser tests, and platform or packaging
+changes the self-contained image build and its upstream drift tests; the exact
+commands are in [`docs/testing.md`](docs/testing.md).
+
 Keep changes focused and add a regression test for every bug fix where practical.
 Use [`docs/testing.md`](docs/testing.md) for the complete validation ladder.
 

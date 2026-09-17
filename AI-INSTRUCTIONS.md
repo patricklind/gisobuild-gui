@@ -96,6 +96,7 @@ A task that changes implementation but leaves `docs/todo/`, relevant Graphify st
 - `docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md` — persistence, job state, security, health/readiness, logging.
 - `docs/todo/05-TESTING-CI-TODO.md` — unit/integration/UI/security tests, CI and release verification.
 - `docs/todo/06-UI-OPERATOR-TODO.md` — operator workflow, automatic defaults, expert settings, decision explanations.
+- `docs/todo/07-BUG-AUDIT-TODO.md` — concrete correctness, security and CI defects, their fixes, and the regression test for each.
 
 If a change spans several areas, update every affected TODO file.
 
