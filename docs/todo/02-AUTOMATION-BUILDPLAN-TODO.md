@@ -390,6 +390,33 @@ Create an explicit supersedence model.
 
 Never silently exclude without a reason.
 
+- [ ] **SMUs that are incompatible with the rest of the selection must be
+      deselected, not just reported** (raised by the maintainer 2026-09-17:
+      "hvis de SMU pakker ikke er kompatible med resten skal de fravælges").
+      Today automatic selection removes what cannot install *against the base
+      image* (wrong platform/release/architecture, renamed or unreadable RPMs,
+      incomplete or altered fixes, unmet exact-version dependencies, superseded
+      fixes). What it does not do is resolve a conflict *between two selected
+      SMUs*: when two different CSC fixes change the same component
+      (`component_conflicts`, "More than one fix changes this component"), both
+      stay selected - it becomes a warning, or a blocker from
+      `validate_smu_selection()` when they carry different versions of one
+      component. The operator then has to work out which fix to drop.
+      Required instead: when the system can determine which of the conflicting
+      fixes cannot be used together with the rest, automatic selection drops
+      the losing one (and the rest of its CSC group) with a reason naming the
+      fix that kept the component, exactly as `exclude_unsatisfiable_packages()`
+      already does for dependencies, and only stops the build when the choice
+      cannot be made safely. Manual selection keeps blocking instead of
+      editing. Needs: a rule for which fix wins (Cisco supersedence notes from
+      the SMU README where present, then the newer package version, otherwise
+      "cannot decide safely" -> MANUAL_REVIEW_REQUIRED), the existing status
+      vocabulary (`CONFLICT`, `SUPERSEDED`), and tests covering two fixes on
+      one component with and without supersedence evidence, a three-way
+      conflict, a conflict inside a multi-component fix, and manual mode still
+      blocking.
+
+
 - [x] one status vocabulary for every decision (2026-09-17). Each excluded
       package now carries a status code from
       `platform_validation.PACKAGE_STATUSES` - WRONG_PLATFORM, WRONG_RELEASE,
