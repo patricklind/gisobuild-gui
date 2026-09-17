@@ -55,7 +55,9 @@ jobs:
         run: docker compose -f staging/compose.yaml config -q
       - name: Build production container
         working-directory: giso-webui
-        run: docker compose build giso-webui
+        run: |
+          SOURCE_REVISION="$GITHUB_SHA" BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            docker compose build giso-webui
       - name: Run tests inside the built container
         run: |
           docker run --rm -v "$PWD:/project:ro" -w /project/giso-webui \
@@ -65,3 +67,20 @@ jobs:
           docker build -f docker/browser-tests.Dockerfile -t gisobuild-browser-tests .
           docker run --rm -v "$PWD:/work:ro" -e PYTHONDONTWRITEBYTECODE=1 \
             gisobuild-browser-tests python3 -m unittest discover -s browser_tests -v
+      - name: Scan production image for fixable HIGH/CRITICAL vulnerabilities
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.65.0 image --quiet --scanners vuln \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            giso-webui-giso-webui:latest
+      - name: Generate SBOM for the production image
+        run: |
+          mkdir -p sbom
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/sbom:/out" anchore/syft:v1.33.0 giso-webui-giso-webui:latest \
+            -o spdx-json=/out/giso-webui.spdx.json -q
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: giso-webui-sbom
+          path: sbom/giso-webui.spdx.json

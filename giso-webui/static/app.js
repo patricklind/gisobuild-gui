@@ -749,7 +749,8 @@ async function loadVersion() {
   try {
     const info = await api('/api/version');
     const engine = `${info.gisobuild_image}${info.gisobuild_commit ? ` @ ${info.gisobuild_commit}` : ''}`;
-    $('#version-info').textContent = `Web UI ${info.app_version} · Build engine ${engine}`;
+    const revision = info.source_revision && info.source_revision !== 'unknown' ? ` (${info.source_revision.slice(0, 7)})` : '';
+    $('#version-info').textContent = `Web UI ${info.app_version}${revision} · Build engine ${engine}`;
   } catch { /* Version info is diagnostic only; a missing line is not an error. */ }
 }
 

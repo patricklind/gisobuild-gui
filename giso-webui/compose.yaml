@@ -1,6 +1,11 @@
 services:
   giso-webui:
-    build: .
+    build:
+      context: .
+      args:
+        SOURCE_REVISION: "${SOURCE_REVISION:-unknown}"
+        BUILD_DATE: "${BUILD_DATE:-unknown}"
+        APP_VERSION: "${APP_VERSION:-0.0.1}"
     container_name: giso-webui
     ports:
       - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:8080"

@@ -77,3 +77,6 @@ giso-webui/secrets/
 *.cer
 *.cms
 !.env.example
+
+# CI-generated SBOM output
+sbom/

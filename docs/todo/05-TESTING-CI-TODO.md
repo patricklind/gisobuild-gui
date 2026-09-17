@@ -342,7 +342,12 @@ Run (`.github/workflows/ci.yml`):
       the existing "Run tests inside the built container" step (see
       "Integration test" above).
 - [x] synthetic LNT integration — same file and step.
-- [ ] SBOM generation — not implemented.
+- [x] SBOM generation — 2026-09-17: "Generate SBOM for the production image"
+      runs pinned `anchore/syft:v1.33.0` against `giso-webui-giso-webui` and
+      uploads `giso-webui.spdx.json` as a CI artifact. Run locally the same
+      way: 92 packages, including `flask`, `gunicorn`, `click`, `rpm`,
+      `cdrkit` and `docker-cli`. actionlint passes; not yet observed on
+      GitHub Actions (nothing is pushed from this environment).
 - [x] Graphify freshness validation for code-changing PRs
 
 Steps that exist but weren't listed here at all: `actionlint` (workflow
@@ -352,7 +357,15 @@ linting), `hadolint` (both Dockerfiles), `docker compose config -q`
 
 Optional:
 
-- [ ] Trivy image scan
+- [x] Trivy image scan — 2026-09-17: pinned `aquasec/trivy:0.65.0` in CI
+      fails the run on any fixable HIGH/CRITICAL vulnerability in the
+      production image. Its first local run found seven fixed HIGH util-linux
+      CVEs in the base image's `libuuid` 2.42.1-r0 (CVE-2026-53612, -53613,
+      -53614, -76642, -78408, -78409, -78410); `giso-webui/Dockerfile` now
+      pins `libuuid=2.42.3-r1` and the rescan reports 0 for the Alpine
+      packages and every Python package. 285 unit tests pass in the rebuilt
+      image and its `/api/health` answers. Unfixed findings are not gated
+      (`--ignore-unfixed`): there is nothing to upgrade to.
 - [x] dependency vulnerability scan — `pip-audit -r giso-webui/requirements.txt`
       runs on every CI invocation, not gated behind an opt-in flag.
 

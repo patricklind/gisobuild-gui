@@ -82,6 +82,15 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(body["gisobuild_image"], module.IMAGE)
         self.assertIsNone(body["gisobuild_commit"])
 
+    def test_version_reports_the_image_source_revision_and_build_date(self):
+        with patch.dict(os.environ, {"SOURCE_REVISION": "0123456789abcdef", "BUILD_DATE": "2026-09-17T08:00:00Z"}):
+            body = self.client.get("/api/version").get_json()
+        self.assertEqual(body["source_revision"], "0123456789abcdef")
+        self.assertEqual(body["build_date"], "2026-09-17T08:00:00Z")
+        with patch.dict(os.environ, {"SOURCE_REVISION": "", "BUILD_DATE": ""}):
+            body = self.client.get("/api/version").get_json()
+        self.assertIsNone(body["source_revision"])
+
     def test_version_reports_the_real_commit_of_a_git_checkout(self):
         # Point TOOL at this very repository (mounted read-only into the test
         # container) to prove gisobuild_commit() actually reads a real git

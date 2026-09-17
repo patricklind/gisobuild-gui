@@ -187,13 +187,30 @@ Return:
 
 ## Reproducibility
 
-- [ ] pin base-image digest
-- [ ] pin Python dependencies
-- [ ] pin gisobuild commit
-- [ ] image labels
-- [ ] SBOM
-- [ ] build timestamp
-- [ ] source revision
+Progress 2026-09-17 on today's `giso-webui` image (the self-contained
+image this file targets does not exist yet; these apply to it too):
+
+- [x] pin base-image digest - `FROM python:3.12-alpine@sha256:b64631e0…`;
+      system packages pinned by version (`apk add … =`), hadolint-clean.
+- [x] pin Python dependencies - `requirements.txt` now pins all nine
+      installed distributions, including Flask's and gunicorn's transitive
+      ones (`blinker`, `itsdangerous`, `Jinja2`, `MarkupSafe`, `packaging`,
+      `Werkzeug`), which were previously resolved freshly on every build.
+      `pip freeze` in the rebuilt image lists exactly those nine; pip-audit
+      reports no known vulnerabilities.
+- [ ] pin gisobuild commit - still a bind-mounted `.gisobuild-tool`
+      checkout; its commit is reported (`/api/version`, BuildPlan
+      fingerprint) but not pinned by the image.
+- [x] image labels - OCI `org.opencontainers.image.{title,description,source,
+      revision,created,version}` in `giso-webui/Dockerfile`.
+- [x] SBOM - SPDX JSON from pinned Syft in CI, uploaded as an artifact (see
+      `05-TESTING-CI-TODO.md`).
+- [x] build timestamp - `BUILD_DATE` build arg → label, env and
+      `/api/version.build_date`; CI passes UTC now.
+- [x] source revision - `SOURCE_REVISION` build arg → label, env,
+      `/api/version.source_revision` and the page's version line; CI passes
+      `$GITHUB_SHA`. Verified by building with the local HEAD: label and
+      API both returned `c6158c668c16f4f8cd17e8b652df8a676ff3e68c`.
 
 ## Compose
 

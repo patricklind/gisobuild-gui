@@ -2552,6 +2552,8 @@ def version():
     """
     return jsonify(
         app_version=APP_VERSION,
+        source_revision=os.environ.get("SOURCE_REVISION") or None,
+        build_date=os.environ.get("BUILD_DATE") or None,
         gisobuild_image=IMAGE,
         gisobuild_commit=gisobuild_commit(),
     )
