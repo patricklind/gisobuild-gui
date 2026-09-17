@@ -1259,6 +1259,7 @@ def create_build_plan(payload: dict) -> dict:
             )
             blockers.extend(compatibility["issues"])
             warnings.extend(compatibility["warnings"])
+            blockers.extend(manifest_blockers([item["basename"] for item in selected]))
             if not recommendation["package_groups"]:
                 recommendation["package_groups"] = compatibility["package_groups"]
                 recommendation["component_conflicts"] = compatibility["component_conflicts"]
@@ -1696,6 +1697,8 @@ def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dic
                 f"Filename does not match the package inside it (its own metadata says "
                 f"{canonical}); platform, release and CSC checks cannot be trusted for it",
             )
+    for name, reason in _screened_rpms()[2].items():
+        explained.setdefault(name, reason)
     if explained:
         recommendation["excluded"] = sorted(
             recommendation.get("excluded", []) + [
@@ -1706,24 +1709,121 @@ def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dic
     return recommendation
 
 
-def active_rpm_names() -> tuple[list[str], set[str]]:
-    superseded: set[str] = set()
+SUPERSEDENCE_FULL = re.compile(r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE)
+SMU_README_NAME = re.compile(r"^Name:[ \t]+(?P<name>\S+)[ \t]*$", re.MULTILINE)
+SMU_README_RPMS = re.compile(
+    r"^RPMS:[ \t]*\n(?P<body>(?:[ \t]+\S+\.rpm[ \t]+[0-9A-Fa-f]{32}[ \t]*\n)+)", re.MULTILINE
+)
+SMU_README_RPM_LINE = re.compile(r"(?P<rpm>\S+\.rpm)[ \t]+(?P<md5>[0-9A-Fa-f]{32})")
+
+
+def smu_readme_texts() -> list[str]:
+    """Every bounded-size .txt in the workspace - Cisco ships one README per SMU."""
+    texts: list[str] = []
     inspected_bytes = 0
-    pattern = re.compile(r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE)
     for readme in DATA.rglob("*.txt"):
         try:
             size = readme.stat().st_size
             if size > MAX_SUPERSEDENCE_FILE_BYTES or inspected_bytes + size > MAX_SUPERSEDENCE_TOTAL_BYTES:
                 continue
             inspected_bytes += size
-            superseded.update(pattern.findall(readme.read_text(errors="ignore")))
+            texts.append(readme.read_text(errors="ignore"))
         except OSError:
             pass
-    candidates = [
+    return texts
+
+
+def smu_readme_manifests(texts: list[str]) -> dict[str, dict[str, str]]:
+    """{SMU name: {rpm basename: md5}} from each Cisco SMU README's "RPMS:" block.
+
+    Cisco's README is the only authority in the workspace on how many RPMs a
+    fix consists of: a filename's CSC ID only says which RPMs *present* share
+    it, never that a companion was never uploaded. READMEs without an RPMS
+    block (the base bundle's, or an unknown format) yield nothing - no
+    manifest means no claim.
+    """
+    manifests: dict[str, dict[str, str]] = {}
+    for text in texts:
+        name = SMU_README_NAME.search(text)
+        block = SMU_README_RPMS.search(text)
+        if not name or not block:
+            continue
+        rpms = {match.group("rpm"): match.group("md5").lower()
+                for match in SMU_README_RPM_LINE.finditer(block.group("body"))}
+        if rpms:
+            manifests.setdefault(name.group("name"), {}).update(rpms)
+    return manifests
+
+
+def smu_manifest_problems(available: list[str], texts: list[str] | None = None) -> dict[str, str]:
+    """RPMs that must not be built because their own Cisco README says so.
+
+    For every SMU with at least one RPM in `available`: if a README-listed
+    RPM is not available, every present member is incomplete; if a present
+    member's MD5 differs from the README, that file is not the Cisco
+    original and the whole fix is unusable. Returns {basename: reason}.
+    """
+    present = set(available)
+    paths_by_name: dict[str, list[Path]] = {}
+    for rpm in DATA.rglob("*.rpm"):
+        if rpm.name in present:
+            paths_by_name.setdefault(rpm.name, []).append(rpm)
+    problems: dict[str, str] = {}
+    manifests = smu_readme_manifests(smu_readme_texts() if texts is None else texts)
+    for smu, members in sorted(manifests.items()):
+        here = sorted(name for name in members if name in present)
+        if not here:
+            continue
+        missing = sorted(name for name in members if name not in present)
+        corrupt = []
+        for name in here:
+            for path in paths_by_name.get(name, []):
+                try:
+                    if file_checksums(path)["md5"] != members[name]:
+                        corrupt.append(name)
+                        break
+                except OSError:
+                    corrupt.append(name)
+                    break
+        for name in here:
+            if name in corrupt:
+                problems.setdefault(name, f"MD5 does not match the Cisco README for {smu}; "
+                                          "the file is damaged or not the Cisco original")
+            elif corrupt:
+                problems.setdefault(name, f"Part of {smu}, but {', '.join(corrupt)} from the same "
+                                          "fix failed its README checksum")
+            elif missing:
+                problems.setdefault(name, f"Incomplete fix: the Cisco README for {smu} lists "
+                                          f"{len(members)} RPMs; missing {', '.join(missing)}")
+    return problems
+
+
+def _screened_rpms() -> tuple[list[str], set[str], dict[str, str]]:
+    texts = smu_readme_texts()
+    superseded: set[str] = set()
+    for text in texts:
+        superseded.update(SUPERSEDENCE_FULL.findall(text))
+    readable = [
         rpm.name for rpm in DATA.rglob("*.rpm")
         if not rpm_is_superseded(rpm, superseded) and rpm_filename_mismatch(rpm) is None
     ]
-    return candidates, superseded
+    return readable, superseded, smu_manifest_problems(readable, texts)
+
+
+def manifest_blockers(selected_names: list[str]) -> list[str]:
+    """Selected RPMs their own Cisco README proves unusable - for manual selection.
+
+    Automatic selection never picks these (active_rpm_names() drops them), so
+    this only fires when an operator chose one by hand; manual mode may
+    override inference, never a failure the workspace already proves.
+    """
+    problems = _screened_rpms()[2]
+    return [f"{name}: {problems[name]}" for name in sorted(set(selected_names)) if name in problems]
+
+
+def active_rpm_names() -> tuple[list[str], set[str]]:
+    readable, superseded, problems = _screened_rpms()
+    return [name for name in readable if name not in problems], superseded
 
 
 def discover() -> dict:
@@ -2340,13 +2440,15 @@ def compatibility():
                 identity_name, _ = iso_identity(iso_candidate)
         except ValueError:
             iso_architectures = frozenset()
-        result = {
-            "smu": validate_smu_selection(
-                identity_name, package_names, iso_architectures=iso_architectures,
-                full_candidate_packages=active_rpm_names()[0],
-            ),
-            "upgrade": None,
-        }
+        smu = validate_smu_selection(
+            identity_name, package_names, iso_architectures=iso_architectures,
+            full_candidate_packages=active_rpm_names()[0],
+        )
+        readme_issues = manifest_blockers(package_names)
+        if readme_issues:
+            smu["issues"] = sorted(set(smu["issues"]) | set(readme_issues))
+            smu["compatible"] = False
+        result = {"smu": smu, "upgrade": None}
         matrix_name = body.get("matrix", "")
         if matrix_name:
             matrix_path = safe_data_path(cisco_text(matrix_name, "compatibility matrix", maximum=4096))

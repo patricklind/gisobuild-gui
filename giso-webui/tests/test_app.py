@@ -1400,6 +1400,77 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm", excluded[renamed.name])
         self.assertNotIn(honest.name, excluded)
 
+    def _smu_readme(self, smu, rpms):
+        # Same layout as a real Cisco SMU README: tab-indented "<rpm> <md5>"
+        # lines under "RPMS:", terminated by a line with only a tab.
+        lines = "".join(f"\t{name} {md5}\n" for name, md5 in rpms.items())
+        return (f"# Readme for SMU {smu}\n\nName:                    {smu}\n\n"
+                f"DDTS:                    {smu.rsplit('.', 1)[-1]}\n\nRPMS: \n{lines}\t\n"
+                "Pre-requisites:          \n")
+
+    def _smu_fix(self, smu, contents, uploaded):
+        directory = self.data / smu
+        directory.mkdir()
+        rpms = {name: hashlib.md5(body).hexdigest() for name, body in contents.items()}
+        (directory / f"{smu}.txt").write_text(self._smu_readme(smu, rpms))
+        for name in uploaded:
+            (directory / name).write_bytes(contents[name])
+        return directory
+
+    def test_fix_missing_a_readme_listed_rpm_is_excluded_with_what_is_missing(self):
+        # The case filename CSC grouping can never see: a 3-RPM fix uploaded
+        # without its third RPM looks like a complete 2-RPM group.
+        smu = "ncs5500-25.1.2.CSCtest00001"
+        names = [f"ncs5500-{component}-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"
+                 for component in ("infra", "routing", "iosxr-fwding")]
+        self._smu_fix(smu, {name: name.encode() for name in names}, uploaded=names[:2])
+        candidates, superseded = module.active_rpm_names()
+        self.assertEqual(candidates, [])
+        excluded = {item["name"]: item["reason"] for item in
+                    module.add_superseded_exclusions({"excluded": []}, superseded)["excluded"]}
+        for name in names[:2]:
+            self.assertIn("lists 3 RPMs", excluded[name])
+            self.assertIn(names[2], excluded[name])
+
+    def test_rpm_whose_md5_differs_from_its_readme_excludes_the_whole_fix(self):
+        smu = "ncs5500-25.1.2.CSCtest00002"
+        good = "ncs5500-infra-1.0.0.3-r2512.CSCtest00002.x86_64.rpm"
+        bad = "ncs5500-routing-1.0.0.3-r2512.CSCtest00002.x86_64.rpm"
+        directory = self._smu_fix(smu, {good: b"good", bad: b"original"}, uploaded=[good, bad])
+        (directory / bad).write_bytes(b"truncated")
+        problems = module.smu_manifest_problems([good, bad])
+        self.assertIn("MD5 does not match", problems[bad])
+        self.assertIn("failed its README checksum", problems[good])
+        self.assertEqual(module.active_rpm_names()[0], [])
+
+    def test_complete_fix_matching_its_readme_stays_selectable(self):
+        smu = "ncs5500-25.1.2.CSCtest00003"
+        names = [f"ncs5500-{component}-1.0.0.4-r2512.CSCtest00003.x86_64.rpm"
+                 for component in ("infra", "routing")]
+        self._smu_fix(smu, {name: name.encode() for name in names}, uploaded=names)
+        # A README with no RPMS block (the base bundle's) makes no claim.
+        (self.data / "README-base.txt").write_text("Name: base\nPackage(s): everything\n")
+        self.assertEqual(sorted(module.active_rpm_names()[0]), sorted(names))
+        self.assertEqual(module.smu_manifest_problems(names), {})
+
+    def test_manual_selection_of_an_incomplete_fix_is_a_plan_blocker(self):
+        (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
+        smu = "ncs5500-25.1.2.CSCtest00004"
+        names = [f"ncs5500-{component}-1.0.0.5-r2512.CSCtest00004.x86_64.rpm"
+                 for component in ("infra", "routing")]
+        self._smu_fix(smu, {name: name.encode() for name in names}, uploaded=names[:1])
+        plan = self.client.post("/api/build-plan", json={
+            "iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500", "pkglist": [names[0]],
+            "automatic_smu_selection": False,
+        }).get_json()
+        self.assertFalse(plan["ready"])
+        self.assertTrue(any("Incomplete fix" in blocker and names[1] in blocker
+                            for blocker in plan["blockers"]), plan["blockers"])
+        compatibility = self.client.post("/api/compatibility", json={
+            "iso": "ncs5500-x64-25.1.2.iso", "packages": [names[0]],
+        }).get_json()
+        self.assertFalse(compatibility["smu"]["compatible"])
+
     def test_unreadable_rpm_header_and_source_rpms_are_never_excluded_by_name(self):
         # No ground truth means no claim: a header rpm cannot read is left to
         # the existing checks, and source RPMs are not matched by name at all.

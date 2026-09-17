@@ -191,7 +191,8 @@ new reason.
 - [x] architecture (header `ARCH`)
 - [x] provides (header `PROVIDENAME/FLAGS/VERSION`, exact `=` entries)
 - [x] requires (header `REQUIRENAME/FLAGS/VERSION`, exact `=` entries)
-- [ ] signature metadata where available - not done. The query deliberately
+- [ ] signature metadata where available - not done (integrity is: MD5
+      against the Cisco SMU README, see "CSC grouping"). The query deliberately
       passes `--nosignature`; nothing reads `RSAHEADER`/`SIGPGP` or checks
       against Cisco's key. gisobuild itself verifies signatures during the
       build, so this is a pre-build nicety, not a gap in the build's safety.
@@ -247,26 +248,32 @@ this session was retained afterward per `SECURITY.md`.
       group, and nine other real single-RPM fixes into their own groups.
 - [x] select complete groups by default — the real 3-RPM `CSCwu13268` group
       was selected as a whole by automatic selection, not partially.
-- [ ] warn/block incomplete CSC groups — still not implemented for the case
-      described below, and still not implementable without external data.
-      **Narrower, related case fixed 2026-09-16** (see
-      `05-TESTING-CI-TODO.md` "incomplete CSC"): if all N members of a
-      bundle *are* present in the uploaded inventory but the operator
-      manually deselects some of them in Manual package list mode,
-      `validate_smu_selection()`'s new `full_candidate_packages` parameter
-      now blocks that with a specific "N of M required RPMs are selected"
-      message — this only needed the app's own inventory, not external
-      metadata, since every member genuinely exists as an uploaded file.
-      **This item is about the different, harder case that remains open**:
-      the app only knows a CSC group's full membership from *which uploaded
-      RPMs happen to share that CSC ID* in their filename. There is no
-      external manifest saying "CSCxxxxxxx requires exactly N RPMs", so if
-      an operator uploads only 2 of a real 3-RPM fix — never had the 3rd
-      file at all — the app has no way to know a 3rd RPM is supposed to
-      exist; it correctly shows a complete 2-member group for what it can
-      see, not an incomplete 3-member one. This would need a genuine
-      external source of truth (e.g. Cisco's own bug/fix metadata), not just
-      smarter filename parsing.
+- [x] warn/block incomplete CSC groups - fixed 2026-09-17. This was recorded
+      as "not implementable without external data"; that was wrong. Every
+      real Cisco SMU tar ships a README whose `RPMS:` block lists each RPM of
+      the fix with its MD5. `smu_readme_manifests()` parses it and
+      `smu_manifest_problems()` flags (a) every present member of a fix with
+      a README-listed RPM missing, and (b) a member whose MD5 differs from
+      the README, plus its siblings. Automatic selection drops them via
+      `active_rpm_names()` and `add_superseded_exclusions()` explains each;
+      a manual selection gets a plan blocker (`manifest_blockers()`) and
+      `/api/compatibility` reports it as incompatible. The earlier
+      same-inventory case (`full_candidate_packages`) is unchanged.
+      Tests: `test_fix_missing_a_readme_listed_rpm_is_excluded_with_what_is_missing`,
+      `test_rpm_whose_md5_differs_from_its_readme_excludes_the_whole_fix`,
+      `test_complete_fix_matching_its_readme_stays_selectable`,
+      `test_manual_selection_of_an_incomplete_fix_is_a_plan_blocker`.
+      Live, inside a `--rm` container with the operator's real NCS5500 25.1.2
+      bundle and 20 SMU tars (nothing kept on the host): 20 manifests parsed,
+      34 RPMs, 24 selected, 0 manifest exclusions (same 24 as before the
+      change, so no false positives); deleting
+      `ncs5500-iosxr-fwding-1.0.0.4-r2512.CSCwu13268.x86_64.rpm` excluded the
+      other two `CSCwu13268` RPMs naming the missing file (21 selected);
+      restoring it with one flipped byte excluded all three with the MD5
+      reason. 0.47 s cold including MD5s.
+      Still out of scope: a loose RPM uploaded *without* its README has no
+      manifest, so nothing is claimed about it. README `Pre-requisites:` are
+      not enforced yet.
 - [x] show components — each `package_groups` entry lists its member
       component names (confirmed live: `CSCwu13268` showed `ncs5500-infra`,
       `ncs5500-iosxr-fwding`, `ncs5500-routing`).
