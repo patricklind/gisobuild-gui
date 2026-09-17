@@ -390,8 +390,8 @@ ERROR_TAXONOMY: tuple[tuple[str, re.Pattern, bool, str, str], ...] = tuple(
     for code, pattern, recoverable, human, action in (
         ("DEPENDENCY_ERROR", r"is required by .* no selected package provides|is needed by",
          True, "A selected package needs a package version that nothing provides.",
-         "Download the Cisco SMU named in the message (or the one that provides the package), "
-         "or remove the package that needs it."),
+         ("Download the Cisco SMU named in the message (or the one that provides the package), "
+          "or remove the package that needs it.")),
         ("CSC_INCOMPLETE", r"Incomplete fix|is a multi-component fix",
          True, "A Cisco fix is only partly present.",
          "Upload every RPM of the fix (its SMU tar), or deselect the whole fix."),
