@@ -416,14 +416,47 @@ After upload/download:
 
 One authoritative preflight must decide whether Build is enabled.
 
-- [ ] base image valid
-- [ ] engine known
-- [ ] release known
-- [ ] compatible package set
-- [ ] duplicate conflicts resolved
-- [ ] CSC completeness checked
-- [ ] disk space sufficient
-- [ ] gisobuild available
-- [ ] required tools available
-- [ ] no conflicting job
-- [ ] expected outputs supported
+`create_build_plan()` is that preflight: `plan.ready` is `not blockers`, the
+Start button submits only after `/api/build-plan` says ready, and
+`create_job()` re-derives the same plan before building. Fixed 2026-09-17: the
+build environment (gisobuild, Docker CLI, a running build/upload/Cisco
+download) used to be checked only in `create_job()`, so Step 2 could call a
+plan ready that Start then refused. `build_environment_blockers()` now feeds
+the plan; `create_job()` keeps its own identical checks as the race-safe gate
+under `operation_lock`. Live check (throwaway `giso-webui` container, dummy
+ISO, no Cisco content): without `/tool` mounted the plan returned exactly
+`["gisobuild is not available (/tool/src/gisobuild.py is missing)"]`; with the
+repo's `.gisobuild-tool` mounted it returned no blockers.
+
+- [ ] base image valid - only "exists in inventory as `.iso`" is enforced.
+      `iso_identity()` reads `iosxr_image_mdata.yml` when present, but a file
+      that is not an ISO at all still passes; gisobuild rejects it at build
+      time.
+- [x] engine known - `validate_platform_options()` raises for an unresolved
+      platform, which becomes a blocker.
+- [ ] release known - not a blocker. An unknown release only degrades
+      automatic selection (which blocks with "ISO release could not be
+      detected") and confidence to `UNKNOWN`; a manual build with no release
+      still counts as ready.
+- [x] compatible package set - `validate_smu_selection()` issues plus
+      `missing_package_dependencies()` are blockers.
+- [x] duplicate conflicts resolved - `resolve_rpm_identifiers()` raises
+      "Conflicting RPM identities selected", which becomes a blocker
+      (`test_different_duplicate_rpms_are_rejected`).
+- [ ] CSC completeness checked - partial multi-component bundles are
+      reported (`full_candidate_packages`), but see "warn/block incomplete
+      CSC groups" above for the case that is still open.
+- [x] disk space sufficient - `build_space_blockers()` for uploads, work and
+      output volumes.
+- [x] gisobuild available - `gisobuild_tool_available()`
+      (`test_build_plan_is_blocked_when_gisobuild_or_docker_is_unavailable`,
+      plus the live check above).
+- [x] required tools available - Docker CLI is a blocker; `isoinfo`/`rpm` are
+      warnings because only this app's metadata checks need them
+      (`test_missing_metadata_tools_warn_but_do_not_block`).
+- [x] no conflicting job - uploads, Cisco download, active job and running
+      build container
+      (`test_build_plan_is_blocked_by_the_same_conditions_start_build_refuses`).
+- [ ] expected outputs supported - `expected_outputs` is computed from the
+      platform capabilities but never blocks; nothing rejects an option the
+      engine does not support at plan time beyond `validate_platform_options()`.

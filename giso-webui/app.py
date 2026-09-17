@@ -1129,12 +1129,55 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     }
 
 
+def gisobuild_tool_available() -> bool:
+    """The pinned gisobuild checkout build_command() mounts into the builder."""
+    return (TOOL / "src/gisobuild.py").is_file()
+
+
+def build_environment_blockers() -> tuple[list[str], list[str]]:
+    """Everything outside the inventory that decides whether a build can start now.
+
+    create_job() has always refused a build while an upload, a Cisco download
+    or another build was active, and build_command() needs gisobuild and the
+    Docker CLI - but none of that was part of the BuildPlan, so Step 2 could
+    report "ready" for a build Start would then refuse. Folding these checks
+    in here makes create_build_plan() the one preflight that decides; the
+    identical checks in create_job() remain as the race-safe gate under
+    operation_lock.
+
+    isoinfo and rpm are warnings, not blockers: without them this app cannot
+    read ISO/RPM metadata and falls back to filenames, but gisobuild itself
+    does not need them and still validates the real transaction.
+    """
+    blockers: list[str] = []
+    warnings: list[str] = []
+    if not gisobuild_tool_available():
+        blockers.append(f"gisobuild is not available ({TOOL / 'src/gisobuild.py'} is missing)")
+    if not os.access(DOCKER_BIN, os.X_OK):
+        blockers.append(f"The Docker CLI is not available at {DOCKER_BIN}")
+    elif docker_build_running():
+        blockers.append("A build container is already running, or Docker cannot be reached "
+                        "to confirm that none is")
+    if cisco_download_running():
+        blockers.append("Wait for the Cisco download to finish before starting a build")
+    with upload_lock:
+        if uploads:
+            blockers.append("Wait for all uploads to finish before starting the build")
+    with job_lock:
+        if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
+            blockers.append("A build is already running")
+    for label, binary in (("isoinfo", ISOINFO_BIN), ("rpm", RPM_BIN)):
+        if not os.access(binary, os.X_OK):
+            warnings.append(f"{label} is not available at {binary}; ISO/RPM metadata checks "
+                            f"fall back to filenames")
+    return blockers, warnings
+
+
 def create_build_plan(payload: dict) -> dict:
     """Create one immutable, backend-owned build decision from current inventory."""
     inventory = inventory_files()
     revision = current_inventory_revision(inventory)
-    blockers: list[str] = []
-    warnings: list[str] = []
+    blockers, warnings = build_environment_blockers()
     if bool(payload.get("ownership_vouchers")) != bool(payload.get("ownership_certificate")):
         # Mirrors _validate_ovs_and_oc() in .gisobuild-tool/src/lnt/builder/_coordinate.py:
         # gisobuild requires both an ownership certificate and ownership

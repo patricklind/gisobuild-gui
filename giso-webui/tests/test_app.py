@@ -44,11 +44,14 @@ class GisoWebTests(unittest.TestCase):
         module.archive_policy_checked = 0.0
         self.docker_running = patch("app.docker_build_running", return_value=False)
         self.docker_running.start()
+        self.tool_available = patch("app.gisobuild_tool_available", return_value=True)
+        self.tool_available.start()
         self.disk_usage = patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=100 * 1024**3))
         self.disk_usage.start()
         self.client = module.app.test_client()
 
     def tearDown(self):
+        self.tool_available.stop()
         self.disk_usage.stop()
         self.docker_running.stop()
         module.store_initialized = False
@@ -1533,6 +1536,49 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.get_json()["ready"])
         self.assertIn("current inventory", response.get_json()["blockers"][0])
+
+    def test_build_plan_is_blocked_by_the_same_conditions_start_build_refuses(self):
+        # Step 2 used to say "ready" while an upload or another build was
+        # active, and only POST /api/jobs refused. The plan is now the one
+        # preflight, so it must name those conditions itself.
+        (self.data / "base.iso").write_bytes(b"iso")
+        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": []}
+        self.assertTrue(self.client.post("/api/build-plan", json=payload).get_json()["ready"])
+
+        module.uploads["pending"] = {"name": "x.rpm"}
+        module.jobs["other"] = {"status": "running"}
+        try:
+            with patch("app.cisco_download_running", return_value=True):
+                plan = self.client.post("/api/build-plan", json=payload).get_json()
+        finally:
+            module.uploads.clear()
+            module.jobs.clear()
+        self.assertFalse(plan["ready"])
+        text = " | ".join(plan["blockers"])
+        self.assertIn("uploads to finish", text)
+        self.assertIn("A build is already running", text)
+        self.assertIn("Cisco download", text)
+
+    def test_build_plan_is_blocked_when_gisobuild_or_docker_is_unavailable(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": []}
+        with patch("app.gisobuild_tool_available", return_value=False), \
+                patch.object(module, "DOCKER_BIN", str(Path(self.temp.name) / "no-docker")):
+            plan = self.client.post("/api/build-plan", json=payload).get_json()
+        self.assertFalse(plan["ready"])
+        text = " | ".join(plan["blockers"])
+        self.assertIn("gisobuild is not available", text)
+        self.assertIn("Docker CLI is not available", text)
+
+    def test_missing_metadata_tools_warn_but_do_not_block(self):
+        # gisobuild does not need isoinfo or rpm; only this app's own
+        # metadata checks degrade to filenames without them.
+        (self.data / "base.iso").write_bytes(b"iso")
+        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": []}
+        with patch.object(module, "RPM_BIN", str(Path(self.temp.name) / "no-rpm")):
+            plan = self.client.post("/api/build-plan", json=payload).get_json()
+        self.assertTrue(plan["ready"], plan["blockers"])
+        self.assertTrue(any("rpm is not available" in warning for warning in plan["warnings"]))
 
     def test_build_plan_confidence_is_unknown_when_no_iso_is_selected(self):
         # Nothing has been detected yet, so every confidence entry must say so
