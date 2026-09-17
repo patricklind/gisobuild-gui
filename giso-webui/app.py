@@ -840,6 +840,7 @@ def iso_shipped_packages_from_mdata(text: str) -> dict[str, str]:
 
 RPM_QUERY_FORMAT = (
     "NVRA %{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}\n"
+    "SIGN %{RSAHEADER:pgpsig}\n"
     "[REQ %{REQUIRENAME}|%{REQUIREFLAGS:depflags}|%{REQUIREVERSION}\n]"
     "[PRV %{PROVIDENAME}|%{PROVIDEFLAGS:depflags}|%{PROVIDEVERSION}\n]"
 )
@@ -851,6 +852,7 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict:
     One `rpm -qp --nosignature --qf ...` call per file, which only *reads* the
     file - it never installs anything and never touches an RPM database.
     Returns {"identity": {name, version, release, arch} | None,
+    "signature": {algorithm, key_id} | None (unsigned or unreadable),
     "requires": [(name, version)], "provides": [(name, version)]}, keeping
     only exact-version ("=") dependency entries, because those are the only
     ones this app acts on (see missing_package_dependencies()).
@@ -859,7 +861,7 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict:
     header cannot be read must never be treated as "has no dependencies" *or*
     as broken; callers simply have no ground truth for it and leave it alone.
     """
-    empty: dict = {"identity": None, "requires": [], "provides": []}
+    empty: dict = {"identity": None, "signature": None, "requires": [], "provides": []}
     with checksum_lock:
         try:
             stat = rpm_path.stat()
@@ -877,12 +879,19 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict:
         return empty
     if completed.returncode != 0:
         return empty
-    result: dict = {"identity": None, "requires": [], "provides": []}
+    result: dict = {"identity": None, "signature": None, "requires": [], "provides": []}
     for line in completed.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES].splitlines():
         tag, _, body = line.partition(" ")
         fields = body.split("|")
         if tag == "NVRA" and len(fields) == 4 and all(fields):
             result["identity"] = dict(zip(("name", "version", "release", "arch"), fields))
+        elif tag == "SIGN":
+            # e.g. "RSA/SHA256, Wed Jul  2 22:15:22 2025, Key ID 7476b0605746bd08";
+            # "(none)" when unsigned. Read only - verification is gisobuild's.
+            signed = re.match(r"^(?P<algorithm>[A-Z0-9]+/[A-Z0-9]+),.*Key ID (?P<key>[0-9a-f]+)$", body.strip())
+            if signed:
+                result["signature"] = {"algorithm": signed.group("algorithm"),
+                                       "key_id": signed.group("key")}
         elif tag in {"REQ", "PRV"} and len(fields) == 3:
             name, operator, version = (field.strip() for field in fields)
             # Only "=" constraints: a bare name, ">=" or "<" cannot be proven
@@ -1349,6 +1358,8 @@ def inventory_files() -> list[dict]:
             extraction_dir = top_level_extraction_dir(path)
             source_archive = archive_source_for_extraction(extraction_dir) if extraction_dir else None
             metadata_source, metadata_confidence, metadata_name = file_metadata_provenance(path)
+            signature = (rpm_dependency_metadata(path).get("signature")
+                         if suffix == ".rpm" and metadata_source == "rpm-header" else None)
             physical.append({
                 "id": inventory_id(relative_path, sha256),
                 "basename": name,
@@ -1361,6 +1372,7 @@ def inventory_files() -> list[dict]:
                 "metadata_source": metadata_source,
                 "metadata_confidence": metadata_confidence,
                 "metadata_name": metadata_name,
+                "signature": signature,
                 "lifecycle": "READY",
                 "type": suffix,
             })
@@ -1816,6 +1828,16 @@ def create_build_plan(payload: dict) -> dict:
         validate_smu_selection(identity_name, [])["iso_release"] if iso else None
     )
     resolved_platform = (profile["id"] if profile else None) or recommendation.get("platform")
+    unsigned = sorted(item["basename"] for item in selected
+                      if item.get("metadata_source") == "rpm-header" and not item.get("signature"))
+    if unsigned:
+        warnings.append(f"{len(unsigned)} selected RPM(s) carry no RSA header signature "
+                        f"({', '.join(unsigned[:3])}{'…' if len(unsigned) > 3 else ''}); Cisco RPMs are "
+                        "signed, and gisobuild's signature check is expected to reject these")
+    key_ids = {item["signature"]["key_id"] for item in selected if item.get("signature")}
+    if len(key_ids) > 1:
+        warnings.append("Selected RPMs are signed with different keys (" + ", ".join(sorted(key_ids))
+                        + "); confirm every package comes from Cisco")
     evidence = selection_evidence(iso["relative_path"] if iso else None,
                                   [item["basename"] for item in selected])
     warnings = reword_dependency_warning(warnings, evidence)

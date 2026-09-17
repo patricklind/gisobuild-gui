@@ -213,11 +213,15 @@ new reason.
 - [x] architecture (header `ARCH`)
 - [x] provides (header `PROVIDENAME/FLAGS/VERSION`, exact `=` entries)
 - [x] requires (header `REQUIRENAME/FLAGS/VERSION`, exact `=` entries)
-- [ ] signature metadata where available - not done (integrity is: MD5
-      against the Cisco SMU README, see "CSC grouping"). The query deliberately
-      passes `--nosignature`; nothing reads `RSAHEADER`/`SIGPGP` or checks
-      against Cisco's key. gisobuild itself verifies signatures during the
-      build, so this is a pre-build nicety, not a gap in the build's safety.
+- [x] signature metadata where available - 2026-09-17: the same single
+      `rpm -qp` query now reads `RSAHEADER` (algorithm and key ID; nothing is
+      verified - that remains gisobuild's signature check). Inventory items
+      carry `signature`; the plan warns when a selected RPM is unsigned or
+      when selected RPMs use different keys. Tests:
+      `test_rpm_header_query_parses_identity_and_exact_dependencies`,
+      `test_unsigned_or_mixed_key_rpms_are_warned_about`. Real NCS5500 bundle
+      + 20 SMUs: all 34 RPMs `RSA/SHA256`, key `7476b0605746bd08`, no
+      warnings.
 - [x] CSC ID - still parsed from the filename, but the filename is now
       proven identical to the header's `RELEASE` (which carries the
       `CSCxxxxxxx` suffix) whenever the header is readable.

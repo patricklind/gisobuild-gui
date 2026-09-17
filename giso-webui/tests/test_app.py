@@ -1488,6 +1488,7 @@ class GisoWebTests(unittest.TestCase):
         rpm.write_bytes(b"not parsed here")
         output = (
             "NVRA ncs5500-bgp|1.0.0.1|r2512.CSCtest00001|x86_64\n"
+            "SIGN RSA/SHA256, Sun Jul 26 14:53:45 2026, Key ID 7476b0605746bd08\n"
             "REQ ncs5500-dpa|=|1.0.0.5\n"
             "REQ /bin/sh||\n"
             "REQ ncs5500-core|>=|1.0.0.0\n"
@@ -1506,6 +1507,7 @@ class GisoWebTests(unittest.TestCase):
             "release": "r2512.CSCtest00001", "arch": "x86_64",
         })
         # Only exact, epoch-free constraints are kept.
+        self.assertEqual(metadata["signature"], {"algorithm": "RSA/SHA256", "key_id": "7476b0605746bd08"})
         self.assertEqual(metadata["requires"], [("ncs5500-dpa", "1.0.0.5")])
         self.assertEqual(metadata["provides"], [("ncs5500-bgp", "1.0.0.1-r2512.CSCtest00001")])
 
@@ -1561,6 +1563,33 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(len(blockers), 1, blockers)
         self.assertIn(renamed.name, blockers[0])
         self.assertIn("header says it is", blockers[0])
+
+    def test_unsigned_or_mixed_key_rpms_are_warned_about(self):
+        (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
+        names = ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm",
+                 "ncs5500-ospf-1.0.0.1-r2512.CSCtest00002.x86_64.rpm",
+                 "ncs5500-isis-1.0.0.1-r2512.CSCtest00003.x86_64.rpm"]
+        for name in names:
+            (self.data / name).write_bytes(name.encode())
+        signatures = {names[0]: {"algorithm": "RSA/SHA256", "key_id": "7476b0605746bd08"},
+                      names[1]: {"algorithm": "RSA/SHA256", "key_id": "0000000000000001"},
+                      names[2]: None}
+
+        def metadata(path):
+            component, version, release = path.name.split("-")[1], "1.0.0.1", path.name.split("-", 3)[3][:-11]
+            return {"identity": {"name": f"ncs5500-{component}", "version": version,
+                                 "release": release, "arch": "x86_64"},
+                    "signature": signatures[path.name], "requires": [], "provides": []}
+
+        with patch("app.rpm_dependency_metadata", side_effect=metadata):
+            items = {i["basename"]: i for i in module.inventory_files()}
+            plan = module.create_build_plan({"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500",
+                                             "pkglist": names, "automatic_smu_selection": False})
+        self.assertEqual(items[names[0]]["signature"]["key_id"], "7476b0605746bd08")
+        self.assertIsNone(items[names[2]]["signature"])
+        text = " | ".join(plan["warnings"])
+        self.assertIn("1 selected RPM(s) carry no RSA header signature", text)
+        self.assertIn("signed with different keys (0000000000000001, 7476b0605746bd08)", text)
 
     def test_manual_package_list_blocks_and_labels_header_mismatches(self):
         source = (Path(module.__file__).parent / "static/manual-packages.js").read_text()
