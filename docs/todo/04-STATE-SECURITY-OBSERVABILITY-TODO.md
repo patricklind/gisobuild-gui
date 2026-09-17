@@ -49,12 +49,15 @@ Persist:
       `test_active_job_is_marked_interrupted_after_restart` and
       `test_expired_orphan_partial_upload_is_removed_after_restart` in
       `giso-webui/tests/test_app.py`.
-- [ ] no critical state only in Python globals — partially true: jobs and
-      activity are durable (sqlite), but `uploads`, `cisco_searches`, and
-      `cisco_download_jobs` are process-local dicts with no persistence, so
-      a restart mid-upload or mid-Cisco-download silently drops that
-      in-progress state (the operator sees it as if it never started, rather
-      than as a recorded failure).
+- [ ] no critical state only in Python globals — still partially true:
+      `uploads`, `cisco_searches` and `cisco_download_jobs` live in memory
+      and cannot be resumed after a restart. Since 2026-09-17 they no longer
+      vanish silently: on startup `report_interrupted_transfers()` finds
+      what survives on disk (upload partials in `.parts`, Cisco `.<name>.part`
+      files), records "N upload(s)/Cisco download(s) were interrupted by a
+      service restart" in the activity log, and removes the unresumable Cisco
+      partials (`test_restart_reports_interrupted_uploads_and_cisco_downloads`).
+      Resumable uploads/downloads remain open.
 
 ## Job model
 

@@ -548,12 +548,46 @@ def apply_schema_migrations(database: sqlite3.Connection) -> str | None:
     return None
 
 
+def report_interrupted_transfers() -> None:
+    """Record uploads and Cisco downloads that a restart cut off, once at startup.
+
+    Both are tracked only in memory while they run, so after a restart they
+    would otherwise vanish without trace. What survives on disk is their
+    partial file: browser uploads under DATA/.parts, Cisco downloads as a
+    hidden ".<name>.part" next to the target. A Cisco partial cannot be
+    resumed and is removed; upload partials keep their normal expiry.
+    """
+    uploads_cut = len(list((DATA / ".parts").glob("*.part"))) if (DATA / ".parts").is_dir() else 0
+    cisco_cut = 0
+    if DATA.is_dir():
+        for partial in DATA.glob(".*.part"):
+            try:
+                partial.unlink()
+                cisco_cut += 1
+            except OSError:
+                pass
+    if uploads_cut:
+        append_activity(f"{uploads_cut} upload(s) were interrupted by a service restart; "
+                        "upload those files again.")
+    if cisco_cut:
+        append_activity(f"{cisco_cut} Cisco download(s) were interrupted by a service restart; "
+                        "start the download again.")
+    if uploads_cut or cisco_cut:
+        log_event("interrupted_transfers_found", uploads=uploads_cut, cisco_downloads=cisco_cut)
+
+
 def initialize_job_store() -> None:
     """Create the job store and restore safe job history once per process."""
+    initialized_now = _initialize_job_store()
+    if initialized_now:
+        report_interrupted_transfers()
+
+
+def _initialize_job_store() -> bool:
     global store_initialized, store_schema_problem
     with store_lock:
         if store_initialized:
-            return
+            return False
         STATE.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(JOB_DB) as database:
             store_schema_problem = apply_schema_migrations(database)
@@ -562,7 +596,7 @@ def initialize_job_store() -> None:
                 # layout could corrupt it. Serve, but block builds and say why.
                 log_event("job_store_schema_unsupported", detail=store_schema_problem)
                 store_initialized = True
-                return
+                return True
             rows = database.execute(
                 "SELECT id, data FROM jobs ORDER BY updated DESC LIMIT ?", (MAX_JOB_HISTORY,)
             )
@@ -602,6 +636,7 @@ def initialize_job_store() -> None:
                 (MAX_JOB_HISTORY,),
             )
         store_initialized = True
+        return True
 
 
 def persist_job(job_id: str, *, min_interval: float = 0.0) -> None:

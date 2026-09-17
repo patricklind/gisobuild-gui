@@ -2812,6 +2812,20 @@ class GisoWebTests(unittest.TestCase):
         finally:
             module.store_schema_problem = None
 
+    def test_restart_reports_interrupted_uploads_and_cisco_downloads(self):
+        (self.data / ".parts").mkdir()
+        (self.data / ".parts" / "abc.part").write_bytes(b"half an upload")
+        cisco_partial = self.data / ".ncs5500-x-25.1.2.iso.part"
+        cisco_partial.write_bytes(b"half a download")
+        module.initialize_job_store()  # a fresh process
+        log = self.client.get("/api/activity").get_json()["log"]
+        self.assertIn("1 upload(s) were interrupted by a service restart", log)
+        self.assertIn("1 Cisco download(s) were interrupted by a service restart", log)
+        self.assertFalse(cisco_partial.exists())
+        self.assertTrue((self.data / ".parts" / "abc.part").exists())  # normal expiry still applies
+        module.initialize_job_store()  # already initialized: not reported twice
+        self.assertEqual(self.client.get("/api/activity").get_json()["log"].count("interrupted"), 2)
+
     def test_storage_reports_real_disk_and_archive_usage(self):
         archive_dir = module.ARCHIVE / "job-1"
         archive_dir.mkdir(parents=True)
