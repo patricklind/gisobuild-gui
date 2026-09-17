@@ -77,8 +77,14 @@ curl --fail http://127.0.0.1:8080/api/health
 
 1. Upload the base ISO and matching RPM, SMU, or configuration files.
 2. Review the automatic package plan. The application selects every RPM that
-   matches the single base ISO's platform and release and excludes deterministic
-   mismatches. Manual RPM selection remains under Expert settings.
+   matches the single base ISO's platform and release, and leaves out, with a
+   reason, anything it can prove will not install: a different platform,
+   release or processor architecture, a renamed or unreadable file, a Cisco fix
+   whose README shows it incomplete or altered, and a package whose exact
+   dependency neither the base image nor the selection provides (the reason
+   names the Cisco SMU to download). Manual RPM selection remains under Expert
+   settings; there, the same problems block the build instead of being
+   removed.
 3. Start the build. Only one build can run, and it starts only after every
    upload and archive extraction has completed.
 4. Follow the live log until the job succeeds or fails.
@@ -89,11 +95,14 @@ passes discovered `.rpm` files to `--pkglist`; do not select the tar file itself
 as a package.
 
 The automatic package plan is recalculated server-side when the build starts,
-so the build does not trust a stale browser selection. The complete matching
-repository is passed to Cisco `gisobuild`, allowing its RPM metadata engine to
-resolve prerequisites, dependency closure, and supersedence. The pre-check
-rejects deterministic filename conflicts such as a different platform, IOS XR
-release, processor architecture, or multiple versions of one component/CSC.
+so the build does not trust a stale browser selection. The selected RPMs are
+passed to Cisco `gisobuild`, which still performs the complete dependency and
+supersedence resolution. Before that, the application reads each RPM's own
+header and each SMU's Cisco README: it checks names against headers, fix
+completeness and MD5 against the README, and exact-version requirements
+against the base image's package list. It also rejects conflicts such as a
+different platform, IOS XR release, processor architecture, or multiple
+versions of one component/CSC.
 RPMs carrying the same CSC identifier are shown as one package group; a fix
 that changes several components is explicitly marked as a group that should be
 kept together. Overlapping CSC fixes for the same component are highlighted,
