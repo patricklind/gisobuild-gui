@@ -231,8 +231,15 @@ new reason.
 ## TAR/TGZ handling
 
 Two independent implementations share these rules: `upload_complete()` (an
-operator-uploaded `.tar`/`.tgz`) and `extract_cisco_archive()` (a
-Cisco-downloaded archive). Both are now covered.
+operator-uploaded archive) and `extract_cisco_archive()` (a Cisco-downloaded
+archive). Both are now covered. Since 2026-09-17 both accept `.tar.gz` as
+well as `.tar`/`.tgz` (`ARCHIVE_SUFFIXES`, `archive_suffix()`): upstream
+gisobuild documents LNT bugfixes as `<platform>-<release>-CSC<id>.tar.gz`,
+and that suffix was rejected at upload. The collision rename keeps the whole
+suffix, the inventory type is `.tar.gz`, provenance (`extracted_from`) and
+log redaction cover it; a plain `.gz` is still rejected. Tests:
+`test_lnt_bugfix_tar_gz_is_uploaded_extracted_and_traced_to_its_archive`,
+`test_plain_gzip_upload_is_still_rejected`, `test_tar_gz_paths_are_redacted_whole`.
 
 - [x] safe extraction (`test_chunked_upload_and_safe_tar_extraction`,
       `test_cisco_archive_extraction_succeeds_for_a_safe_archive`)

@@ -247,8 +247,27 @@ def cisco_response_requires(value: object, field: str) -> bool:
     return False
 
 
+# Longest first: ".tar.gz" must win over a bare ".gz" split. Upstream gisobuild
+# documents LNT bugfixes as <platform>-<release>-CSC<id>.tar.gz.
+ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar")
+
+
+def archive_suffix(name: str) -> str | None:
+    """The archive suffix a filename ends with (case-insensitive), or None."""
+    lowered = name.lower()
+    return next((suffix for suffix in ARCHIVE_SUFFIXES if lowered.endswith(suffix)), None)
+
+
+def split_upload_name(name: str) -> tuple[str, str]:
+    """(stem, suffix) that keeps a multi-part archive suffix like ".tar.gz" intact."""
+    suffix = archive_suffix(name)
+    if suffix:
+        return name[:-len(suffix)], name[-len(suffix):]
+    return Path(name).stem, Path(name).suffix
+
+
 def extract_cisco_archive(path: Path) -> int:
-    if not path.name.lower().endswith((".tar", ".tgz")):
+    if not archive_suffix(path.name):
         return 0
     destination = extraction_path(path)
     if destination is None:
@@ -283,8 +302,8 @@ def log_event(event: str, **fields: object) -> None:
 
 
 ARTIFACT_TOKEN = re.compile(
-    r"(?:[\"'][^\"'\r\n]*?\.(?:iso|rpm|zip|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt|json)[\"']|"
-    r"(?<!\w)[^\s\"'=]+?\.(?:iso|rpm|zip|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt|json)(?!\w))",
+    r"(?:[\"'][^\"'\r\n]*?\.(?:iso|rpm|zip|tar\.gz|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt|json)[\"']|"
+    r"(?<!\w)[^\s\"'=]+?\.(?:iso|rpm|zip|tar\.gz|tar|tgz|yaml|yml|cfg|ini|sh|cms|txt|json)(?!\w))",
     re.IGNORECASE,
 )
 
@@ -993,7 +1012,7 @@ def file_metadata_provenance(path: Path) -> tuple[str, str, str | None]:
 
 def inventory_files() -> list[dict]:
     """Build the canonical, browser-safe inventory for supported input files."""
-    supported = {".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg",
+    supported = {".iso", ".rpm", *ARCHIVE_SUFFIXES, ".yaml", ".yml", ".cfg",
                  ".ini", ".sh", ".cms", ".json"}
     physical: list[dict] = []
     for root, names, filenames in os.walk(DATA):
@@ -1002,7 +1021,7 @@ def inventory_files() -> list[dict]:
         root_path = Path(root)
         for name in filenames:
             path = root_path / name
-            suffix = path.suffix.lower()
+            suffix = archive_suffix(name) or path.suffix.lower()
             if suffix not in supported:
                 continue
             try:
@@ -1669,9 +1688,8 @@ def docker_build_running() -> bool:
 
 
 def extraction_path(path: Path) -> Path | None:
-    if path.name.lower().endswith((".tar", ".tgz")):
-        return DATA / path.name.removesuffix(".tgz").removesuffix(".tar")
-    return None
+    suffix = archive_suffix(path.name)
+    return DATA / path.name[:-len(suffix)] if suffix else None
 
 
 def archive_source_for_extraction(directory: Path) -> Path | None:
@@ -1685,7 +1703,7 @@ def archive_source_for_extraction(directory: Path) -> Path | None:
     """
     if directory.parent != DATA:
         return None
-    for suffix in (".tar", ".tgz"):
+    for suffix in ARCHIVE_SUFFIXES:
         candidate = DATA / f"{directory.name}{suffix}"
         if candidate.is_file():
             return candidate
@@ -2930,7 +2948,7 @@ def upload_init():
     size = body.get("size")
     if isinstance(size, bool) or not isinstance(size, int):
         return jsonify(error="Upload size must be an integer"), 400
-    allowed = (".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".txt", ".json")
+    allowed = (".iso", ".rpm", *ARCHIVE_SUFFIXES, ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".txt", ".json")
     if not name or size <= 0 or size > MAX_UPLOAD_BYTES or not name.lower().endswith(allowed):
         return jsonify(error="Unsupported file or invalid size"), 400
     with operation_lock:
@@ -3022,11 +3040,12 @@ def upload_complete(upload_id: str):
     with upload_lock:
         target = DATA / item["name"]
         while target.exists() or (extraction_path(target) and extraction_path(target).exists()):
-            target = DATA / f"{Path(item['name']).stem}-{uuid.uuid4().hex[:8]}{Path(item['name']).suffix}"
+            stem, suffix = split_upload_name(item["name"])
+            target = DATA / f"{stem}-{uuid.uuid4().hex[:8]}{suffix}"
         Path(item["temp"]).replace(target)
     extracted = 0
     try:
-        if target.name.lower().endswith((".tar", ".tgz")):
+        if archive_suffix(target.name):
             destination = extraction_path(target)
             if destination is None:
                 raise ValueError("Unsupported archive type")
@@ -3049,12 +3068,12 @@ def upload_complete(upload_id: str):
                 archive.extractall(destination, members=members, filter="data")
                 extracted = sum(1 for member in members if member.isfile())
     except ValueError as exc:
-        if target.name.lower().endswith((".tar", ".tgz")):
+        if archive_suffix(target.name):
             shutil.rmtree(destination, ignore_errors=True)
         target.unlink(missing_ok=True)
         return jsonify(error=f"Tar archive rejected: {exc}"), 400
     except (tarfile.TarError, OSError) as exc:
-        if target.name.lower().endswith((".tar", ".tgz")):
+        if archive_suffix(target.name):
             shutil.rmtree(destination, ignore_errors=True)
         target.unlink(missing_ok=True)
         log_event("upload_archive_failed", error_type=type(exc).__name__, upload_id=upload_id)

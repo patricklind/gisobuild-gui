@@ -275,6 +275,40 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue((self.data / "cisco-smu/smu/package.rpm").is_file())
 
+    def test_lnt_bugfix_tar_gz_is_uploaded_extracted_and_traced_to_its_archive(self):
+        # Upstream gisobuild documents LNT bugfixes as
+        # <platform>-<release>-CSC<id>.tar.gz; that suffix was rejected at upload.
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w:gz") as archive:
+            payload = b"lnt rpm"
+            info = tarfile.TarInfo("xr-cdp-24.3.1v1.0.1-1.x86_64.rpm")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        name = "8000-x64-24.3.1-CSCab12345.tar.gz"
+        first = self.upload(name, stream.getvalue())
+        self.assertEqual(first.status_code, 200, first.get_json())
+        self.assertEqual(first.get_json()["extracted"], 1)
+        extracted = self.data / "8000-x64-24.3.1-CSCab12345/xr-cdp-24.3.1v1.0.1-1.x86_64.rpm"
+        self.assertTrue(extracted.is_file())
+
+        # A second copy keeps the whole ".tar.gz" suffix when renamed apart.
+        second = self.upload(name, stream.getvalue()).get_json()
+        self.assertRegex(second["path"], r"^8000-x64-24\.3\.1-CSCab12345-[0-9a-f]{8}\.tar\.gz$")
+        self.assertTrue((self.data / second["path"].removesuffix(".tar.gz")).is_dir())
+
+        items = {item["relative_path"]: item for item in module.inventory_files()}
+        self.assertEqual(items[name]["type"], ".tar.gz")
+        rpm = items["8000-x64-24.3.1-CSCab12345/xr-cdp-24.3.1v1.0.1-1.x86_64.rpm"]
+        self.assertEqual(rpm["extracted_from"], name)
+
+    def test_plain_gzip_upload_is_still_rejected(self):
+        response = self.client.post("/api/uploads/init", json={"name": "notes.gz", "size": 10})
+        self.assertEqual(response.status_code, 400)
+
+    def test_tar_gz_paths_are_redacted_whole(self):
+        redacted = module.safe_log_text("extracting /uploads/8000-x64-24.3.1-CSCab12345.tar.gz now")
+        self.assertEqual(redacted, "extracting [artifact] now")
+
     def test_upload_progress_is_available_in_activity_log(self):
         upload_id = self.client.post(
             "/api/uploads/init", json={"name": "private.iso", "size": 10}

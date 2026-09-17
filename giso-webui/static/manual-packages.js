@@ -133,7 +133,7 @@
       const empty = document.createElement('div');
       empty.className = 'manual-package-empty';
       const message = document.createElement('p');
-      message.textContent = 'No RPM files are available in the workspace. Upload individual .rpm files or a Cisco .tar/.tgz SMU bundle first.';
+      message.textContent = 'No RPM files are available in the workspace. Upload individual .rpm files or a Cisco .tar/.tgz/.tar.gz SMU bundle first.';
       const upload = document.createElement('button');
       upload.type = 'button';
       upload.className = 'secondary small';
