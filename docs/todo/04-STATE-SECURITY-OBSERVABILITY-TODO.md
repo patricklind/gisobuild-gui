@@ -296,8 +296,8 @@ reworded message that loses its code fails the test. Browser:
 `test_failed_build_says_what_went_wrong_and_what_to_do`,
 `test_blocked_start_names_the_problem_and_the_fix`.
 
-- [ ] `UPLOAD_ERROR` - upload endpoints still return plain `error` strings
-- [ ] `ARCHIVE_ERROR` - archive endpoints still return plain `error` strings
+- [x] `UPLOAD_ERROR` - every JSON API error now gains `code`, `human_message`, `recoverable`, `suggested_action` in one response hook (`classify_api_error()`, by endpoint and message; `error` itself is unchanged)
+- [x] `ARCHIVE_ERROR` - archive endpoints only `abort(404)`ed with an HTML page; `/api/` 404s now return JSON, so they are classified too
 - [x] `ISO_METADATA_ERROR`
 - [x] `PLATFORM_AMBIGUOUS`
 - [x] `RELEASE_MISMATCH`
@@ -310,7 +310,7 @@ reworded message that loses its code fails the test. Browser:
 - [x] `OUTPUT_VALIDATION_ERROR` (exit 0 without an ISO - the real
       "Nothing to do" case found in `03-DOCKER-SELF-CONTAINED-TODO.md`)
 - [x] `STORAGE_ERROR`
-- [ ] `CISCO_AUTH_ERROR` - Cisco download endpoints not classified yet
+- [x] `CISCO_AUTH_ERROR` - credential/authorization/token messages from Cisco endpoints, including a failed download job's `failure`; other Cisco errors are `CISCO_DOWNLOAD_ERROR`. Test: `test_api_errors_carry_a_code_by_where_they_happened`. Not exercised against Cisco's real API here (no credentials configured).
 
 Added because real blockers needed them: `PLATFORM_MISMATCH`,
 `INPUT_MISSING`, `OPTION_UNSUPPORTED`, `ENVIRONMENT_ERROR`; unmatched text

@@ -1866,6 +1866,36 @@ class GisoWebTests(unittest.TestCase):
             self.assertIs(detail["recoverable"], True)
         self.assertEqual(len(plan["issues"]), len(plan["blockers"]))
 
+    def test_api_errors_carry_a_code_by_where_they_happened(self):
+        upload = self.client.post("/api/uploads/init", json={"name": "notes.gz", "size": 10}).get_json()
+        self.assertEqual(upload["code"], "UPLOAD_ERROR")
+        self.assertTrue(upload["suggested_action"])
+        self.assertEqual(upload["error"], "Unsupported file or invalid size")  # unchanged
+        archive = self.client.delete("/api/archive/no-such-job/golden.iso")
+        self.assertEqual(archive.status_code, 404)
+        self.assertEqual(archive.get_json()["code"], "ARCHIVE_ERROR")
+        self.assertEqual(self.client.get("/api/jobs/no-such-job").get_json()["error"],
+                         "The requested item was not found")
+        self.assertNotIn("application/json", self.client.get("/no-such-page").content_type)
+        self.assertEqual(module.classify_api_error("cisco_search", "Cisco authorization failed: 401")["code"],
+                         "CISCO_AUTH_ERROR")
+        self.assertEqual(module.classify_api_error("cisco_search", "Cisco API credentials are not configured")["code"],
+                         "CISCO_AUTH_ERROR")
+        self.assertEqual(module.classify_api_error("cisco_search", "No matching images")["code"],
+                         "CISCO_DOWNLOAD_ERROR")
+        self.assertEqual(module.classify_api_error("archive_delete", "Archive item not found")["code"],
+                         "ARCHIVE_ERROR")
+        self.assertEqual(module.classify_api_error("upload_complete",
+                                                   "Not enough free disk space to extract tar archive")["code"],
+                         "STORAGE_ERROR")
+        module.cisco_download_jobs["dl"] = {"status": "failed", "error": "Cisco authorization failed: 403",
+                                            "created": time.time()}
+        try:
+            status = self.client.get("/api/cisco/downloads/dl").get_json()
+        finally:
+            module.cisco_download_jobs.clear()
+        self.assertEqual(status["failure"]["code"], "CISCO_AUTH_ERROR")
+
     def test_job_failures_are_classified(self):
         dependency = {"status": "failed", "exit_code": 1,
                       "log": "\tncs5500-dpa = 1.0.0.5 is needed by ncs5500-routing-1.0.0.2-r2512.x86_64\n"}

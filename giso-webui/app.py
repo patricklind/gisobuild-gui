@@ -44,7 +44,7 @@ from platform_validation import (
     validate_platform_options,
     validate_smu_selection,
 )
-from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
+from werkzeug.exceptions import BadRequest, NotFound, RequestEntityTooLarge
 
 
 def validate_image_reference(value: str) -> str:
@@ -456,6 +456,40 @@ def classify_error(message: str) -> dict:
                     "recoverable": recoverable, "suggested_action": action}
     return {"code": "BUILD_PLAN_BLOCKED", "human_message": message, "technical_message": message,
             "recoverable": True, "suggested_action": "Resolve the problem described, then check again."}
+
+
+CISCO_AUTH_PATTERN = re.compile(r"credential|authori[sz]ation|authenticat|access token", re.IGNORECASE)
+
+
+def classify_api_error(endpoint: str, message: str) -> dict:
+    """Structured form of an API error, using where it happened as well as what it says.
+
+    Upload, archive and Cisco messages are too varied to match one by one,
+    so the endpoint decides the family and the message only refines it.
+    """
+    detail = classify_error(message)
+    if endpoint.startswith("cisco_"):
+        if CISCO_AUTH_PATTERN.search(message):
+            return {**detail, "code": "CISCO_AUTH_ERROR",
+                    "human_message": "Cisco did not accept this service's API credentials.",
+                    "suggested_action": "Check the Cisco API client ID and secret configured for "
+                                        "this service, and that the account may download this software."}
+        return detail if detail["code"] != "BUILD_PLAN_BLOCKED" else {
+            **detail, "code": "CISCO_DOWNLOAD_ERROR",
+            "human_message": "The Cisco search or download could not be completed.",
+            "suggested_action": "Check the product ID and releases, then try again."}
+    if detail["code"] == "STORAGE_ERROR":
+        return detail
+    if endpoint.startswith("upload") or endpoint == "delete_upload":
+        return {**detail, "code": "UPLOAD_ERROR",
+                "human_message": "The file could not be uploaded or stored.",
+                "suggested_action": "Check the file type and size and upload it again; "
+                                    "wait for any running build or download to finish first."}
+    if endpoint.startswith("archive"):
+        return {**detail, "code": "ARCHIVE_ERROR",
+                "human_message": "The archived image could not be served or changed.",
+                "suggested_action": "Refresh the archive list; the item may have expired or been removed."}
+    return detail
 
 
 def classify_job_failure(job: dict) -> dict | None:
@@ -2697,6 +2731,13 @@ def security_headers(response):
         response.headers["Cache-Control"] = "no-store"
     request_id = getattr(g, "request_id", uuid.uuid4().hex[:12])
     response.headers["X-Request-ID"] = request_id
+    if response.status_code >= 400 and response.is_json and request.path.startswith("/api/"):
+        body = response.get_json(silent=True)
+        if isinstance(body, dict) and isinstance(body.get("error"), str) and "code" not in body:
+            detail = classify_api_error(request.endpoint or "", body["error"])
+            body.update({key: detail[key] for key in
+                         ("code", "human_message", "recoverable", "suggested_action")})
+            response.set_data(json.dumps(body))
     if request.endpoint not in {"health", "upload_chunk"} or response.status_code >= 400:
         elapsed_ms = round((time.monotonic() - getattr(g, "request_started", time.monotonic())) * 1000)
         log_event("http_request", elapsed_ms=elapsed_ms, endpoint=request.endpoint or "unknown",
@@ -2707,6 +2748,14 @@ def security_headers(response):
 @app.errorhandler(BadRequest)
 def bad_request(error):
     return jsonify(error=error.description or "Invalid request"), 400
+
+
+@app.errorhandler(NotFound)
+def not_found(error):
+    # API clients get JSON (and therefore an error code) instead of an HTML page.
+    if request.path.startswith("/api/"):
+        return jsonify(error="The requested item was not found"), 404
+    return error
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -3270,7 +3319,10 @@ def cisco_download_status(job_id: str):
     job = cisco_download_jobs.get(job_id)
     if not job:
         abort(404)
-    return jsonify({key: value for key, value in job.items() if key != "pending"})
+    body = {key: value for key, value in job.items() if key != "pending"}
+    if isinstance(job.get("error"), str):
+        body["failure"] = classify_api_error("cisco_download_status", job["error"])
+    return jsonify(body)
 
 
 @app.get("/api/archive")
