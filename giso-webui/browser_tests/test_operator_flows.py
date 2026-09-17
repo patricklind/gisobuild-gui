@@ -158,6 +158,23 @@ class OperatorFlowTests(unittest.TestCase):
         expect(excluded.filter(has_text=self.BGP)).to_contain_text(
             "Part of CSCTEST00001, left out because another RPM of the same fix cannot be installed")
         expect(self.page.locator("#start-build")).to_be_enabled()
+        # A Cisco search that returns the missing SMU pre-selects and labels it.
+        self.page.route("**/api/cisco/search", lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps({"id": "s1", "images": [
+                {"guid": "G1", "name": "asr9k-x64-7.3.2.CSCtest00099.tar", "release": "7.3.2", "size": 1048576},
+                {"guid": "G2", "name": "asr9k-x64-7.3.2.CSCtest00100.tar", "release": "7.3.2", "size": 1048576}]})))
+        self.page.evaluate("""() => { document.querySelector('#cisco-download').hidden = false;
+                                     document.querySelector('#cisco-download').open = true; }""")
+        form = self.page.locator("#cisco-search-form")
+        form.locator("[name=pid]").fill("ASR-9901")
+        form.locator("[name=current_release]").fill("7.3.2")
+        form.locator("[name=target_release]").fill("7.3.2")
+        form.locator("button[type=submit]").click()
+        needed = self.page.locator("#cisco-results label.needed-by-plan")
+        expect(needed).to_have_count(1)
+        expect(needed).to_contain_text("CSCtest00099.tar · 7.3.2 · 1.0 MB · needed by the current package plan")
+        expect(needed.locator("input")).to_be_checked()
+        expect(self.page.locator("#cisco-results input[value=G2]")).not_to_be_checked()
         callout = self.page.locator(".left-out-fixes")
         expect(callout).to_contain_text("2 RPMs left out: a required package is missing")
         expect(callout).to_contain_text("Download asr9k-x64-7.3.2.CSCtest00099 from Cisco and upload it")

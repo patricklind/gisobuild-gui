@@ -235,7 +235,12 @@ function renderDiskEstimate() {
       : '.');
 }
 
+// SMUs the current plan says to download (see exclude_unsatisfiable_packages());
+// Cisco search results that match are pre-selected and labelled.
+let neededPrerequisiteSmus = [];
+
 function applySmuRecommendation(plan) {
+  if (!plan.ready) neededPrerequisiteSmus = [];
   detectedPlatform = plan.platform || '';
   if (!packageListEdited) $('[name=pkglist]').value=(plan.selected || []).join('\n');
   // updatePlatformControls() force-checks "Skip USB image" for a platform
@@ -296,6 +301,7 @@ function applySmuRecommendation(plan) {
     // build can go ahead without them, but the operator should know what to
     // download to include them next time.
     const leftOut=plan.left_out_for_dependencies || [];
+    neededPrerequisiteSmus=[...new Set(leftOut.map(entry => entry.prerequisite_smu).filter(Boolean))];
     if (leftOut.length) {
       const needed=[...new Set(leftOut.map(entry => entry.prerequisite_smu).filter(Boolean))];
       // Every RPM excluded for this, including the rest of each affected fix.
@@ -1224,6 +1230,12 @@ $('#cisco-search-form').addEventListener('submit', async event => {
       label.dataset.name=image.name.toLowerCase();
       const input = document.createElement('input'); input.type='checkbox'; input.name='image_guid'; input.value=image.guid;
       const text = document.createElement('span'); text.textContent=`${image.name} · ${image.release || 'release not supplied'} · ${(image.size/1048576).toFixed(1)} MB${image.entitlement ? ' · contract required' : ''}`;
+      const needed = neededPrerequisiteSmus.find(smu => image.name.toLowerCase().startsWith(smu.toLowerCase()));
+      if (needed) {
+        input.checked = true;
+        label.classList.add('needed-by-plan');
+        text.textContent += ' · needed by the current package plan';
+      }
       label.append(input,text); list.appendChild(label);
     });
     $('#cisco-results-form').hidden = result.images.length === 0;

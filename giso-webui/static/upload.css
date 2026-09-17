@@ -17,3 +17,4 @@ a.secondary{display:inline-block;text-decoration:none}
 .disk-estimate{margin:10px 0 0;color:var(--muted);font-size:.9rem}.disk-estimate.bad{color:var(--red);font-weight:700}
 .inventory-changed{margin:10px 0;padding:9px 12px;border:1px solid #d9ad68;border-radius:7px;background:#fff8e8;color:var(--amber);font-size:.9rem}
 .confidence-badge.partial{border-color:var(--blue);background:var(--blue2)}.confidence-badge.partial b{color:var(--blue)}
+.needed-by-plan span{font-weight:600;color:var(--blue)}
