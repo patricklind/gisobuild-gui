@@ -166,6 +166,11 @@ docker compose up -d --build
 curl --fail http://127.0.0.1:8080/api/ready
 ```
 
+The image is built from this checkout, so an upgrade is `git pull` followed by
+`docker compose up -d --build`. `docker compose pull` fetches nothing by
+default: point `GISO_WEBUI_IMAGE` in `.env` at a published image
+(`ghcr.io/patricklind/gisobuild-gui:<version>`) to run that instead of building.
+
 The container runs as root with a read-only root filesystem, `no-new-privileges`
 and every Linux capability dropped except `SYS_CHROOT`, which gisobuild's eXR
 engine needs to inspect RPMs inside the extracted image. Without it the build

@@ -84,6 +84,11 @@ git pull --ff-only
 docker compose -f giso-webui/compose.yaml up --build -d
 ```
 
+`--build` is what upgrades the service: the default deployment builds its image
+from the checkout. `docker compose pull` only works when `GISO_WEBUI_IMAGE`
+names a published image; without it, pulling reports that the local image name
+does not exist in a registry.
+
 `down` preserves named volumes. Never add `-v` unless permanent deletion of all
 uploads, job history, work files, and archived artifacts is intentional.
 

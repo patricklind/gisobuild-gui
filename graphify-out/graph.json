@@ -5924,7 +5924,7 @@
       "file_type": "code",
       "norm_label": ".test_env_example_sets_nothing_that_only_the_socket_deployment_uses()",
       "source_file": "giso-webui/tests/test_selfcontained_packaging.py",
-      "source_location": "L60"
+      "source_location": "L64"
     },
     {
       "id": "giso_webui_tests_test_selfcontained_packaging_selfcontainedpackagingtests_test_every_base_image_is_pinned_by_digest",
@@ -5936,7 +5936,7 @@
       "file_type": "code",
       "norm_label": ".test_every_base_image_is_pinned_by_digest()",
       "source_file": "giso-webui/tests/test_selfcontained_packaging.py",
-      "source_location": "L68"
+      "source_location": "L72"
     },
     {
       "id": "giso_webui_tests_test_selfcontained_packaging_selfcontainedpackagingtests_test_image_pins_one_exact_gisobuild_commit_and_uses_the_local_runner",
@@ -9048,7 +9048,7 @@
       "node_kind": "heading",
       "norm_label": "alternative: `compose.socket.yaml` (docker socket)",
       "source_file": "README.md",
-      "source_location": "L178"
+      "source_location": "L183"
     },
     {
       "id": "readme_cisco_ios_xr_giso_builder",
@@ -9108,7 +9108,7 @@
       "node_kind": "heading",
       "norm_label": "license",
       "source_file": "README.md",
-      "source_location": "L225"
+      "source_location": "L230"
     },
     {
       "id": "readme_moving_an_existing_installation_to_the_default",
@@ -9120,7 +9120,7 @@
       "node_kind": "heading",
       "norm_label": "moving an existing installation to the default",
       "source_file": "README.md",
-      "source_location": "L196"
+      "source_location": "L201"
     },
     {
       "id": "readme_operational_limitations",
@@ -9132,7 +9132,7 @@
       "node_kind": "heading",
       "norm_label": "operational limitations",
       "source_file": "README.md",
-      "source_location": "L213"
+      "source_location": "L218"
     },
     {
       "id": "readme_quick_start",
@@ -9180,7 +9180,7 @@
       "node_kind": "heading",
       "norm_label": "security",
       "source_file": "README.md",
-      "source_location": "L206"
+      "source_location": "L211"
     },
     {
       "id": "readme_staging",
@@ -9438,7 +9438,7 @@
       "node_kind": "heading",
       "norm_label": "back up and restore state",
       "source_file": "docs/operations.md",
-      "source_location": "L90"
+      "source_location": "L95"
     },
     {
       "id": "docs_operations_decommission",
@@ -9450,7 +9450,7 @@
       "node_kind": "heading",
       "norm_label": "decommission",
       "source_file": "docs/operations.md",
-      "source_location": "L155"
+      "source_location": "L160"
     },
     {
       "id": "docs_operations_failure_handling",
@@ -9462,7 +9462,7 @@
       "node_kind": "heading",
       "norm_label": "failure handling",
       "source_file": "docs/operations.md",
-      "source_location": "L134"
+      "source_location": "L139"
     },
     {
       "id": "docs_operations_logs_and_capacity",
@@ -9498,7 +9498,7 @@
       "node_kind": "heading",
       "norm_label": "running behind a reverse proxy or tunnel",
       "source_file": "docs/operations.md",
-      "source_location": "L119"
+      "source_location": "L124"
     },
     {
       "id": "docs_operations_start_and_verify",
@@ -26371,7 +26371,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L119",
+      "source_location": "L124",
       "weight": 1.0
     },
     {
@@ -26382,7 +26382,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L134",
+      "source_location": "L139",
       "weight": 1.0
     },
     {
@@ -26393,7 +26393,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L155",
+      "source_location": "L160",
       "weight": 1.0
     },
     {
@@ -26437,7 +26437,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L90",
+      "source_location": "L95",
       "weight": 1.0
     },
     {
@@ -31959,7 +31959,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L206",
+      "source_location": "L211",
       "weight": 1.0
     },
     {
@@ -31970,7 +31970,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L213",
+      "source_location": "L218",
       "weight": 1.0
     },
     {
@@ -31981,7 +31981,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L225",
+      "source_location": "L230",
       "weight": 1.0
     },
     {
@@ -32036,7 +32036,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L178",
+      "source_location": "L183",
       "weight": 1.0
     },
     {
@@ -32047,7 +32047,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L196",
+      "source_location": "L201",
       "weight": 1.0
     },
     {
@@ -36898,7 +36898,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_selfcontained_packaging.py",
-      "source_location": "L60",
+      "source_location": "L64",
       "weight": 1.0
     },
     {
@@ -36909,7 +36909,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/tests/test_selfcontained_packaging.py",
-      "source_location": "L68",
+      "source_location": "L72",
       "weight": 1.0
     },
     {
@@ -38592,7 +38592,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L211",
+      "source_location": "L216",
       "weight": 1.0
     },
     {
@@ -39079,5 +39079,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "cccda17c7fe640bc292bc5d72f29e7ecd51583f3"
+  "built_at_commit": "cc9db92201ca8ee8eba0a166ee9a9dfe701b3a03"
 }

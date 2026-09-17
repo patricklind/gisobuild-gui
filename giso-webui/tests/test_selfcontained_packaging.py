@@ -47,6 +47,10 @@ class SelfContainedPackagingTests(unittest.TestCase):
 
     def test_default_compose_builds_our_image_and_the_socket_variant_is_explicit_and_pinned(self):
         self.assertIn("dockerfile: docker/selfcontained.Dockerfile", self.compose)
+        # A published image can replace the local build without editing compose
+        # (a real deployment ran "docker compose pull" against the local name).
+        self.assertEqual(self.compose.count("image: ${GISO_WEBUI_IMAGE:-giso-webui-selfcontained}"), 2)
+        self.assertIn("GISO_WEBUI_IMAGE", ENV_EXAMPLE.read_text())
         self.assertNotIn("GISO_IMAGE", self.compose)
         socket = SOCKET_COMPOSE.read_text()
         self.assertIn("/var/run/docker.sock", socket)

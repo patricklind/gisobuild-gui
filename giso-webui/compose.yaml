@@ -5,6 +5,11 @@
 # image. The older socket-based deployment is compose.socket.yaml.
 #
 #   cd giso-webui && docker compose up -d --build
+#
+# That builds the image here. To run a published image instead, set
+# GISO_WEBUI_IMAGE in .env (for example
+# ghcr.io/patricklind/gisobuild-gui:v1.2.3) and use docker compose pull:
+# a plain "docker compose pull" cannot fetch the local build name below.
 services:
   giso-webui:
     build:
@@ -14,7 +19,7 @@ services:
         SOURCE_REVISION: "${SOURCE_REVISION:-unknown}"
         BUILD_DATE: "${BUILD_DATE:-unknown}"
         APP_VERSION: "${APP_VERSION:-0.0.1}"
-    image: giso-webui-selfcontained
+    image: ${GISO_WEBUI_IMAGE:-giso-webui-selfcontained}
     # gisobuild and Cisco IOS XR images are x86_64.
     platform: linux/amd64
     container_name: giso-webui
@@ -64,7 +69,7 @@ services:
     restart: unless-stopped
 
   archive-maintenance:
-    image: giso-webui-selfcontained
+    image: ${GISO_WEBUI_IMAGE:-giso-webui-selfcontained}
     platform: linux/amd64
     container_name: giso-archive-maintenance
     depends_on:
