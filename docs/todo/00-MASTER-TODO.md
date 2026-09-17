@@ -30,7 +30,9 @@ Core principle:
       `rpm -qp`; renamed files, unreadable files, incomplete fixes and MD5
       mismatches against Cisco's SMU README are excluded with reasons, and
       unsatisfiable dependencies block the plan naming the prerequisite SMU.
-      Signature metadata is not read (gisobuild checks signatures itself).
+      Header signature algorithm/key ID is read (not verified; gisobuild
+      verifies), and automatic selection leaves out packages proven unable
+      to install - proven by a real 19-RPM NCS5500 build.
 - [x] Automatically group RPMs by CSC — `package_groups`/`smuGroupCard()`.
 - [x] Automatically exclude incompatible packages with reasons — wrong
       platform/release/architecture, superseded, and duplicate-conflict all
@@ -80,8 +82,8 @@ Core principle:
 - [ ] Canonical package/inventory model
 - [ ] Upstream-driven platform/capability model
 - [ ] ISO metadata inspection
-- [ ] RPM metadata inspection — header identity/dependencies done; RPM
-      signature metadata still open
+- [x] RPM metadata inspection — header identity, dependencies and signature
+      metadata (`02-AUTOMATION-BUILDPLAN-TODO.md` "RPM inspection")
 - [ ] CSC grouping and supersedence model
 - [x] Unified automatic/manual selection engine (`02-AUTOMATION-BUILDPLAN-TODO.md`)
 - [x] Immutable BuildPlan
