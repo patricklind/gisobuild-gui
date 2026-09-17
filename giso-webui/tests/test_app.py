@@ -1681,6 +1681,44 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotEqual(second["fingerprint"], third["fingerprint"])
         self.assertEqual(third["gisobuild_commit"], "def5678")
 
+    def test_automatic_and_manual_selection_reach_the_same_plan(self):
+        # One backend model: choosing by hand exactly what automatic selection
+        # chose must give the same packages, blockers and warnings.
+        (self.data / "asr9k-x64-7.3.2.iso").write_bytes(b"iso")
+        for name in ("asr9k-x64-routing-1.0.0.1-r732.CSCtest00001.x86_64.rpm",
+                     "asr9k-x64-bgp-1.0.0.1-r732.CSCtest00002.x86_64.rpm"):
+            (self.data / name).write_bytes(name.encode())
+        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00003.x86_64.rpm").write_bytes(b"other")
+        base = {"iso": "asr9k-x64-7.3.2.iso", "platform": "asr9k", "auto_repo": True}
+        automatic = self.client.post("/api/build-plan", json={
+            **base, "pkglist": [], "automatic_smu_selection": True}).get_json()
+        manual = self.client.post("/api/build-plan", json={
+            **base, "automatic_smu_selection": False,
+            "pkglist": [item["id"] for item in automatic["selected_packages"]]}).get_json()
+        self.assertTrue(automatic["ready"], automatic["blockers"])
+        self.assertEqual(len(automatic["selected_packages"]), 2)
+        for key in ("selected_packages", "blockers", "warnings", "platform", "engine", "release"):
+            self.assertEqual(automatic[key], manual[key], key)
+
+    def test_compatibility_check_reports_the_dependency_blocker_the_plan_would(self):
+        (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
+        rpm = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
+        (self.data / rpm).write_bytes(b"rpm")
+        missing = [{"requirement": "ncs5500-dpa = 1.0.0.5", "required_by": [rpm],
+                    "base_image_has": "1.0.0.0"}]
+        with patch("app.missing_package_dependencies", return_value=missing), \
+                patch("app.inspect_iso_shipped_packages", return_value={"ncs5500-dpa": "1.0.0.0"}):
+            check = self.client.post("/api/compatibility", json={
+                "iso": "ncs5500-x64-25.1.2.iso", "packages": [rpm]}).get_json()
+            plan = self.client.post("/api/build-plan", json={
+                "iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500", "pkglist": [rpm],
+                "automatic_smu_selection": False}).get_json()
+        self.assertFalse(check["smu"]["compatible"])
+        self.assertEqual(check["smu"]["unsatisfied_dependencies"], missing)
+        dependency_line = module.dependency_blocker_text(missing[0])
+        self.assertIn(dependency_line, check["smu"]["issues"])
+        self.assertIn(dependency_line, plan["blockers"])
+
     def test_build_plan_returns_blockers_instead_of_enabling_invalid_build(self):
         response = self.client.post("/api/build-plan", json={
             "iso": "missing.iso", "platform": "asr9k", "pkglist": [],

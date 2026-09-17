@@ -338,9 +338,30 @@ Never silently exclude without a reason.
 
 ## Unified selection engine
 
-- [ ] automatic mode and manual mode use the same backend model
-- [ ] manual mode modifies BuildPlan
-- [ ] no separate incompatible selection path
+- [x] automatic mode and manual mode use the same backend model - both are
+      a `create_build_plan()` payload; automatic mode only chooses the
+      identifiers, then the same resolution, `validate_smu_selection()`,
+      `selection_integrity_blockers()`, dependency, space and environment
+      checks run. `create_job()` pins the plan's resolved package IDs and
+      turns automatic selection off, so `build_command()` builds exactly the
+      reviewed set. Test: `test_automatic_and_manual_selection_reach_the_same_plan`.
+- [x] manual mode modifies BuildPlan - the manual `pkglist` becomes the
+      plan's `selected_packages` and is re-derived at Start.
+- [x] no separate incompatible selection path - fixed 2026-09-17: the
+      manual "Check compatibility" endpoint (`/api/compatibility`) skipped
+      the dependency check, so it could say "compatible" for a selection
+      the plan then blocked. It now reports `unsatisfied_dependencies` and
+      the identical blocker text (`dependency_blocker_text()`); the UI
+      metric is renamed "Package checks" because it is no longer
+      filename-only. Test:
+      `test_compatibility_check_reports_the_dependency_blocker_the_plan_would`.
+      Live, `--rm` container, real NCS5500 25.1.2 bundle and 20 SMUs:
+      automatic plan 24 RPMs with 5 dependency blockers
+      (`ncs5500-dpa = 1.0.0.5`, `ncs5500-dpa-fwding = 1.0.0.2`,
+      `ncs5500-fwding = 1.0.0.3`, `ncs5500-os = 1.0.0.1`,
+      `ncs5500-os-support = 1.0.0.2`); manual plan with the same IDs had
+      identical blockers; `/api/compatibility` for the same names returned
+      `compatible: false` with the same 5 lines.
 - [x] never submit workspace paths as package identifiers
 
 ## BuildPlan

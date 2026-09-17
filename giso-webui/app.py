@@ -916,6 +916,16 @@ def iso_identity(iso_path: Path) -> tuple[str, bool]:
     return iso_path.name, False
 
 
+def dependency_blocker_text(entry: dict) -> str:
+    """One operator-facing line per unsatisfiable requirement, shared by every gate."""
+    return (
+        f"{entry['requirement']} is required by {', '.join(entry['required_by'])}, "
+        f"but the base image ships {entry['requirement'].split(' = ')[0]} "
+        f"{entry['base_image_has']} and no selected package provides it — "
+        f"download the Cisco SMU that provides {entry['requirement']}"
+    )
+
+
 def unsatisfied_dependencies_for_recommendation(iso_relative_path: str, selected_names: list[str]) -> list[dict]:
     """Run the pre-build dependency check for a Step 2 preview selection.
 
@@ -929,11 +939,14 @@ def unsatisfied_dependencies_for_recommendation(iso_relative_path: str, selected
         return []
     try:
         iso_path = safe_data_path(iso_relative_path)
+        if not iso_path.is_file():
+            return []
+        shipped = inspect_iso_shipped_packages(iso_path)
     except (OSError, ValueError):
         return []
     by_name = {item["basename"]: item for item in inventory_files() if item["type"] == ".rpm"}
     selected = [by_name[name] for name in selected_names if name in by_name]
-    return missing_package_dependencies(selected, inspect_iso_shipped_packages(iso_path))
+    return missing_package_dependencies(selected, shipped)
 
 
 def inventory_id(relative_path: str, sha256: str) -> str:
@@ -1306,13 +1319,7 @@ def create_build_plan(payload: dict) -> dict:
         unsatisfied = missing_package_dependencies(
             selected, inspect_iso_shipped_packages(safe_data_path(iso["relative_path"]))
         )
-        blockers.extend(
-            f"{entry['requirement']} is required by {', '.join(entry['required_by'])}, "
-            f"but the base image ships {entry['requirement'].split(' = ')[0]} "
-            f"{entry['base_image_has']} and no selected package provides it — "
-            f"download the Cisco SMU that provides {entry['requirement']}"
-            for entry in unsatisfied
-        )
+        blockers.extend(dependency_blocker_text(entry) for entry in unsatisfied)
 
     # The estimate the Step 2 UI already showed (base ISO + selected RPMs) is
     # the best lower bound available for what this build has to write, so use
@@ -2516,9 +2523,14 @@ def compatibility():
             identity_name, package_names, iso_architectures=iso_architectures,
             full_candidate_packages=active_rpm_names()[0],
         )
-        readme_issues = selection_integrity_blockers(package_names)
-        if readme_issues:
-            smu["issues"] = sorted(set(smu["issues"]) | set(readme_issues))
+        # The same package-level proofs create_build_plan() blocks on, so this
+        # manual check can never call a selection compatible that Start would
+        # then refuse.
+        extra_issues = selection_integrity_blockers(package_names)
+        smu["unsatisfied_dependencies"] = unsatisfied_dependencies_for_recommendation(iso, package_names)
+        extra_issues += [dependency_blocker_text(entry) for entry in smu["unsatisfied_dependencies"]]
+        if extra_issues:
+            smu["issues"] = sorted(set(smu["issues"]) | set(extra_issues))
             smu["compatible"] = False
         result = {"smu": smu, "upgrade": None}
         matrix_name = body.get("matrix", "")

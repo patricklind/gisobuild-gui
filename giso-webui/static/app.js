@@ -469,7 +469,7 @@ function compatibilityList(title, items, state) {
 function renderCompatibilityResult(result, check, payload) {
   const summary=document.createElement('div'); summary.className='compatibility-summary';
   summary.append(
-    compatibilityMetric(check.smu.compatible ? '✓' : '×','Package filename checks',check.smu.compatible ? 'Passed' : 'Blocked',check.smu.compatible ? 'pass' : 'fail'),
+    compatibilityMetric(check.smu.compatible ? '✓' : '×','Package checks',check.smu.compatible ? 'Passed' : 'Blocked',check.smu.compatible ? 'pass' : 'fail'),
     compatibilityMetric('▦','RPM packages',String(check.smu.checked),'neutral'),
     compatibilityMetric('◆','CSC groups',String(check.smu.package_groups.length),'neutral'),
   );
