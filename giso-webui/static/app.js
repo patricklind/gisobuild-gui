@@ -856,6 +856,18 @@ function renderBuildReport(job) {
   const meta=document.createElement('p'); meta.className='build-report-meta';
   meta.textContent=`Inventory revision ${plan.inventory_revision} · BuildPlan fingerprint ${plan.fingerprint.slice(0,16)}…`;
   body.appendChild(meta);
+  if (job.stages?.length) {
+    // How long each pipeline step took (run_job()'s enter_stage()).
+    const label = {preflight:'Preflight', preparing_builder:'Builder', building:'gisobuild', verifying:'Verify', archiving:'Archive'};
+    const format = seconds => seconds >= 60 ? `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s` : `${seconds.toFixed(1)}s`;
+    const timed = job.stages.filter(entry => label[entry.stage] && entry.ended !== undefined)
+      .map(entry => `${label[entry.stage]} ${format(entry.ended - entry.started)}`);
+    if (timed.length) {
+      const stages=document.createElement('p'); stages.className='build-report-meta';
+      stages.textContent=`Time per step: ${timed.join(' · ')}`;
+      body.appendChild(stages);
+    }
+  }
   if (job.builder_image) {
     // Which builder actually ran: a registry pull, or the host's cached copy
     // because the registry could not be reached (see run_job()).

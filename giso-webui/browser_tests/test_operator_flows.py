@@ -152,6 +152,12 @@ class OperatorFlowTests(unittest.TestCase):
         module.jobs["done"] = {
             "id": "done", "status": "success", "created": 1, "updated": 2, "finished": 2,
             "progress": 100, "phase": "Complete", "log": "", "artifacts": [],
+            "stages": [{"stage": "preflight", "started": 100, "ended": 100.4},
+                       {"stage": "preparing_builder", "started": 100.4, "ended": 102},
+                       {"stage": "building", "started": 102, "ended": 327},
+                       {"stage": "verifying", "started": 327, "ended": 327.2},
+                       {"stage": "archiving", "started": 327.2, "ended": 339},
+                       {"stage": "complete", "started": 339, "ended": 339}],
             "builder_image": {"reference": "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
                               "id": "sha256:" + "be" * 32, "source": "cache"},
             "build_plan": {"iso": {"relative_path": self.ISO, "sha256": "0" * 64},
@@ -166,6 +172,8 @@ class OperatorFlowTests(unittest.TestCase):
         expect(report).to_contain_text(
             "Builder ciscogisobuild/cisco-xr-gisobuild:2.3.4 · cached copy on this host "
             "(registry unreachable) · sha256:bebebebebebe")
+        expect(report).to_contain_text(
+            "Time per step: Preflight 0.4s · Builder 1.6s · gisobuild 3m 45s · Verify 0.2s · Archive 11.8s")
 
     def test_failed_build_says_what_went_wrong_and_what_to_do(self):
         module.jobs["broken"] = {

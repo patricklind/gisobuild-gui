@@ -12,6 +12,7 @@ RPM dependency check. No container, image, network or Cisco content is used.
 
 import hashlib
 import io
+import itertools
 import json
 import os
 import stat
@@ -194,6 +195,14 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.assertEqual(job["status"], "success", job.get("log"))
         self.assertEqual(job["exit_code"], 0)
         self.assertEqual(module.jobs[job_id]["builder_image"]["source"], "registry")
+        # Every pipeline step is recorded in order with its own timing.
+        stages = module.jobs[job_id]["stages"]
+        self.assertEqual([entry["stage"] for entry in stages],
+                         ["preflight", "preparing_builder", "building", "verifying", "archiving", "complete"])
+        self.assertEqual(job["stage"], "complete")
+        for earlier, later in itertools.pairwise(stages):
+            self.assertLessEqual(earlier["started"], earlier["ended"])
+            self.assertEqual(earlier["ended"], later["started"])
         self.assertIn("Gisobuild starting", job["log"])
         self.assertIn("Golden ISO build complete", job["log"])
 
@@ -239,6 +248,8 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.assertEqual(job["status"], "failed")
         self.assertEqual(job["exit_code"], 1)
         self.assertEqual(job["failure"]["code"], "DEPENDENCY_ERROR")
+        self.assertEqual([e["stage"] for e in module.jobs[job["id"]]["stages"]],
+                         ["preflight", "preparing_builder", "building", "verifying", "failed"])
         self.assertEqual(job["missing_dependencies"], [{
             "requirement": "ncs5500-dpa = 1.0.0.5",
             "required_by": "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64",
@@ -284,6 +295,8 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
 
         self.assertEqual(job["status"], "cancelled")
         self.assertIn("Build cancelled by user.", job["log"])
+        self.assertEqual(job["stage"], "cancelled")
+        self.assertNotIn("verifying", [e["stage"] for e in job["stages"]])
         self.assertEqual(self.stops_file.read_text().split(), [f"giso-build-{job_id}"])
         self.assertFalse((module.ARCHIVE / job_id).exists())
         self.assertTrue(iso.exists())
@@ -338,6 +351,7 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
                                                       "pkglist": []}))
         self.assertEqual(job["status"], "failed")
         self.assertIn("could not be pulled (exited with status 1) and is not cached", job["log"])
+        self.assertEqual([e["stage"] for e in job["stages"]], ["preflight", "preparing_builder", "failed"])
         self.assertFalse(self.args_file.exists())  # the engine never ran
         self.assertTrue(iso.exists())
         self.assertTrue(rpm.exists())

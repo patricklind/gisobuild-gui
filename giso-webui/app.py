@@ -2477,6 +2477,38 @@ def local_builder_image_id() -> str | None:
     return image_id if result.returncode == 0 and image_id.startswith("sha256:") else None
 
 
+JOB_STAGES = ("preflight", "preparing_builder", "building", "verifying", "archiving",
+              "complete", "failed", "cancelled")
+TERMINAL_STAGES = {"complete", "failed", "cancelled"}
+
+
+def enter_stage(job_id: str, stage: str, at: float | None = None) -> None:
+    """Record the machine-readable step a job is in, with timings per step.
+
+    `status` stays coarse (queued/running/finalizing/...) and `phase` stays
+    human text; `stage` names the pipeline step and `stages` keeps when each
+    started and ended, so how long preflight, image preparation, the
+    gisobuild run, output verification and archiving each took is visible
+    per job. Repeating the current stage, or leaving a terminal one, is a
+    no-op.
+    """
+    if stage not in JOB_STAGES:
+        raise ValueError(f"Unknown job stage: {stage}")
+    now = time.time() if at is None else at
+    with job_lock:
+        job = jobs.get(job_id)
+        if job is None or job.get("stage") == stage or job.get("stage") in TERMINAL_STAGES:
+            return
+        history = job.setdefault("stages", [])
+        if history and "ended" not in history[-1]:
+            history[-1]["ended"] = now
+        entry = {"stage": stage, "started": now}
+        if stage in TERMINAL_STAGES:
+            entry["ended"] = now
+        history.append(entry)
+        job["stage"] = stage
+
+
 def run_job(job_id: str, command: list[str]) -> None:
     with job_lock:
         job_started = jobs[job_id]["created"]
@@ -2485,6 +2517,7 @@ def run_job(job_id: str, command: list[str]) -> None:
     try:
         append_log(job_id, "$ " + shlex.join(command) + "\n\n")
         log_event("build_started", job_id=job_id, **build_log_context)
+        enter_stage(job_id, "preparing_builder")
         if GISO_RUNNER == "docker":
             log_event("image_pull_started", job_id=job_id)
             pull = subprocess.Popen(
@@ -2547,6 +2580,7 @@ def run_job(job_id: str, command: list[str]) -> None:
                     "id": None, "source": "bundled",
                 }
         process_env, process_cwd = builder_process_environment(job_id)
+        enter_stage(job_id, "building")
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, bufsize=1, start_new_session=True,
                                 env=process_env, cwd=process_cwd)
@@ -2566,6 +2600,7 @@ def run_job(job_id: str, command: list[str]) -> None:
             job_processes.pop(job_id, None)
         if cancellation_requested(job_id):
             raise BuildCancelled("Build cancelled")
+        enter_stage(job_id, "verifying")
         artifacts = []
         job_dir = OUTPUT / job_id
         if job_dir.exists():
@@ -2576,6 +2611,7 @@ def run_job(job_id: str, command: list[str]) -> None:
             path.suffix.lower() == ".iso" for path in giso_artifact_candidates(job_dir)
         )
         if success:
+            enter_stage(job_id, "archiving")
             with job_lock:
                 jobs[job_id]["status"] = "finalizing"
                 cleanup_paths = [Path(path) for path in jobs[job_id].get("cleanup_paths", [])]
@@ -2590,6 +2626,7 @@ def run_job(job_id: str, command: list[str]) -> None:
                                     progress=100 if success else jobs[job_id].get("progress", 0),
                                     phase="Complete" if success else "Build failed")
             job_snapshot = dict(jobs[job_id])
+        enter_stage(job_id, "complete" if success else "failed")
         persist_job(job_id)
         if success:
             write_build_report(job_id, job_snapshot, artifacts)
@@ -2597,6 +2634,7 @@ def run_job(job_id: str, command: list[str]) -> None:
                   status="success" if success else "failed",
                   duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
     except BuildCancelled:
+        enter_stage(job_id, "cancelled")
         with job_lock:
             job_processes.pop(job_id, None)
             jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
@@ -2606,6 +2644,9 @@ def run_job(job_id: str, command: list[str]) -> None:
                   duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
     except Exception as exc:  # noqa: BLE001 - background failures must update job state
         append_log(job_id, f"\nERROR: {exc}\n")
+        with job_lock:
+            cancelled = jobs[job_id]["status"] in {"cancelling", "cancelled"}
+        enter_stage(job_id, "cancelled" if cancelled else "failed")
         with job_lock:
             job_processes.pop(job_id, None)
             if jobs[job_id]["status"] in {"cancelling", "cancelled"}:
@@ -3515,6 +3556,7 @@ def create_job():
         payload = validate_build_payload(json_object())
     except (TypeError, ValueError) as exc:
         return jsonify(error=str(exc)), 400
+    preflight_started = time.time()
     with operation_lock:
         if cisco_download_running():
             return jsonify(error="Wait for the Cisco download to finish before starting a build"), 409
@@ -3545,7 +3587,9 @@ def create_job():
                             "updated": time.time(), "progress": 1, "phase": "Validating inputs",
                             "log": "", "artifacts": [], "payload": payload, "command": [],
                             "inventory_revision": plan["inventory_revision"],
-                            "plan_fingerprint": plan["fingerprint"], "build_plan": plan}
+                            "plan_fingerprint": plan["fingerprint"], "build_plan": plan,
+                            "stage": "preflight",
+                            "stages": [{"stage": "preflight", "started": preflight_started}]}
         try:
             command = build_command(payload, job_id)
             cleanup_paths = build_cleanup_paths(payload, plan["selected_packages"])
@@ -3640,6 +3684,7 @@ def cancel_job(job_id: str):
         with job_lock:
             jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
                                 updated=time.time())
+        enter_stage(job_id, "cancelled")
         append_log(job_id, "\nBuild cancelled by user.\n")
         persist_job(job_id)
         return jsonify(ok=True)
@@ -3653,6 +3698,7 @@ def cancel_job(job_id: str):
         return jsonify(error="The build container could not be stopped"), 503
     with job_lock:
         jobs[job_id].update(status="cancelled", finished=time.time(), updated=time.time())
+    enter_stage(job_id, "cancelled")
     append_log(job_id, "\nBuild cancelled by user.\n")
     persist_job(job_id)
     return jsonify(ok=True)

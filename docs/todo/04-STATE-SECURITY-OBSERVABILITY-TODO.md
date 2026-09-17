@@ -61,22 +61,16 @@ Persist:
 Explicit states:
 
 - [x] queued
-- [ ] analyzing — no distinct state; covered by `"queued"` with
-      `phase="Validating inputs"` until `create_build_plan()` finishes.
-- [ ] preflight — no distinct state; the BuildPlan check happens before a
-      job is created at all (`/api/build-plan`/`create_job()`), not as a
-      job-visible state.
-- [x] building — implemented as `status="running"` plus a human-readable
-      `phase` string that tracks real log milestones (`append_log()`'s
-      `milestones` table: "Scanning update packages", "Building Golden ISO",
-      etc.), not as a separate `status` enum value. Verified by
-      `test_build_progress_follows_real_log_milestones`.
-- [ ] verifying — no distinct state; artifact verification
-      (`giso_artifact_candidates`/checksum comparison) happens synchronously
-      inside the "finalizing"/"committing" transition, not as its own
-      job-visible status.
-- [ ] archiving — no distinct state; covered by `status="finalizing"` /
-      `"committing"` in `run_job()`/`prepare_destructive_finalization()`.
+- [x] analyzing / preflight — 2026-09-17: recorded as job `stage`
+      `preflight`, timed from the `POST /api/jobs` request (the environment
+      checks and the full BuildPlan) until the job is handed to `run_job()`.
+- [x] building — `status="running"` with milestone-driven `phase`
+      (`test_build_progress_follows_real_log_milestones`), and stages
+      `preparing_builder` (Docker pull or nothing for the local runner) and
+      `building` (the gisobuild process).
+- [x] verifying — stage `verifying`: output discovery and the "exit 0 *and*
+      an ISO" success decision.
+- [x] archiving — stage `archiving` (while `status="finalizing"`).
 - [x] success
 - [x] failed
 - [x] cancelling
@@ -89,10 +83,15 @@ The actual state machine (`queued` → `running` → `finalizing`/`committing` �
 `success`/`failed`/`cancelled`/`interrupted`, with `cancelling` as a
 transient request-to-cancel marker) uses a coarser `status` plus a free-text
 `phase` for detail, rather than the finer-grained named states this list
-originally proposed. This is a deliberate two-field design, not a partial
-implementation of the list above — `analyzing`/`preflight`/`verifying`/
-`archiving` were never built as literal `status` values and are not planned
-to be; the `phase` field already carries that detail to the UI.
+originally proposed. Since 2026-09-17 a third, machine-readable field sits
+beside them: `stage` (`preflight`, `preparing_builder`, `building`,
+`verifying`, `archiving`, then `complete`/`failed`/`cancelled`) and `stages`,
+the ordered history with `started`/`ended` per step (`enter_stage()`), so a
+job shows where it is and how long each step took without changing the
+`status` values every client already uses. Tests: stage sequences for
+success, dependency failure, missing builder image and cancellation in
+`tests/test_integration_build.py`; the build report shows "Time per step"
+(`test_build_report_shows_a_cached_builder_fallback`, browser).
 
 ## Concurrency
 
