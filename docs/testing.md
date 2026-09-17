@@ -29,7 +29,9 @@ boundary" in `AGENTS.md`. `docker/tooling.Dockerfile` is a small, pinned
 container (Python 3.12 + git) that `rehearse.py`'s pure-stdlib logic runs in
 unmodified; build it once and reuse the image.
 
-CI additionally runs Ruff and `pip-audit`. Locally, run the pinned
+CI additionally runs Ruff, `pip-audit`, the Docker-only guard, the Graphify
+freshness check, Trivy, and the platform drift tests inside the self-contained
+image (see the command reference below). Locally, run the pinned
 equivalents from the same `gisobuild-tooling` image built above — never
 `pip install ruff`/`pip install pip-audit` on the host:
 
@@ -104,6 +106,13 @@ docker compose -f giso-webui/compose.yaml ps
 ```
 
 This verifies the application and Docker connection, not `gisobuild` output.
+For the self-contained deployment use `-f giso-webui/compose.selfcontained.yaml`;
+`/api/ready`'s `self_test.gisobuild_source` must report that every bundled file
+matches the pinned SHA-256 manifest.
+
+The documented Docker-only workflow was last run end to end on a clean machine
+(a throwaway Docker-in-Docker container with only git and Docker) on
+2026-09-17: every image built from scratch and every check above passed.
 
 ## 3. Licensed-ISO acceptance test
 

@@ -132,16 +132,22 @@ cd ..
 bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
 ```
 
-GitHub Actions runs unit tests (inside the built container image), staging
-rehearsal, Ruff, `pip-audit`, Actionlint, Hadolint, Compose validation, shell
-syntax validation, and an application container build for every pull request.
+GitHub Actions runs, for every pull request: unit and synthetic integration
+tests inside the built container image, Playwright browser tests, the staging
+rehearsal, Ruff (including flake8-bandit rules), `pip-audit`, Actionlint,
+Hadolint, Compose and shell syntax validation, a Graphify freshness check, a
+guard against host-side tooling in docs and scripts, both container builds,
+Trivy scans, an SBOM, and the platform drift tests against the gisobuild
+bundled in the self-contained image.
 See the [release process](docs/releasing.md) for versioned GHCR publication.
 
 ## Self-contained deployment (no Docker socket)
 
 `docker/selfcontained.Dockerfile` bundles the web app with
 [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at a pinned, verified
-commit on upstream's own AlmaLinux 8.10 base. Builds run as child processes of
+commit on upstream's own AlmaLinux 8.10 base. The image build also checks every
+bundled gisobuild file against a pinned SHA-256 manifest, and the web app checks
+it again at startup; a mismatch fails `/api/ready` and blocks builds. Builds run as child processes of
 the web app: no Docker socket, no second builder container, no builder image
 pull and no host `.gisobuild-tool` checkout.
 
@@ -154,8 +160,9 @@ curl --fail http://127.0.0.1:8080/api/ready
 The container runs as root with a read-only root filesystem, `no-new-privileges`
 and every Linux capability dropped except `SYS_CHROOT`, which gisobuild's eXR
 engine needs to inspect RPMs inside the extracted image. Without it the build
-plan is blocked with an explanation. `/api/version` reports `runner: local` and
-the bundled gisobuild commit. A real NCS5500 25.1.2 Golden ISO has been built
+plan is blocked with an explanation. `/api/version` reports `runner: local`, the
+bundled gisobuild commit and its source SHA-256. Releases publish this image as
+`ghcr.io/patricklind/gisobuild-gui:<version>-selfcontained` (`linux/amd64`). A real NCS5500 25.1.2 Golden ISO has been built
 this way; LNT images have not yet been exercised in this deployment.
 
 ## Security

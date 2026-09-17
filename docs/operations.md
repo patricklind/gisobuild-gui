@@ -42,7 +42,8 @@ local `gisobuild` tool entry point is unavailable — use it to decide whether
 to route traffic or investigate a degraded-but-alive container, not whether to
 restart it. Its `self_test` object names each startup check (gisobuild, runner
 binary, job store schema, writable volumes, configuration, free space, CPU
-architecture) with a short reason. Image pulls are bounded by
+architecture, and `gisobuild_source` in the self-contained image) with a short
+reason. Image pulls are bounded by
 `GISO_PULL_TIMEOUT_SECONDS` (600 seconds by default); if the pull fails or times
 out, a builder image already on the host is used and the job log says so (a
 digest-pinned reference is identical; a tag may be older). Without a cached
@@ -59,7 +60,10 @@ builds or cleanup.
 
 The self-contained deployment is operated the same way with
 `-f giso-webui/compose.selfcontained.yaml`; it needs no `.gisobuild-tool`
-checkout and no Docker socket.
+checkout and no Docker socket. Its `/api/ready` self-test also re-checks the
+bundled gisobuild against the image's pinned SHA-256 manifest. A failed or
+cancelled build's work files and extracted image are removed automatically
+(logs are kept), and so are those of a build interrupted by a restart.
 
 ## Stop and upgrade
 

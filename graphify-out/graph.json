@@ -8591,7 +8591,7 @@
       "node_kind": "heading",
       "norm_label": "build workflow",
       "source_file": "giso-webui/README.md",
-      "source_location": "L76"
+      "source_location": "L80"
     },
     {
       "id": "giso_webui_readme_configuration",
@@ -8603,7 +8603,7 @@
       "node_kind": "heading",
       "norm_label": "configuration",
       "source_file": "giso-webui/README.md",
-      "source_location": "L137"
+      "source_location": "L141"
     },
     {
       "id": "giso_webui_readme_data_lifecycle",
@@ -8615,7 +8615,7 @@
       "node_kind": "heading",
       "norm_label": "data lifecycle",
       "source_file": "giso-webui/README.md",
-      "source_location": "L170"
+      "source_location": "L174"
     },
     {
       "id": "giso_webui_readme_ios_xr_giso_web_ui",
@@ -8639,7 +8639,7 @@
       "node_kind": "heading",
       "norm_label": "optional cisco software download",
       "source_file": "giso-webui/README.md",
-      "source_location": "L13"
+      "source_location": "L16"
     },
     {
       "id": "giso_webui_readme_requirements",
@@ -8651,7 +8651,7 @@
       "node_kind": "heading",
       "norm_label": "requirements",
       "source_file": "giso-webui/README.md",
-      "source_location": "L43"
+      "source_location": "L46"
     },
     {
       "id": "giso_webui_readme_security_and_disclaimer",
@@ -8663,7 +8663,7 @@
       "node_kind": "heading",
       "norm_label": "security and disclaimer",
       "source_file": "giso-webui/README.md",
-      "source_location": "L252"
+      "source_location": "L265"
     },
     {
       "id": "giso_webui_readme_start",
@@ -8675,7 +8675,7 @@
       "node_kind": "heading",
       "norm_label": "start",
       "source_file": "giso-webui/README.md",
-      "source_location": "L57"
+      "source_location": "L61"
     },
     {
       "id": "giso_webui_readme_stop",
@@ -8687,7 +8687,7 @@
       "node_kind": "heading",
       "norm_label": "stop",
       "source_file": "giso-webui/README.md",
-      "source_location": "L246"
+      "source_location": "L259"
     },
     {
       "id": "giso_webui_readme_test_and_verify",
@@ -8699,7 +8699,7 @@
       "node_kind": "heading",
       "norm_label": "test and verify",
       "source_file": "giso-webui/README.md",
-      "source_location": "L207"
+      "source_location": "L211"
     },
     {
       "id": "giso_webui_readme_troubleshooting",
@@ -8711,7 +8711,7 @@
       "node_kind": "heading",
       "norm_label": "troubleshooting",
       "source_file": "giso-webui/README.md",
-      "source_location": "L223"
+      "source_location": "L228"
     },
     {
       "id": "readme_cisco_ios_xr_giso_builder",
@@ -8747,7 +8747,7 @@
       "node_kind": "heading",
       "norm_label": "license",
       "source_file": "README.md",
-      "source_location": "L180"
+      "source_location": "L187"
     },
     {
       "id": "readme_operational_limitations",
@@ -8759,7 +8759,7 @@
       "node_kind": "heading",
       "norm_label": "operational limitations",
       "source_file": "README.md",
-      "source_location": "L168"
+      "source_location": "L175"
     },
     {
       "id": "readme_quick_start",
@@ -8807,7 +8807,7 @@
       "node_kind": "heading",
       "norm_label": "security",
       "source_file": "README.md",
-      "source_location": "L161"
+      "source_location": "L168"
     },
     {
       "id": "readme_self_contained_deployment_no_docker_socket",
@@ -8819,7 +8819,7 @@
       "node_kind": "heading",
       "norm_label": "self-contained deployment (no docker socket)",
       "source_file": "README.md",
-      "source_location": "L140"
+      "source_location": "L144"
     },
     {
       "id": "readme_staging",
@@ -8915,7 +8915,7 @@
       "node_kind": "heading",
       "norm_label": "release checklist",
       "source_file": "docs/releasing.md",
-      "source_location": "L19"
+      "source_location": "L22"
     },
     {
       "id": "docs_releasing_release_process",
@@ -9089,7 +9089,7 @@
       "node_kind": "heading",
       "norm_label": "back up and restore state",
       "source_file": "docs/operations.md",
-      "source_location": "L77"
+      "source_location": "L81"
     },
     {
       "id": "docs_operations_decommission",
@@ -9101,7 +9101,7 @@
       "node_kind": "heading",
       "norm_label": "decommission",
       "source_file": "docs/operations.md",
-      "source_location": "L127"
+      "source_location": "L131"
     },
     {
       "id": "docs_operations_failure_handling",
@@ -9113,7 +9113,7 @@
       "node_kind": "heading",
       "norm_label": "failure handling",
       "source_file": "docs/operations.md",
-      "source_location": "L106"
+      "source_location": "L110"
     },
     {
       "id": "docs_operations_logs_and_capacity",
@@ -9161,7 +9161,7 @@
       "node_kind": "heading",
       "norm_label": "stop and upgrade",
       "source_file": "docs/operations.md",
-      "source_location": "L64"
+      "source_location": "L68"
     },
     {
       "id": "build_giso",
@@ -9260,7 +9260,7 @@
       "node_kind": "heading",
       "norm_label": "2. container smoke test",
       "source_file": "docs/testing.md",
-      "source_location": "L96"
+      "source_location": "L98"
     },
     {
       "id": "docs_testing_3_licensed_iso_acceptance_test",
@@ -9272,7 +9272,7 @@
       "node_kind": "heading",
       "norm_label": "3. licensed-iso acceptance test",
       "source_file": "docs/testing.md",
-      "source_location": "L108"
+      "source_location": "L117"
     },
     {
       "id": "docs_testing_4_matching_hardware_validation",
@@ -9284,7 +9284,7 @@
       "node_kind": "heading",
       "norm_label": "4. matching-hardware validation",
       "source_file": "docs/testing.md",
-      "source_location": "L137"
+      "source_location": "L146"
     },
     {
       "id": "docs_testing_developer_command_reference",
@@ -9296,7 +9296,7 @@
       "node_kind": "heading",
       "norm_label": "developer command reference",
       "source_file": "docs/testing.md",
-      "source_location": "L55"
+      "source_location": "L57"
     },
     {
       "id": "docs_testing_reporting_results",
@@ -9308,7 +9308,7 @@
       "node_kind": "heading",
       "norm_label": "reporting results",
       "source_file": "docs/testing.md",
-      "source_location": "L145"
+      "source_location": "L154"
     },
     {
       "id": "docs_testing_testing_and_acceptance",
@@ -9481,7 +9481,7 @@
       "node_kind": "heading",
       "norm_label": "operational controls",
       "source_file": "SECURITY.md",
-      "source_location": "L37"
+      "source_location": "L38"
     },
     {
       "id": "security_reporting_a_vulnerability",
@@ -9517,7 +9517,7 @@
       "node_kind": "heading",
       "norm_label": "sensitive data",
       "source_file": "SECURITY.md",
-      "source_location": "L27"
+      "source_location": "L28"
     },
     {
       "id": "security_supported_version",
@@ -9541,7 +9541,7 @@
       "node_kind": "heading",
       "norm_label": "option rules",
       "source_file": "docs/platform-support.md",
-      "source_location": "L32"
+      "source_location": "L36"
     },
     {
       "id": "docs_platform_support_platform_matrix",
@@ -9577,7 +9577,7 @@
       "node_kind": "heading",
       "norm_label": "smu compatibility checks",
       "source_file": "docs/platform-support.md",
-      "source_location": "L41"
+      "source_location": "L45"
     },
     {
       "id": "docs_platform_support_source_of_truth",
@@ -9589,7 +9589,7 @@
       "node_kind": "heading",
       "norm_label": "source of truth",
       "source_file": "docs/platform-support.md",
-      "source_location": "L57"
+      "source_location": "L75"
     },
     {
       "id": "scripts_coord_sh__entry",
@@ -10540,7 +10540,7 @@
       "node_kind": "heading",
       "norm_label": "optional publishing",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L358"
+      "source_location": "L368"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_optional_stage_service_tooling",
@@ -13914,7 +13914,7 @@
       "node_kind": "heading",
       "norm_label": "data lifecycle",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L65"
+      "source_location": "L68"
     },
     {
       "id": "architecture_high_docker_socket_is_a_host_administration_boundary_default_deployment",
@@ -13926,7 +13926,7 @@
       "node_kind": "heading",
       "norm_label": "high: docker socket is a host-administration boundary (default deployment)",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L103"
+      "source_location": "L106"
     },
     {
       "id": "architecture_low_the_cisco_build_image_identity_is_mutable",
@@ -13938,7 +13938,7 @@
       "node_kind": "heading",
       "norm_label": "low: the cisco build image identity is mutable",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L159"
+      "source_location": "L162"
     },
     {
       "id": "architecture_medium_persistent_volumes_are_a_single_point_of_failure",
@@ -13950,7 +13950,7 @@
       "node_kind": "heading",
       "norm_label": "medium: persistent volumes are a single point of failure",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L136"
+      "source_location": "L139"
     },
     {
       "id": "architecture_medium_running_builds_cannot_resume_after_a_web_service_restart",
@@ -13962,7 +13962,7 @@
       "node_kind": "heading",
       "norm_label": "medium: running builds cannot resume after a web-service restart",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L115"
+      "source_location": "L118"
     },
     {
       "id": "architecture_resolved_archive_cleanup_is_independent_of_web_traffic",
@@ -13974,7 +13974,7 @@
       "node_kind": "heading",
       "norm_label": "resolved: archive cleanup is independent of web traffic",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L127"
+      "source_location": "L130"
     },
     {
       "id": "architecture_resolved_container_health_reflects_required_local_dependencies",
@@ -13986,7 +13986,7 @@
       "node_kind": "heading",
       "norm_label": "resolved: container health reflects required local dependencies",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L145"
+      "source_location": "L148"
     },
     {
       "id": "architecture_review_outcome",
@@ -13998,7 +13998,7 @@
       "node_kind": "heading",
       "norm_label": "review outcome",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L176"
+      "source_location": "L179"
     },
     {
       "id": "architecture_risks_and_recommendations",
@@ -14010,7 +14010,7 @@
       "node_kind": "heading",
       "norm_label": "risks and recommendations",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L101"
+      "source_location": "L104"
     },
     {
       "id": "architecture_scaling_decision",
@@ -14022,7 +14022,7 @@
       "node_kind": "heading",
       "norm_label": "scaling decision",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L168"
+      "source_location": "L171"
     },
     {
       "id": "architecture_scope_and_requirements",
@@ -14082,7 +14082,7 @@
       "node_kind": "heading",
       "norm_label": "what is working well",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L81"
+      "source_location": "L84"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_a_stale_partial_file_from_a_crashed_download_made_the_next_attempt_fail_too_2026_09_16",
@@ -24932,7 +24932,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L103",
+      "source_location": "L106",
       "weight": 1.0
     },
     {
@@ -24943,7 +24943,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L115",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -24954,7 +24954,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L127",
+      "source_location": "L130",
       "weight": 1.0
     },
     {
@@ -24965,7 +24965,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L136",
+      "source_location": "L139",
       "weight": 1.0
     },
     {
@@ -24976,7 +24976,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L145",
+      "source_location": "L148",
       "weight": 1.0
     },
     {
@@ -24987,7 +24987,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L159",
+      "source_location": "L162",
       "weight": 1.0
     },
     {
@@ -24998,7 +24998,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L101",
+      "source_location": "L104",
       "weight": 1.0
     },
     {
@@ -25020,7 +25020,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L168",
+      "source_location": "L171",
       "weight": 1.0
     },
     {
@@ -25031,7 +25031,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L176",
+      "source_location": "L179",
       "weight": 1.0
     },
     {
@@ -25042,7 +25042,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L65",
+      "source_location": "L68",
       "weight": 1.0
     },
     {
@@ -25064,7 +25064,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L81",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -25361,7 +25361,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L106",
+      "source_location": "L110",
       "weight": 1.0
     },
     {
@@ -25372,7 +25372,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L127",
+      "source_location": "L131",
       "weight": 1.0
     },
     {
@@ -25405,7 +25405,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L64",
+      "source_location": "L68",
       "weight": 1.0
     },
     {
@@ -25416,7 +25416,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/operations.md",
-      "source_location": "L77",
+      "source_location": "L81",
       "weight": 1.0
     },
     {
@@ -25449,7 +25449,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/platform-support.md",
-      "source_location": "L32",
+      "source_location": "L36",
       "weight": 1.0
     },
     {
@@ -25460,18 +25460,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/platform-support.md",
-      "source_location": "L41",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_platform_support_platform_support_and_validation",
-      "target": "docs_platform_support_source_of_truth",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/platform-support.md",
-      "source_location": "L57",
+      "source_location": "L45",
       "weight": 1.0
     },
     {
@@ -25483,6 +25472,17 @@
       "confidence_score": 1.0,
       "source_file": "docs/platform-support.md",
       "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_support_platform_support_and_validation",
+      "target": "docs_platform_support_source_of_truth",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/platform-support.md",
+      "source_location": "L75",
       "weight": 1.0
     },
     {
@@ -25515,7 +25515,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/releasing.md",
-      "source_location": "L19",
+      "source_location": "L22",
       "weight": 1.0
     },
     {
@@ -25537,7 +25537,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L55",
+      "source_location": "L57",
       "weight": 1.0
     },
     {
@@ -25548,7 +25548,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L108",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
@@ -25559,7 +25559,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L137",
+      "source_location": "L146",
       "weight": 1.0
     },
     {
@@ -25570,7 +25570,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L145",
+      "source_location": "L154",
       "weight": 1.0
     },
     {
@@ -25592,7 +25592,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L96",
+      "source_location": "L98",
       "weight": 1.0
     },
     {
@@ -26153,7 +26153,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L358",
+      "source_location": "L368",
       "weight": 1.0
     },
     {
@@ -29139,24 +29139,24 @@
     },
     {
       "source": "giso_webui_readme_ios_xr_giso_web_ui",
-      "target": "giso_webui_readme_optional_cisco_software_download",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "giso-webui/README.md",
-      "source_location": "L13",
-      "weight": 1.0
-    },
-    {
-      "source": "giso_webui_readme_ios_xr_giso_web_ui",
       "target": "giso_webui_readme_configuration",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L137",
+      "source_location": "L141",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_readme_ios_xr_giso_web_ui",
+      "target": "giso_webui_readme_optional_cisco_software_download",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/README.md",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
@@ -29167,7 +29167,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L170",
+      "source_location": "L174",
       "weight": 1.0
     },
     {
@@ -29178,7 +29178,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L207",
+      "source_location": "L211",
       "weight": 1.0
     },
     {
@@ -29189,7 +29189,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L223",
+      "source_location": "L228",
       "weight": 1.0
     },
     {
@@ -29200,7 +29200,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L246",
+      "source_location": "L259",
       "weight": 1.0
     },
     {
@@ -29211,7 +29211,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L252",
+      "source_location": "L265",
       "weight": 1.0
     },
     {
@@ -29222,7 +29222,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L43",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -29233,7 +29233,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L57",
+      "source_location": "L61",
       "weight": 1.0
     },
     {
@@ -29244,7 +29244,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L76",
+      "source_location": "L80",
       "weight": 1.0
     },
     {
@@ -30718,7 +30718,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L140",
+      "source_location": "L144",
       "weight": 1.0
     },
     {
@@ -30729,7 +30729,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L161",
+      "source_location": "L168",
       "weight": 1.0
     },
     {
@@ -30740,7 +30740,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L168",
+      "source_location": "L175",
       "weight": 1.0
     },
     {
@@ -30751,7 +30751,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L180",
+      "source_location": "L187",
       "weight": 1.0
     },
     {
@@ -31059,7 +31059,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "SECURITY.md",
-      "source_location": "L27",
+      "source_location": "L28",
       "weight": 1.0
     },
     {
@@ -31081,7 +31081,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "SECURITY.md",
-      "source_location": "L37",
+      "source_location": "L38",
       "weight": 1.0
     },
     {
@@ -36999,7 +36999,18 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L142",
+      "source_location": "L151",
+      "weight": 1.0
+    },
+    {
+      "source": "giso_webui_readme",
+      "target": "readme",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "giso-webui/README.md",
+      "source_location": "L13",
       "weight": 1.0
     },
     {
@@ -37010,7 +37021,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L205",
+      "source_location": "L209",
       "weight": 1.0
     },
     {
@@ -37021,7 +37032,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L221",
+      "source_location": "L226",
       "weight": 1.0
     },
     {
@@ -37032,7 +37043,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L258",
+      "source_location": "L272",
       "weight": 1.0
     },
     {
@@ -37043,7 +37054,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "giso-webui/README.md",
-      "source_location": "L55",
+      "source_location": "L59",
       "weight": 1.0
     },
     {
@@ -37098,7 +37109,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L138",
+      "source_location": "L142",
       "weight": 1.0
     },
     {
@@ -37109,7 +37120,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L166",
+      "source_location": "L173",
       "weight": 1.0
     },
     {
@@ -37135,17 +37146,6 @@
       "weight": 1.0
     },
     {
-      "source": "readme",
-      "target": "giso_webui_readme",
-      "relation": "references",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "README.md",
-      "source_location": "L82",
-      "weight": 1.0
-    },
-    {
       "source": "security",
       "target": "docs_operations",
       "relation": "references",
@@ -37153,7 +37153,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "SECURITY.md",
-      "source_location": "L47",
+      "source_location": "L48",
       "weight": 1.0
     },
     {
@@ -37595,5 +37595,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "50a50651863219882586e8d5e6bd88dff73544c3"
+  "built_at_commit": "4b33d2632414ab5926e317f7df8f91cda94e4f71"
 }

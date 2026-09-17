@@ -10,7 +10,7 @@ replace the tool's ISO metadata, signature, dependency, or PID validation.
 | --- | --- | --- | --- |
 | `asr9k` | ASR 9000 | eXR | Yes |
 | `ncs1k` | NCS 1000 | eXR | Yes |
-| `ncs1001` | NCS 1001 | eXR | Yes |
+| `ncs1001` | NCS 1001 | eXR | No |
 | `ncs1004` | NCS 1004 | eXR | Yes |
 | `ncs5k` | NCS 5000 | eXR | No |
 | `ncs540` | NCS 540 eXR images | eXR | Yes |
@@ -20,12 +20,16 @@ replace the tool's ISO metadata, signature, dependency, or PID validation.
 | `iosxrwb` | IOS XR whitebox | eXR | No |
 | `iosxrwbd` | IOS XR whitebox distributed | eXR | Yes |
 | `xrv9k` | IOS XRv 9000 | eXR | No |
+| `exr-generic` | Other eXR platform (manual override) | eXR | Not assumed |
+| `lnt-generic` | Other LNT platform (manual override) | IOS XR7/LNT | Not assumed |
 | `8000` | Cisco 8000/8800 | IOS XR7/LNT | Yes |
 | `ncs1010` | NCS 1010/1014 | IOS XR7/LNT | Yes |
 | `ncs540l` | NCS 540L XR7 images | IOS XR7/LNT | Yes |
 | `ncs57` | NCS 5700 | IOS XR7/LNT | Yes |
 
-“Automatic USB expected” reflects the upstream build path, not a guarantee that
+For eXR, “Automatic USB expected” follows upstream's
+`src/exrmod/usb_zip/platform_scripts.yaml`; for LNT it follows upstream's LNT
+engine. It reflects the upstream build path, not a guarantee that
 every release, route processor, or boot mode supports that artifact. Confirm the
 result in the build log and the platform recovery guide.
 
@@ -40,15 +44,29 @@ result in the build log and the platform recovery guide.
 
 ## SMU compatibility checks
 
-Automatic selection includes only RPM filenames that identify the same platform
-and IOS XR release as the base ISO. The validator also rejects mixed processor
-architectures and multiple versions of the same component and CSC. RPMs sharing
-a CSC identifier are displayed as a package group, while overlapping CSC fixes
-for one component are flagged for supersedence review.
+Automatic selection includes RPMs for the same platform and IOS XR release as
+the base ISO. For eXR the platform and release come from the image's own
+`iosxr_image_mdata.yml`; LNT images are still identified by filename, and LNT
+packages are matched by upstream's naming (`xr-cdp-24.3.1v1.0.0-1.x86_64.rpm`).
+Each RPM's own header (name, version, release, architecture, requires,
+provides, signature key ID) is read, and each Cisco SMU README's package list,
+MD5s and prerequisites are used when present.
 
-These are deterministic pre-checks. They cannot prove dependency closure,
-supersedence, signature validity, or PID support. Cisco `gisobuild`, ISO metadata,
-and an approved Cisco package list remain authoritative.
+Automatic selection leaves out, with a reason, anything proven unable to
+install: a different platform, release or processor architecture, a renamed or
+unreadable RPM, a fix whose README shows it incomplete or altered, and a
+package whose exact-version dependency nothing in the base image or selection
+provides. The rest of that fix is left out with it, and the reason names the
+Cisco SMU to download. Manual selection is never edited: the same problems
+block the build instead. Multiple versions of one component and CSC are
+rejected; RPMs sharing a CSC identifier are displayed as one package group, and
+overlapping CSC fixes for one component are flagged for supersedence review.
+
+These are pre-checks. Dependency closure is checked only for exact-version
+requirements, signatures are read but not verified, and supersedence order and
+PID support are not decided here. Cisco `gisobuild` performs the full
+dependency, supersedence and signature validation and remains authoritative,
+together with the ISO metadata and an approved Cisco package list.
 
 When using PID filtering, inspect the input ISO with upstream
 `isols.py --dump-mdata`. Removing PID support is one-way and can make a system
@@ -56,7 +74,9 @@ unbootable if required route processors or line cards are omitted.
 
 ## Source of truth
 
-The eXR identifiers follow the checked-out `ios-xr/gisobuild` source. IOS XR7
+The eXR identifiers and USB flags follow the pinned `ios-xr/gisobuild` source;
+`giso-webui/tests/test_platform_compatibility.py` fails if they drift, and CI runs
+it against the gisobuild bundled in the self-contained image. IOS XR7
 support is metadata-driven upstream, so the UI groups current public product
 families for early validation. Keep this table and
 `giso-webui/platform_validation.py` synchronized in the same change.

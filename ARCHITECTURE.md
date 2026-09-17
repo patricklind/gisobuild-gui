@@ -52,7 +52,10 @@ its temporary files on the work volume, and process-group cancellation. There
 is no Docker socket, no second container and no registry pull; the container
 runs read-only as root with every capability dropped except `SYS_CHROOT`,
 which gisobuild's eXR engine needs (non-root cannot hold it; see
-`docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md`).
+`docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md`). The bundled gisobuild is pinned
+twice: by git commit, and by a SHA-256 manifest of its files that the image
+build verifies and the startup self-test re-checks, blocking builds on any
+changed, missing or added file.
 
 ```mermaid
 flowchart LR
@@ -67,8 +70,8 @@ flowchart LR
 | Data | Location | Lifecycle |
 | --- | --- | --- |
 | Uploads | `giso-uploads` volume | Kept on failure; removed after verified successful archival |
-| Build work | `giso-work` volume | Per-job temporary data; eligible for manual cleanup |
-| Raw output | `giso-output` volume | Moved to the verified archive after success |
+| Build work | `giso-work` volume | Per-job temporary data; removed after archival, when a build fails or is cancelled, and (local runner) for a build interrupted by a restart |
+| Raw output | `giso-output` volume | Moved to the verified archive after success; after a failure or cancellation only logs and small metadata are kept |
 | ISO/USB archive | `giso-archive` volume | 30 days and 50 GiB combined by default |
 | Job history and logs | `giso-state` SQLite volume | Bounded to 100 jobs by default |
 | Upload sessions, file provenance, large-file checksums | `giso-state` SQLite volume | Versioned schema (`PRAGMA user_version`) |

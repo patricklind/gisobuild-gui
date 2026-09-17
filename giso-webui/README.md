@@ -6,9 +6,12 @@ chunked uploads, common eXR and LNT options, live logs, checksums, downloads,
 and a persistent artifact archive.
 
 > [!CAUTION]
-> The application controls Docker through `/var/run/docker.sock`, which is
+> The default deployment controls Docker through `/var/run/docker.sock`, which is
 > effectively administrative access to the Docker host. Keep the default
 > localhost binding and do not deploy this as an untrusted or multi-user service.
+> The self-contained deployment (`compose.selfcontained.yaml`, see the
+> [project README](../README.md#self-contained-deployment-no-docker-socket))
+> needs no socket and no gisobuild checkout.
 
 ## Optional Cisco software download
 
@@ -46,7 +49,8 @@ are true for the organisation.
 - An x86_64 host, or x86_64 emulation on Apple Silicon
 - Approximately 25 GB of free disk space
 - A checkout of [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at
-  `../.gisobuild-tool`
+  `../.gisobuild-tool` (default deployment only; the self-contained image
+  bundles a pinned copy)
 - Properly licensed Cisco IOS XR ISO, RPM, and SMU files
 
 The expert form requires a recognizable ISO filename or an explicit platform
@@ -215,13 +219,18 @@ docker compose run --rm --no-deps \
   giso-webui python -B -m unittest discover -s tests -v
 ```
 
-The repository CI also runs Ruff, `pip-audit`, shell syntax validation, Compose
-validation, and an application container build. A real GISO build is not part of
+The repository CI also runs browser tests, Ruff, `pip-audit`, shell syntax and
+Compose validation, both container builds, image scans, and the platform drift
+tests. A real GISO build is not part of
 CI because it requires licensed Cisco inputs and substantial compute resources.
 See [testing and acceptance](../docs/testing.md).
 
 ## Troubleshooting
 
+- **Readiness is failing:** `curl http://127.0.0.1:8080/api/ready` names each
+  failing startup check in `self_test` (gisobuild, runner, job store, writable
+  volumes, configuration, free space, architecture and, in the self-contained
+  image, `gisobuild_source`).
 - **Health check is failing:** Run `docker info`, confirm
   `.gisobuild-tool/src/gisobuild.py` and the mounted storage exist, then inspect
   `docker compose logs --tail=200 giso-webui`.
@@ -235,6 +244,10 @@ See [testing and acceptance](../docs/testing.md).
   hostname to `ALLOWED_HOSTS`; do not use a wildcard.
 - **Build was interrupted by restart:** The job and log remain visible. Check
   running `giso-build-*` containers and application logs before starting again.
+  In the self-contained deployment the interrupted build's work files are
+  removed automatically at startup; its logs are kept.
+- **Upload was interrupted:** Select the same file again; the upload resumes from
+  the bytes the server already has, also after a service restart.
 - **Cleanup reports zero items:** The workspace is already empty. Archived ISO
   and USB files are intentionally managed separately by retention and quota.
 - **Old failed-build links remain:** Recreate the Web UI from the latest image,
@@ -252,7 +265,8 @@ docker compose down
 ## Security and disclaimer
 
 The web container uses a read-only root filesystem, has all Linux capabilities
-dropped, and gives child build containers only the required mounts. Uploaded tar
+dropped (the self-contained image keeps only `SYS_CHROOT`), and gives child
+build containers only the required mounts. Uploaded tar
 paths, symlinks, hard links, request origins, host headers, and size limits are
 validated. These controls reduce risk but do not remove the Docker-socket trust
 boundary. See [`../SECURITY.md`](../SECURITY.md).
