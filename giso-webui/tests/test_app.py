@@ -1660,6 +1660,27 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotEqual(first["inventory_revision"], second["inventory_revision"])
         self.assertNotEqual(first["fingerprint"], second["fingerprint"])
 
+    def test_build_plan_fingerprint_changes_when_config_content_or_gisobuild_changes(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+        # .txt is not an inventory type, so only the explicit content hash
+        # can notice this edit - the inventory revision stays the same.
+        config = self.data / "router-config.txt"
+        config.write_text("hostname one\n")
+        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [],
+                   "xrconfig": "router-config.txt"}
+        with patch("app.gisobuild_commit", return_value="abc1234"):
+            first = self.client.post("/api/build-plan", json=payload).get_json()
+            config.write_text("hostname two\n")
+            second = self.client.post("/api/build-plan", json=payload).get_json()
+        with patch("app.gisobuild_commit", return_value="def5678"):
+            third = self.client.post("/api/build-plan", json=payload).get_json()
+        self.assertEqual(first["inventory_revision"], second["inventory_revision"])
+        self.assertNotEqual(first["fingerprint"], second["fingerprint"])
+        self.assertEqual(second["config_files"]["xrconfig"],
+                         hashlib.sha256(b"hostname two\n").hexdigest())
+        self.assertNotEqual(second["fingerprint"], third["fingerprint"])
+        self.assertEqual(third["gisobuild_commit"], "def5678")
+
     def test_build_plan_returns_blockers_instead_of_enabling_invalid_build(self):
         response = self.client.post("/api/build-plan", json={
             "iso": "missing.iso", "platform": "asr9k", "pkglist": [],

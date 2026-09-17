@@ -379,12 +379,21 @@ Hash together:
 
 - [x] ISO checksum
 - [x] selected RPM checksums
-- [ ] configuration files (build option paths such as `xrconfig`/`ztp_ini` are
-      included as literal values in `options`, but their *content* is not
-      independently checksummed into the fingerprint yet)
-- [ ] gisobuild version/commit (only the builder container image tag is
-      captured today; the pinned upstream `gisobuild` source revision inside
-      that image is not separately tracked)
+- [x] configuration files - fixed 2026-09-17: the SHA-256 of every path
+      option's file (`xrconfig`, `ztp_ini`, `script`, `key_request`,
+      `yamlfile`, ownership files) is hashed in as `config_files` and
+      returned in the plan. Before, a config with an inventory suffix was
+      only covered indirectly via the inventory revision, and one with any
+      other suffix (e.g. `.txt`) not at all.
+      Test: `test_build_plan_fingerprint_changes_when_config_content_or_gisobuild_changes`
+      (a same-size in-place `.txt` edit keeps the revision but changes the
+      fingerprint).
+- [x] gisobuild version/commit - `gisobuild_commit()` of the mounted
+      `/tool` checkout is hashed in and returned. Verified in the
+      `giso-webui` image with the real `.gisobuild-tool` mount: `0388af2`,
+      identical to `git -C .gisobuild-tool rev-parse --short HEAD` on the
+      host. Returns `None` (still hashed) when `/tool` is not a git
+      checkout; the builder image reference was already included.
 - [x] application version (`APP_VERSION` env var, defaults to `0.0.1`)
 - [x] build options
 

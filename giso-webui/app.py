@@ -1341,9 +1341,25 @@ def create_build_plan(payload: dict) -> dict:
     option_keys = sorted(set(BOOL_OPTIONS) | set(PATH_OPTIONS) | set(LIST_OPTIONS) |
                          {"label", "platform", "auto_repo", "automatic_smu_selection"})
     options = {key: payload[key] for key in option_keys if key in payload}
+    # Content, not just the path: an xrconfig edited in place (or one whose
+    # suffix keeps it out of the inventory, and so out of the revision) must
+    # still invalidate a plan the operator already reviewed.
+    config_files: dict[str, str | None] = {}
+    for key in sorted(PATH_OPTIONS.keys() - {"iso"}):
+        value = payload.get(key)
+        if not value:
+            continue
+        try:
+            config_path = safe_data_path(value)
+            config_files[key] = file_checksums(config_path)["sha256"] if config_path.is_file() else None
+        except (OSError, ValueError):
+            config_files[key] = None
+    tool_commit = gisobuild_commit()
     fingerprint_input = {
         "application_version": APP_VERSION,
         "builder_image": IMAGE,
+        "gisobuild_commit": tool_commit,
+        "config_files": config_files,
         "inventory_revision": revision,
         "iso": {"id": iso["id"], "sha256": iso["sha256"]} if iso else None,
         "packages": [{"id": item["id"], "sha256": item["sha256"]} for item in selected],
@@ -1366,6 +1382,8 @@ def create_build_plan(payload: dict) -> dict:
         "excluded_packages": recommendation["excluded"],
         "component_conflicts": recommendation["component_conflicts"],
         "options": options,
+        "config_files": config_files,
+        "gisobuild_commit": tool_commit,
         "confidence": confidence,
         "blockers": sorted(set(blockers)),
         "warnings": sorted(set(warnings)),
