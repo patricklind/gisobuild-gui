@@ -349,7 +349,17 @@ docker compose exec <service> <maintenance-command>
 ```
 
 - [x] document all common commands — `docs/testing.md` command reference, README deployment sections
-- [ ] verify clean-machine workflow with no host Python/Node/project packages
+- [x] verify clean-machine workflow with no host Python/Node/project packages —
+      2026-09-17: a throwaway `docker:27-dind` container (only `git` and
+      Docker; `python`, `python3`, `node`, `pip`, `rpm`, `isoinfo`, `ruff`,
+      `graphify` all absent before and after) cloned the repository at
+      `78584dd` and ran the `docs/testing.md` commands against its own empty
+      image store: tooling, compose, self-contained and browser-test images
+      built from scratch; unit/integration `Ran 319 tests ... OK (skipped=2)`;
+      ruff clean; pip-audit "No known vulnerabilities found"; docker-only
+      check clean; Graphify freshness matched; staging rehearsal PASS;
+      upstream drift tests in the self-contained image `Ran 35 tests ... OK`;
+      browser tests `Ran 20 tests ... OK`. Container and volumes removed.
 - [x] verify local test suite entirely in containers — 304 unit/integration and 17 browser tests run only in containers (2026-09-17)
 - [x] verify Graphify entirely in containers — see above
 - [x] verify staging/rehearsal entirely in containers — rehearsal PASS in `gisobuild-tooling`
