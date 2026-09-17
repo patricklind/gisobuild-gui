@@ -342,5 +342,126 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.assertTrue(rpm.exists())
 
 
+FAKE_LOCAL_GISOBUILD = r'''
+import json, os, subprocess, sys, time
+from pathlib import Path
+
+# The build environment is sanitized, so test settings come from a file next
+# to this script rather than environment variables.
+config = json.loads((Path(__file__).resolve().parent.parent / "fake-config.json").read_text())
+args = sys.argv[1:]
+Path(config["record"]).write_text(json.dumps({
+    "argv": [sys.executable, __file__] + args, "env": dict(os.environ), "cwd": os.getcwd(),
+}))
+print("Gisobuild starting (local)", flush=True)
+if config.get("mode") == "slow":
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
+    Path(config["child_pid"]).write_text(str(child.pid))
+    print("Validating inputs", flush=True)
+    time.sleep(300)
+out = Path(args[args.index("--out-directory") + 1])
+out.mkdir(parents=True, exist_ok=True)
+(out / "ncs5500-golden-x-25.1.2-LOCAL.iso").write_bytes(b"synthetic golden iso")
+print("Golden ISO build complete", flush=True)
+'''
+
+
+def process_is_running(pid: int) -> bool:
+    """True for a live process; a zombie (exited, not yet reaped) counts as gone."""
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+    except (OSError, IndexError):
+        return False
+    return state != "Z"
+
+
+class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
+    """The same pipeline with GISO_RUNNER=local: gisobuild as a child process, no Docker at all."""
+
+    def setUp(self):
+        super().setUp()
+        root = Path(self.temp.name)
+        tool = root / "tool"
+        (tool / "src").mkdir(parents=True)
+        (tool / "src" / "gisobuild.py").write_text(FAKE_LOCAL_GISOBUILD)
+        self.record = root / "local-run.json"
+        self.child_pid = root / "child.pid"
+        self.config = tool / "fake-config.json"
+        self.configure(mode="success")
+        local = [
+            patch.object(module, "GISO_RUNNER", "local"),
+            patch.object(module, "GISOBUILD_PYTHON", sys.executable),
+            patch.object(module, "TOOL", tool),
+            # Anything that still reached for Docker would fail loudly.
+            patch.object(module, "DOCKER_BIN", str(root / "no-docker-here")),
+            patch.dict(os.environ, {"CISCO_CLIENT_SECRET": "must-not-leak",
+                                    "GISOBUILD_COMMIT": "0388af2989bb7022"}),
+        ]
+        for active in local:
+            active.start()
+        self.patches.extend(local)
+
+    def configure(self, **settings):
+        self.config.write_text(json.dumps({"record": str(self.record),
+                                           "child_pid": str(self.child_pid), **settings}))
+
+    def test_local_build_runs_gisobuild_directly_with_a_sanitized_environment(self):
+        iso = self.write(self.ISO)
+        self.write(self.ROUTING)
+        job_id = self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
+                                   "pkglist": [], "label": "LOCAL"})
+        job = self.wait_for_job(job_id)
+
+        self.assertEqual(job["status"], "success", job.get("log"))
+        run = json.loads(self.record.read_text())
+        engine = run["argv"][2:]
+        self.assertEqual(run["argv"][0], sys.executable)
+        self.assertEqual(engine[engine.index("--iso") + 1], str(iso))
+        self.assertEqual(engine[engine.index("--out-directory") + 1], str(module.OUTPUT / job_id))
+        self.assertEqual(Path(run["cwd"]), module.WORK / job_id)
+        self.assertEqual(run["env"]["TMPDIR"], str(module.WORK / job_id / "tmp"))
+        self.assertNotIn("CISCO_CLIENT_SECRET", run["env"])
+        self.assertNotIn("FAKE_DOCKER_ARGS", run["env"])
+        self.assertFalse(self.args_file.exists())  # no docker run happened
+        self.assertEqual(module.jobs[job_id]["builder_image"]["source"], "bundled")
+        self.assertIn("0388af2989bb", module.jobs[job_id]["builder_image"]["reference"])
+        self.assertTrue((module.ARCHIVE / job_id / "ncs5500-golden-x-25.1.2-LOCAL.iso").exists())
+        version = self.client.get("/api/version").get_json()
+        self.assertEqual((version["runner"], version["gisobuild_image"]), ("local", None))
+
+    def test_cancelling_a_local_build_leaves_no_orphan_processes(self):
+        iso = self.write(self.ISO)
+        self.write(self.ROUTING)
+        self.configure(mode="slow")
+        job_id = self.start_build({"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []})
+        deadline = time.monotonic() + 10
+        while not self.child_pid.exists() or "Validating inputs" not in module.jobs[job_id]["log"]:
+            self.assertLess(time.monotonic(), deadline, module.jobs[job_id]["log"])
+            time.sleep(0.05)
+        child = int(self.child_pid.read_text())
+        leader = module.jobs[job_id]["container_pid"]
+        self.assertTrue(process_is_running(child))
+
+        started = time.monotonic()
+        self.assertEqual(self.client.delete(f"/api/jobs/{job_id}").status_code, 200)
+        job = self.wait_for_job(job_id)
+
+        self.assertEqual(job["status"], "cancelled")
+        self.assertLess(time.monotonic() - started, 15)  # SIGTERM was enough
+        self.assertFalse(process_is_running(leader))
+        self.assertFalse(process_is_running(child), "gisobuild's own child process survived")
+        self.assertTrue(iso.exists())
+        self.assertFalse((module.ARCHIVE / job_id).exists())
+
+    # Docker-only behaviour does not apply to the local runner.
+    test_cancelling_a_running_build_stops_the_container_and_keeps_inputs = None
+    test_registry_outage_builds_with_the_cached_builder_image = None
+    test_registry_outage_without_a_cached_image_fails_clearly = None
+    test_exr_build_runs_the_plan_archives_the_image_and_cleans_inputs = None
+    test_exr_dependency_failure_is_reported_and_inputs_are_kept = None
+    test_lnt_build_passes_lnt_only_options_to_the_engine = None
+    test_consecutive_builds_use_only_their_own_inventory = None
+
+
 if __name__ == "__main__":
     unittest.main()

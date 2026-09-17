@@ -8,6 +8,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import sqlite3
 import subprocess
 import tarfile
@@ -69,6 +70,17 @@ JOB_DB = STATE / "jobs.sqlite3"
 IMAGE = validate_image_reference(
     os.environ.get("GISO_IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4")
 )
+# How gisobuild runs. "docker" (the original architecture): a child builder
+# container started through the Docker socket. "local": gisobuild is part of
+# this image and runs as a child process - no socket, no second container, no
+# registry (see docker/selfcontained.Dockerfile and
+# docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md).
+GISO_RUNNER = os.environ.get("GISO_RUNNER", "docker").strip().lower()
+if GISO_RUNNER not in {"docker", "local"}:
+    raise RuntimeError("GISO_RUNNER must be 'docker' or 'local'")
+GISOBUILD_PYTHON = os.environ.get("GISOBUILD_PYTHON", "/usr/bin/python3")
+if not Path(GISOBUILD_PYTHON).is_absolute():
+    raise RuntimeError("GISOBUILD_PYTHON must be an absolute path")
 APP_VERSION = os.environ.get("APP_VERSION", "0.0.1")
 jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
@@ -1243,7 +1255,10 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
     warnings: list[str] = []
     if not gisobuild_tool_available():
         blockers.append(f"gisobuild is not available ({TOOL / 'src/gisobuild.py'} is missing)")
-    if not os.access(DOCKER_BIN, os.X_OK):
+    if GISO_RUNNER == "local":
+        if not os.access(GISOBUILD_PYTHON, os.X_OK):
+            blockers.append(f"The Python interpreter for gisobuild is not available at {GISOBUILD_PYTHON}")
+    elif not os.access(DOCKER_BIN, os.X_OK):
         blockers.append(f"The Docker CLI is not available at {DOCKER_BIN}")
     elif docker_build_running():
         blockers.append("A build container is already running, or Docker cannot be reached "
@@ -1391,7 +1406,7 @@ def create_build_plan(payload: dict) -> dict:
     tool_commit = gisobuild_commit()
     fingerprint_input = {
         "application_version": APP_VERSION,
-        "builder_image": IMAGE,
+        "builder_image": IMAGE if GISO_RUNNER == "docker" else f"local:{GISOBUILD_PYTHON}",
         "gisobuild_commit": tool_commit,
         "config_files": config_files,
         "inventory_revision": revision,
@@ -1677,6 +1692,10 @@ archive_golden_iso_and_cleanup = archive_giso_artifacts_and_cleanup
 
 
 def docker_build_running() -> bool:
+    if GISO_RUNNER == "local":
+        # No containers exist in this mode; the job registry (checked by
+        # every caller alongside this) is the whole truth about running builds.
+        return False
     try:
         result = subprocess.run(
             [DOCKER_BIN, "ps", "-q", "--filter", "label=app=giso-webui"],
@@ -2098,12 +2117,15 @@ def child_mount_args() -> list[str]:
 
 
 def build_command(payload: dict, job_id: str) -> list[str]:
-    command = [
-        DOCKER_BIN, "run", "--platform", "linux/amd64", "--rm",
-        "--name", f"giso-build-{job_id}", "--label", "app=giso-webui",
-        *child_mount_args(), IMAGE,
-        "/tool/src/gisobuild.py",
-    ]
+    if GISO_RUNNER == "local":
+        command = [GISOBUILD_PYTHON, str(TOOL / "src/gisobuild.py")]
+    else:
+        command = [
+            DOCKER_BIN, "run", "--platform", "linux/amd64", "--rm",
+            "--name", f"giso-build-{job_id}", "--label", "app=giso-webui",
+            *child_mount_args(), IMAGE,
+            "/tool/src/gisobuild.py",
+        ]
     if payload.get("yamlfile"):
         command += ["--yamlfile", str(safe_data_path(payload["yamlfile"]))]
     else:
@@ -2165,7 +2187,9 @@ def build_command(payload: dict, job_id: str) -> list[str]:
         for key, option in BOOL_OPTIONS.items():
             if payload.get(key):
                 command.append(option)
-    command += ["--out-directory", f"/output/{job_id}", "--clean"]
+    # The child container sees OUTPUT at /output; a local process sees it as is.
+    out_directory = str(OUTPUT / job_id) if GISO_RUNNER == "local" else f"/output/{job_id}"
+    command += ["--out-directory", out_directory, "--clean"]
     return command
 
 
@@ -2236,6 +2260,32 @@ def prepare_destructive_finalization(job_id: str) -> None:
         jobs[job_id]["status"] = "committing"
 
 
+def builder_process_environment(job_id: str) -> tuple[dict[str, str] | None, str | None]:
+    """Environment and working directory for the build process.
+
+    Docker mode keeps the inherited environment: it only reaches the docker
+    CLI, and `docker run` passes none of it into the builder. A local
+    gisobuild runs in this container itself, so it gets a minimal, explicit
+    environment instead - never Cisco API credentials or any other service
+    setting - with its temporary files on the work volume rather than the
+    small /tmp tmpfs.
+    """
+    if GISO_RUNNER != "local":
+        return None, None
+    job_work = WORK / job_id
+    temporary = job_work / "tmp"
+    temporary.mkdir(parents=True, exist_ok=True)
+    environment = {
+        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "HOME": str(job_work),
+        "TMPDIR": str(temporary),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    return environment, str(job_work)
+
+
 def local_builder_image_id() -> str | None:
     """Docker's ID for the builder image if this host already has it, else None."""
     try:
@@ -2257,62 +2307,71 @@ def run_job(job_id: str, command: list[str]) -> None:
     try:
         append_log(job_id, "$ " + shlex.join(command) + "\n\n")
         log_event("build_started", job_id=job_id, **build_log_context)
-        log_event("image_pull_started", job_id=job_id)
-        pull = subprocess.Popen(
-            [DOCKER_BIN, "pull", "--platform", "linux/amd64", IMAGE],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            start_new_session=True,
-        )
-        with job_lock:
-            job_processes[job_id] = pull
-            jobs[job_id]["process_phase"] = "pulling"
-        pull_failure = None
-        try:
-            pull_output, _ = pull.communicate(timeout=GISO_PULL_TIMEOUT_SECONDS)
-        except subprocess.TimeoutExpired:
-            pull.terminate()
-            pull.wait(timeout=20)
-            pull_output, pull_failure = "", f"timed out after {GISO_PULL_TIMEOUT_SECONDS} seconds"
-        finally:
+        if GISO_RUNNER == "docker":
+            log_event("image_pull_started", job_id=job_id)
+            pull = subprocess.Popen(
+                [DOCKER_BIN, "pull", "--platform", "linux/amd64", IMAGE],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                start_new_session=True,
+            )
             with job_lock:
-                job_processes.pop(job_id, None)
-        if cancellation_requested(job_id):
-            raise BuildCancelled("Build cancelled during image preparation")
-        if pull_output:
-            append_log(job_id, pull_output)
-        if pull_failure is None and pull.returncode:
-            pull_failure = f"exited with status {pull.returncode}"
-        # Registry access is not a build input: when the pull fails, a builder
-        # image this host already holds is used instead of failing every build
-        # during a registry or network outage. A digest-pinned reference is
-        # content-addressed, so the cached copy is exactly what would have been
-        # pulled; a tag-only one may lag the registry, which the log says.
-        image_id = local_builder_image_id()
-        if pull_failure:
-            if image_id is None:
-                raise RuntimeError(
-                    f"The builder image could not be pulled ({pull_failure}) and is not cached "
-                    f"on this host: {IMAGE}"
-                )
-            pinned = "@sha256:" in IMAGE
-            append_log(job_id, (
-                f"\nWARNING: pulling the builder image {pull_failure}; using the copy already "
-                f"on this host ({image_id[:19]}). "
-                + ("The reference is digest-pinned, so it is identical.\n" if pinned else
-                   "The reference is a tag, so this copy may be older than the registry's.\n")
-            ))
-            log_event("image_pull_fallback_to_cache", job_id=job_id, pinned=pinned)
+                job_processes[job_id] = pull
+                jobs[job_id]["process_phase"] = "pulling"
+            pull_failure = None
+            try:
+                pull_output, _ = pull.communicate(timeout=GISO_PULL_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                pull.terminate()
+                pull.wait(timeout=20)
+                pull_output, pull_failure = "", f"timed out after {GISO_PULL_TIMEOUT_SECONDS} seconds"
+            finally:
+                with job_lock:
+                    job_processes.pop(job_id, None)
+            if cancellation_requested(job_id):
+                raise BuildCancelled("Build cancelled during image preparation")
+            if pull_output:
+                append_log(job_id, pull_output)
+            if pull_failure is None and pull.returncode:
+                pull_failure = f"exited with status {pull.returncode}"
+            # Registry access is not a build input: when the pull fails, a builder
+            # image this host already holds is used instead of failing every build
+            # during a registry or network outage. A digest-pinned reference is
+            # content-addressed, so the cached copy is exactly what would have been
+            # pulled; a tag-only one may lag the registry, which the log says.
+            image_id = local_builder_image_id()
+            if pull_failure:
+                if image_id is None:
+                    raise RuntimeError(
+                        f"The builder image could not be pulled ({pull_failure}) and is not cached "
+                        f"on this host: {IMAGE}"
+                    )
+                pinned = "@sha256:" in IMAGE
+                append_log(job_id, (
+                    f"\nWARNING: pulling the builder image {pull_failure}; using the copy already "
+                    f"on this host ({image_id[:19]}). "
+                    + ("The reference is digest-pinned, so it is identical.\n" if pinned else
+                       "The reference is a tag, so this copy may be older than the registry's.\n")
+                ))
+                log_event("image_pull_fallback_to_cache", job_id=job_id, pinned=pinned)
+            else:
+                log_event("image_pull_completed", job_id=job_id)
+            with job_lock:
+                jobs[job_id]["builder_image"] = {
+                    "reference": IMAGE, "id": image_id,
+                    "source": "cache" if pull_failure else "registry",
+                }
         else:
-            log_event("image_pull_completed", job_id=job_id)
-        with job_lock:
-            jobs[job_id]["builder_image"] = {
-                "reference": IMAGE, "id": image_id,
-                "source": "cache" if pull_failure else "registry",
-            }
+            with job_lock:
+                jobs[job_id]["builder_image"] = {
+                    "reference": f"gisobuild {gisobuild_commit() or 'unknown commit'} (bundled)",
+                    "id": None, "source": "bundled",
+                }
+        process_env, process_cwd = builder_process_environment(job_id)
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, bufsize=1, start_new_session=True)
+                                text=True, bufsize=1, start_new_session=True,
+                                env=process_env, cwd=process_cwd)
         with job_lock:
             job_processes[job_id] = proc
             jobs[job_id]["process_phase"] = "building"
@@ -2477,12 +2536,16 @@ def health():
 @app.get("/api/ready")
 def ready():
     docker_ok = False
-    try:
-        subprocess.run([DOCKER_BIN, "info"], timeout=5, check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        docker_ok = True
-    except (OSError, subprocess.SubprocessError):
-        pass
+    if GISO_RUNNER == "local":
+        # Nothing to reach: the "engine" check is that gisobuild's interpreter exists.
+        docker_ok = os.access(GISOBUILD_PYTHON, os.X_OK)
+    else:
+        try:
+            subprocess.run([DOCKER_BIN, "info"], timeout=5, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            docker_ok = True
+        except (OSError, subprocess.SubprocessError):
+            pass
     db_ok = False
     try:
         with sqlite3.connect(JOB_DB, timeout=5) as database:
@@ -2531,15 +2594,18 @@ def gisobuild_commit() -> str | None:
     Returns None (never raises) when TOOL isn't a git checkout or git isn't
     available - version info is diagnostic, never load-bearing.
     """
+    # A self-contained image copies gisobuild without its .git directory and
+    # records the pinned commit at build time instead.
+    recorded = os.environ.get("GISOBUILD_COMMIT", "").strip()[:12] or None
     try:
         result = subprocess.run(
             ["git", "-C", str(TOOL), "rev-parse", "--short", "HEAD"],
             capture_output=True, text=True, timeout=5, check=False,
         )
     except (OSError, subprocess.SubprocessError):
-        return None
+        return recorded
     commit = result.stdout.strip()
-    return commit if result.returncode == 0 and commit else None
+    return commit if result.returncode == 0 and commit else recorded
 
 
 @app.get("/api/version")
@@ -2554,7 +2620,8 @@ def version():
         app_version=APP_VERSION,
         source_revision=os.environ.get("SOURCE_REVISION") or None,
         build_date=os.environ.get("BUILD_DATE") or None,
-        gisobuild_image=IMAGE,
+        runner=GISO_RUNNER,
+        gisobuild_image=IMAGE if GISO_RUNNER == "docker" else None,
         gisobuild_commit=gisobuild_commit(),
     )
 
@@ -3235,6 +3302,33 @@ def get_job(job_id: str):
         return jsonify(public_job(job))
 
 
+def terminate_process_group(process: subprocess.Popen, grace_seconds: float = 20) -> None:
+    """Stop a local build and everything it started, leaving no orphans.
+
+    Builds run with start_new_session=True, so the process ID is also the
+    process group ID and every helper gisobuild spawned (rpm, mkisofs,
+    chroot, ...) is in it. SIGTERM the group, give it grace_seconds, then
+    SIGKILL whatever is left of the group - also when the leader already
+    exited but a child did not.
+    """
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+
+
 @app.delete("/api/jobs/<job_id>")
 def cancel_job(job_id: str):
     with job_lock:
@@ -3249,7 +3343,9 @@ def cancel_job(job_id: str):
         process_phase = job.get("process_phase")
     persist_job(job_id)
     process_was_running = process is not None and process.poll() is None
-    if process_was_running:
+    if process_was_running and GISO_RUNNER == "local":
+        terminate_process_group(process)
+    elif process_was_running:
         process.terminate()
         try:
             process.wait(timeout=20)
@@ -3258,7 +3354,7 @@ def cancel_job(job_id: str):
             process.wait(timeout=5)
     if previous_status == "finalizing":
         return jsonify(ok=True)
-    if process_phase == "pulling" or not process_was_running:
+    if process_phase == "pulling" or not process_was_running or GISO_RUNNER == "local":
         with job_lock:
             jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
                                 updated=time.time())
