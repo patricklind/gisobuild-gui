@@ -99,19 +99,21 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Socket deployment web image (compose.socket.yaml).
       - uses: docker/build-push-action@v6
         with:
           context: giso-webui
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}-socket
+            ghcr.io/${{ github.repository }}:latest-socket
           build-args: |
             SOURCE_REVISION=${{ github.sha }}
             APP_VERSION=${{ env.RELEASE_TAG }}
           provenance: mode=max
           sbom: true
+      # Default image (compose.yaml): web app plus pinned gisobuild.
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -123,8 +125,8 @@ jobs:
             SOURCE_REVISION=${{ github.sha }}
             APP_VERSION=${{ env.RELEASE_TAG }}
           tags: |
-            ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}-selfcontained
-            ghcr.io/${{ github.repository }}:latest-selfcontained
+            ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}
+            ghcr.io/${{ github.repository }}:latest
           provenance: mode=max
           sbom: true
       - name: Create GitHub release

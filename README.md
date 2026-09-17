@@ -25,7 +25,7 @@ A local Docker-based interface and CLI for building Cisco IOS XR Golden ISO
   and package naming convention.
 - `GISOBUILD-GUIDE.md` — platform-aware build, upgrade, validation, and rollback
   guide for Cisco IOS XR families supported by the upstream GISO tool.
-- `docker/` — the self-contained image (web app plus pinned gisobuild, no Docker
+- `docker/` — the default image (web app plus pinned gisobuild, no Docker
   socket) and the tooling and browser-test images.
 - `staging/` — isolated upgrade and rollback workflow simulator.
 - `scripts/e2e_real_iso.py` — licensed-ISO end-to-end ISO/USB verification.
@@ -33,22 +33,18 @@ A local Docker-based interface and CLI for building Cisco IOS XR Golden ISO
 See the [documentation index](docs/README.md) for operations, platform support,
 testing, releases, architecture, security, and contribution guidance.
 
-In the default deployment the web process starts an isolated Cisco build
-container. Input and tool mounts are read-only; only dedicated output and
-working volumes are writable. The web container itself uses a read-only root
-filesystem with all Linux capabilities dropped. The
-[self-contained deployment](#self-contained-deployment-no-docker-socket) runs
-gisobuild inside the web container instead, with no Docker socket.
+The default deployment runs gisobuild inside the web container, from a copy
+pinned by commit and SHA-256: no Docker socket, no second container and no host
+gisobuild checkout. A socket-based alternative that starts Cisco's builder image
+is described under [deployment options](#deployment-options).
 
 ## Requirements
 
 - Docker Desktop or Docker Engine with Compose v2
 - An x86_64 host, or x86_64 emulation on Apple Silicon
 - Approximately 25 GB of free disk space
-- For the default deployment, a local checkout of
-  [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at
-  `.gisobuild-tool/`, or permission for `build-giso.sh` to clone it (the
-  self-contained image bundles a pinned copy)
+- Only for the socket deployment or `build-giso.sh`: a checkout of
+  [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at `.gisobuild-tool/`
 - Properly licensed Cisco IOS XR input files
 
 Keep at least 25 GB free beyond the input files. A build temporarily stores the
@@ -58,9 +54,7 @@ upload, extracted packages, working data, and generated output at the same time.
 
 ```bash
 git clone https://github.com/patricklind/gisobuild-gui.git
-cd gisobuild-gui
-git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
-cd giso-webui
+cd gisobuild-gui/giso-webui
 cp .env.example .env
 docker compose up --build -d
 docker compose ps
@@ -131,8 +125,9 @@ This simulator does not replace a test on matching lab hardware. See
 ```bash
 cd giso-webui
 docker compose config -q
-docker compose build giso-webui
-docker compose run --rm --no-deps \
+docker compose -f compose.socket.yaml config -q
+docker compose -f compose.socket.yaml build giso-webui
+docker compose -f compose.socket.yaml run --rm --no-deps \
   -v "$(cd .. && pwd):/project:ro" \
   -w /project/giso-webui \
   giso-webui python -B -m unittest discover -s tests -v
@@ -140,8 +135,9 @@ cd ..
 bash -n build-giso.sh scripts/coord.sh scripts/worktree.sh
 ```
 
-Browser tests, lint, dependency audit, Graphify and the self-contained image
-checks are listed in [testing](docs/testing.md#developer-command-reference).
+Unit tests run in the lighter socket-deployment web image because they set
+their own runner environment. Browser tests, lint, dependency audit, Graphify
+and the default image checks are listed in [testing](docs/testing.md#developer-command-reference).
 
 GitHub Actions runs, for every pull request: unit and synthetic integration
 tests inside the built container image, Playwright browser tests, the staging
@@ -149,10 +145,12 @@ rehearsal, Ruff (including flake8-bandit rules), `pip-audit`, Actionlint,
 Hadolint, Compose and shell syntax validation, a Graphify freshness check, a
 guard against host-side tooling in docs and scripts, both container builds,
 Trivy scans, an SBOM, and the platform drift tests against the gisobuild
-bundled in the self-contained image.
+bundled in the default image.
 See the [release process](docs/releasing.md) for versioned GHCR publication.
 
-## Self-contained deployment (no Docker socket)
+## Deployment options
+
+### Default: `compose.yaml` (no Docker socket)
 
 `docker/selfcontained.Dockerfile` bundles the web app with
 [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at a pinned, verified
@@ -164,7 +162,7 @@ pull and no host `.gisobuild-tool` checkout.
 
 ```bash
 cd giso-webui
-docker compose -f compose.selfcontained.yaml up -d --build
+docker compose up -d --build
 curl --fail http://127.0.0.1:8080/api/ready
 ```
 
@@ -173,14 +171,43 @@ and every Linux capability dropped except `SYS_CHROOT`, which gisobuild's eXR
 engine needs to inspect RPMs inside the extracted image. Without it the build
 plan is blocked with an explanation. `/api/version` reports `runner: local`, the
 bundled gisobuild commit and its source SHA-256. Releases publish this image as
-`ghcr.io/patricklind/gisobuild-gui:<version>-selfcontained` (`linux/amd64`). A real NCS5500 25.1.2 Golden ISO has been built
-this way; LNT images have not yet been exercised in this deployment.
+`ghcr.io/patricklind/gisobuild-gui:<version>` and `:latest` (`linux/amd64`). Real
+NCS5500 25.1.2 Golden ISOs have been built this way; LNT images have not yet
+been exercised in this deployment.
+
+### Alternative: `compose.socket.yaml` (Docker socket)
+
+The original architecture: the web container gets `/var/run/docker.sock` and
+starts a child container from Cisco's `ciscogisobuild/cisco-xr-gisobuild` image
+(pinned by digest) for each build. That image carries only gisobuild's runtime;
+the gisobuild code is the host checkout at `.gisobuild-tool/`, which is not
+pinned. Socket access is equivalent to administrative access to the Docker host.
+Use it only where the default image cannot run.
+
+```bash
+git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
+cd giso-webui
+docker compose -f compose.socket.yaml up -d --build
+```
+
+Both files use the same volumes; stop one before starting the other. Releases
+publish its web image as `<version>-socket` / `latest-socket`.
+
+### Moving an existing installation to the default
+
+Earlier versions used the socket deployment as `compose.yaml`. After updating
+the checkout, `docker compose down` then `docker compose up -d --build` switches
+to the default image and keeps the same `giso-webui_*` volumes (uploads, job
+history, archive). Wait for any active build to finish first. `GISO_IMAGE`,
+`GISO_PULL_TIMEOUT_SECONDS` and the storage-path settings in an existing `.env`
+are ignored by the default deployment, and `.gisobuild-tool/` is no longer
+needed. To keep the old behaviour, use `-f compose.socket.yaml`.
 
 ## Security
 
-The default `compose.yaml` deployment binds only to localhost because the web
-container has access to the Docker socket (the self-contained deployment above
-has none). Do not expose port 8080 to an untrusted network. See
+Both deployments bind only to localhost. The socket deployment's web container
+has access to the Docker socket; the default one has none, but the application
+still has no authentication. Do not expose port 8080 to an untrusted network. See
 [`SECURITY.md`](SECURITY.md) for the deployment boundary and reporting process.
 
 ## Operational limitations

@@ -154,14 +154,13 @@ rule in this file wins and the examples must be corrected.
   unless the user explicitly authorizes the exact device and operation.
 - All application/runtime/build execution must stay inside Docker. Never install
   project dependencies or invoke project code directly on the user's host.
-- The default deployment (`giso-webui/compose.yaml`) controls Docker through
-  `/var/run/docker.sock`. Keep it bound to localhost, preserve host/origin
+- The default deployment (`giso-webui/compose.yaml`) bundles gisobuild, has no
+  Docker socket and runs read-only with only `SYS_CHROOT`; keep it that way.
+  The alternative `giso-webui/compose.socket.yaml` controls Docker through
+  `/var/run/docker.sock`. Keep both bound to localhost, preserve host/origin
   checks, and do not weaken container isolation without an explicit security
-  review. The self-contained deployment (`giso-webui/compose.selfcontained.yaml`)
-  has no socket and runs read-only with only `SYS_CHROOT`; keep it that way.
-  Which one is the documented default is still an open decision
-  (`docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md`).
-- The bundled gisobuild in the self-contained image is pinned by commit and by
+  review.
+- The bundled gisobuild in the default image is pinned by commit and by
   a SHA-256 manifest (`GISOBUILD_COMMIT`, `GISOBUILD_SOURCE_SHA256` in
   `docker/selfcontained.Dockerfile`). Bumping gisobuild means updating both and
   running the platform drift tests against the new image.
@@ -183,8 +182,9 @@ This repository provides a Docker-hosted Web UI and orchestration layer around
 Cisco's `ios-xr/gisobuild` project.
 
 - Web application: `giso-webui/`
-- Container images: `giso-webui/Dockerfile` (default), `docker/selfcontained.Dockerfile`
-  (web app plus pinned gisobuild), `docker/tooling.Dockerfile`, `docker/browser-tests.Dockerfile`
+- Container images: `docker/selfcontained.Dockerfile` (the default deployment:
+  web app plus pinned gisobuild), `giso-webui/Dockerfile` (socket deployment and
+  unit tests), `docker/tooling.Dockerfile`, `docker/browser-tests.Dockerfile`
 - Platform validation: `giso-webui/platform_validation.py`
 - CLI helper: `build-giso.sh`
 - Safe workflow simulator: `staging/`
@@ -207,8 +207,9 @@ use containerized equivalents of:
 
 ```bash
 docker compose -f giso-webui/compose.yaml config -q
+docker compose -f giso-webui/compose.socket.yaml config -q
 docker compose -f staging/compose.yaml config -q
-docker compose -f giso-webui/compose.yaml build giso-webui
+docker compose -f giso-webui/compose.socket.yaml build giso-webui
 docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui \
   giso-webui-giso-webui python -B -m unittest discover -s tests -v
 ```
@@ -220,7 +221,7 @@ required check, create or extend a tooling/test container; do not run it on the
 host as a fallback.
 
 Changes to the operator UI also need the Playwright browser tests, and changes to
-platform handling the upstream drift tests in the self-contained image; both
+platform handling the upstream drift tests in the default image; both
 commands are in `docs/testing.md`.
 
 Run the `giso-webui` unit test suite only inside the built `giso-webui-giso-webui`
@@ -240,12 +241,12 @@ fully implemented and appropriately verified work as complete.
   real acceptance runner.
 - eXR and IOS XR7/LNT options are not interchangeable. Keep the platform matrix
   synchronized with the pinned upstream tool (`test_platform_compatibility.py`
-  fails on drift; CI runs it in the self-contained image) and defer exact PID
+  fails on drift; CI runs it in the default image) and defer exact PID
   support to ISO metadata.
 - Automatic USB output is not supported for every eXR family. Do not promise a
   USB artifact where upstream `gisobuild` does not create one.
-- Builds run in a `linux/amd64` Cisco-compatible container environment. Apple
-  Silicon relies on Docker emulation and may be significantly slower.
+- Builds run in a `linux/amd64` Cisco-compatible environment. Apple Silicon
+  relies on Docker emulation and may be significantly slower.
 - Successful builds remove uploaded source and temporary build files only after
   archive copies pass SHA-256 verification.
 - An active build cannot be reattached after a Web UI restart; its persisted job

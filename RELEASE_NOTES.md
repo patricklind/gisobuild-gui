@@ -23,9 +23,14 @@ The latest published version is
 - Selects LNT packages named the upstream way (`xr-cdp-24.3.1v1.0.0-1.x86_64.rpm`)
   and accepts `.tar.gz` bugfix bundles; eXR USB output follows upstream's
   per-platform scripts.
-- Adds a self-contained image (`docker/selfcontained.Dockerfile`,
-  `giso-webui/compose.selfcontained.yaml`) that runs pinned gisobuild without a
-  Docker socket, read-only and with only `SYS_CHROOT`. The bundled gisobuild
+- The default deployment (`giso-webui/compose.yaml`,
+  `docker/selfcontained.Dockerfile`) now bundles pinned gisobuild and runs it
+  without a Docker socket, read-only and with only `SYS_CHROOT`. The previous
+  socket-based deployment is kept as `giso-webui/compose.socket.yaml` with its
+  builder image pinned by digest; existing volumes are unchanged, so an upgrade
+  is `docker compose down` followed by `docker compose up -d --build`. Releases
+  publish the default image as `<version>`/`latest` and the socket deployment's
+  web image as `<version>-socket`/`latest-socket`. The bundled gisobuild
   files are pinned by commit and by a SHA-256 manifest that the image build
   and the startup self-test both verify; a mismatch blocks builds.
 - Structured error codes with suggested actions, per-step build timings,

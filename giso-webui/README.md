@@ -6,12 +6,12 @@ chunked uploads, common eXR and LNT options, live logs, checksums, downloads,
 and a persistent artifact archive.
 
 > [!CAUTION]
-> The default deployment controls Docker through `/var/run/docker.sock`, which is
-> effectively administrative access to the Docker host. Keep the default
-> localhost binding and do not deploy this as an untrusted or multi-user service.
-> The self-contained deployment (`compose.selfcontained.yaml`, see the
-> [project README](../README.md#self-contained-deployment-no-docker-socket))
-> needs no socket and no gisobuild checkout.
+> Keep the default localhost binding and do not deploy this as an untrusted or
+> multi-user service: the application has no authentication. The default
+> deployment (`compose.yaml`) bundles gisobuild and needs no Docker socket. The
+> alternative `compose.socket.yaml` gives the web container
+> `/var/run/docker.sock`, which is effectively administrative access to the
+> Docker host — see [deployment options](../README.md#deployment-options).
 
 ## Optional Cisco software download
 
@@ -48,9 +48,9 @@ are true for the organisation.
 - Docker Desktop or Docker Engine with Compose v2
 - An x86_64 host, or x86_64 emulation on Apple Silicon
 - Approximately 25 GB of free disk space
-- A checkout of [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at
-  `../.gisobuild-tool` (default deployment only; the self-contained image
-  bundles a pinned copy)
+- Only for `compose.socket.yaml`: a checkout of
+  [`ios-xr/gisobuild`](https://github.com/ios-xr/gisobuild) at
+  `../.gisobuild-tool` (the default image bundles a pinned copy)
 - Properly licensed Cisco IOS XR ISO, RPM, and SMU files
 
 The expert form requires a recognizable ISO filename or an explicit platform
@@ -63,7 +63,6 @@ build and shows whether upstream automatic USB output is expected. See the
 From the repository root:
 
 ```bash
-git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
 cd giso-webui
 cp .env.example .env
 docker compose up --build -d
@@ -145,9 +144,7 @@ container with `docker compose up -d --force-recreate`.
 
 | Variable | Default | Purpose |
 | --- | ---: | --- |
-| `GISO_IMAGE` | `ciscogisobuild/cisco-xr-gisobuild:2.3.4` | Cisco build image |
 | `LOG_LEVEL` | `INFO` | Application event log level written to container stdout/stderr |
-| `GISO_PULL_TIMEOUT_SECONDS` | `600` | Maximum time allowed for pulling the Cisco build image |
 | `CISCO_CLIENT_ID_FILE` | `/run/secrets/cisco_client_id` | Container path to the Cisco API client ID secret |
 | `CISCO_CLIENT_SECRET_FILE` | `/run/secrets/cisco_client_secret` | Container path to the Cisco API client secret |
 | `CISCO_SECRETS_DIR` | `./secrets` | Host directory mounted read-only at `/run/secrets` |
@@ -167,9 +164,11 @@ container with `docker compose up -d --force-recreate`.
 | `MAX_ARCHIVE_BYTES` | `53687091200` | Combined ISO and USB archive quota (50 GiB) |
 | `ARCHIVE_CLEANUP_INTERVAL_SECONDS` | `3600` | Maintenance interval; minimum 60 seconds |
 
-The `DATA_ROOT`, `OUTPUT_ROOT`, `TOOL_ROOT`, `WORK_ROOT`, `ARCHIVE_ROOT`, and `STATE_ROOT`
-variables are container paths matched to Compose mounts. Change them only when
-you also update the corresponding volume destinations.
+`compose.socket.yaml` additionally reads `GISO_IMAGE` (the Cisco builder image,
+pinned by digest), `GISO_PULL_TIMEOUT_SECONDS`, and the `DATA_ROOT`,
+`OUTPUT_ROOT`, `TOOL_ROOT`, `WORK_ROOT`, `ARCHIVE_ROOT` and `STATE_ROOT`
+container paths; they are commented out in `.env.example`. The default
+deployment fixes those paths in `compose.yaml` and ignores the variables.
 
 ## Data lifecycle
 
@@ -210,10 +209,14 @@ procedures are in the [operations runbook](../docs/operations.md).
 
 ## Test and verify
 
+The unit tests run in the lighter web image of the socket deployment: they set
+their own runner environment, which the default image would override.
+
 ```bash
 docker compose config -q
-docker compose build giso-webui
-docker compose run --rm --no-deps \
+docker compose -f compose.socket.yaml config -q
+docker compose -f compose.socket.yaml build giso-webui
+docker compose -f compose.socket.yaml run --rm --no-deps \
   -v "$(cd .. && pwd):/project:ro" \
   -w /project/giso-webui \
   giso-webui python -B -m unittest discover -s tests -v
@@ -229,23 +232,24 @@ See [testing and acceptance](../docs/testing.md).
 
 - **Readiness is failing:** `curl http://127.0.0.1:8080/api/ready` names each
   failing startup check in `self_test` (gisobuild, runner, job store, writable
-  volumes, configuration, free space, architecture and, in the self-contained
-  image, `gisobuild_source`).
-- **Health check is failing:** Run `docker info`, confirm
-  `.gisobuild-tool/src/gisobuild.py` and the mounted storage exist, then inspect
-  `docker compose logs --tail=200 giso-webui`.
-- **Build cannot start:** Confirm `.gisobuild-tool/src/gisobuild.py` exists and
-  no container named `giso-build-*` is already running.
-- **Apple Silicon build is slow:** The Cisco image runs with `linux/amd64`
-  emulation; longer build times are expected.
+  volumes, configuration, free space, architecture and `gisobuild_source`, which
+  re-checks the bundled gisobuild against the image's pinned SHA-256 manifest).
+- **Health check is failing:** Inspect
+  `docker compose logs --tail=200 giso-webui`. With `compose.socket.yaml` also
+  run `docker info` and confirm `.gisobuild-tool/src/gisobuild.py` exists.
+- **Build cannot start:** Check `/api/ready`, and with `compose.socket.yaml`
+  that `.gisobuild-tool/src/gisobuild.py` exists and no container named
+  `giso-build-*` is already running.
+- **Apple Silicon build is slow:** gisobuild runs with `linux/amd64` emulation;
+  longer build times are expected.
 - **Upload is rejected:** Check the file extension and the upload, extraction,
   and free-space limits in `.env`.
 - **Host header is rejected:** Keep the service local or add the exact trusted
   hostname to `ALLOWED_HOSTS`; do not use a wildcard.
 - **Build was interrupted by restart:** The job and log remain visible. Check
-  running `giso-build-*` containers and application logs before starting again.
-  In the self-contained deployment the interrupted build's work files are
-  removed automatically at startup; its logs are kept.
+  application logs (and, with `compose.socket.yaml`, running `giso-build-*`
+  containers) before starting again. In the default deployment the interrupted
+  build's work files are removed automatically at startup; its logs are kept.
 - **Upload was interrupted:** Select the same file again; the upload resumes from
   the bytes the server already has, also after a service restart.
 - **Cleanup reports zero items:** The workspace is already empty. Archived ISO
@@ -264,12 +268,12 @@ docker compose down
 
 ## Security and disclaimer
 
-The web container uses a read-only root filesystem, has all Linux capabilities
-dropped (the self-contained image keeps only `SYS_CHROOT`), and gives child
-build containers only the required mounts. Uploaded tar
+The web container uses a read-only root filesystem and drops every Linux
+capability except `SYS_CHROOT`, which gisobuild's eXR engine needs. Uploaded tar
 paths, symlinks, hard links, request origins, host headers, and size limits are
-validated. These controls reduce risk but do not remove the Docker-socket trust
-boundary. See [`../SECURITY.md`](../SECURITY.md).
+validated. The default deployment has no Docker socket;
+`compose.socket.yaml` keeps that trust boundary and gives its child build
+containers only the required mounts. See [`../SECURITY.md`](../SECURITY.md).
 
 This tooling is provided without warranty and is used at your own risk. You are
 responsible for validating Cisco compatibility, checksums, backups, change

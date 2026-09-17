@@ -515,6 +515,51 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
             "message": f"The matrix permits {source} to {target} on {PLATFORMS[normalized]['label']}"}
 
 
+# Every build option that a platform's capabilities decide, and the human name
+# the operator sees. Which platforms have which capability is data
+# (PLATFORMS/PLATFORM_CAPABILITY_OVERRIDES, derived from upstream's own CLI
+# maps), never a platform name written into a condition: a new upstream
+# platform needs a profile entry, not a code change.
+OPTION_CAPABILITIES = {
+    "migration": "migration", "full_iso": "full_iso",
+    "x86_only": "x86_only", "optimize": "optimize", "script": "script",
+    "remove_packages": "remove_packages", "only_support_pids": "only_support_pids",
+    "clear_bridging_fixes": "clear_bridging_fixes",
+    "verbose_dep_check": "verbose_dependency_check",
+    "ownership_vouchers": "ownership_vouchers",
+    "ownership_certificate": "ownership_certificate",
+    "clear_ownership_vouchers": "clear_ownership_vouchers",
+    "clear_ownership_certificate": "clear_ownership_certificate",
+    "key_request": "key_request", "clear_key_request": "clear_key_request",
+    "no_buildinfo": "no_buildinfo",
+}
+OPTION_LABELS = {
+    "migration": "Migration TAR", "full_iso": "Full ISO", "x86_only": "x86-only packages",
+    "optimize": "Optimized ISO", "script": "Boot script", "remove_packages": "Remove packages",
+    "only_support_pids": "PID filtering", "clear_bridging_fixes": "Clear bridging fixes",
+    "verbose_dep_check": "Verbose dependency check",
+    "ownership_vouchers": "Ownership vouchers", "ownership_certificate": "Ownership certificate",
+    "clear_ownership_vouchers": "Clear ownership vouchers",
+    "clear_ownership_certificate": "Clear ownership certificate",
+    "key_request": "Key request", "clear_key_request": "Clear key request",
+    "no_buildinfo": "No build information",
+}
+
+
+def platforms_supporting(capability: str) -> list[str]:
+    """Labels of the real platforms whose capabilities include `capability`.
+
+    Used to turn "this option is not available here" into "upstream offers it
+    on <platforms>". The manual-override profiles are left out: they claim no
+    platform-specific capability, so naming them would mislead.
+    """
+    return sorted(
+        PLATFORMS[name]["label"] for name in PLATFORMS
+        if name not in GENERIC_PLATFORM_IDS
+        and capabilities_for_platform(name).get(capability, False)
+    )
+
+
 def validate_platform_options(payload: dict) -> dict:
     requested = payload.get("platform", "")
     platform = normalize_platform(requested) if requested else infer_platform(payload.get("iso", ""))
@@ -523,27 +568,16 @@ def validate_platform_options(payload: dict) -> dict:
     profile = platform_profile(platform)
     architecture = profile["architecture"]
     errors = []
-    if payload.get("migration") and platform != "asr9k":
-        errors.append("Migration TAR is supported only for ASR 9000 eXR images")
-    if payload.get("full_iso") and platform != "xrv9k":
-        errors.append("Full ISO is supported only for IOS XRv 9000")
-    option_capabilities = {
-        "x86_only": "x86_only", "optimize": "optimize", "script": "script",
-        "remove_packages": "remove_packages", "only_support_pids": "only_support_pids",
-        "clear_bridging_fixes": "clear_bridging_fixes",
-        "verbose_dep_check": "verbose_dependency_check",
-        "ownership_vouchers": "ownership_vouchers",
-        "ownership_certificate": "ownership_certificate",
-        "clear_ownership_vouchers": "clear_ownership_vouchers",
-        "clear_ownership_certificate": "clear_ownership_certificate",
-        "key_request": "key_request", "clear_key_request": "clear_key_request",
-        "no_buildinfo": "no_buildinfo",
-    }
-    unsupported = [option for option, capability in option_capabilities.items()
-                   if payload.get(option) and not profile["capabilities"].get(capability, False)]
-    if unsupported:
+    for option, capability in OPTION_CAPABILITIES.items():
+        if not payload.get(option) or profile["capabilities"].get(capability, False):
+            continue
+        elsewhere = platforms_supporting(capability)
+        named, extra = elsewhere[:3], len(elsewhere) - 3
+        where = ", ".join(named) + (f" and {extra} more" if extra > 0 else "")
         errors.append(
-            f"{', '.join(unsupported)} not supported by the {profile['label']} {architecture.upper()} build engine"
+            f"{OPTION_LABELS.get(option, option)} is not supported on {profile['label']} "
+            f"({architecture.upper()} build engine)"
+            + (f"; upstream gisobuild offers it on {where}" if elsewhere else "")
         )
     # Only LNT can be told to skip USB, and only LNT would try and fail; the
     # eXR engine simply produces no USB zip for a platform without a script.

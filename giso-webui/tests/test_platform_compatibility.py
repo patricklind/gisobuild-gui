@@ -6,12 +6,15 @@ from pathlib import Path
 
 from platform_validation import (
     GENERIC_PLATFORM_IDS,
+    OPTION_CAPABILITIES,
+    OPTION_LABELS,
     PLATFORMS,
     capabilities_for_platform,
     check_upgrade_matrix,
     infer_platform,
     infer_platform_pid,
     normalize_platform,
+    platforms_supporting,
     recommend_smu_selection,
     validate_platform_options,
     validate_smu_selection,
@@ -166,17 +169,38 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertTrue(capabilities_for_platform("xrv9k")["full_iso"])
 
     def test_adapter_rejects_capability_not_supported_by_engine(self):
-        with self.assertRaisesRegex(ValueError, "remove_packages not supported"):
+        # The message names the option, the platform that cannot do it and
+        # where upstream does offer it - never a hardcoded platform condition.
+        with self.assertRaisesRegex(
+                ValueError,
+                r"Remove packages is not supported on NCS 5500 \(EXR build engine\); "
+                r"upstream gisobuild offers it on .+"):
             validate_platform_options({
                 "iso": "ncs5500-mini-x-26.1.2.iso", "remove_packages": ["optional-pkg"]
             })
+
+    def test_platform_only_options_are_decided_by_capabilities_not_platform_names(self):
+        # migration/full_iso used to be two hardcoded platform comparisons.
+        for option, owner, other in (("migration", "asr9k", "ncs5500"),
+                                     ("full_iso", "xrv9k", "asr9k")):
+            self.assertEqual(platforms_supporting(option),
+                             [PLATFORMS[owner]["label"]], option)
+            validate_platform_options({"platform": owner, option: True})
+            with self.assertRaisesRegex(ValueError, "is not supported on"):
+                validate_platform_options({"platform": other, option: True})
+        # Every option the validator gates is a real capability of the engines.
+        known = set(capabilities_for_platform("ncs5500")) | set(capabilities_for_platform("8000"))
+        self.assertTrue(set(OPTION_CAPABILITIES.values()) <= known,
+                        set(OPTION_CAPABILITIES.values()) - known)
+        self.assertEqual(set(OPTION_CAPABILITIES) - set(OPTION_LABELS), set())
 
     def test_adapter_rejects_exr_only_capability_on_lnt_platform(self):
         # The mirror image of the test above: remove_packages is LNT-only
         # and rejected on an eXR platform, but nothing checked the other
         # direction - an eXR-only capability (optimize) offered on an LNT
         # platform (Cisco 8000).
-        with self.assertRaisesRegex(ValueError, "optimize not supported"):
+        with self.assertRaisesRegex(
+                ValueError, r"Optimized ISO is not supported on Cisco 8000 / 8800 \(LNT build engine\)"):
             validate_platform_options({"platform": "8000", "optimize": True})
 
     def test_ncs57c3_inventory_sku_normalizes_to_ncs57(self):

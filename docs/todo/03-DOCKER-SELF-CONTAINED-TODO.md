@@ -26,48 +26,73 @@ No host-side project execution:
 
 No external runtime dependencies:
 
-Status 2026-09-17: available as `docker/selfcontained.Dockerfile` +
-`giso-webui/compose.selfcontained.yaml` (runner `GISO_RUNNER=local`). The
-original `compose.yaml` (socket + child builder) still exists and is still
-the documented default; switching the default is left to the maintainer.
+Status 2026-09-17: this is now the default. `giso-webui/compose.yaml` builds
+`docker/selfcontained.Dockerfile` and runs `GISO_RUNNER=local`; the original
+socket + child-builder deployment is kept as `giso-webui/compose.socket.yaml`
+for hosts where the default image cannot run.
 
 - [ ] **Make our own image the default instead of
       `GISO_IMAGE=ciscogisobuild/cisco-xr-gisobuild:2.3.4`** (raised by the
       maintainer 2026-09-17: "why don't we use our own Docker image?").
-      Today `compose.yaml` / `.env.example` still start a child container from
-      Cisco's image through the Docker socket. Inspection of that image shows
+      Until 2026-09-17 `compose.yaml` / `.env.example` started a child container
+      from Cisco's image through the Docker socket. Inspection of that image shows
       it contains only the runtime (Python + gisobuild's OS dependencies), not
       gisobuild: the code is the host `.gisobuild-tool` checkout mounted at
       `/tool`. So the default deployment (a) needs `/var/run/docker.sock`
       (host-admin equivalent), (b) runs whatever commit that checkout is on,
       not a pin, and (c) references a mutable tag, not a digest. Our
-      self-contained image fixes all three (pinned commit + SHA-256 manifest,
-      no socket, read-only, only `SYS_CHROOT`), is proven by real NCS5500
-      25.1.2 builds, and is already published per release as
-      `<version>-selfcontained`. Merely pointing `GISO_IMAGE` at our image is
-      not the fix: the socket and the unpinned `/tool` mount would remain.
-      To do:
-      - [ ] make `giso-webui/compose.yaml` the self-contained deployment and
-            keep the socket variant as an explicit alternative (e.g.
-            `compose.socket.yaml`), or drop it
-      - [ ] `.env.example`: remove `GISO_IMAGE`/`GISO_PULL_TIMEOUT_SECONDS`
-            from the default path (keep them documented for the alternative)
-      - [ ] if the socket variant stays: pin `GISO_IMAGE` by digest and stop
-            mounting an unpinned host checkout (use the gisobuild bundled in
-            our image, or verify the checkout against the same commit/SHA-256)
-      - [ ] CI "Validate Compose configuration", staging, release workflow,
-            browser/integration tests and `docs/testing.md` smoke test follow
-            the new default
-      - [ ] README, web UI guide, operations, architecture, security,
-            AGENTS.md and GISO guide describe the self-contained deployment
-            first
-      - [ ] upgrade note for existing installs (volume names, the
-            `.gisobuild-tool` checkout no longer needed)
-      - [ ] verify: full unit/integration/browser suites, clean-machine run
-            and a real licensed eXR build with `docker compose up -d` on the
-            new default
-      - [ ] open risk: LNT is unexercised in the self-contained image (no LNT
-            image available); Apple Silicon still uses amd64 emulation
+      own image fixes all three (pinned commit + SHA-256 manifest, no socket,
+      read-only, only `SYS_CHROOT`) and is proven by real NCS5500 25.1.2
+      builds. Merely pointing `GISO_IMAGE` at our image would not have been the
+      fix: the socket and the unpinned `/tool` mount would remain. Done:
+      - [x] `giso-webui/compose.yaml` is now the bundled-gisobuild deployment;
+            the socket variant moved to `giso-webui/compose.socket.yaml` with a
+            header saying what it costs. Both use the same volumes, so an
+            existing install keeps its uploads, job history and archive.
+      - [x] `.env.example` no longer sets `GISO_IMAGE`,
+            `GISO_PULL_TIMEOUT_SECONDS` or the container storage paths; they
+            are commented out for the socket variant.
+            `test_env_example_sets_nothing_that_only_the_socket_deployment_uses`
+            also proves every active variable is one `compose.yaml` reads.
+      - [x] the socket variant's builder image is pinned by digest
+            (`ciscogisobuild/cisco-xr-gisobuild:2.3.4@sha256:be282c7a…`, the
+            same default in `app.py`), checked by
+            `test_default_compose_builds_our_image_and_the_socket_variant_is_explicit_and_pinned`.
+            Its `/tool` checkout stays unpinned - that is the reason to prefer
+            the default deployment, and why it is documented as such.
+      - [x] CI validates both Compose files, builds the default image through
+            `docker compose build`, keeps the unit tests in the socket web
+            image (the default image's own `GISO_RUNNER`/`TOOL_ROOT` break
+            them: 21 failures, 3 errors when tried), hadolints
+            `docker/selfcontained.Dockerfile` (fixed DL3003/DL4006 with
+            `WORKDIR`/`SHELL`), and the release workflow now publishes the
+            default image as `<version>`/`latest` and the socket web image as
+            `<version>-socket`/`latest-socket`.
+      - [x] README ("Deployment options"), web UI guide, operations,
+            architecture, security, testing, releasing, AGENTS.md, the GISO
+            guide and RELEASE_NOTES describe the default deployment first.
+      - [x] upgrade note in README, `docs/operations.md` and RELEASE_NOTES:
+            `docker compose down` then `docker compose up -d --build` keeps the
+            `giso-webui_*` volumes; `.gisobuild-tool/` and `GISO_IMAGE` are no
+            longer used; `-f compose.socket.yaml` keeps the old behaviour.
+      - [x] verified 2026-09-17: 323 unit/integration tests, 20 browser
+            tests, ruff, hadolint, actionlint, the docker-only check, Graphify
+            freshness and both `docker compose config -q` runs. Smoke test of
+            the new default (own compose project, port 8099, throwaway
+            volumes): `/api/ready` healthy with
+            `self_test.gisobuild_source = 67 files match the pinned SHA-256
+            manifest`, `/api/version` runner `local`, commit `0388af2989bb`,
+            source SHA-256 `9d03ff0c…`. Real licensed build through that
+            deployment (`docker compose up -d --build`, automatic selection of
+            11 RPMs, 1 left out): status `success`, archived
+            `ncs5500-golden-x-25.1.2-CLEANUPFIX.iso` (2 477 621 248 bytes,
+            sha256 `8ce8ad01a42f1b28…`) and
+            `ncs5500-usb_boot-25.1.2-CLEANUPFIX.zip` (2 467 271 102 bytes,
+            sha256 `81229fa2dc7fdfb1…`) plus `build-report.json`, builder
+            `gisobuild 0388af2989bb (bundled)`. Licensed content lived only in
+            that project's volumes and was removed with `down -v`.
+      - [ ] open risk: LNT is unexercised in the default image (no LNT image
+            available); Apple Silicon still uses amd64 emulation
 
 **Real-build evidence** (throwaway container and Docker volumes on this Mac,
 amd64 emulation; licensed content only inside those volumes, all removed
@@ -87,7 +112,7 @@ up front (see "Security").
 
 - [x] separate `ios-xr/gisobuild` checkout - source cloned in the image build
       at a pinned commit, verified, `.git` removed.
-- [x] `.gisobuild-tool` bind mount - not in `compose.selfcontained.yaml`
+- [x] `.gisobuild-tool` bind mount - not in the default `compose.yaml`
       (guarded by `test_compose_never_mounts_the_docker_socket_or_a_host_gisobuild_checkout`).
 - [x] `/var/run/docker.sock` in the final target architecture - absent in the
       self-contained deployment (same guard; confirmed missing in the running

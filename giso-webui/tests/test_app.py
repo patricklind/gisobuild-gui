@@ -2759,6 +2759,41 @@ class GisoWebTests(unittest.TestCase):
         with_report = self.client.get("/api/archive").get_json()
         self.assertTrue(with_report[0]["has_report"])
 
+    def test_input_that_cannot_be_deleted_does_not_fail_an_archived_build(self):
+        # A real NCS5500 build (2026-09-17) archived and verified both artifacts
+        # and was then marked "failed" because removing one consumed input
+        # raised PermissionError: the container drops CAP_DAC_OVERRIDE, so root
+        # cannot unlink inside a directory owned by another user.
+        stubborn = self.data / "vendor-bundle"
+        stubborn.mkdir()
+        (stubborn / "package.rpm").write_bytes(b"package")
+        deletable = self.data / "selected.rpm"
+        deletable.write_bytes(b"selected")
+        job_dir = self.output / "cleanup-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+        module.jobs["cleanup-job"] = {"log": "", "progress": 0, "phase": "",
+                                       "status": "running", "updated": time.time()}
+        self.addCleanup(module.jobs.pop, "cleanup-job", None)
+        real_rmtree = module.shutil.rmtree
+
+        def rmtree(path, *args, **kwargs):
+            if Path(path) == stubborn:
+                raise PermissionError(13, "Permission denied")
+            return real_rmtree(path, *args, **kwargs)
+
+        with patch.object(module.shutil, "rmtree", side_effect=rmtree):
+            artifacts = module.archive_giso_artifacts_and_cleanup(
+                "cleanup-job", job_dir, [stubborn, deletable])
+
+        self.assertEqual([artifact["path"] for artifact in artifacts], ["router-golden.iso"])
+        self.assertTrue((module.ARCHIVE / "cleanup-job" / "router-golden.iso").exists())
+        self.assertFalse(deletable.exists())
+        self.assertTrue(stubborn.exists())
+        note = module.jobs.get("cleanup-job", {}).get("log", "")
+        self.assertIn("vendor-bundle", note)
+        self.assertIn("Clear workspace files", note)
+
     def test_successful_build_preserves_inputs_not_owned_by_job(self):
         owned = self.data / "selected.rpm"
         unrelated = self.data / "future-build.iso"

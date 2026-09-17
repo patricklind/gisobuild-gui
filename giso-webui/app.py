@@ -70,7 +70,10 @@ ARCHIVE = Path(os.environ.get("ARCHIVE_ROOT", "/archive")).resolve()
 STATE = Path(os.environ.get("STATE_ROOT", "/state")).resolve()
 JOB_DB = STATE / "jobs.sqlite3"
 IMAGE = validate_image_reference(
-    os.environ.get("GISO_IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4")
+    os.environ.get(
+        "GISO_IMAGE",
+        "ciscogisobuild/cisco-xr-gisobuild:2.3.4@sha256:be282c7a76b03820d7bdd6c8b8cc0d4a54a5b6207143f089123b32e245018bf3",
+    )
 )
 # How gisobuild runs. "docker" (the original architecture): a child builder
 # container started through the Docker socket. "local": gisobuild is part of
@@ -460,7 +463,7 @@ ERROR_TAXONOMY: tuple[tuple[str, re.Pattern, bool, str, str], ...] = tuple(
         ("INPUT_MISSING", r"Select one ISO that exists|was not found|must be an inventory ID|Input does not exist",
          True, "A selected input is not in the workspace.",
          "Check files again and reselect the base ISO and packages."),
-        ("OPTION_UNSUPPORTED", r"not supported by the|is supported only for|Automatic USB output is not supported",
+        ("OPTION_UNSUPPORTED", r"is not supported on|not supported by the|is supported only for|Automatic USB output is not supported",
          True, "A build option does not apply to this platform.",
          "Turn the option off in Expert settings."),
         ("STORAGE_ERROR", r"Not enough free (disk )?space",
@@ -2198,6 +2201,44 @@ def enforce_archive_policy(*, protected_job_id: str | None = None) -> list[str]:
     return removed
 
 
+def remove_consumed_inputs(cleanup_paths: list[Path] | None) -> list[str]:
+    """Delete the inputs a finished build consumed; describe what could not go.
+
+    Never raises: callers use it after the artifacts are archived and verified,
+    where an undeletable input is a housekeeping problem, not a build failure.
+    Messages name the file relative to the upload area and what to do about it.
+    """
+    problems: list[str] = []
+    touched_extraction_dirs: set[Path] = set()
+    for child in cleanup_paths or []:
+        resolved = child.resolve()
+        if DATA not in resolved.parents or not resolved.exists():
+            continue
+        try:
+            if resolved.is_dir():
+                shutil.rmtree(resolved)
+            else:
+                extraction_dir = top_level_extraction_dir(resolved)
+                resolved.unlink()
+                if extraction_dir is not None:
+                    touched_extraction_dirs.add(extraction_dir)
+        except OSError as exc:
+            problems.append(
+                f"{rel_data(resolved)} was used by this build but could not be removed "
+                f"({exc.strerror or type(exc).__name__}); check its ownership and "
+                "permissions, then use Clear workspace files"
+            )
+    for extraction_dir in touched_extraction_dirs:
+        if not extraction_dir.is_dir() or any(item.is_file() for item in extraction_dir.rglob("*")):
+            continue
+        source = archive_source_for_extraction(extraction_dir)
+        shutil.rmtree(extraction_dir, ignore_errors=True)
+        if source is not None:
+            with contextlib.suppress(OSError):
+                source.unlink(missing_ok=True)
+    return problems
+
+
 def archive_giso_artifacts_and_cleanup(
     job_id: str,
     job_dir: Path,
@@ -2240,25 +2281,17 @@ def archive_giso_artifacts_and_cleanup(
         except Exception:
             shutil.rmtree(archive_dir, ignore_errors=True)
             raise
-    touched_extraction_dirs: set[Path] = set()
-    for child in cleanup_paths or []:
-        resolved = child.resolve()
-        if DATA not in resolved.parents or not resolved.exists():
-            continue
-        if resolved.is_dir():
-            shutil.rmtree(resolved)
-        else:
-            extraction_dir = top_level_extraction_dir(resolved)
-            resolved.unlink()
-            if extraction_dir is not None:
-                touched_extraction_dirs.add(extraction_dir)
-    for extraction_dir in touched_extraction_dirs:
-        if not extraction_dir.is_dir() or any(item.is_file() for item in extraction_dir.rglob("*")):
-            continue
-        source = archive_source_for_extraction(extraction_dir)
-        shutil.rmtree(extraction_dir, ignore_errors=True)
-        if source is not None:
-            source.unlink(missing_ok=True)
+    # The artifacts are archived and verified from here on, so the build has
+    # succeeded. Removing the inputs it consumed is housekeeping: a file the
+    # service cannot delete (foreign ownership, or a directory it may not write
+    # because the container drops CAP_DAC_OVERRIDE) leaves disk in use, it does
+    # not invalidate the Golden ISO. Report it instead of failing the job.
+    for problem in remove_consumed_inputs(cleanup_paths):
+        log_event("input_cleanup_incomplete", job_id=job_id, detail=problem)
+        with job_lock:
+            tracked = job_id in jobs
+        if tracked:
+            append_log(job_id, f"\nNote: {problem}\n")
     shutil.rmtree(WORK / job_id, ignore_errors=True)
     shutil.rmtree(job_dir, ignore_errors=True)
     return archived

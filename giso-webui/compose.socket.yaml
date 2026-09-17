@@ -1,37 +1,38 @@
-# Self-contained deployment: one image holds the web app and a pinned
-# ios-xr/gisobuild (docker/selfcontained.Dockerfile). Unlike compose.yaml it
-# mounts no Docker socket and no host gisobuild checkout, and never starts a
-# second container or pulls a builder image.
+# Alternative deployment: the web container starts a child builder container
+# from Cisco's image through the Docker socket (administrative access to the
+# Docker host) and runs gisobuild from the host checkout ../.gisobuild-tool.
+# Prefer compose.yaml, which needs neither. Uses the same volumes, so do not
+# run both at once.
 #
-#   docker compose -f giso-webui/compose.selfcontained.yaml up -d --build
+#   cd giso-webui && docker compose -f compose.socket.yaml up -d --build
 services:
   giso-webui:
     build:
-      context: ..
-      dockerfile: docker/selfcontained.Dockerfile
+      context: .
       args:
         SOURCE_REVISION: "${SOURCE_REVISION:-unknown}"
         BUILD_DATE: "${BUILD_DATE:-unknown}"
         APP_VERSION: "${APP_VERSION:-0.0.1}"
-    image: giso-webui-selfcontained
-    # gisobuild and Cisco IOS XR images are x86_64.
-    platform: linux/amd64
     container_name: giso-webui
     ports:
       - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:8080"
     volumes:
       - giso-uploads:/uploads
       - "${CISCO_SECRETS_DIR:-./secrets}:/run/secrets:ro"
+      - ../.gisobuild-tool:/tool:ro
       - giso-output:/output
       - giso-archive:/archive
       - giso-work:/work
       - giso-state:/state
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      DATA_ROOT: /uploads
-      OUTPUT_ROOT: /output
-      WORK_ROOT: /work
-      ARCHIVE_ROOT: /archive
-      STATE_ROOT: /state
+      GISO_IMAGE: "${GISO_IMAGE:-ciscogisobuild/cisco-xr-gisobuild:2.3.4@sha256:be282c7a76b03820d7bdd6c8b8cc0d4a54a5b6207143f089123b32e245018bf3}"
+      DATA_ROOT: "${DATA_ROOT:-/uploads}"
+      OUTPUT_ROOT: "${OUTPUT_ROOT:-/output}"
+      TOOL_ROOT: "${TOOL_ROOT:-/tool}"
+      WORK_ROOT: "${WORK_ROOT:-/work}"
+      ARCHIVE_ROOT: "${ARCHIVE_ROOT:-/archive}"
+      STATE_ROOT: "${STATE_ROOT:-/state}"
       MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-8589934592}"
       MAX_EXTRACTED_BYTES: "${MAX_EXTRACTED_BYTES:-17179869184}"
       MAX_TAR_MEMBERS: "${MAX_TAR_MEMBERS:-10000}"
@@ -41,6 +42,8 @@ services:
       ARCHIVE_RETENTION_DAYS: "${ARCHIVE_RETENTION_DAYS:-30}"
       MAX_ARCHIVE_BYTES: "${MAX_ARCHIVE_BYTES:-53687091200}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      UPLOAD_SESSION_TTL: "${UPLOAD_SESSION_TTL:-86400}"
+      GISO_PULL_TIMEOUT_SECONDS: "${GISO_PULL_TIMEOUT_SECONDS:-600}"
       CISCO_CLIENT_ID: "${CISCO_CLIENT_ID:-}"
       CISCO_CLIENT_SECRET: "${CISCO_CLIENT_SECRET:-}"
       CISCO_CLIENT_ID_FILE: "${CISCO_CLIENT_ID_FILE:-}"
@@ -48,33 +51,28 @@ services:
       CISCO_DOWNLOAD_TIMEOUT_SECONDS: "${CISCO_DOWNLOAD_TIMEOUT_SECONDS:-60}"
       CISCO_DOWNLOAD_HOSTS: "${CISCO_DOWNLOAD_HOSTS:-cisco.com}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-127.0.0.1,localhost,giso-webui}"
+      PYTHONDONTWRITEBYTECODE: "1"
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    # The only capability gisobuild needs: its eXR engine chroots into the
-    # extracted image to query RPMs. Verified with a real NCS5500 build.
-    cap_add:
-      - SYS_CHROOT
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
     restart: unless-stopped
 
   archive-maintenance:
-    image: giso-webui-selfcontained
-    platform: linux/amd64
+    build: .
     container_name: giso-archive-maintenance
-    depends_on:
-      - giso-webui
-    command: ["python3.12", "maintenance.py"]
+    command: ["python", "maintenance.py"]
     volumes:
       - giso-archive:/archive
     environment:
-      ARCHIVE_ROOT: /archive
+      ARCHIVE_ROOT: "${ARCHIVE_ROOT:-/archive}"
       ARCHIVE_RETENTION_DAYS: "${ARCHIVE_RETENTION_DAYS:-30}"
       MAX_ARCHIVE_BYTES: "${MAX_ARCHIVE_BYTES:-53687091200}"
       ARCHIVE_CLEANUP_INTERVAL_SECONDS: "${ARCHIVE_CLEANUP_INTERVAL_SECONDS:-3600}"
+      PYTHONDONTWRITEBYTECODE: "1"
     security_opt:
       - no-new-privileges:true
     cap_drop:

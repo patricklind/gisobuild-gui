@@ -60,6 +60,19 @@ The application must distinguish:
 - [x] Read LNT-specific code
 - [x] Detect supported CLI options from upstream
 - [x] Build a `GisoBuildCapabilities` abstraction
+- [x] No platform name decides an option any more (2026-09-17).
+      `validate_platform_options()` had two hardcoded comparisons left
+      (`platform != "asr9k"` for migration, `platform != "xrv9k"` for
+      full_iso) that duplicated `PLATFORM_CAPABILITY_OVERRIDES`. Both options
+      are now ordinary entries in `OPTION_CAPABILITIES`, so every gate is
+      decided by the platform's capabilities, and the error names the option,
+      the platform and where upstream does offer it (`platforms_supporting()`),
+      e.g. "Remove packages is not supported on NCS 5500 (EXR build engine);
+      upstream gisobuild offers it on Cisco 8000 / 8800, NCS 1010/1014,
+      NCS 540L (XR7) and 1 more". Tests:
+      `test_platform_only_options_are_decided_by_capabilities_not_platform_names`,
+      `test_adapter_rejects_capability_not_supported_by_engine`,
+      `test_adapter_rejects_exr_only_capability_on_lnt_platform`.
 - [ ] Stop using a locally maintained list as the authoritative support list
       — still open: `platform_validation.PLATFORMS`'s eXR entries remain a
       hand-maintained Python literal, not something read from the mounted

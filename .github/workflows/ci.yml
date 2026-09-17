@@ -48,20 +48,23 @@ jobs:
           docker run --rm -i hadolint/hadolint:2.12.0 < giso-webui/Dockerfile
           docker run --rm -i hadolint/hadolint:2.12.0 < staging/Dockerfile
           docker run --rm -i hadolint/hadolint:2.12.0 < docker/tooling.Dockerfile
-      - name: Validate Compose configuration
+          docker run --rm -i hadolint/hadolint:2.12.0 < docker/selfcontained.Dockerfile
+      - name: Validate Compose configuration (default and socket deployments)
         working-directory: giso-webui
-        run: docker compose config -q
+        run: |
+          docker compose config -q
+          docker compose -f compose.socket.yaml config -q
       - name: Rehearse staged upgrade and rollback
         run: |
           docker run --rm -v "$PWD:/project:ro" -w /project/staging gisobuild-tooling \
             python -B rehearse.py
       - name: Validate staging Compose configuration
         run: docker compose -f staging/compose.yaml config -q
-      - name: Build production container
+      - name: Build the socket-deployment web image (also the unit-test image)
         working-directory: giso-webui
         run: |
           SOURCE_REVISION="$GITHUB_SHA" BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            docker compose build giso-webui
+            docker compose -f compose.socket.yaml build giso-webui
       - name: Run tests inside the built container
         run: |
           docker run --rm -v "$PWD:/project:ro" -w /project/giso-webui \
@@ -71,7 +74,7 @@ jobs:
           docker build -f docker/browser-tests.Dockerfile -t gisobuild-browser-tests .
           docker run --rm -v "$PWD:/work:ro" -e PYTHONDONTWRITEBYTECODE=1 \
             gisobuild-browser-tests python3 -m unittest discover -s browser_tests -v
-      - name: Scan production image for fixable HIGH/CRITICAL vulnerabilities
+      - name: Scan socket-deployment image for fixable HIGH/CRITICAL vulnerabilities
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.65.0 image --quiet --scanners vuln \
@@ -83,10 +86,11 @@ jobs:
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/sbom:/out" anchore/syft:v1.33.0 giso-webui-giso-webui:latest \
             -o spdx-json=/out/giso-webui.spdx.json -q
-      - name: Build self-contained image (bundled gisobuild, no Docker socket)
+      - name: Build the default image through compose.yaml (bundled gisobuild, no Docker socket)
+        working-directory: giso-webui
         run: |
-          docker build --platform linux/amd64 -f docker/selfcontained.Dockerfile \
-            --build-arg SOURCE_REVISION="$GITHUB_SHA" -t giso-webui-selfcontained .
+          SOURCE_REVISION="$GITHUB_SHA" BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            docker compose build giso-webui
           docker run --rm giso-webui-selfcontained \
             python3 /opt/gisobuild/src/gisobuild.py --help > /dev/null
       - name: Check platform support against the bundled upstream gisobuild
@@ -94,7 +98,7 @@ jobs:
           docker run --rm -v "$PWD:/project:ro" -w /project/giso-webui \
             -e REQUIRE_UPSTREAM_GISOBUILD=1 -e PYTHONDONTWRITEBYTECODE=1 giso-webui-selfcontained \
             python3.12 -m unittest discover -s tests -p test_platform_compatibility.py -v
-      - name: Scan self-contained image for fixable HIGH/CRITICAL vulnerabilities
+      - name: Scan default image for fixable HIGH/CRITICAL vulnerabilities
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.65.0 image --quiet --scanners vuln \

@@ -6,6 +6,8 @@ The project uses four distinct validation levels. Report them separately.
 
 Run the `giso-webui` unit tests only inside the built container image (the
 `docker run ... giso-webui-giso-webui python -B -m unittest ...` line below).
+That image is the socket deployment's web image: the tests set the runner
+environment themselves, so the default image's own settings would break them.
 Never invoke `python -m unittest` or `pytest` directly against the host Python
 interpreter for this module — the host has neither the pinned dependency
 versions nor OS tools such as `isoinfo` that the image provides, so a host run
@@ -13,8 +15,9 @@ is not equivalent to CI.
 
 ```bash
 docker compose -f giso-webui/compose.yaml config -q
+docker compose -f giso-webui/compose.socket.yaml config -q
 docker compose -f staging/compose.yaml config -q
-docker compose -f giso-webui/compose.yaml build giso-webui
+docker compose -f giso-webui/compose.socket.yaml build giso-webui
 docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui \
   giso-webui-giso-webui python -B -m unittest discover -s tests -v
 docker build -f docker/tooling.Dockerfile -t gisobuild-tooling .
@@ -30,8 +33,8 @@ container (Python 3.12 + git) that `rehearse.py`'s pure-stdlib logic runs in
 unmodified; build it once and reuse the image.
 
 CI additionally runs Ruff, `pip-audit`, the Docker-only guard, the Graphify
-freshness check, Trivy, and the platform drift tests inside the self-contained
-image (see the command reference below). Locally, run the pinned
+freshness check, Trivy, and the platform drift tests inside the default image
+(see the command reference below). Locally, run the pinned
 equivalents from the same `gisobuild-tooling` image built above — never
 `pip install ruff`/`pip install pip-audit` on the host:
 
@@ -63,13 +66,13 @@ Dockerfile instead of installing it on the workstation.
 ```bash
 # images (once, and after Dockerfile changes)
 docker build -f docker/tooling.Dockerfile -t gisobuild-tooling .
-docker compose -f giso-webui/compose.yaml build giso-webui
+docker compose -f giso-webui/compose.socket.yaml build giso-webui   # unit-test image
 docker build -f docker/browser-tests.Dockerfile -t gisobuild-browser-tests .
-docker build --platform linux/amd64 -f docker/selfcontained.Dockerfile -t giso-webui-selfcontained .
+docker compose -f giso-webui/compose.yaml build giso-webui          # the default image
 
 # unit + synthetic integration tests
 docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui giso-webui-giso-webui python -B -m unittest discover -s tests
-# platform/USB lists against the pinned upstream gisobuild bundled in the self-contained image
+# platform/USB lists against the pinned upstream gisobuild bundled in the default image
 docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui -e REQUIRE_UPSTREAM_GISOBUILD=1 -e PYTHONDONTWRITEBYTECODE=1 giso-webui-selfcontained python3.12 -m unittest discover -s tests -p test_platform_compatibility.py
 # browser tests
 docker run --rm -v "$(pwd):/work:ro" -e PYTHONDONTWRITEBYTECODE=1 gisobuild-browser-tests python3 -m unittest discover -s browser_tests
@@ -105,10 +108,11 @@ curl --fail http://127.0.0.1:8080/api/platforms
 docker compose -f giso-webui/compose.yaml ps
 ```
 
-This verifies the application and Docker connection, not `gisobuild` output.
-For the self-contained deployment use `-f giso-webui/compose.selfcontained.yaml`;
-`/api/ready`'s `self_test.gisobuild_source` must report that every bundled file
-matches the pinned SHA-256 manifest.
+This verifies the application, not `gisobuild` output. `/api/ready`'s
+`self_test.gisobuild_source` must report that every bundled file matches the
+pinned SHA-256 manifest. For the socket deployment use
+`-f giso-webui/compose.socket.yaml`; there `/api/ready` also proves the Docker
+connection.
 
 The documented Docker-only workflow was last run end to end on a clean machine
 (a throwaway Docker-in-Docker container with only git and Docker) on
@@ -134,7 +138,7 @@ docker run --rm --add-host=host.docker.internal:host-gateway \
   --url http://host.docker.internal:8080
 ```
 
-The runner uploads the files, waits for the real Cisco build container, requires
+The runner uploads the files, waits for the real gisobuild run, requires
 both a Golden ISO and USB ZIP, and prints SHA-256 checksums. Do not commit the
 input files, output files, logs, filenames containing customer data, or secrets.
 

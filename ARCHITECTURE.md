@@ -43,9 +43,9 @@ Before constructing the child-container command, a platform validator rejects
 unsupported family/architecture option combinations. Cisco's tool remains the
 source of truth for the contents and metadata of the actual ISO.
 
-### Self-contained variant (no Docker socket)
+### Default deployment (no Docker socket)
 
-`docker/selfcontained.Dockerfile` with `giso-webui/compose.selfcontained.yaml`
+`docker/selfcontained.Dockerfile` with `giso-webui/compose.yaml`
 bundles gisobuild at a pinned, verified commit and sets `GISO_RUNNER=local`:
 gisobuild runs as a child process of the web app with a minimal environment,
 its temporary files on the work volume, and process-group cancellation. There
@@ -162,7 +162,8 @@ requirements are checked again when an upload starts and before TAR extraction.
 ### Low: The Cisco build image identity is mutable
 
 Python packages, the application base image, and the Alpine Docker CLI package
-are pinned. The separately pulled Cisco GISO build image still uses a tag, which
+are pinned. The Cisco builder image of the socket deployment is pinned by
+digest. (Historical note: it previously used a mutable tag, which
 can resolve to different content if the publisher republishes it.
 
 **Recommendation:** Record and test approved image digests for controlled

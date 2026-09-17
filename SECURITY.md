@@ -14,12 +14,12 @@ credentials, logs, or customer information.
 ## Deployment boundary
 
 This application is designed for trusted, local operation and binds to
-`127.0.0.1` by default. The default deployment has access to the Docker socket,
-which is equivalent to administrative access to the Docker host; the
-self-contained deployment (`giso-webui/compose.selfcontained.yaml`) has no
-socket, runs read-only with only the `SYS_CHROOT` capability, and verifies its
-bundled gisobuild against a pinned SHA-256 manifest at build time and at
-startup. Do not expose it to an untrusted network or deploy it as a multi-user service without adding authentication,
+`127.0.0.1` by default. The default deployment (`giso-webui/compose.yaml`) has
+no Docker socket, runs read-only with only the `SYS_CHROOT` capability, and
+verifies its bundled gisobuild against a pinned SHA-256 manifest at build time
+and at startup. The alternative `giso-webui/compose.socket.yaml` gives the web
+container the Docker socket, which is equivalent to administrative access to the
+Docker host. Do not expose either to an untrusted network or deploy it as a multi-user service without adding authentication,
 authorization, TLS, and stronger workload isolation.
 
 Cisco software images, RPMs, SMUs, generated Golden ISOs, and USB boot packages
@@ -38,7 +38,8 @@ of logs and persisted job history.
 ## Operational controls
 
 - Keep the default localhost bind and exact `ALLOWED_HOSTS` values.
-- Restrict access to the Docker host and its socket.
+- Prefer the default deployment; with `compose.socket.yaml`, restrict access to
+  the Docker host and its socket.
 - Store archives and backups only in approved locations; automatic retention is
   not a secure-erasure guarantee for storage snapshots or external backups.
 - Verify Cisco-provided hashes, generated checksums, and the exact supported

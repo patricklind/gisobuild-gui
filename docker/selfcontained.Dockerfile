@@ -14,11 +14,12 @@ ARG GISOBUILD_COMMIT=0388af2989bb7022d780a8732dbfbfeb77a70ee7
 # commit pin is a SHA-1 git object name; this binds the exact bytes copied into
 # the image with SHA-256 as well, and the web app re-checks them at startup.
 ARG GISOBUILD_SOURCE_SHA256=9d03ff0ccf5ccf1c5d3d75b14b29258272bd9d50109e4ace283e02e8eac3836d
-RUN git clone --quiet "$GISOBUILD_REPOSITORY" /src \
-    && git -C /src checkout --quiet "$GISOBUILD_COMMIT" \
-    && test "$(git -C /src rev-parse HEAD)" = "$GISOBUILD_COMMIT" \
-    && rm -rf /src/.git \
-    && cd /src \
+WORKDIR /src
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
+RUN git clone --quiet "$GISOBUILD_REPOSITORY" . \
+    && git checkout --quiet "$GISOBUILD_COMMIT" \
+    && test "$(git rev-parse HEAD)" = "$GISOBUILD_COMMIT" \
+    && rm -rf .git \
     && test -z "$(find . ! -type f ! -type d)" \
     && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > /gisobuild.sha256sums \
     && echo "$GISOBUILD_SOURCE_SHA256  /gisobuild.sha256sums" | sha256sum -c -

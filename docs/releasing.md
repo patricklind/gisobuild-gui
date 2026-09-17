@@ -8,16 +8,16 @@ operating an older release.
 The **Release** workflow can create both the version tag and GitHub Release from
 the GitHub Actions page. It runs the complete CI workflow first, creates an
 annotated semantic-version tag, builds `linux/amd64` and `linux/arm64`
-application images and a `linux/amd64` self-contained image, publishes the
-version and `latest` tags (and `<version>-selfcontained` /
-`latest-selfcontained`) to GitHub Container Registry, attaches provenance and an SBOM, and creates a GitHub Release with
+the `linux/amd64` default image as the `<version>` and `latest` tags and the
+socket deployment's `linux/amd64,linux/arm64` web image as `<version>-socket` /
+`latest-socket` in GitHub Container Registry, attaches provenance and an SBOM, and creates a GitHub Release with
 automatically generated release notes. A manually pushed tag matching `v*`
 continues to trigger the same verified image and release process.
 
 Cisco's `gisobuild` runtime image and all Cisco input/output artifacts are
 outside the application images and must never be attached to a release. The
-self-contained image contains only the open-source `ios-xr/gisobuild` tool at a
-pinned commit and SHA-256 manifest, never Cisco software images or packages.
+default image contains only the open-source `ios-xr/gisobuild` tool at a pinned
+commit and SHA-256 manifest, never Cisco software images or packages.
 
 ## Release checklist
 
@@ -33,8 +33,8 @@ pinned commit and SHA-256 manifest, never Cisco software images or packages.
    it. The workflow rejects invalid or existing versions and only creates the
    tag after its CI job succeeds.
 7. Wait for the Release workflow to succeed.
-8. Verify the GitHub Release, GHCR version tag, `latest` tag, the
-   `-selfcontained` tags, SBOM, provenance, and image pull on a clean host.
+8. Verify the GitHub Release, GHCR version tag, `latest` tag, the `-socket`
+   tags, SBOM, provenance, and image pull on a clean host.
 
 ```bash
 docker pull ghcr.io/patricklind/gisobuild-gui:vX.Y.Z

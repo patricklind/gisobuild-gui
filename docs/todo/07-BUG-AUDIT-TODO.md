@@ -1435,6 +1435,27 @@ each test failed before its fix:
       both drift tests `ok`, 35 tests OK; actionlint clean. Not yet observed
       on GitHub Actions (nothing is pushed from this environment).
 
+## P1 — A verified, archived build was reported as failed (2026-09-17)
+
+- [x] Found by the first real build on the new default deployment: gisobuild
+      produced the Golden ISO and USB zip, both were copied into the archive
+      and verified byte-for-byte, and the job then failed with
+      `PermissionError: [Errno 13]`. Root cause:
+      `archive_giso_artifacts_and_cleanup()` deleted the inputs the build had
+      consumed *after* archiving, with no error handling, so one undeletable
+      input turned a finished build into a failure - and
+      `discard_job_work_directory()` then ran for a "failed" job. The container
+      drops every capability except `SYS_CHROOT`, so root has no
+      `CAP_DAC_OVERRIDE` and cannot unlink inside a directory owned by another
+      user (here `optional-rpms/<package>/` owned by uid 1094, as Cisco's tar
+      carries it). Uploads extracted by the app are unaffected (`extractall`
+      uses `filter="data"`), but any input restored into the volume by other
+      means can trigger it. Now `remove_consumed_inputs()` collects such
+      failures, the build stays successful, and each leftover is logged
+      (`input_cleanup_incomplete`) and added to the job log naming the file and
+      what to do. Test:
+      `test_input_that_cannot_be_deleted_does_not_fail_an_archived_build`.
+
 ## Required regression-test additions
 
 - [x] cancel during builder preparation/pull

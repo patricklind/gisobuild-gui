@@ -128,15 +128,14 @@ validate it separately and omit it when it is not required.
 Start the local application:
 
 ```bash
-git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
 cd giso-webui
 cp .env.example .env
 docker compose up --build -d
 ```
 
-To avoid the Docker socket and the host checkout, start
-`docker compose -f compose.selfcontained.yaml up -d --build` instead (see the
-[project README](README.md#self-contained-deployment-no-docker-socket)).
+This image bundles gisobuild and needs no Docker socket. The socket-based
+alternative is `docker compose -f compose.socket.yaml up -d --build` (see
+[deployment options](README.md#deployment-options)).
 
 Open <http://127.0.0.1:8080>, upload the base ISO and packages, select only the
 options valid for the detected image architecture, and start the build. The UI
@@ -164,7 +163,7 @@ the archive.
 ### Direct `gisobuild.py` workflow
 
 The upstream tool supports CLI and YAML input. Run it inside a container, never
-on the workstation. With the self-contained image
+on the workstation. With the default image
 (`docker/selfcontained.Dockerfile`), which bundles the pinned gisobuild, a
 representative CLI build is:
 

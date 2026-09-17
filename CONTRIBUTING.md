@@ -22,8 +22,9 @@ Run these checks before opening a pull request:
 ```bash
 cd giso-webui
 docker compose config -q
-docker compose build giso-webui
-docker compose run --rm --no-deps \
+docker compose -f compose.socket.yaml config -q
+docker compose -f compose.socket.yaml build giso-webui
+docker compose -f compose.socket.yaml run --rm --no-deps \
   -v "$(cd .. && pwd):/project:ro" \
   -w /project/giso-webui \
   giso-webui python -B -m unittest discover -s tests -v
@@ -47,7 +48,7 @@ Never add Cisco-distributed software, generated images, device configuration,
 credentials, build logs, or customer data to commits or test fixtures.
 
 UI changes also need the Playwright browser tests, and platform or packaging
-changes the self-contained image build and its upstream drift tests; the exact
+changes the default image build and its upstream drift tests; the exact
 commands are in [`docs/testing.md`](docs/testing.md).
 
 Keep changes focused and add a regression test for every bug fix where practical.

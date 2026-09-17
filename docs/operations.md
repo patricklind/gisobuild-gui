@@ -6,7 +6,6 @@ not designed for an untrusted network or multiple users.
 ## Start and verify
 
 ```bash
-git clone --depth 1 https://github.com/ios-xr/gisobuild.git .gisobuild-tool
 cp giso-webui/.env.example giso-webui/.env
 docker compose -f giso-webui/compose.yaml up --build -d
 docker compose -f giso-webui/compose.yaml ps
@@ -43,11 +42,12 @@ to route traffic or investigate a degraded-but-alive container, not whether to
 restart it. Its `self_test` object names each startup check (gisobuild, runner
 binary, job store schema, writable volumes, configuration, free space, CPU
 architecture, and `gisobuild_source` in the self-contained image) with a short
-reason. Image pulls are bounded by
+reason. The default deployment needs no registry: gisobuild is part of the
+image. With `compose.socket.yaml`, builder-image pulls are bounded by
 `GISO_PULL_TIMEOUT_SECONDS` (600 seconds by default); if the pull fails or times
-out, a builder image already on the host is used and the job log says so (a
-digest-pinned reference is identical; a tag may be older). Without a cached
-image the job fails and uploaded inputs are preserved.
+out, a builder image already on the host is used and the job log says so (the
+default reference is digest-pinned, so it is identical). Without a cached image
+the job fails and uploaded inputs are preserved.
 
 The application accepts one build at a time. A separate maintenance service
 removes complete archives older than 30 days and then removes the oldest
@@ -58,12 +58,21 @@ restart and can be resumed by selecting the same file again; they expire after
 partial files. A session idle for `UPLOAD_ACTIVE_SECONDS` (600) no longer blocks
 builds or cleanup.
 
-The self-contained deployment is operated the same way with
-`-f giso-webui/compose.selfcontained.yaml`; it needs no `.gisobuild-tool`
+The commands above use the default deployment, which needs no `.gisobuild-tool`
 checkout and no Docker socket. Its `/api/ready` self-test also re-checks the
 bundled gisobuild against the image's pinned SHA-256 manifest. A failed or
 cancelled build's work files and extracted image are removed automatically
 (logs are kept), and so are those of a build interrupted by a restart.
+
+The socket deployment is operated the same way with
+`-f giso-webui/compose.socket.yaml`; it also needs the `.gisobuild-tool`
+checkout. Both use the same volumes, so run only one at a time.
+
+Upgrading from a version where `compose.yaml` was the socket deployment: stop
+the service, update the checkout, and start it again with the same commands.
+The volumes are unchanged, so uploads, job history and archives are kept; the
+Docker socket, the `.gisobuild-tool` mount and `GISO_IMAGE` are no longer used.
+Keep the old behaviour with `-f giso-webui/compose.socket.yaml`.
 
 ## Stop and upgrade
 
@@ -111,11 +120,11 @@ licensed and protected appropriately. Test restore procedures periodically.
 
 | Symptom | Check | Safe action |
 | --- | --- | --- |
-| `/api/ready` fails | Its `self_test` details, `gisobuild_source` (self-contained image: bundled gisobuild no longer matches its pinned SHA-256 manifest - rebuild or pull the image again), `docker info` (socket deployment), gisobuild presence, mounted storage, the state database, free disk space, and web logs | Restore the failed dependency; do not expose the service remotely |
+| `/api/ready` fails | Its `self_test` details, `gisobuild_source` (the bundled gisobuild no longer matches its pinned SHA-256 manifest - rebuild or pull the image again), `docker info` (socket deployment), gisobuild presence, mounted storage, the state database, free disk space, and web logs | Restore the failed dependency; do not expose the service remotely |
 | Build plan says the job store cannot be used | Web log `job_store_schema_unsupported` | The state volume was written by a newer release; run that release or restore a matching backup |
-| Plan blocked: SYS_CHROOT (self-contained) | Compose `cap_add` | Add `SYS_CHROOT`; gisobuild's eXR engine needs it |
+| Plan blocked: SYS_CHROOT | Compose `cap_add` | Add `SYS_CHROOT`; gisobuild's eXR engine needs it |
 | `/api/health` fails | Container/process state and web logs | The process itself is down or unresponsive; restart the service |
-| Build will not start | Active jobs/uploads and `giso-build-*` containers | Wait, cancel the active upload, or investigate the surviving build container before cleanup |
+| Build will not start | Active jobs/uploads, and with the socket deployment `giso-build-*` containers | Wait, cancel the active upload, or investigate the surviving build container before cleanup |
 | Job is `interrupted` | Saved log and Docker container list | Reconcile the old container; do not assume the build failed cleanly |
 | Upload rejected | Extension, configured limits, and free space | Correct the input or increase a reviewed limit |
 | Upload paused | Network and service availability | Select the same file again; it resumes from the bytes already received |
