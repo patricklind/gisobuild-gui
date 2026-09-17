@@ -1432,6 +1432,26 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("file.metadata_confidence === 'mismatch'", source)
         self.assertIn("identity confirmed by RPM header", source)
 
+    def test_inventory_revision_moves_only_when_files_change(self):
+        first = self.client.get("/api/inventory/revision").get_json()["inventory_revision"]
+        self.assertEqual(first, self.client.get("/api/inputs").get_json()["inventory_revision"])
+        self.assertEqual(first, self.client.get("/api/inventory/revision").get_json()["inventory_revision"])
+        (self.data / "added-out-of-band.iso").write_bytes(b"iso")
+        second = self.client.get("/api/inventory/revision").get_json()["inventory_revision"]
+        self.assertNotEqual(first, second)
+        (self.data / "added-out-of-band.iso").unlink()
+        self.assertEqual(first, self.client.get("/api/inventory/revision").get_json()["inventory_revision"])
+
+    def test_ui_refreshes_automatically_without_discarding_a_manual_selection(self):
+        source = (Path(module.__file__).parent / "static/app.js").read_text()
+        template = (Path(module.__file__).parent / "templates/index.html").read_text()
+        self.assertIn("api('/api/inventory/revision')", source)
+        self.assertIn("setTimeout(watchInventory, INVENTORY_WATCH_MS)", source)
+        self.assertIn("document.addEventListener('visibilitychange', checkInventoryChanged)", source)
+        # A manual selection in progress is never re-rendered away.
+        self.assertIn("if (packageListEdited) $('#inventory-changed').hidden = false;", source)
+        self.assertIn('id="inventory-changed"', template)
+
     def _smu_readme(self, smu, rpms):
         # Same layout as a real Cisco SMU README: tab-indented "<rpm> <md5>"
         # lines under "RPMS:", terminated by a line with only a tab.

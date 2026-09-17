@@ -2403,6 +2403,18 @@ def inputs():
     return jsonify(discover())
 
 
+@app.get("/api/inventory/revision")
+def inventory_revision():
+    """Cheap change signal for the UI's automatic refresh.
+
+    Hashes the same ready-inventory snapshot /api/inputs reports, without
+    re-running recommendation, ISO inspection or dependency checks. Checksums
+    are cached by path/size/mtime, so an unchanged workspace costs a
+    directory walk; the page calls /api/inputs only when this value moves.
+    """
+    return jsonify(inventory_revision=current_inventory_revision())
+
+
 @app.get("/api/platforms")
 def platforms():
     return jsonify([platform_profile(key) for key in PLATFORMS])

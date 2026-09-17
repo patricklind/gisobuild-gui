@@ -95,8 +95,38 @@ function setReadyCard(selector, ready, text) {
   card.querySelector('p').textContent = text;
 }
 
+let renderedInventoryRevision = null;
+let activeUploads = 0;
+const INVENTORY_WATCH_MS = 10000;
+
+// Automatic refresh: files can change without this tab doing anything (a
+// Cisco download finishing, another browser, files copied into the volume).
+// Poll the cheap revision and re-render only when it moves. Never while this
+// tab is uploading (upload completion refreshes itself) and never over a
+// manual package selection the operator is still editing - that gets a
+// notice instead, so a refresh cannot silently discard their choices.
+async function checkInventoryChanged() {
+  if (document.visibilityState !== 'visible' || activeUploads > 0 || !renderedInventoryRevision) return;
+  try {
+    const {inventory_revision: revision} = await api('/api/inventory/revision');
+    if (revision === renderedInventoryRevision) return;
+    if (packageListEdited) $('#inventory-changed').hidden = false;
+    else await loadInputs();
+  } catch { /* Transient; the next tick retries. */ }
+}
+
+async function watchInventory() {
+  await checkInventoryChanged();
+  setTimeout(watchInventory, INVENTORY_WATCH_MS);
+}
+
+// A background tab skips ticks; check as soon as it is looked at again.
+document.addEventListener('visibilitychange', checkInventoryChanged);
+
 function renderInputs(data) {
   inputs = data;
+  renderedInventoryRevision = data.inventory_revision || null;
+  $('#inventory-changed').hidden = true;
   const isoFiles = data.files.filter(file => file.type === '.iso');
   const addOptions = (selector, files) => {
     const list = $(selector); list.replaceChildren();
@@ -991,7 +1021,11 @@ async function uploadFile(file) {
     row.classList.add('upload-error'); status.textContent = error.message;
   }
 }
-async function uploadFiles(files) { for (const file of files) await uploadFile(file); }
+async function uploadFiles(files) {
+  activeUploads += 1;
+  try { for (const file of files) await uploadFile(file); }
+  finally { activeUploads -= 1; }
+}
 
 let ciscoSearchId = null;
 let ciscoDownloadJob = null;
@@ -1146,3 +1180,4 @@ updatePackageSelectionMode();
 
 api('/api/cisco/config').then(config => { $('#cisco-download').hidden = !config.enabled; }).catch(() => {});
 health(); loadVersion(); loadStorage(); loadPlatforms(); loadInputs(); loadArchive(); restoreJob();
+setTimeout(watchInventory, INVENTORY_WATCH_MS);

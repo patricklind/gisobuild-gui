@@ -66,7 +66,8 @@
           <button id="refresh-smu-plan" class="secondary small" type="button">Recalculate package set</button>
         </section>
         <div id="file-library" class="file-library"></div>
-        <button type="button" id="refresh" class="secondary">Check files again</button>
+        <p id="inventory-changed" class="inventory-changed" role="status" hidden>Files in the workspace changed. Your manual package selection was kept; choose "Check files again" to update the list.</p>
+        <button type="button" id="refresh" class="secondary" title="Troubleshooting: the page already refreshes automatically when files change">Check files again</button>
 
         <form id="build-form">
           <input name="iso" list="iso-files" hidden required>

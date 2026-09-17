@@ -421,16 +421,44 @@ strategy ever changes from content-hash to an explicit counter.
 
 After upload/download:
 
-- [ ] classify
-- [ ] checksum
-- [ ] extract if needed
-- [ ] inspect metadata
-- [ ] refresh inventory
-- [ ] refresh recommendation
-- [ ] regenerate BuildPlan
-- [ ] update UI automatically
+Nothing here is a stored snapshot: `GET /api/inputs` (`discover()`)
+recomputes everything from the volume on each call, with checksums and
+metadata cached by path/size/mtime.
 
-"Check files again" and "Recalculate" become troubleshooting controls only.
+- [x] classify - `inventory_files()` by suffix on every read.
+- [x] checksum - `file_checksums()` (SHA-256 + MD5) on every read, cached.
+- [x] extract if needed - `upload_complete()` for uploaded `.tar`/`.tgz`,
+      `extract_cisco_archive()` for Cisco downloads (see "TAR/TGZ
+      handling"). An archive copied into the volume out-of-band is listed
+      but not extracted.
+- [x] inspect metadata - ISO `iosxr_image_mdata.yml`, RPM headers and SMU
+      README manifests (`file_metadata_provenance()`, `active_rpm_names()`).
+- [x] refresh inventory - recomputed per request.
+- [x] refresh recommendation - `discover()` reruns `recommend_smu_selection()`.
+- [x] regenerate BuildPlan - never cached: `/api/build-plan` at Start and
+      `create_job()` both recompute it, and a stale confirmed fingerprint is
+      rejected (see "Inventory revision").
+- [x] update UI automatically - fixed 2026-09-17. The page already reloaded
+      inputs after its *own* upload or Cisco download, but a change from
+      anywhere else (another browser, files copied into the volume) needed
+      "Check files again". New `GET /api/inventory/revision` returns only
+      the revision hash; `static/app.js` polls it every 10 s while the tab
+      is visible and no upload is running, checks immediately on
+      `visibilitychange`, and reloads inputs only when it moved. If the
+      operator has edited the manual package selection it shows a notice
+      instead, so a refresh never discards their choices. Tests:
+      `test_inventory_revision_moves_only_when_files_change`,
+      `test_ui_refreshes_automatically_without_discarding_a_manual_selection`.
+      Browser check against a throwaway `giso-webui` container (dummy files
+      only): an ISO written into `/data` with `docker exec` changed Step 2 to
+      "Found and ready" with no reload; a later `build.yaml` appeared on the
+      next timer tick; with `packageListEdited` set, deleting it kept the
+      list and showed the notice. The in-app browser pane reports
+      `visibilityState: hidden`, so visibility was overridden in the page
+      for that check.
+
+"Check files again" and "Recalculate" remain, now labelled as troubleshooting
+controls (button tooltip).
 
 ## Preflight
 
