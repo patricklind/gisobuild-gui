@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-17)
 
 ## Corpus Check
-- 55 files · ~110,758 words
+- 55 files · ~111,128 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 16 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 3)
 
 ## Summary
-- 1242 nodes · 2111 edges · 78 communities (53 shown, 19 thin omitted)
+- 1247 nodes · 2118 edges · 71 communities (51 shown, 14 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 37 edges (avg confidence: 0.87)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e38cf017`
+- Built from commit: `cccda17c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -59,38 +59,31 @@
 - manual-packages.js
 - OperatorFlowTests
 - app.py
-- finalize_recommendation
-- initialize_job_store
+- Contributing
+- startup_self_test
 - SelfContainedPackagingTests
-- enforce_archive_policy
+- archive_giso_artifacts_and_cleanup
 - check_graphify_freshness.py
 - SyntheticBuildIntegrationTests
 - Path
-- _screened_rpms
+- explain_with_prerequisites
 - DockerOnlyCheckTests
 - .test_cisco_downloads_are_recorded_as_such_in_the_inventory
-- command_preview
 - create_build_plan
 - check_docker_only.py
 - log_event
 - P1 — Wrong file/package selection
 - P2 — Inventory consistency and races
-- iso_architectures_from_mdata
 - P1/P2 — Platform and compatibility validation
-- iso_architectures_from_listing
 - P1 — Misleading UI status
 - P0/P1 — Build lifecycle and destructive cleanup
 - P2 — CI process fidelity
 - .test_automatic_selection_leaves_out_fixes_that_cannot_install
 - P2 — Tooling reliability
-- iso_shipped_packages_from_mdata
-- _version_satisfies
-- recorded_provenance
-- MaintenanceTests
 - staging/README.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `GisoWebTests` - 233 edges
+1. `GisoWebTests` - 234 edges
 2. `PlatformCompatibilityTests` - 37 edges
 3. `create_build_plan()` - 35 edges
 4. `OperatorFlowTests` - 32 edges
@@ -116,7 +109,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (78 total, 19 thin omitted)
+## Communities (71 total, 14 thin omitted)
 
 ### Community 2 - "CiscoDownloadError"
 Cohesion: 0.06
@@ -132,7 +125,7 @@ Nodes (25): 1. Determine the platform and install architecture, 2. Validate the 
 
 ### Community 5 - "PlatformCompatibilityTests"
 Cohesion: 0.05
-Nodes (34): _bundle_files_by_csc(), capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), classify_exclusion(), describe_package(), GisoBuildCapabilities, infer_platform() (+26 more)
+Nodes (36): package_decisions(), One structured row per package left out of the build. The reason text stays as…, _bundle_files_by_csc(), capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), classify_exclusion(), describe_package() (+28 more)
 
 ### Community 7 - "System architecture"
 Cohesion: 0.12
@@ -155,7 +148,7 @@ Cohesion: 0.14
 Nodes (14): Alternative: `compose.socket.yaml` (Docker socket), Cisco IOS XR GISO Builder, Components, Default: `compose.yaml` (no Docker socket), Deployment options, License, Moving an existing installation to the default, Operational limitations (+6 more)
 
 ### Community 13 - "docs/README.md"
-Cohesion: 0.38
+Cohesion: 0.35
 Nodes (3): Documentation, Release checklist, Release process
 
 ### Community 15 - "rehearse.py"
@@ -163,8 +156,8 @@ Cohesion: 0.43
 Nodes (5): Verify upgrade and rollback state transitions against the XR simulator., run(), execute(), main(), Non-networked IOS XR transaction simulator for rehearsal only.
 
 ### Community 16 - "Operations runbook"
-Cohesion: 0.29
-Nodes (7): Back up and restore state, Decommission, Failure handling, Logs and capacity, Operations runbook, Start and verify, Stop and upgrade
+Cohesion: 0.25
+Nodes (8): Back up and restore state, Decommission, Failure handling, Logs and capacity, Operations runbook, Running behind a reverse proxy or tunnel, Start and verify, Stop and upgrade
 
 ### Community 17 - "build-giso.sh"
 Cohesion: 0.70
@@ -194,10 +187,6 @@ Nodes (3): coord.sh script, slug(), usage()
 Cohesion: 0.83
 Nodes (3): worktree.sh script, usage(), validate()
 
-### Community 26 - "AGENTS.md"
-Cohesion: 0.22
-Nodes (5): Contributing, Coordination and branches, Local verification, Module coordination board, Parallel work with Git worktrees
-
 ### Community 27 - "Path"
 Cohesion: 0.07
 Nodes (5): fake_disk_usage(), fake_disk_usage(), rmtree(), Path, skipUnless
@@ -207,8 +196,8 @@ Cohesion: 0.11
 Nodes (18): AI Master Prompt — Cisco IOS-XR GISO Build Web UI, Artifacts and reproducibility, Automatic package handling, Beginner and advanced modes, BuildPlan, Capability-driven UI, Compatibility matrix, Completion criteria (+10 more)
 
 ### Community 29 - "run_job"
-Cohesion: 0.10
-Nodes (23): build_report(), BuildCancelled, builder_process_environment(), cancellation_requested(), child_mount_args(), enter_stage(), gisobuild_commit(), local_builder_image_id() (+15 more)
+Cohesion: 0.07
+Nodes (34): Connection, append_log(), apply_schema_migrations(), BuildCancelled, builder_process_environment(), cancel_job(), cancellation_requested(), child_mount_args() (+26 more)
 
 ### Community 31 - "TODO — Concrete Bug Audit"
 Cohesion: 0.13
@@ -251,20 +240,20 @@ Cohesion: 0.50
 Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 
 ### Community 47 - "app.py"
-Cohesion: 0.07
-Nodes (49): after_request, errorhandler, get, activity(), archive_checksums(), archive_delete(), archive_download(), archive_list() (+41 more)
+Cohesion: 0.05
+Nodes (59): after_request, context_processor, errorhandler, get, activity(), archive_checksums(), archive_download(), archive_size() (+51 more)
 
-### Community 48 - "finalize_recommendation"
-Cohesion: 0.33
-Nodes (6): finalize_recommendation(), package_decisions(), package_summary(), One structured row per package left out of the build. The reason text stays as…, Give one recommendation its status rows and counts, in place. Every consumer -…, Counts for the build preview: what was found, kept and left out, and why.
+### Community 48 - "Contributing"
+Cohesion: 0.67
+Nodes (3): Contributing, Coordination and branches, Local verification
 
-### Community 49 - "initialize_job_store"
-Cohesion: 0.12
-Nodes (14): before_request, expire_upload_sessions(), initialize_job_store(), log_startup_self_test_once(), Remember where a workspace file came from (see file_provenance)., Everything a build depends on that can be checked without starting one. Each…, Bring back upload sessions whose partial file survived a restart. `received` is…, Record uploads and Cisco downloads that a restart cut off, once at startup.… (+6 more)
+### Community 49 - "startup_self_test"
+Cohesion: 0.17
+Nodes (10): before_request, _check_gisobuild_source(), expire_upload_sessions(), gisobuild_source_integrity(), log_startup_self_test_once(), Re-check the bundled gisobuild files against the image's SHA-256 manifest. Only…, Everything a build depends on that can be checked without starting one. Each…, ready() (+2 more)
 
-### Community 52 - "enforce_archive_policy"
-Cohesion: 0.18
-Nodes (11): archive_size(), archive_timestamp(), build_space_blockers(), build_volume_free_bytes(), enforce_archive_policy(), Free space on every volume a build actually touches, not just uploads. Every…, Name every build volume that cannot fit this build, for the pre-build gate.…, Remove expired archive jobs, then oldest jobs until the archive fits its quota. (+3 more)
+### Community 52 - "archive_giso_artifacts_and_cleanup"
+Cohesion: 0.13
+Nodes (14): archive_delete(), archive_giso_artifacts_and_cleanup(), archive_list(), archive_timestamp(), cross_process_archive_lock(), enforce_archive_policy(), file_sha256(), giso_artifact_candidates() (+6 more)
 
 ### Community 53 - "check_graphify_freshness.py"
 Cohesion: 0.50
@@ -275,32 +264,28 @@ Cohesion: 0.17
 Nodes (8): LocalRunnerIntegrationTests, process_is_running(), Synthetic end-to-end build integration: the real job pipeline, a fake engine.…, The real browser upload protocol: init, chunked PUT, complete., A Cisco-style SMU tar: the RPMs plus a README whose RPMS block lists them., True for a live process; a zombie (exited, not yet reaped) counts as gone., The same pipeline with GISO_RUNNER=local: gisobuild as a child process, no…, SyntheticBuildIntegrationTests
 
 ### Community 55 - "Path"
-Cohesion: 0.10
-Nodes (27): archive_giso_artifacts_and_cleanup(), archive_source_for_extraction(), build_cleanup_paths(), _check_gisobuild_source(), file_metadata_provenance(), file_sha256(), giso_artifact_candidates(), gisobuild_source_integrity() (+19 more)
+Cohesion: 0.08
+Nodes (40): archive_source_for_extraction(), archive_suffix(), assign_lifecycle(), extract_cisco_archive(), extraction_path(), file_metadata_provenance(), file_source(), glob_metacharacters() (+32 more)
 
-### Community 56 - "_screened_rpms"
-Cohesion: 0.12
-Nodes (19): assign_lifecycle(), explain_with_prerequisites(), is_iso9660_image(), Set each item's lifecycle from what the workspace proves about it. INVALID…, Whether a file carries the ISO 9660 primary volume descriptor signature. Every…, A package's containing directory names the Cisco supersedence identifier it…, Every bounded-size .txt in the workspace - Cisco ships one README per SMU., {SMU name: {rpm basename: md5}} from each Cisco SMU README's "RPMS:" block.… (+11 more)
+### Community 56 - "explain_with_prerequisites"
+Cohesion: 0.22
+Nodes (10): explain_with_prerequisites(), Every bounded-size .txt in the workspace - Cisco ships one README per SMU., {SMU name: {rpm basename: md5}} from each Cisco SMU README's "RPMS:" block.…, {SMU name: {package name: prerequisite SMU name}} from each README. A Cisco SMU…, Name the Cisco SMU that supplies each unsatisfiable requirement, when a README…, RPMs that must not be built because their own Cisco README says so. For every…, smu_manifest_problems(), smu_readme_manifests() (+2 more)
 
 ### Community 57 - "DockerOnlyCheckTests"
 Cohesion: 0.28
 Nodes (3): DockerOnlyCheckTests, load_checker(), The Docker-only documentation guard (scripts/check_docker_only.py).
 
-### Community 59 - "command_preview"
-Cohesion: 0.50
-Nodes (4): command_preview(), planned_command_preview(), The gisobuild command this plan would run, for review before starting. Exactly…, Redacted, script-only view of the real build command for operator display.…
-
 ### Community 60 - "create_build_plan"
-Cohesion: 0.08
-Nodes (48): active_rpm_names(), add_superseded_exclusions(), build_command(), cisco_text(), compatibility(), confidence_report(), create_build_plan(), current_inventory_revision() (+40 more)
+Cohesion: 0.06
+Nodes (63): active_rpm_names(), add_superseded_exclusions(), build_cleanup_paths(), build_command(), cisco_text(), command_preview(), compatibility(), confidence_report() (+55 more)
 
 ### Community 61 - "check_docker_only.py"
 Cohesion: 0.42
 Nodes (8): command_lines(), logical_lines(), main(), Path, Flag instructions and scripts that run project tooling on the host. AGENTS.md…, Join backslash continuations so a multi-line docker command is one unit., tracked_files(), violations()
 
 ### Community 62 - "log_event"
-Cohesion: 0.06
-Nodes (62): Connection, delete, Exception, append_activity(), append_log(), apply_schema_migrations(), archive_suffix(), build_environment_blockers() (+54 more)
+Cohesion: 0.09
+Nodes (45): delete, Exception, append_activity(), build_environment_blockers(), build_plan(), cancel_upload(), cisco_accept(), cisco_client() (+37 more)
 
 ### Community 63 - "P1 — Wrong file/package selection"
 Cohesion: 0.25
@@ -331,24 +316,24 @@ Cohesion: 0.67
 Nodes (3): `gisobuild_commit()` silently returned null due to git's ownership check (2026-09-16), P2 — Tooling reliability, `ruff` is installed unpinned in CI, so its rule set can change without a code change
 
 ## Knowledge Gaps
-- **246 isolated node(s):** `inputs`, `platformProfiles`, `VOLUME_LABELS`, `neededPrerequisiteSmus`, `CONFIDENCE_LABELS` (+241 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 608 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **247 isolated node(s):** `inputs`, `platformProfiles`, `VOLUME_LABELS`, `neededPrerequisiteSmus`, `CONFIDENCE_LABELS` (+242 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 611 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `validate_smu_selection()` connect `PlatformCompatibilityTests` to `create_build_plan`, `IsoArchitectureInspectionTests`, `app.py`?**
-  _High betweenness centrality (0.180) - this node is a cross-community bridge._
+  _High betweenness centrality (0.183) - this node is a cross-community bridge._
 - **Why does `GisoWebTests` connect `GisoWebTests` to `PlatformCompatibilityTests`, `patch`, `.test_automatic_selection_leaves_out_fixes_that_cannot_install`, `IsoArchitectureInspectionTests`, `.test_discover_tolerates_file_removed_during_scan`, `._smu_fix`, `.upload`, `dict`, `.test_cisco_downloads_are_recorded_as_such_in_the_inventory`, `Path`?**
-  _High betweenness centrality (0.174) - this node is a cross-community bridge._
+  _High betweenness centrality (0.173) - this node is a cross-community bridge._
 - **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `log_event`, `app.py`?**
-  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `patch` (e.g. with `.setUpClass()` and `.test_unsatisfiable_fix_is_left_out_and_names_the_smu_to_download()`) actually correct?**
   _`patch` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inputs`, `platformProfiles`, `VOLUME_LABELS` to the rest of the system?**
-  _246 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _247 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
-  _Cohesion score 0.015748031496062992 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.015625 - nodes in this community are weakly interconnected._
 - **Should `CiscoDownloadError` be split into smaller, more focused modules?**
   _Cohesion score 0.06429070580013976 - nodes in this community are weakly interconnected._

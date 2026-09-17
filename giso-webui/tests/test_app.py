@@ -2189,6 +2189,19 @@ class GisoWebTests(unittest.TestCase):
             self.assertTrue(module.process_has_capability(module.CAP_SYS_CHROOT))
             self.assertFalse(module.process_has_capability(0))
 
+    def test_static_assets_are_versioned_so_a_proxy_cannot_serve_the_previous_page(self):
+        # A deployment behind Cloudflare kept serving the previous app.js after
+        # an upgrade; /static/*.js is cached by extension there.
+        with patch.dict(os.environ, {"SOURCE_REVISION": "abc123def4567890"}):
+            page = self.client.get("/").get_data(as_text=True)
+        self.assertIn("/static/app.js?v=abc123def456", page)
+        self.assertIn("/static/style.css?v=abc123def456", page)
+        self.assertNotIn('"/static/app.js"', page)
+        with patch.dict(os.environ, {"SOURCE_REVISION": "unknown"}):
+            fallback = module.asset_version()
+        self.assertTrue(fallback.startswith(module.APP_VERSION), fallback)
+        self.assertNotEqual(fallback, module.APP_VERSION)
+
     def test_build_plan_carries_the_command_it_would_run_and_its_package_counts(self):
         (self.data / "ncs5500-mini-x-25.1.2.iso").write_bytes(b"CD001 image")
         (self.data / "ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm").write_bytes(b"rpm")

@@ -116,6 +116,21 @@ docker compose -f giso-webui/compose.yaml up -d
 Back up `giso-archive` with the same pattern only when the destination is
 licensed and protected appropriately. Test restore procedures periodically.
 
+## Running behind a reverse proxy or tunnel
+
+The service expects to be reached directly on localhost. When a proxy, tunnel
+or CDN is in front of it (for example Cloudflare):
+
+- Add the hostname to `ALLOWED_HOSTS`, exactly, with no wildcard.
+- Static files are versioned per build (`/static/app.js?v=<revision>`), so an
+  upgrade always produces new URLs. Do not rewrite or strip that query string
+  in the proxy, or browsers will keep the previous page against the new API.
+- A proxy error such as `502 Bad gateway` means the proxy could not reach this
+  service; the page reports it as a status. Check the container and
+  `/api/health` on the host itself before looking at the application.
+- `/api/health` only says the process is alive; `/api/ready` says whether it
+  can build. Point the proxy's own health probe at `/api/health`.
+
 ## Failure handling
 
 | Symptom | Check | Safe action |

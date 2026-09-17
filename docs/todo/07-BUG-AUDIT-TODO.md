@@ -1469,6 +1469,13 @@ each test failed before its fix:
       may be restarting, or a proxy in front of it could not reach it."), never
       the body, and only appends short plain-text bodies. Test:
       `test_a_proxy_error_page_is_reported_as_a_status_not_rendered_into_the_page`.
+- [x] After an upgrade the deployment kept serving the previous `app.js`:
+      `/static/*` was referenced without a version and a CDN caches those by
+      extension, so a new backend ran against an old page. Static URLs now
+      carry `?v=<build revision>` (the newest static file's timestamp in a
+      development image). Test:
+      `test_static_assets_are_versioned_so_a_proxy_cannot_serve_the_previous_page`.
+      Proxy guidance added to `docs/operations.md`.
 
 ## Required regression-test additions
 

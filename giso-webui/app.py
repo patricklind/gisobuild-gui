@@ -3394,6 +3394,29 @@ def validate_host():
         archive_policy_checked = now
 
 
+# Static files are versioned so an upgraded deployment cannot keep serving the
+# previous page: a CDN or proxy in front of this service (a real deployment
+# runs behind Cloudflare) caches /static/*.js by extension, and without a new
+# URL the browser keeps yesterday's app.js against today's API. The revision
+# the image was built from changes the URL; in a development image, where that
+# is unknown, the newest static file's timestamp does.
+def asset_version() -> str:
+    revision = (os.environ.get("SOURCE_REVISION") or "").strip()
+    if revision and revision != "unknown":
+        return revision[:12]
+    try:
+        newest = max(path.stat().st_mtime_ns for path in Path(app.static_folder).rglob("*")
+                     if path.is_file())
+    except (OSError, ValueError):
+        return APP_VERSION
+    return f"{APP_VERSION}-{newest:x}"
+
+
+@app.context_processor
+def template_assets() -> dict:
+    return {"asset_version": asset_version()}
+
+
 @app.get("/api/health")
 def health():
     """Liveness only: has the process itself started and can it respond.
