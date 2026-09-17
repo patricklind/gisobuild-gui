@@ -124,6 +124,10 @@ Mandatory regression coverage for:
       `giso-webui/tests/test_app.py` to pin the backend half of that split
       responsibility, since nothing did before.
 - [x] CSC group selection mismatch — same gap as "incomplete CSC" above, now fixed; see that entry.
+      2026-09-17: the harder case - a companion RPM that was never uploaded
+      at all - is now covered too, from each Cisco SMU README's `RPMS:`
+      manifest (with MD5), in all three gates; see "CSC grouping" in
+      `02-AUTOMATION-BUILDPLAN-TODO.md`.
 - [x] "No RPM packages uploaded" despite inventory containing compatible
       RPMs — verified 2026-09-16, not a live bug: `templates/index.html`'s
       static "No RPM packages uploaded." text is only ever a pre-JS

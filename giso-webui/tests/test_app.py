@@ -1470,6 +1470,10 @@ class GisoWebTests(unittest.TestCase):
             "iso": "ncs5500-x64-25.1.2.iso", "packages": [names[0]],
         }).get_json()
         self.assertFalse(compatibility["smu"]["compatible"])
+        with patch("app.child_mount_args", return_value=[]), \
+                self.assertRaisesRegex(ValueError, "Incomplete fix"):
+            module.build_command({"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500",
+                                  "pkglist": [names[0]]}, "manifest")
 
     def test_unreadable_rpm_header_and_source_rpms_are_never_excluded_by_name(self):
         # No ground truth means no claim: a header rpm cannot read is left to

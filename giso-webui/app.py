@@ -1975,8 +1975,9 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             identity_name, selected_names, iso_architectures=iso_architectures,
             full_candidate_packages=candidates,
         )
-        if smu_check["issues"]:
-            raise ValueError("SMU compatibility check failed: " + "; ".join(smu_check["issues"]))
+        issues = smu_check["issues"] + manifest_blockers(selected_names)
+        if issues:
+            raise ValueError("SMU compatibility check failed: " + "; ".join(issues))
         command += ["--iso", str(iso_path)]
         for key, option in PATH_OPTIONS.items():
             if key in {"iso", "yamlfile"}:
