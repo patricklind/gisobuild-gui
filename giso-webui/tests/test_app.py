@@ -855,6 +855,21 @@ class GisoWebTests(unittest.TestCase):
         with sqlite3.connect(module.JOB_DB) as database:
             self.assertEqual(database.execute("SELECT count(*) FROM upload_sessions").fetchone()[0], 0)
 
+    def test_refusals_distinguish_a_running_build_from_unreachable_docker(self):
+        self.docker_running.stop()
+        try:
+            with patch("app.docker_build_state", return_value=None):
+                unreachable = self.client.post("/api/uploads/init", json={"name": "a.iso", "size": 3}).get_json()
+            with patch("app.docker_build_state", return_value=True):
+                busy = self.client.post("/api/uploads/init", json={"name": "a.iso", "size": 3}).get_json()
+            with patch("app.docker_build_state", return_value=False):
+                allowed = self.client.post("/api/uploads/init", json={"name": "a.iso", "size": 3})
+        finally:
+            self.docker_running.start()
+        self.assertIn("Docker cannot be reached", unreachable["error"])
+        self.assertIn("must wait for the running Docker build container", busy["error"])
+        self.assertEqual(allowed.status_code, 200)
+
     def test_cleanup_rejects_running_build(self):
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1, "updated": 1}
         response = self.client.post("/api/cleanup")

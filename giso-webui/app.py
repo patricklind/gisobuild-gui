@@ -2239,7 +2239,8 @@ def write_build_report(job_id: str, job: dict, artifacts: list[dict]) -> None:
 archive_golden_iso_and_cleanup = archive_giso_artifacts_and_cleanup
 
 
-def docker_build_running() -> bool:
+def docker_build_state() -> bool | None:
+    """True/False whether a builder container runs; None when Docker cannot be asked."""
     if GISO_RUNNER == "local":
         # No containers exist in this mode; the job registry (checked by
         # every caller alongside this) is the whole truth about running builds.
@@ -2251,7 +2252,21 @@ def docker_build_running() -> bool:
         )
         return bool(result.stdout.strip())
     except (OSError, subprocess.SubprocessError):
-        return True
+        return None
+
+
+def docker_build_running() -> bool:
+    # Unknown counts as running: without Docker's answer nothing may assume
+    # a build container is not still writing to the workspace.
+    return docker_build_state() is not False
+
+
+def docker_busy_message(action: str) -> str:
+    """Why `action` is refused, telling "a build runs" apart from "Docker is unreachable"."""
+    if docker_build_state() is None:
+        return (f"{action} is not possible while Docker cannot be reached to confirm that no "
+                "build container is running; check the Docker socket and try again")
+    return f"{action} must wait for the running Docker build container to finish"
 
 
 def extraction_path(path: Path) -> Path | None:
@@ -3633,7 +3648,7 @@ def cisco_download_start():
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
                 return jsonify(error="Wait for the current build to finish"), 409
         if docker_build_running():
-            return jsonify(error="Wait for the current Docker build to finish"), 409
+            return jsonify(error=docker_busy_message("Starting a Cisco download")), 409
         with cisco_lock:
             if cisco_download_running():
                 return jsonify(error="Wait for the current Cisco download to finish"), 409
@@ -3766,7 +3781,7 @@ def cleanup():
         for upload_id in idle_sessions:
             forget_upload_session(upload_id)
         if docker_build_running():
-            return jsonify(error="Temporary files cannot be cleaned while a Docker build is running"), 409
+            return jsonify(error=docker_busy_message("Cleaning temporary files")), 409
         removed_bytes = 0
         removed_items = 0
         removed_by_area: dict[str, int] = {}
@@ -3842,7 +3857,7 @@ def upload_init():
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
                 return jsonify(error="Wait for the current build to finish before uploading more files"), 409
         if docker_build_running():
-            return jsonify(error="Wait for the current Docker build to finish before uploading more files"), 409
+            return jsonify(error=docker_busy_message("Uploading")), 409
         with upload_lock:
             reserved = sum(
                 max(0, int(item["size"]) - int(item["received"]))
@@ -4003,7 +4018,7 @@ def delete_upload(name: str):
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
                 return jsonify(error="Inputs cannot be deleted while a build is running"), 409
         if docker_build_running():
-            return jsonify(error="Inputs cannot be deleted while a Docker build is running"), 409
+            return jsonify(error=docker_busy_message("Deleting inputs")), 409
         destination = extraction_path(path)
         path.unlink()
         if destination is not None and destination.is_dir():
@@ -4032,7 +4047,7 @@ def create_job():
             if uploads_in_progress():
                 return jsonify(error="Wait for all uploads to finish before starting the build"), 409
         if docker_build_running():
-            return jsonify(error="A Docker build is already running"), 409
+            return jsonify(error=docker_busy_message("Starting a build")), 409
         with job_lock:
             if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
                 return jsonify(error="A build is already running"), 409
