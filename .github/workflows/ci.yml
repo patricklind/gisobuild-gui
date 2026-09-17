@@ -60,3 +60,8 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/project:ro" -w /project/giso-webui \
             giso-webui-giso-webui python -B -m unittest discover -s tests -v
+      - name: Run browser tests (Playwright/Chromium in Docker)
+        run: |
+          docker build -f docker/browser-tests.Dockerfile -t gisobuild-browser-tests .
+          docker run --rm -v "$PWD:/work:ro" -e PYTHONDONTWRITEBYTECODE=1 \
+            gisobuild-browser-tests python3 -m unittest discover -s browser_tests -v

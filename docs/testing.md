@@ -40,6 +40,18 @@ docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling \
   pip-audit -r giso-webui/requirements.txt
 ```
 
+Operator UI behaviour is covered by real-browser tests
+(`giso-webui/browser_tests/`, Playwright + Chromium). They run the Flask app
+in-process against synthetic placeholder files - no Cisco content, Docker or
+gisobuild - and assert on what the page renders. Only in their own pinned
+image:
+
+```bash
+docker build -f docker/browser-tests.Dockerfile -t gisobuild-browser-tests .
+docker run --rm -v "$(pwd):/work:ro" -e PYTHONDONTWRITEBYTECODE=1 \
+  gisobuild-browser-tests python3 -m unittest discover -s browser_tests -v
+```
+
 Workflow and Dockerfile changes should also pass Actionlint and Hadolint —
 both already run as containers (`docker run --rm ... rhysd/actionlint:1.7.7`,
 `docker run --rm -i hadolint/hadolint:2.12.0 < <file>`), matching

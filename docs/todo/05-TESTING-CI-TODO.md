@@ -17,10 +17,12 @@ Cover:
       `test_detects_x86_64_only_exr_image_from_metadata`)
 - [x] filename fallback detection (`test_falls_back_to_rpm_repository_listing_for_lnt_image`,
       `test_unreadable_iso_reports_unknown_rather_than_raising`)
-- [ ] RPM metadata parsing — genuinely not implemented: RPM architecture is
-      read from the filename suffix, not a real RPM header parser (see the
-      "Confidence display" honesty note in `06-UI-OPERATOR-TODO.md`), so
-      there is nothing here to test yet.
+- [x] RPM metadata parsing — implemented 2026-09-17 (`rpm_dependency_metadata()`,
+      one read-only `rpm -qp --qf` per file):
+      `test_rpm_header_query_parses_identity_and_exact_dependencies`,
+      `test_renamed_rpm_is_excluded_with_the_name_its_header_gives`,
+      `test_unreadable_rpm_header_and_source_rpms_are_never_excluded_by_name`,
+      `test_inventory_reports_where_each_rpm_identity_comes_from`.
 - [x] CSC grouping (`test_csc_package_groups_show_components_that_belong_together`,
       `test_overlapping_csc_fixes_are_explained`,
       `test_multiple_fixes_for_same_component_require_supersedence_data`,
@@ -184,19 +186,34 @@ upload
 
 ## Browser/DOM tests
 
-- [ ] automatic selection
-- [ ] manual CSC selection
-- [ ] upload while manual mode open
-- [ ] manual → automatic
-- [ ] inventory refresh
-- [ ] no RPM state
-- [ ] failed compatibility
-- [ ] successful preflight
-- [ ] Build button enable/disable
-- [ ] unknown platform presentation
-- [ ] multiple ISO ambiguity blocks Build
-- [ ] duplicate RPM basename conflict is visible
-- [ ] ISO switch refreshes auto-derived release
+Implemented 2026-09-17 in `giso-webui/browser_tests/test_operator_flows.py`:
+Playwright 1.55.0 + Chromium in `docker/browser-tests.Dockerfile` (pinned by
+digest), the real Flask app in-process on synthetic placeholder files, only
+Docker/gisobuild/disk space patched, assertions on the rendered page, and any
+uncaught page JavaScript error fails the test. 14 tests, ~4 s. The first run
+found four real UI defects - see "Operator UI defects found by the first
+real-browser tests" in `07-BUG-AUDIT-TODO.md`.
+
+- [x] automatic selection (`test_automatic_selection`)
+- [x] manual CSC selection (`test_manual_csc_selection`)
+- [x] upload while manual mode open
+      (`test_upload_while_manual_mode_is_open_keeps_the_manual_selection`)
+- [x] manual → automatic (`test_manual_to_automatic`)
+- [x] inventory refresh (`test_inventory_refresh`)
+- [x] no RPM state (`test_no_rpm_state`)
+- [x] failed compatibility (`test_failed_compatibility`)
+- [x] successful preflight (`test_successful_preflight` - stops at the
+      confirmation dialog, no build is started)
+- [x] Build button enable/disable (`test_build_button_enable_disable`)
+- [x] unknown platform presentation (`test_unknown_platform_presentation`)
+- [x] multiple ISO ambiguity blocks Build (`test_multiple_iso_ambiguity_blocks_build`)
+- [x] duplicate RPM basename conflict is visible
+      (`test_duplicate_rpm_basename_conflict_is_visible`)
+- [x] ISO switch refreshes auto-derived release
+      (`test_iso_switch_refreshes_auto_derived_release`)
+
+Also: `test_dependency_blocker_names_the_prerequisite_smu` (Step 2 names the
+README prerequisite SMU).
 
 ## Security tests
 
@@ -232,8 +249,10 @@ Run (`.github/workflows/ci.yml`):
 
 - [x] Python tests — "Run tests inside the built container" step
       (`giso-webui/tests` via `unittest discover`, matching `docs/testing.md`).
-- [ ] JS/DOM tests — no JS test runner exists in this repo at all; the
-      "Browser/DOM tests" list below is entirely aspirational.
+- [x] JS/DOM tests — "Run browser tests (Playwright/Chromium in Docker)"
+      step in `.github/workflows/ci.yml` (added 2026-09-17; actionlint and
+      hadolint pass locally in their containers). Not yet observed running
+      on GitHub Actions - nothing is pushed from this environment.
 - [x] lint — `ruff check` step, now running a pinned `ruff==0.16.7` from
       `docker/tooling.Dockerfile` (fixed 2026-09-16; previously an unpinned
       `pip install ruff` — see "`ruff` is installed unpinned in CI" in

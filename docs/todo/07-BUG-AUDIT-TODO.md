@@ -895,6 +895,18 @@ TODO:
       `27.2.3` (not stuck on the old value); manually set the field to
       `99.9.9` and refreshed again → stayed `99.9.9` (manual override
       correctly not clobbered by the next automatic refresh).
+      **Correction 2026-09-17:** that check was not what it claimed. The page
+      has two `[name=target_release]` fields - the Cisco download search
+      form in step 1 and the upgrade compatibility field - and
+      `updateAutomaticTargetRelease()`, `checkCompatibility()` and the
+      manual-override listener all used `$('[name=target_release]')`, which
+      resolves to the Cisco one. The field the operator actually sees in the
+      upgrade check never received the auto-derived release, and the
+      upgrade check sent the Cisco search field's value. The earlier
+      verification read the same wrong element. Fixed with
+      `upgradeTargetRelease()` scoped to `#upgrade-compatibility-fields`;
+      now covered by a real browser test,
+      `test_iso_switch_refreshes_auto_derived_release` (see below).
 
 ### Archive maintenance runs in a separate process with no cross-process lock (2026-09-16)
 
@@ -1310,6 +1322,33 @@ TODO:
       deliberately unchecked as a trip-wire: whoever introduces a
       less-trusted URL source is the one who must action it. Do not treat it
       as outstanding work when assessing whether this file is finished.
+
+## P2 — Operator UI defects found by the first real-browser tests (2026-09-17)
+
+`giso-webui/browser_tests/` (Playwright + Chromium in
+`docker/browser-tests.Dockerfile`) is the first suite that drives the real
+page. Its first run failed on these real defects; all three are fixed and
+each test failed before its fix:
+
+- [x] Clicking a CSC group checkbox in the manual package list did nothing.
+      `app.js`'s generic `#manual-package-list` change listener runs before
+      the group handler in `manual-packages.js` and re-synced the group box
+      from its still-unchanged members, reverting the click. The generic
+      listener now ignores `.manual-csc-checkbox` events.
+      Test: `test_manual_csc_selection`.
+- [x] Uploading a file while manual package mode was open discarded the
+      operator's manual selection: `uploadFile()` reset `packageListEdited`
+      before reloading inputs, so `renderManualPackages()` re-ticked the
+      automatic set. The reset is removed (it is already `false` in
+      automatic mode); new RPMs appear unticked.
+      Test: `test_upload_while_manual_mode_is_open_keeps_the_manual_selection`.
+- [x] Auto-derived target release went to the wrong field - see the
+      correction under "Target release can remain stale" above.
+      Test: `test_iso_switch_refreshes_auto_derived_release`.
+- [x] With RPMs uploaded but no single base ISO, Start said "Waiting for an
+      ISO and a customization…" although only the ISO was missing. It now
+      says "Waiting for an ISO…". Tests: `test_build_button_enable_disable`,
+      `test_multiple_iso_ambiguity_blocks_build`.
 
 ## Required regression-test additions
 

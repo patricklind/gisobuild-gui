@@ -9,6 +9,10 @@ let pollTimer = null;
 let activityTimer = null;
 let storageInfo = null;
 const $ = selector => document.querySelector(selector);
+// Two fields are named target_release: the Cisco download search form (step 1)
+// and the upgrade compatibility check. A bare [name=target_release] resolves
+// to the Cisco one, which is never the field meant here.
+const upgradeTargetRelease = () => $('#upgrade-compatibility-fields [name=target_release]');
 const lines = value => value.split(/\n|,/).map(item => item.trim()).filter(Boolean);
 const selectedPackages = () => lines(
   $('[name=package_selection_mode]:checked').value === 'manual'
@@ -166,7 +170,7 @@ function renderInputs(data) {
 }
 
 function updateAutomaticTargetRelease(release) {
-  const field=$('[name=target_release]');
+  const field=upgradeTargetRelease();
   if (targetReleaseIsAutomatic || field.value === lastAutomaticTargetRelease) {
     field.value=release;
     lastAutomaticTargetRelease=release;
@@ -283,7 +287,9 @@ function applySmuRecommendation(plan) {
     const dependencyBlockers=(plan.unsatisfied_dependencies || []).map(entry =>
       `${entry.requirement} is required by ${summarizeNames(entry.required_by || [])}`
       + (entry.base_image_has ? `, but the base image ships ${entry.base_image_has}` : '')
-      + ' — download the Cisco SMU that provides it, or remove the package that needs it');
+      + (entry.prerequisite_smu
+        ? ` — download Cisco SMU ${entry.prerequisite_smu} (listed as a prerequisite by ${entry.listed_by}), or remove the package that needs it`
+        : ' — download the Cisco SMU that provides it, or remove the package that needs it'));
     const blockerList=compatibilityList('Fix before building', [...dependencyBlockers, ...blockers], 'fail');
     if (blockerList) details.appendChild(blockerList);
     if (plan.warnings?.length) {
@@ -387,10 +393,14 @@ function updateBuildAvailability() {
   }
   const customFiles = ['xrconfig','ztp_ini','script','key_request','ownership_vouchers','ownership_certificate']
     .some(name => $(`[name=${name}]`).value.trim());
-  const packageUpdates = selectedPackages().length > 0;
+  // RPMs already in the workspace count as the customization while the ISO is
+  // still missing or ambiguous - automatic selection cannot run without one
+  // base ISO, so the only thing actually missing is that ISO.
+  const hasIso = Boolean($('[name=iso_override]').value || $('[name=iso]').value);
+  const packageUpdates = selectedPackages().length > 0
+    || (!hasIso && inputs.files.some(file => file.type === '.rpm'));
   const otherChanges = customFiles || packageUpdates || lines($('[name=bridging_fixes]').value).length > 0 ||
     lines($('[name=remove_packages]').value).length > 0;
-  const hasIso = Boolean($('[name=iso_override]').value || $('[name=iso]').value);
   const ready = hasIso && otherChanges;
   button.disabled = !ready;
   // Naming exactly what's still missing, rather than always "an ISO and a
@@ -435,7 +445,7 @@ async function checkCompatibility() {
   const upgradeMode=$('[name=compatibility_mode]:checked').value === 'upgrade';
   const payload={iso:$('[name=iso_override]').value || $('[name=iso]').value,packages,
     matrix:upgradeMode ? $('[name=compatibility_matrix]').value : '',source_release:$('[name=source_release]').value,
-    target_release:$('[name=target_release]').value,platform:$('[name=platform]').value};
+    target_release:upgradeTargetRelease().value,platform:$('[name=platform]').value};
   if (!payload.iso) { result.className='compatibility-result bad'; result.textContent='Select a base ISO first.'; return; }
   if (upgradeMode && (!payload.matrix || !payload.source_release || !payload.target_release || !payload.platform)) {
     result.className='compatibility-result bad'; result.textContent='For a router upgrade, select a matrix and platform and enter both releases.'; return;
@@ -1016,7 +1026,10 @@ async function uploadFile(file) {
     }
     const done = await api(`/api/uploads/${upload.id}/complete`, {method:'POST'});
     row.classList.add('done'); status.textContent = done.extracted ? `Ready – ${done.extracted} files extracted` : 'Ready and saved';
-    packageListEdited = false; await loadInputs();
+    // Not resetting packageListEdited here: in manual mode that flag is what
+    // keeps the operator's own ticks across the re-render this upload causes
+    // (new RPMs appear unticked); in automatic mode it is already false.
+    await loadInputs();
   } catch (error) {
     if (upload) fetch(`/api/uploads/session/${upload.id}`, {method:'DELETE'}).catch(() => {});
     row.classList.add('upload-error'); status.textContent = error.message;
@@ -1160,7 +1173,14 @@ $('#cancel-build').onclick = async () => {
     catch (error) { await showNotice('Could not stop build', error.message); }
   }
 };
-$('#manual-package-list').addEventListener('change', () => { packageListEdited=true; syncManualPackageValue(); });
+$('#manual-package-list').addEventListener('change', event => {
+  // A CSC group checkbox is handled in manual-packages.js, which applies it to
+  // the members first. Syncing here - this listener runs earlier - recomputed
+  // the group box from its still-unchanged members and silently reverted the
+  // operator's click.
+  if (event.target.classList.contains('manual-csc-checkbox')) return;
+  packageListEdited=true; syncManualPackageValue();
+});
 document.querySelectorAll('[name=package_selection_mode]').forEach(control=>control.addEventListener('change',updatePackageSelectionMode));
 $('#refresh-smu-plan').onclick=refreshSmuRecommendation;
 $('#use-automatic-packages').onclick=async()=>{
@@ -1172,7 +1192,7 @@ $('[name=iso_override]').addEventListener('change',()=>{
   updateAutomaticTargetRelease(match?.[1] || '');
   refreshSmuRecommendation();
 });
-$('[name=target_release]').addEventListener('input',()=>{ targetReleaseIsAutomatic=false; });
+upgradeTargetRelease().addEventListener('input',()=>{ targetReleaseIsAutomatic=false; });
 $('[name=platform]').addEventListener('change',()=>{ updatePlatformControls(); refreshExpectedOutput(); });
 $('#check-compatibility').onclick=checkCompatibility;
 document.querySelectorAll('[name=compatibility_mode]').forEach(control=>control.addEventListener('change', updateCompatibilityMode));
