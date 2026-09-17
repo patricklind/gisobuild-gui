@@ -1788,6 +1788,10 @@ def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dic
         if rpm_is_superseded(rpm, superseded):
             explained.setdefault(rpm.name, "Superseded by a newer fix per Cisco supersedence notes")
             continue
+        if not service_can_read(rpm):
+            explained.setdefault(rpm.name, "The service cannot read this file; fix its ownership "
+                                           "or permissions and check files again")
+            continue
         canonical = rpm_filename_mismatch(rpm)
         if canonical:
             # active_rpm_names() also drops these; say why instead of letting
@@ -1963,6 +1967,21 @@ def smu_manifest_problems(available: list[str], texts: list[str] | None = None) 
     return problems
 
 
+def service_can_read(path: Path) -> bool:
+    """Whether this process can actually open the file (not just see its name).
+
+    A file copied into a volume with foreign ownership and restrictive mode is
+    listed by a directory walk but cannot be checksummed, inspected or built;
+    inventory_files() already skips it, so selection must too.
+    """
+    try:
+        with path.open("rb") as handle:
+            handle.read(1)
+        return True
+    except OSError:
+        return False
+
+
 def _screened_rpms() -> tuple[list[str], set[str], dict[str, str]]:
     texts = smu_readme_texts()
     superseded: set[str] = set()
@@ -1970,7 +1989,8 @@ def _screened_rpms() -> tuple[list[str], set[str], dict[str, str]]:
         superseded.update(SUPERSEDENCE_FULL.findall(text))
     readable = [
         rpm.name for rpm in DATA.rglob("*.rpm")
-        if not rpm_is_superseded(rpm, superseded) and rpm_filename_mismatch(rpm) is None
+        if not rpm_is_superseded(rpm, superseded) and service_can_read(rpm)
+        and rpm_filename_mismatch(rpm) is None
     ]
     return readable, superseded, smu_manifest_problems(readable, texts)
 
@@ -2377,7 +2397,7 @@ def run_job(job_id: str, command: list[str]) -> None:
             jobs[job_id]["process_phase"] = "building"
             jobs[job_id]["container_pid"] = proc.pid
         if proc.stdout is None:
-            raise RuntimeError("Build container output stream is unavailable")
+            raise RuntimeError("Build output stream is unavailable")
         # Close the pipe explicitly: iterating it to EOF does not, so every
         # build otherwise left a descriptor for the garbage collector.
         with proc.stdout:
@@ -3278,7 +3298,7 @@ def create_job():
                       inventory_revision=plan["inventory_revision"], plan_fingerprint=plan["fingerprint"])
             return jsonify(error="Build setup failed; inspect the service log using the request ID"), 503
         with job_lock:
-            jobs[job_id].update(status="running", progress=3, phase="Preparing build container",
+            jobs[job_id].update(status="running", progress=3, phase="Preparing build",
                                 command=command, command_preview=command_preview(command),
                                 cleanup_paths=[str(path) for path in cleanup_paths])
         with store_lock, sqlite3.connect(JOB_DB) as database:

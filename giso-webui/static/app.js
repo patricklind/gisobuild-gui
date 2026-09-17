@@ -978,7 +978,7 @@ async function poll() {
       interrupted: 'The web service restarted before this build completed. Check Docker and the technical log before starting another build.',
       cancelled: 'The build was stopped. Your uploaded files are still saved.',
       queued: 'Waiting for the current build slot to free up. Only one build can run at a time.',
-      cancelling: 'Stopping the build. This can take a few seconds while the build container shuts down.',
+      cancelling: 'Stopping the build. This can take a few seconds while gisobuild shuts down.',
     };
     $('#friendly-status').textContent = friendlyStatusByJobStatus[job.status] || 'The build is running. You may leave this page open or return later.';
     renderMissingDependencies(job);

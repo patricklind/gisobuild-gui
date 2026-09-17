@@ -1499,6 +1499,23 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("if (packageListEdited) $('#inventory-changed').hidden = false;", source)
         self.assertIn('id="inventory-changed"', template)
 
+    def test_unreadable_rpm_is_excluded_with_a_reason_instead_of_breaking_the_plan(self):
+        (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
+        good = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
+        locked = "ncs5500-dpa-1.0.0.5-r2512.CSCtest00002.x86_64.rpm"
+        (self.data / good).write_bytes(b"good")
+        (self.data / locked).write_bytes(b"locked")
+        real_can_read = module.service_can_read
+        with patch("app.service_can_read", side_effect=lambda p: p.name != locked and real_can_read(p)):
+            candidates, superseded = module.active_rpm_names()
+            excluded = module.add_superseded_exclusions({"excluded": []}, superseded)["excluded"]
+            plan = self.client.post("/api/build-plan", json={
+                "iso": "ncs5500-x64-25.1.2.iso", "automatic_smu_selection": True, "pkglist": []}).get_json()
+        self.assertEqual(candidates, [good])
+        self.assertIn("cannot read this file", {e["name"]: e["reason"] for e in excluded}[locked])
+        self.assertTrue(plan["ready"], plan["blockers"])
+        self.assertEqual([p["basename"] for p in plan["selected_packages"]], [good])
+
     def _smu_readme(self, smu, rpms):
         # Same layout as a real Cisco SMU README: tab-indented "<rpm> <md5>"
         # lines under "RPMS:", terminated by a line with only a tab.
