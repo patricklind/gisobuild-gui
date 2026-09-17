@@ -114,8 +114,22 @@ Suggested stages:
       `/api/version.gisobuild_repository`)
 - [x] record commit SHA (label, env, `/api/version.gisobuild_commit`; the
       build fails unless `git rev-parse HEAD` equals the pin)
-- [ ] optionally verify expected source hash - not done; the commit check
-      covers tampering with history but not a tree hash.
+- [x] verify expected source hash - 2026-09-17: `ARG GISOBUILD_SOURCE_SHA256`
+      pins the SHA-256 of a `sha256sum` manifest of every file (C-sorted; the
+      build also refuses symlinks/special files). The image build fails on a
+      mismatch (proven with an all-zero pin: `sha256sum: WARNING: 1 of 1
+      computed checksums did NOT match`, exit 1). The manifest ships as
+      `/opt/gisobuild.sha256sums`; `gisobuild_source_integrity()` re-checks
+      every file and rejects additions at startup (required self-test check
+      `gisobuild_source`, and a build blocker classified `ENVIRONMENT_ERROR`).
+      `/api/version.gisobuild_source_sha256` and an image label report the pin.
+      Live: the rebuilt image reported "67 files match the pinned SHA-256
+      manifest"; the same image with `src/gisobuild.py` bind-mounted over
+      reported "1 changed or missing (src/gisobuild.py)" and logged
+      `startup_self_test_failed check=gisobuild_source`. Tests:
+      `test_self_contained_gisobuild_source_is_checked_against_its_pinned_sha256`,
+      `test_unpinned_gisobuild_checkout_skips_the_source_check_and_version_reports_the_pin`,
+      `test_image_verifies_and_records_one_sha256_of_the_gisobuild_source`.
 
 ### Stage 2 — dependencies
 

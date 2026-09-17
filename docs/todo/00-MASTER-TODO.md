@@ -89,7 +89,7 @@ Core principle:
 - [x] Immutable BuildPlan
 - [x] Inventory revision + stale-state prevention
 - [ ] Self-contained Docker image — built and proven with a real eXR build;
-      open: LNT unexercised, non-root, source tree hash, default switch
+      open: LNT unexercised, non-root, default switch (source SHA-256 manifest done)
 - [x] GisoBuildRunner abstraction — `GISO_RUNNER` docker/local in
       `build_command()`/`run_job()`/`cancel_job()`, integration-tested for
       both and proven live for local

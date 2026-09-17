@@ -107,7 +107,7 @@ licensed and protected appropriately. Test restore procedures periodically.
 
 | Symptom | Check | Safe action |
 | --- | --- | --- |
-| `/api/ready` fails | Its `self_test` details, `docker info` (socket deployment), gisobuild presence, mounted storage, the state database, free disk space, and web logs | Restore the failed dependency; do not expose the service remotely |
+| `/api/ready` fails | Its `self_test` details, `gisobuild_source` (self-contained image: bundled gisobuild no longer matches its pinned SHA-256 manifest - rebuild or pull the image again), `docker info` (socket deployment), gisobuild presence, mounted storage, the state database, free disk space, and web logs | Restore the failed dependency; do not expose the service remotely |
 | Build plan says the job store cannot be used | Web log `job_store_schema_unsupported` | The state volume was written by a newer release; run that release or restore a matching backup |
 | Plan blocked: SYS_CHROOT (self-contained) | Compose `cap_add` | Add `SYS_CHROOT`; gisobuild's eXR engine needs it |
 | `/api/health` fails | Container/process state and web logs | The process itself is down or unresponsive; restart the service |

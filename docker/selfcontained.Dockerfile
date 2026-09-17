@@ -10,10 +10,18 @@
 FROM alpine/git:v2.49.1@sha256:c0280cf9572316299b08544065d3bf35db65043d5e3963982ec50647d2746e26 AS source
 ARG GISOBUILD_REPOSITORY=https://github.com/ios-xr/gisobuild.git
 ARG GISOBUILD_COMMIT=0388af2989bb7022d780a8732dbfbfeb77a70ee7
+# SHA-256 of the file manifest below (sha256sum of every file, C-sorted). The
+# commit pin is a SHA-1 git object name; this binds the exact bytes copied into
+# the image with SHA-256 as well, and the web app re-checks them at startup.
+ARG GISOBUILD_SOURCE_SHA256=9d03ff0ccf5ccf1c5d3d75b14b29258272bd9d50109e4ace283e02e8eac3836d
 RUN git clone --quiet "$GISOBUILD_REPOSITORY" /src \
     && git -C /src checkout --quiet "$GISOBUILD_COMMIT" \
     && test "$(git -C /src rev-parse HEAD)" = "$GISOBUILD_COMMIT" \
-    && rm -rf /src/.git
+    && rm -rf /src/.git \
+    && cd /src \
+    && test -z "$(find . ! -type f ! -type d)" \
+    && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > /gisobuild.sha256sums \
+    && echo "$GISOBUILD_SOURCE_SHA256  /gisobuild.sha256sums" | sha256sum -c -
 
 # --- Stage 2: runtime = upstream's own base and dependency set ------------
 # Upstream's Dockerfile builds on almalinux:8.10 with setup/prep_dependency.sh.
@@ -46,9 +54,11 @@ COPY giso-webui/app.py giso-webui/cisco_download.py giso-webui/maintenance.py gi
 COPY giso-webui/templates templates
 COPY giso-webui/static static
 COPY --from=source /src /opt/gisobuild
+COPY --from=source /gisobuild.sha256sums /opt/gisobuild.sha256sums
 
 ARG GISOBUILD_REPOSITORY=https://github.com/ios-xr/gisobuild.git
 ARG GISOBUILD_COMMIT=0388af2989bb7022d780a8732dbfbfeb77a70ee7
+ARG GISOBUILD_SOURCE_SHA256=9d03ff0ccf5ccf1c5d3d75b14b29258272bd9d50109e4ace283e02e8eac3836d
 ARG SOURCE_REVISION=unknown
 ARG BUILD_DATE=unknown
 ARG APP_VERSION=0.0.1
@@ -59,12 +69,15 @@ LABEL org.opencontainers.image.title="giso-webui-selfcontained" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.version="${APP_VERSION}" \
       io.github.ios-xr.gisobuild.repository="${GISOBUILD_REPOSITORY}" \
-      io.github.ios-xr.gisobuild.commit="${GISOBUILD_COMMIT}"
+      io.github.ios-xr.gisobuild.commit="${GISOBUILD_COMMIT}" \
+      io.github.ios-xr.gisobuild.source-sha256="${GISOBUILD_SOURCE_SHA256}"
 ENV GISO_RUNNER=local \
     GISOBUILD_PYTHON=/usr/bin/python3 \
     TOOL_ROOT=/opt/gisobuild \
     GISOBUILD_REPOSITORY=${GISOBUILD_REPOSITORY} \
     GISOBUILD_COMMIT=${GISOBUILD_COMMIT} \
+    GISOBUILD_SOURCE_SHA256=${GISOBUILD_SOURCE_SHA256} \
+    GISOBUILD_SOURCE_MANIFEST=/opt/gisobuild.sha256sums \
     SOURCE_REVISION=${SOURCE_REVISION} \
     BUILD_DATE=${BUILD_DATE} \
     APP_VERSION=${APP_VERSION} \

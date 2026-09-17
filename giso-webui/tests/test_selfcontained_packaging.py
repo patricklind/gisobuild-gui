@@ -35,6 +35,14 @@ class SelfContainedPackagingTests(unittest.TestCase):
         self.assertIn("GISO_RUNNER=local", self.dockerfile)
         self.assertIn("TOOL_ROOT=/opt/gisobuild", self.dockerfile)
 
+    def test_image_verifies_and_records_one_sha256_of_the_gisobuild_source(self):
+        pins = set(re.findall(r"^ARG GISOBUILD_SOURCE_SHA256=(\S+)$", self.dockerfile, re.MULTILINE))
+        self.assertEqual(len(pins), 1, pins)
+        self.assertRegex(pins.pop(), r"^[0-9a-f]{64}$")
+        self.assertIn('sha256sum -c -', self.dockerfile)
+        self.assertIn("COPY --from=source /gisobuild.sha256sums /opt/gisobuild.sha256sums", self.dockerfile)
+        self.assertIn("GISOBUILD_SOURCE_MANIFEST=/opt/gisobuild.sha256sums", self.dockerfile)
+
     def test_every_base_image_is_pinned_by_digest(self):
         bases = re.findall(r"^FROM\s+(\S+)", self.dockerfile, re.MULTILINE)
         self.assertEqual(len(bases), 2)

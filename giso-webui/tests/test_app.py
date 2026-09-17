@@ -3005,6 +3005,59 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(broken["self_test"]["architecture"]["ok"])
         self.assertIn("no-such-platform", broken["self_test"]["configuration"]["detail"])
 
+    def pinned_gisobuild_tree(self):
+        tool = Path(self.temp.name) / "gisobuild"
+        (tool / "src").mkdir(parents=True)
+        (tool / "src" / "gisobuild.py").write_text("print('gisobuild')\n")
+        (tool / "README.md").write_text("upstream\n")
+        lines = "".join(f"{hashlib.sha256((tool / name).read_bytes()).hexdigest()}  ./{name}\n"
+                        for name in ("README.md", "src/gisobuild.py"))
+        manifest = Path(self.temp.name) / "gisobuild.sha256sums"
+        manifest.write_text(lines)
+        environment = {"GISOBUILD_SOURCE_SHA256": hashlib.sha256(lines.encode()).hexdigest(),
+                       "GISOBUILD_SOURCE_MANIFEST": str(manifest)}
+        return tool, manifest, environment
+
+    def test_self_contained_gisobuild_source_is_checked_against_its_pinned_sha256(self):
+        tool, manifest, environment = self.pinned_gisobuild_tree()
+
+        def check():
+            module.gisobuild_source_results.clear()
+            with patch.object(module, "TOOL", tool), patch.dict(os.environ, environment):
+                return module.startup_self_test()["gisobuild_source"], module.build_environment_blockers()[0]
+
+        result, blockers = check()
+        self.assertEqual(result, {"ok": True, "required": True,
+                                  "detail": "2 files match the pinned SHA-256 manifest"})
+        self.assertFalse(any("pinned source" in blocker for blocker in blockers), blockers)
+        (tool / "__pycache__").mkdir()
+        (tool / "__pycache__" / "x.pyc").write_bytes(b"cache")
+        self.assertTrue(check()[0]["ok"])
+
+        (tool / "src" / "gisobuild.py").write_text("print('patched')\n")
+        (tool / "src" / "extra.py").write_text("")
+        result, blockers = check()
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["detail"], "gisobuild files differ from the pinned source: "
+                         "1 changed or missing (src/gisobuild.py); 1 unexpected (src/extra.py)")
+        blocker = next(blocker for blocker in blockers if "pinned source" in blocker)
+        self.assertEqual(module.classify_error(blocker)["code"], "ENVIRONMENT_ERROR")
+
+        manifest.write_text(manifest.read_text() + "0" * 64 + "  ./src/extra.py\n")
+        result, _ = check()
+        self.assertEqual(result["detail"], "source manifest does not match the pinned SHA-256")
+        manifest.unlink()
+        self.assertEqual(check()[0]["detail"], "source manifest missing")
+
+    def test_unpinned_gisobuild_checkout_skips_the_source_check_and_version_reports_the_pin(self):
+        module.gisobuild_source_results.clear()
+        with patch.dict(os.environ, {"GISOBUILD_SOURCE_SHA256": ""}):
+            self.assertNotIn("gisobuild_source", module.startup_self_test())
+            self.assertIsNone(self.client.get("/api/version").get_json()["gisobuild_source_sha256"])
+        with patch.dict(os.environ, {"GISOBUILD_SOURCE_SHA256": "ab" * 32}):
+            self.assertEqual(self.client.get("/api/version").get_json()["gisobuild_source_sha256"],
+                             "ab" * 32)
+
     def test_self_test_reports_unwritable_directories_and_a_bad_schema(self):
         module.initialize_job_store()
         with sqlite3.connect(module.JOB_DB) as database:

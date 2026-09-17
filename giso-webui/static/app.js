@@ -736,6 +736,7 @@ const SELF_TEST_LABELS = {
   writable_directories: 'a storage directory is not writable',
   configuration: 'the platform configuration is inconsistent',
   architecture: 'this CPU architecture cannot run gisobuild here',
+  gisobuild_source: 'the bundled gisobuild files do not match the pinned source',
 };
 
 async function health() {

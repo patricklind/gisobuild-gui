@@ -466,7 +466,7 @@ ERROR_TAXONOMY: tuple[tuple[str, re.Pattern, bool, str, str], ...] = tuple(
         ("STORAGE_ERROR", r"Not enough free (disk )?space",
          True, "There is not enough free disk space for this build.",
          "Free space (clear the workspace or old archives) or enlarge the named volume."),
-        ("ENVIRONMENT_ERROR", r"gisobuild is not available|job store cannot be used|Docker CLI|interpreter for gisobuild|SYS_CHROOT|already running|Wait for|could not be pulled",
+        ("ENVIRONMENT_ERROR", r"gisobuild is not available|bundled gisobuild files|job store cannot be used|Docker CLI|interpreter for gisobuild|SYS_CHROOT|already running|Wait for|could not be pulled",
          True, "The build service is not ready to run this build right now.",
          "Wait for the running activity to finish, or fix the service setup named in the message."),
     )
@@ -1826,6 +1826,10 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
         blockers.append(f"The job store cannot be used: {store_schema_problem}")
     if not gisobuild_tool_available():
         blockers.append(f"gisobuild is not available ({TOOL / 'src/gisobuild.py'} is missing)")
+    integrity = gisobuild_source_integrity()
+    if integrity is not None and not integrity[0]:
+        blockers.append(f"The bundled gisobuild files do not match the pinned source ({integrity[1]}); "
+                        "rebuild or pull the image again")
     if GISO_RUNNER == "local":
         if not os.access(GISOBUILD_PYTHON, os.X_OK):
             blockers.append(f"The Python interpreter for gisobuild is not available at {GISOBUILD_PYTHON}")
@@ -3283,6 +3287,62 @@ EXPECTED_TABLE_COLUMNS = {
     "file_checksums": {"path", "size", "mtime_ns", "md5", "sha256", "recorded"},
 }
 startup_self_test_logged = False
+gisobuild_source_results: dict[tuple, tuple[bool, str]] = {}
+
+
+def gisobuild_source_integrity() -> tuple[bool, str] | None:
+    """Re-check the bundled gisobuild files against the image's SHA-256 manifest.
+
+    Only a self-contained image records GISOBUILD_SOURCE_SHA256 (the socket
+    deployment mounts a checkout the operator manages), so None means "not
+    pinned". The manifest itself must hash to the pinned value, every listed
+    file must match, and nothing else may have been added to the tree
+    (bytecode caches aside). The files never change inside a read-only image,
+    so the result is computed once per tree.
+    """
+    expected = os.environ.get("GISOBUILD_SOURCE_SHA256", "").strip().lower()
+    if not expected:
+        return None
+    manifest = Path(os.environ.get("GISOBUILD_SOURCE_MANIFEST", "/opt/gisobuild.sha256sums"))
+    key = (str(TOOL), str(manifest), expected)
+    if key not in gisobuild_source_results:
+        gisobuild_source_results[key] = _check_gisobuild_source(manifest, expected)
+    return gisobuild_source_results[key]
+
+
+def _check_gisobuild_source(manifest: Path, expected: str) -> tuple[bool, str]:
+    try:
+        listing = manifest.read_bytes()
+    except OSError:
+        return False, "source manifest missing"
+    if hashlib.sha256(listing).hexdigest() != expected:
+        return False, "source manifest does not match the pinned SHA-256"
+    listed: dict[str, str] = {}
+    for line in listing.decode("utf-8", "replace").splitlines():
+        digest, _, name = line.partition("  ")
+        listed[name.removeprefix("./")] = digest
+    changed = []
+    for name, digest in listed.items():
+        try:
+            actual = hashlib.sha256((TOOL / name).read_bytes()).hexdigest()
+        except OSError:
+            actual = None
+        if actual != digest:
+            changed.append(name)
+    try:
+        present = {path.relative_to(TOOL).as_posix() for path in TOOL.rglob("*")
+                   if not path.is_dir() and "__pycache__" not in path.parts}
+    except OSError:
+        present = set(listed)
+    added = sorted(present - set(listed))
+    if changed or added:
+        parts = []
+        if changed:
+            parts.append(f"{len(changed)} changed or missing ({', '.join(sorted(changed)[:3])})")
+        if added:
+            parts.append(f"{len(added)} unexpected ({', '.join(added[:3])})")
+        return False, "gisobuild files differ from the pinned source: " + "; ".join(parts)
+    return True, f"{len(listed)} files match the pinned SHA-256 manifest"
 
 
 def startup_self_test() -> dict[str, dict]:
@@ -3305,6 +3365,9 @@ def startup_self_test() -> dict[str, dict]:
 
     found = (TOOL / "src/gisobuild.py").is_file()
     record("gisobuild", found, f"gisobuild.py {presence(found)}")
+    integrity = gisobuild_source_integrity()
+    if integrity is not None:
+        record("gisobuild_source", *integrity)
     runner_binary = GISOBUILD_PYTHON if GISO_RUNNER == "local" else DOCKER_BIN
     found = os.access(runner_binary, os.X_OK)
     record("runner_binary", found,
@@ -3471,6 +3534,7 @@ def version():
         gisobuild_repository=os.environ.get("GISOBUILD_REPOSITORY") or None,
         gisobuild_image=IMAGE if GISO_RUNNER == "docker" else None,
         gisobuild_commit=gisobuild_commit(),
+        gisobuild_source_sha256=os.environ.get("GISOBUILD_SOURCE_SHA256") or None,
     )
 
 

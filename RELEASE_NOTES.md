@@ -25,7 +25,9 @@ The latest published version is
   per-platform scripts.
 - Adds a self-contained image (`docker/selfcontained.Dockerfile`,
   `giso-webui/compose.selfcontained.yaml`) that runs pinned gisobuild without a
-  Docker socket, read-only and with only `SYS_CHROOT`.
+  Docker socket, read-only and with only `SYS_CHROOT`. The bundled gisobuild
+  files are pinned by commit and by a SHA-256 manifest that the image build
+  and the startup self-test both verify; a mismatch blocks builds.
 - Structured error codes with suggested actions, per-step build timings,
   builder provenance, evidence-based confidence, automatic inventory refresh,
   resumable uploads across dropped connections and restarts, a startup
