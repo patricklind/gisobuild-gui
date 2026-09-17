@@ -272,6 +272,24 @@ this exact list is not just "present" but *identical* to what the pinned
       yet know (e.g. a future variant) falls through to `lnt-generic`
       rather than being rejected.
 - [x] Ensure LNT-only options are capability driven
+- [x] Select LNT SMU packages automatically - fixed 2026-09-17. Automatic
+      selection assumed eXR filenames (`<platform>-<component>-…-rNNN.CSC….rpm`)
+      for every engine, so every real LNT package - upstream's own README
+      names them `xr-cdp-24.3.1v1.0.0-1.x86_64.rpm`, with no platform family
+      and no CSC ID - was excluded as "Platform is missing from filename",
+      leaving an LNT Golden ISO with none of its fixes unless the operator
+      went to manual mode. `LNT_RPM`/`lnt_rpm_release()` in
+      `platform_validation.py` now parse that naming: for an LNT base image
+      a package is selected when its XR release prefix (build suffixes like
+      `24.3.1.22I` normalized) equals the ISO's and its processor family
+      fits; a platform is only compared when the name actually carries one,
+      matching upstream's "include all RPMs, the router installs what suits
+      its PIDs". `validate_smu_selection()` blocks an LNT package built for
+      another release ("built for IOS XR 24.2.1, not 24.3.1"). eXR behaviour
+      is unchanged. Verified with synthetic fixtures only
+      (`tests/test_platform_fixtures.py`); no real LNT content was available
+      to this work. Not modelled: LNT block grouping (a package's
+      PID-specific RPMs) - gisobuild adds whole blocks itself.
 
 ## Hardware aliases
 

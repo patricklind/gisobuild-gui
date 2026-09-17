@@ -43,7 +43,7 @@ class OperatorFlowTests(unittest.TestCase):
         module.store_initialized = False
         cls.patches = [
             patch("app.docker_build_running", return_value=False),
-            patch("app.build_environment_blockers", return_value=([], [])),
+            patch("app.build_environment_blockers", side_effect=lambda: ([], [])),
             patch("app.is_iso9660_image", return_value=True),
             patch("app.shutil.disk_usage", return_value=SimpleNamespace(
                 free=500 * 1024**3, total=1000 * 1024**3, used=500 * 1024**3)),

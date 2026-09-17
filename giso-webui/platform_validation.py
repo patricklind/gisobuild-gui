@@ -97,6 +97,32 @@ RPM_COMPONENT = re.compile(
     r"^(?P<component>[a-z0-9_-]+?)-(?P<version>\d[^/]*?)-r\d{3,6}\.CSC(?P<bug>[a-z0-9]+)",
     re.IGNORECASE,
 )
+# LNT (IOS XR7) package naming, as documented by upstream gisobuild's README
+# ("Specifying LNT bugfixes and packages"): <package>-<XR release>v<package
+# version>-<rpm release>.<arch>.rpm, e.g. xr-cdp-24.3.1v1.0.0-1.x86_64.rpm or
+# the PID-specific xr-cdp-8101-32h-24.3.1v1.0.0-1.x86_64.rpm. The XR release
+# may carry an engineering suffix (xr-telnet-24.3.1.22Iv1.0.0-1). Unlike eXR,
+# the name carries neither the platform family nor a CSC ID.
+LNT_RPM = re.compile(
+    r"^(?P<package>[a-z0-9][a-z0-9_.+-]*?)-(?P<xr>\d+\.\d+\.\d+(?:\.[0-9A-Za-z]+)?)"
+    r"v(?P<version>\d[0-9A-Za-z.]*)-(?P<release>[0-9A-Za-z.]+)"
+    r"\.(?P<architecture>x86_64|aarch64|arm64|noarch)\.rpm$",
+    re.IGNORECASE,
+)
+
+
+def lnt_rpm_release(filename: str) -> str | None:
+    """The IOS XR release an LNT RPM filename was built for, without any build suffix."""
+    match = LNT_RPM.match(Path(filename).name)
+    if not match:
+        return None
+    return ".".join(match.group("xr").split(".")[:3])
+
+
+def is_lnt_platform(platform: str | None) -> bool:
+    return bool(platform) and PLATFORMS.get(platform, {}).get("architecture") == "lnt"
+
+
 RPM_ARCHITECTURE = re.compile(
     r"\.(?P<architecture>x86_64|aarch64|arm64|corei7_64)\.rpm$", re.IGNORECASE
 )
@@ -261,11 +287,16 @@ def validate_smu_selection(
                 f"{PLATFORMS[iso_platform]['label']}"
             )
         rpm_release = RPM_RELEASE.search(name)
+        lnt_release = lnt_rpm_release(name) if not rpm_release else None
         if rpm_release:
             tag = rpm_release.group("release")
             releases.add(tag)
             if expected_tag and tag != expected_tag:
                 issues.append(f"{name}: release r{tag} does not match IOS XR {iso_release}")
+        elif lnt_release:
+            releases.add(lnt_release.replace(".", ""))
+            if iso_release and lnt_release != iso_release:
+                issues.append(f"{name}: built for IOS XR {lnt_release}, not {iso_release}")
         else:
             warnings.append(f"{name}: release could not be determined from the filename")
         component = RPM_COMPONENT.search(name)
@@ -282,6 +313,10 @@ def validate_smu_selection(
             canonical_architecture = normalize_architecture(architecture.group("architecture"))
             if canonical_architecture:
                 architectures.add(canonical_architecture)
+        elif lnt_release:
+            lnt_architecture = normalize_architecture(LNT_RPM.match(name).group("architecture"))
+            if lnt_architecture:  # noarch has no processor family to compare
+                architectures.add(lnt_architecture)
     if len(releases) > 1:
         issues.append("Selected RPMs contain more than one IOS XR release tag")
     if len(architectures) > 1:
@@ -368,7 +403,23 @@ def recommend_smu_selection(
             normalize_architecture(rpm_architecture.group("architecture"))
             if rpm_architecture else None
         )
-        if not package_platform:
+        lnt_release = lnt_rpm_release(name) if is_lnt_platform(iso_platform) else None
+        if lnt_release:
+            # Upstream LNT builds take every RPM of a package and install only
+            # what suits the router's PIDs, and the filename names no platform
+            # family - so only a platform the name *does* carry, the XR release
+            # and the processor family can rule a package out here.
+            lnt_architecture = normalize_architecture(LNT_RPM.match(name).group("architecture"))
+            if package_platform and package_platform != iso_platform:
+                excluded.append({"name": name, "reason": "Different platform"})
+            elif lnt_release != iso_release:
+                excluded.append({"name": name, "reason": "Different IOS XR release"})
+            elif (iso_architectures and lnt_architecture
+                  and lnt_architecture not in iso_architectures):
+                excluded.append({"name": name, "reason": "Processor architecture does not match the base ISO"})
+            else:
+                selected.append(name)
+        elif not package_platform:
             excluded.append({"name": name, "reason": "Platform is missing from filename"})
         elif package_platform != iso_platform:
             excluded.append({"name": name, "reason": "Different platform"})

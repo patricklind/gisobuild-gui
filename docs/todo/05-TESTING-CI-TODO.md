@@ -88,18 +88,34 @@ Cover:
 
 Use synthetic/mocked fixtures, not licensed Cisco artifacts.
 
-- [ ] ASR9000
-- [ ] NCS1000-class where applicable
-- [ ] NCS5000
-- [ ] NCS540
-- [ ] NCS5500
-- [ ] NCS560
-- [ ] NCS6000 where pinned upstream supports it
-- [ ] NCS5700 / NCS57C3 class
-- [ ] Cisco 8000-class LNT
-- [ ] XRv9000
-- [ ] whitebox variants where upstream supports them
-- [ ] unknown/future upstream-supported platform
+Implemented 2026-09-17 in `giso-webui/tests/test_platform_fixtures.py`: every
+profile goes through the real `create_build_plan()` with automatic selection
+and Cisco-style synthetic names (eXR `<platform>-mini-x-<release>.iso` +
+`-rNNN.CSC…` SMUs; LNT `<platform>-x64-<release>.iso` + upstream-README
+`xr-cdp-24.3.1v1.0.0-1.x86_64.rpm` packages). Each asserts detected platform
+and engine, the matching package selected, a foreign one excluded with its
+reason, platform capabilities, expected USB output and - for platforms
+without automatic USB - the blocker when "Skip USB image" is not set. Writing
+the LNT cases exposed that automatic selection excluded every real-style LNT
+package (see "Select LNT SMU packages automatically" in
+`01-PLATFORM-UPSTREAM-TODO.md`), now fixed.
+
+- [x] ASR9000 (`asr9k`, incl. `migration`)
+- [x] NCS1000-class where applicable (`ncs1k`, `ncs1001`, `ncs1004` eXR;
+      `ncs1010` LNT)
+- [x] NCS5000 (`ncs5k`, no USB)
+- [x] NCS540 (`ncs540` eXR; `ncs540l` LNT)
+- [x] NCS5500
+- [x] NCS560
+- [x] NCS6000 where pinned upstream supports it (`ncs6k`, no USB)
+- [x] NCS5700 / NCS57C3 class (`ncs57` via `ncs5700` ISO name)
+- [x] Cisco 8000-class LNT (`8000`)
+- [x] XRv9000 (`xrv9k`, incl. `full_iso`, no USB)
+- [x] whitebox variants where upstream supports them (`iosxrwb`, `iosxrwbd`)
+- [x] unknown/future upstream-supported platform
+      (`test_unknown_future_platform_pauses_automatic_selection_until_overridden`:
+      automatic selection pauses with a named reason; the `lnt-generic`
+      override builds a ready plan reported `MANUAL`)
 
 ## Regression tests
 
