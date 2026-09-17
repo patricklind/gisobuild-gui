@@ -337,3 +337,4 @@ Prepare for:
 
 - [x] `ghcr.io/patricklind/gisobuild-gui:<version>` — configured in `release.yml` (now with source revision and version build args); publishing not observed from this environment
 - [x] `ghcr.io/patricklind/gisobuild-gui:latest` — same
+- [x] self-contained image published alongside as `:<version>-selfcontained` and `:latest-selfcontained` (linux/amd64) — configured in `release.yml` 2026-09-17; not observed from this environment

@@ -112,6 +112,21 @@ jobs:
             APP_VERSION=${{ env.RELEASE_TAG }}
           provenance: mode=max
           sbom: true
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/selfcontained.Dockerfile
+          push: true
+          # gisobuild and Cisco IOS XR images are x86_64-only.
+          platforms: linux/amd64
+          build-args: |
+            SOURCE_REVISION=${{ github.sha }}
+            APP_VERSION=${{ env.RELEASE_TAG }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}-selfcontained
+            ghcr.io/${{ github.repository }}:latest-selfcontained
+          provenance: mode=max
+          sbom: true
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
