@@ -102,15 +102,44 @@ TODO:
       as of 2026-09-16 — only the free-text-to-picklist upgrade remains,
       which depends on the `isols.py` work above.
 
-Detection order:
+Detection order (as implemented 2026-09-17, in precedence order):
 
-- [ ] ISO metadata
-- [ ] upstream gisobuild inspection/isoinfo
-- [ ] image/package metadata
-- [ ] known platform signatures
-- [ ] hardware PID mapping
-- [ ] filename inference
-- [ ] manual override
+- [x] ISO metadata — for eXR, platform and release are now read from the
+      image's own `iosxr_image_mdata.yml` (`iso_mdata:` → `name:`, e.g.
+      `ncs5500-mini-x-25.1.2`) by `iso_identity()` in `giso-webui/app.py`,
+      and reported `VERIFIED` / `source: "iso-metadata"`. Used by every
+      decision point — `discover()`, `/api/smu/recommendation`,
+      `create_build_plan()`, `build_command()`, `/api/compatibility` — so the
+      review and the final gate can never disagree. Validated against the
+      real licensed NCS5500 25.1.2 image **renamed on disk to
+      `customer-golden-base.iso`** (a filename `infer_platform()` returns
+      `None` for, which previously dead-ended automatic selection): platform
+      `ncs5500`, release `25.1.2`, the same 24-RPM selection and 5 dependency
+      blockers as the correctly-named file, with the real filename still
+      shown to the operator. When the metadata identity and the filename
+      disagree, the image wins (`test_metadata_identity_overrides_a_misleading_filename`).
+      LNT images carry no such file and fall through to the filename; that
+      half still depends on the `isols.py` work above.
+- [x] upstream gisobuild inspection/isoinfo — `isoinfo` reads the metadata
+      and the ISO's own RPM listing (architecture fallback). The heavier
+      `isols.py` route remains open above for LNT.
+- [x] image/package metadata — the shipped package list per ISO section
+      (`iso_shipped_packages_from_mdata()`) and each RPM's own
+      `Requires`/`Provides` header (`rpm_dependency_metadata()`), both read
+      from the artifacts, not filenames.
+- [ ] known platform signatures — no signature database beyond the
+      metadata identity above; not needed for eXR now that the image names
+      itself, and LNT would get it from `isols.py`.
+- [x] hardware PID mapping — `ALIASES` + `infer_platform_pid()` (see
+      `01-PLATFORM-UPSTREAM-TODO.md`).
+- [x] filename inference — `infer_platform()`/`ISO_RELEASE`, now strictly
+      the fallback: `iso_identity()` only prefers the metadata name when it
+      resolves to a known platform *and* a release, so an odd or missing
+      metadata identity can never replace a working filename match
+      (`test_unusable_metadata_identity_falls_back_to_the_filename`).
+- [x] manual override — Expert settings platform, including the
+      `exr-generic`/`lnt-generic` fallbacks; a manual platform is reported
+      `operator-selected`, never `VERIFIED`, even when metadata exists.
 
 Return:
 

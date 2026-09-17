@@ -29,9 +29,11 @@ from flask import (
 )
 from platform_validation import (
     GENERIC_PLATFORM_IDS,
+    ISO_RELEASE,
     PLATFORMS,
     RPM_ARCHITECTURE,
     check_upgrade_matrix,
+    infer_platform,
     infer_platform_pid,
     normalize_architecture,
     platform_profile,
@@ -77,7 +79,7 @@ cisco_download_jobs: dict[str, dict] = {}
 cisco_api_client: CiscoSoftwareClient | None = None
 checksum_cache: dict[tuple[str, int, int], dict[str, str]] = {}
 iso_architecture_cache: dict[tuple[str, int, int], frozenset[str]] = {}
-iso_package_cache: dict[tuple[str, int, int], dict[str, str]] = {}
+iso_mdata_cache: dict[tuple[str, int, int], str] = {}
 rpm_metadata_cache: dict[tuple[str, int, int], dict[str, list[tuple[str, str]]]] = {}
 job_lock = threading.RLock()
 upload_lock = threading.Lock()
@@ -802,35 +804,86 @@ def inspect_iso_architecture(iso_path: Path) -> frozenset[str]:
     return architectures
 
 
-def inspect_iso_shipped_packages(iso_path: Path) -> dict[str, str]:
-    """Package name -> version for what the base ISO itself ships, or {} if unknown.
+def read_iso_mdata(iso_path: Path) -> str:
+    """The base ISO's own ``iosxr_image_mdata.yml`` text, capped, or "" if unavailable.
 
-    Same source and same failure posture as inspect_iso_architecture(): an
-    unreadable image or a missing metadata file yields {}, which every
-    caller must read as "no ground truth", never as "ships nothing".
+    One cached read shared by every fact derived from that file (shipped
+    packages, image identity), so a page load does not spawn isoinfo once per
+    fact. "" means "no metadata here" - an LNT image, a non-ISO, or a read
+    failure - and every consumer must treat it as absence of ground truth.
     """
     with checksum_lock:
         stat = iso_path.stat()
         key = (str(iso_path), stat.st_size, stat.st_mtime_ns)
-        if key in iso_package_cache:
-            return iso_package_cache[key]
-    shipped: dict[str, str] = {}
+        if key in iso_mdata_cache:
+            return iso_mdata_cache[key]
+    text = ""
     try:
         mdata = subprocess.run(
             [ISOINFO_BIN, "-R", "-i", str(iso_path), "-x", "/iosxr_image_mdata.yml"],
             capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS, check=False,
         )
         if mdata.returncode == 0 and mdata.stdout.strip():
-            shipped = iso_shipped_packages_from_mdata(
-                mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES]
-            )
+            text = mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES]
     except (OSError, subprocess.SubprocessError):
-        shipped = {}
+        text = ""
     with checksum_lock:
-        if len(iso_package_cache) >= 256:
-            iso_package_cache.pop(next(iter(iso_package_cache)))
-        iso_package_cache[key] = shipped
-    return shipped
+        if len(iso_mdata_cache) >= 256:
+            iso_mdata_cache.pop(next(iter(iso_mdata_cache)))
+        iso_mdata_cache[key] = text
+    return text
+
+
+def inspect_iso_shipped_packages(iso_path: Path) -> dict[str, str]:
+    """Package name -> version for what the base ISO itself ships, or {} if unknown.
+
+    {} must be read as "no ground truth", never as "ships nothing".
+    """
+    return iso_shipped_packages_from_mdata(read_iso_mdata(iso_path))
+
+
+ISO_MDATA_IDENTITY_NAME = re.compile(r"^\s+name:\s*(?P<name>[\w.+-]+)\s*$")
+
+
+def iso_identity_from_mdata(text: str) -> str | None:
+    """The image's own name from the top-level ``iso_mdata:`` block, if present.
+
+    Real eXR images carry an ``iso_mdata:`` block whose indented ``name:``
+    is e.g. ``ncs5500-mini-x-25.1.2`` (validated 2026-09-17 against a
+    licensed NCS5500 image). Only the ``iso_mdata`` block is read: the later ``iso_rpms`` list
+    also has ``name:`` lines (``host-25.1.2``) that must not be mistaken for
+    the image identity.
+    """
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.rstrip() != "iso_mdata:":
+            continue
+        for following in lines[index + 1:]:
+            if not following.startswith((" ", "\t")):
+                return None
+            match = ISO_MDATA_IDENTITY_NAME.match(following)
+            if match:
+                return match.group("name")
+        return None
+    return None
+
+
+def iso_identity(iso_path: Path) -> tuple[str, bool]:
+    """Name to infer platform/release from, and whether it came from the image itself.
+
+    Prefers the ISO's own metadata over its filename: an operator can rename
+    a file on disk, but the image's embedded identity cannot drift that way.
+    Only used when the metadata name actually resolves to a known platform
+    *and* a release - otherwise the filename is kept, so this can only ever
+    add information, never replace a working filename match with a worse one.
+    """
+    try:
+        name = iso_identity_from_mdata(read_iso_mdata(iso_path))
+    except OSError:
+        name = None
+    if name and infer_platform(name) and ISO_RELEASE.search(name):
+        return f"{name}.iso", True
+    return iso_path.name, False
 
 
 def unsatisfied_dependencies_for_recommendation(iso_relative_path: str, selected_names: list[str]) -> list[dict]:
@@ -959,7 +1012,8 @@ def current_inventory_revision(items: list[dict] | None = None) -> str:
 def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
                       release: str | None, iso_architectures: frozenset[str],
                       package_groups: list, has_rpm_selection: bool,
-                      matched_pid: str | None = None) -> dict:
+                      matched_pid: str | None = None,
+                      identity_from_metadata: bool = False) -> dict:
     """Report how each detected fact was derived, never presenting a guess as verified.
 
     Only iso_architecture is read from the artifact's own contents (see
@@ -979,25 +1033,43 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     to be correct.
     """
     platform_is_generic = resolved_platform in GENERIC_PLATFORM_IDS
+    # identity_from_metadata: platform and release were read from the image's
+    # own iosxr_image_mdata.yml (see iso_identity()), not its filename, so they
+    # earn VERIFIED - unless the operator overrode the platform, in which case
+    # the platform shown is theirs, not the image's.
+    platform_verified = identity_from_metadata and not platform_manual and bool(resolved_platform)
+    if platform_is_generic:
+        platform_value = "MANUAL"
+    elif platform_verified:
+        platform_value = "VERIFIED"
+    else:
+        platform_value = "INFERRED" if resolved_platform else "UNKNOWN"
+    if platform_is_generic:
+        platform_detail = ("The operator declared a generic engine profile; the real platform "
+                           "identity is unverified and no platform-specific capabilities apply.")
+    elif platform_verified:
+        platform_detail = "Read from the ISO's own embedded image metadata, not its filename."
+    else:
+        platform_detail = ("Not cross-checked against ISO metadata; select it manually in Expert "
+                           "settings if the filename guess is wrong.")
+    if matched_pid and not platform_is_generic:
+        platform_detail += f" Matched hardware PID/SKU spelling: {matched_pid.upper()}."
+    release_verified = identity_from_metadata and bool(release)
     return {
         "platform": {
-            "value": ("MANUAL" if platform_is_generic
-                       else "INFERRED" if resolved_platform else "UNKNOWN"),
+            "value": platform_value,
             "source": ("operator-selected" if platform_manual
+                       else "iso-metadata" if platform_verified
                        else "iso-filename-pattern" if resolved_platform else "none"),
             "pid": matched_pid,
-            "detail": ("The operator declared a generic engine profile; the real platform "
-                       "identity is unverified and no platform-specific capabilities apply."
-                       if platform_is_generic else
-                       "Not cross-checked against ISO metadata; select it manually in Expert "
-                       "settings if the filename guess is wrong."
-                       + (f" Matched hardware PID/SKU spelling: {matched_pid.upper()}."
-                          if matched_pid else "")),
+            "detail": platform_detail,
         },
         "release": {
-            "value": "INFERRED" if release else "UNKNOWN",
-            "source": "iso-filename-pattern",
-            "detail": "Read from the ISO filename's release tag; not parsed from ISO metadata.",
+            "value": "VERIFIED" if release_verified else "INFERRED" if release else "UNKNOWN",
+            "source": "iso-metadata" if release_verified else "iso-filename-pattern",
+            "detail": ("Read from the ISO's own embedded image metadata, not its filename."
+                       if release_verified else
+                       "Read from the ISO filename's release tag; not parsed from ISO metadata."),
         },
         "iso_architecture": {
             "value": "VERIFIED" if iso_architectures else "UNKNOWN",
@@ -1059,17 +1131,20 @@ def create_build_plan(payload: dict) -> dict:
     selected: list[dict] = []
     profile = None
     iso_architectures: frozenset[str] = frozenset()
+    identity_name, identity_from_metadata = iso_name, False
     if iso:
         identifiers = payload.get("pkglist", [])
         # Same check discover(), /api/smu-recommendation, /api/compatibility, and
         # build_command() already apply - the preview and the actual build must
         # agree on whether a build is ready, not just build_command() as a
         # second, later gate.
-        iso_architectures = inspect_iso_architecture(safe_data_path(iso["relative_path"]))
+        iso_path = safe_data_path(iso["relative_path"])
+        iso_architectures = inspect_iso_architecture(iso_path)
+        identity_name, identity_from_metadata = iso_identity(iso_path)
         candidates, superseded = active_rpm_names()
         if payload.get("automatic_smu_selection"):
             recommendation = recommend_smu_selection(
-                iso_name, candidates, iso_architectures=iso_architectures
+                identity_name, candidates, iso_architectures=iso_architectures
             )
             recommendation = add_superseded_exclusions(recommendation, superseded)
             if recommendation.get("ready"):
@@ -1078,9 +1153,9 @@ def create_build_plan(payload: dict) -> dict:
                 blockers.append(recommendation["message"])
         try:
             selected = resolve_rpm_identifiers(identifiers)
-            profile = validate_platform_options(payload)
+            profile = validate_platform_options({**payload, "iso": identity_name})
             compatibility = validate_smu_selection(
-                iso_name, [item["basename"] for item in selected],
+                identity_name, [item["basename"] for item in selected],
                 iso_architectures=iso_architectures,
                 full_candidate_packages=candidates,
             )
@@ -1119,7 +1194,7 @@ def create_build_plan(payload: dict) -> dict:
     blockers.extend(build_space_blockers(estimated_output_bytes))
 
     release = recommendation.get("release") or (
-        validate_smu_selection(iso_name, [])["iso_release"] if iso else None
+        validate_smu_selection(identity_name, [])["iso_release"] if iso else None
     )
     resolved_platform = (profile["id"] if profile else None) or recommendation.get("platform")
     confidence = confidence_report(
@@ -1131,6 +1206,7 @@ def create_build_plan(payload: dict) -> dict:
         has_rpm_selection=any(item.get("basename", "").lower().endswith(".rpm")
                               for item in selected),
         matched_pid=infer_platform_pid(iso_name) if iso_name else None,
+        identity_from_metadata=identity_from_metadata,
     )
 
     option_keys = sorted(set(BOOL_OPTIONS) | set(PATH_OPTIONS) | set(LIST_OPTIONS) |
@@ -1550,12 +1626,18 @@ def discover() -> dict:
     candidates, superseded = active_rpm_names()
     isos = [item["path"] for item in files if item["type"] == ".iso"]
     iso_architectures: frozenset[str] = frozenset()
+    identity_name, identity_from_metadata = (isos[0] if isos else ""), False
     if len(isos) == 1:
         try:
-            iso_architectures = inspect_iso_architecture(safe_data_path(isos[0]))
+            iso_path = safe_data_path(isos[0])
+            iso_architectures = inspect_iso_architecture(iso_path)
+            identity_name, identity_from_metadata = iso_identity(iso_path)
         except (OSError, ValueError):
             iso_architectures = frozenset()
-        recommendation = recommend_smu_selection(isos[0], candidates, iso_architectures=iso_architectures)
+        recommendation = recommend_smu_selection(identity_name, candidates, iso_architectures=iso_architectures)
+        # Platform/release may come from the image's embedded identity, but the
+        # operator-facing "iso" is always the real file they uploaded.
+        recommendation["iso"] = Path(isos[0]).name
     elif len(isos) > 1:
         recommendation = {"ready": False, "selected": [], "excluded": [],
                           "message": "More than one base ISO was found; keep one ISO or select it in Expert settings"}
@@ -1575,6 +1657,7 @@ def discover() -> dict:
         package_groups=recommendation.get("package_groups", []),
         has_rpm_selection=bool(recommendation.get("selected")),
         matched_pid=infer_platform_pid(isos[0]) if len(isos) == 1 else None,
+        identity_from_metadata=identity_from_metadata,
     )
     matrices = [item["path"] for item in files
                 if item["type"] == ".json" and Path(item["path"]).name.startswith("compatibility_matrix_")]
@@ -1661,21 +1744,24 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             raise ValueError("Select an ISO, or provide a YAML file")
         iso_path = safe_data_path(iso)
         iso_architectures = inspect_iso_architecture(iso_path)
+        # Must infer from the same identity create_build_plan() used, or the
+        # final gate could reject a plan the review step just approved.
+        identity_name, _ = iso_identity(iso_path)
         candidates = active_rpm_names()[0]
         if payload.get("automatic_smu_selection"):
             package_plan = recommend_smu_selection(
-                iso, candidates, iso_architectures=iso_architectures
+                identity_name, candidates, iso_architectures=iso_architectures
             )
             if not package_plan["ready"]:
                 raise ValueError(package_plan["message"])
             payload["pkglist"] = package_plan["selected"]
-        profile = validate_platform_options(payload)
+        profile = validate_platform_options({**payload, "iso": identity_name})
         payload["platform"] = profile["id"]
         selected_rpms = resolve_rpm_identifiers(payload.get("pkglist", []))
         selected_names = [item["basename"] for item in selected_rpms]
         payload["pkglist"] = selected_names
         smu_check = validate_smu_selection(
-            iso, selected_names, iso_architectures=iso_architectures,
+            identity_name, selected_names, iso_architectures=iso_architectures,
             full_candidate_packages=candidates,
         )
         if smu_check["issues"]:
@@ -2102,7 +2188,9 @@ def smu_recommendation():
             raise ValueError("Select an uploaded base ISO")
         packages, superseded = active_rpm_names()
         iso_architectures = inspect_iso_architecture(iso_path)
-        recommendation = recommend_smu_selection(iso, packages, iso_architectures=iso_architectures)
+        identity_name, identity_from_metadata = iso_identity(iso_path)
+        recommendation = recommend_smu_selection(identity_name, packages, iso_architectures=iso_architectures)
+        recommendation["iso"] = iso_path.name
         recommendation = add_superseded_exclusions(recommendation, superseded)
         recommendation["unsatisfied_dependencies"] = (
             unsatisfied_dependencies_for_recommendation(iso, recommendation.get("selected", []))
@@ -2115,6 +2203,7 @@ def smu_recommendation():
             package_groups=recommendation.get("package_groups", []),
             has_rpm_selection=bool(recommendation.get("selected")),
             matched_pid=infer_platform_pid(iso),
+            identity_from_metadata=identity_from_metadata,
         )
         return jsonify(recommendation)
     except (OSError, TypeError, ValueError) as exc:
@@ -2132,15 +2221,17 @@ def compatibility():
             raise ValueError("Packages must be a list")
         package_names = package_names_for_validation(packages)
         iso_architectures = frozenset()
+        identity_name = iso
         try:
             iso_candidate = safe_data_path(iso)
             if iso_candidate.suffix.lower() == ".iso" and iso_candidate.is_file():
                 iso_architectures = inspect_iso_architecture(iso_candidate)
+                identity_name, _ = iso_identity(iso_candidate)
         except ValueError:
             iso_architectures = frozenset()
         result = {
             "smu": validate_smu_selection(
-                iso, package_names, iso_architectures=iso_architectures,
+                identity_name, package_names, iso_architectures=iso_architectures,
                 full_candidate_packages=active_rpm_names()[0],
             ),
             "upgrade": None,

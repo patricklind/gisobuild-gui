@@ -1176,6 +1176,79 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(recommendation["ready"])
         self.assertIn("More than one base ISO", recommendation["message"])
 
+    def test_iso_identity_is_read_from_the_iso_mdata_block_only(self):
+        # Real eXR mdata (validated against a licensed NCS5500 25.1.2 image)
+        # has the image identity under iso_mdata:, and *also* name: lines
+        # under iso_rpms: - those must never be mistaken for the identity.
+        mdata = (
+            "arm supported arch list: arm\n"
+            "iso_mdata:\n"
+            "  iso_type: bundle\n"
+            "  name: ncs5500-mini-x-25.1.2\n"
+            "iso_rpms:\n"
+            "- iso_type: host\n"
+            "  name: host-25.1.2\n"
+        )
+        self.assertEqual(module.iso_identity_from_mdata(mdata), "ncs5500-mini-x-25.1.2")
+        self.assertIsNone(module.iso_identity_from_mdata("iso_rpms:\n- name: host-25.1.2\n"))
+        self.assertIsNone(module.iso_identity_from_mdata(""))
+
+    def test_renamed_iso_platform_and_release_come_from_its_own_metadata(self):
+        # An operator renamed the ISO on disk, so the filename carries neither
+        # platform nor release. Before this, that dead-ended automatic
+        # selection ("platform could not be detected"); the image's embedded
+        # identity now resolves it and reports it as VERIFIED, not guessed.
+        (self.data / "customer-golden-base.iso").write_bytes(b"iso")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm").write_bytes(b"rpm")
+        mdata = "iso_mdata:\n  iso_type: bundle\n  name: ncs5500-mini-x-25.1.2\n"
+        with patch("app.read_iso_mdata", return_value=mdata):
+            plan = self.client.post("/api/build-plan", json={
+                "iso": "customer-golden-base.iso", "pkglist": [],
+                "automatic_smu_selection": True, "auto_repo": True,
+            }).get_json()
+            recommendation = self.client.get("/api/inputs").get_json()["recommendation"]
+
+        self.assertEqual(plan["platform"], "ncs5500")
+        self.assertEqual(plan["release"], "25.1.2")
+        self.assertEqual([p["basename"] for p in plan["selected_packages"]],
+                         ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"])
+        self.assertEqual(plan["confidence"]["platform"]["value"], "VERIFIED")
+        self.assertEqual(plan["confidence"]["platform"]["source"], "iso-metadata")
+        self.assertEqual(plan["confidence"]["release"]["value"], "VERIFIED")
+        # The operator-facing name stays the file they actually uploaded.
+        self.assertEqual(recommendation["iso"], "customer-golden-base.iso")
+        self.assertTrue(recommendation["ready"], recommendation)
+
+    def test_metadata_identity_overrides_a_misleading_filename(self):
+        # The file claims 26.1.2, the image says 25.1.2. The image wins -
+        # matching RPMs against a release the image does not actually contain
+        # is exactly the kind of known-bad build this app must refuse.
+        (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm").write_bytes(b"new")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm").write_bytes(b"old")
+        mdata = "iso_mdata:\n  name: ncs5500-mini-x-25.1.2\n"
+        with patch("app.read_iso_mdata", return_value=mdata):
+            plan = self.client.post("/api/build-plan", json={
+                "iso": "ncs5500-mini-x-26.1.2.iso", "pkglist": [],
+                "automatic_smu_selection": True, "auto_repo": True,
+            }).get_json()
+        self.assertEqual(plan["release"], "25.1.2")
+        self.assertEqual([p["basename"] for p in plan["selected_packages"]],
+                         ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"])
+
+    def test_unusable_metadata_identity_falls_back_to_the_filename(self):
+        # An identity that names no known platform must never replace a
+        # working filename match with a worse one.
+        (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
+        with patch("app.read_iso_mdata", return_value="iso_mdata:\n  name: something-odd\n"):
+            plan = self.client.post("/api/build-plan", json={
+                "iso": "ncs5500-mini-x-26.1.2.iso", "pkglist": [],
+                "automatic_smu_selection": False, "auto_repo": True,
+            }).get_json()
+        self.assertEqual(plan["platform"], "ncs5500")
+        self.assertEqual(plan["release"], "26.1.2")
+        self.assertEqual(plan["confidence"]["platform"]["value"], "INFERRED")
+
     def test_shipped_packages_are_read_from_iso_metadata(self):
         # Key/format validated 2026-09-17 against a real licensed NCS5500
         # 25.1.2 image: "rpms in <type> ISO:" lists name-version-rRELEASE
