@@ -158,6 +158,9 @@ class OperatorFlowTests(unittest.TestCase):
         expect(excluded.filter(has_text=self.BGP)).to_contain_text(
             "Part of CSCTEST00001, left out because another RPM of the same fix cannot be installed")
         expect(self.page.locator("#start-build")).to_be_enabled()
+        callout = self.page.locator(".left-out-fixes")
+        expect(callout).to_contain_text("2 RPMs left out: a required package is missing")
+        expect(callout).to_contain_text("Download asr9k-x64-7.3.2.CSCtest00099 from Cisco and upload it")
 
     def test_build_report_shows_a_cached_builder_fallback(self):
         self.write(self.ISO)

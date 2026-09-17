@@ -292,6 +292,23 @@ function applySmuRecommendation(plan) {
       + (entry.prerequisite_smu
         ? ` — download Cisco SMU ${entry.prerequisite_smu} (listed as a prerequisite by ${entry.listed_by}), or remove the package that needs it`
         : ' — download the Cisco SMU that provides it, or remove the package that needs it'));
+    // Fixes automatic selection left out because a prerequisite is missing: the
+    // build can go ahead without them, but the operator should know what to
+    // download to include them next time.
+    const leftOut=plan.left_out_for_dependencies || [];
+    if (leftOut.length) {
+      const needed=[...new Set(leftOut.map(entry => entry.prerequisite_smu).filter(Boolean))];
+      // Every RPM excluded for this, including the rest of each affected fix.
+      const packages=(plan.excluded || []).filter(item => /^(Needs |Part of CSC)/.test(item.reason));
+      const callout=document.createElement('div'); callout.className='smu-relationship-warning left-out-fixes';
+      const heading=document.createElement('b');
+      heading.textContent=`${packages.length} RPM${packages.length === 1 ? '' : 's'} left out: a required package is missing`;
+      const detail=document.createElement('p');
+      detail.textContent=needed.length
+        ? `Download ${needed.join(', ')} from Cisco and upload it to include them. The rest of the plan can be built now.`
+        : 'Upload the Cisco SMU that provides the missing package to include them. The rest of the plan can be built now.';
+      callout.append(heading, detail); details.appendChild(callout);
+    }
     const blockerList=compatibilityList('Fix before building', [...dependencyBlockers, ...blockers], 'fail');
     if (blockerList) details.appendChild(blockerList);
     if (plan.warnings?.length) {
