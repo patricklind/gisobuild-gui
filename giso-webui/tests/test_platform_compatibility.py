@@ -195,6 +195,26 @@ class PlatformCompatibilityTests(unittest.TestCase):
         self.assertTrue(any("authoritative dependency check" in warning
                             for warning in result["warnings"]))
 
+    def test_unparseable_rpm_metadata_is_excluded_with_a_specific_reason(self):
+        # 06-UI-OPERATOR-TODO.md's "Explain decisions" list asks for
+        # "malformed metadata" as its own explained exclusion category. An
+        # RPM whose filename carries no release tag (or no platform token)
+        # is exactly that: the metadata is not *wrong*, it is unreadable,
+        # and saying "different release" for it would be a lie. Only the
+        # missing-platform half of this had a test.
+        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
+            "ncs5500-bgp-no-release-tag.x86_64.rpm",
+            "totally-unparseable.rpm",
+        ])
+        reasons = {item["name"]: item["reason"] for item in result["excluded"]}
+        self.assertEqual(
+            reasons["ncs5500-bgp-no-release-tag.x86_64.rpm"],
+            "Release is missing from filename",
+        )
+        self.assertEqual(
+            reasons["totally-unparseable.rpm"], "Platform is missing from filename"
+        )
+
     def test_automatic_selection_surfaces_a_real_blocking_issue(self):
         # Two RPMs for the same component and CSC, but different versions,
         # both pass the platform/release filename filters that gate automatic

@@ -1143,6 +1143,21 @@ class GisoWebTests(unittest.TestCase):
             plan["blockers"],
         )
 
+    def test_two_isos_are_reported_as_ambiguous_rather_than_silently_resolved(self):
+        # 06-UI-OPERATOR-TODO.md's "Explain decisions" list asks for
+        # "ambiguous metadata" as its own explained category: metadata that
+        # parses fine but yields more than one valid reading. Two base ISOs
+        # is the clearest case - discover() must say so in words rather than
+        # picking one. The frontend behaviour was verified live (see
+        # 07-BUG-AUDIT-TODO.md) but nothing pinned the backend message.
+        (self.data / "ncs5500-mini-x-26.1.1.iso").write_bytes(b"first")
+        (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"second")
+
+        recommendation = self.client.get("/api/inputs").get_json()["recommendation"]
+
+        self.assertFalse(recommendation["ready"])
+        self.assertIn("More than one base ISO", recommendation["message"])
+
     def test_storage_reports_free_space_for_every_build_volume(self):
         response = self.client.get("/api/storage")
         volumes = response.get_json()["volume_free_bytes"]

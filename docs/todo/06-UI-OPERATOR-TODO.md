@@ -343,8 +343,34 @@ Every exclusion must explain why:
 - [x] duplicate — `inventory_files()` tags each file `duplicate`/
       `duplicate_kind`/`provenance`, surfaced in
       `giso-webui/static/manual-packages.js`.
-- [ ] malformed metadata
-- [ ] ambiguous metadata
+- [x] malformed metadata — metadata that is unreadable rather than wrong,
+      which must never be explained as "different release"/"different
+      platform" (that would assert a fact the filename does not actually
+      carry). `recommend_smu_selection()` already excluded these with their
+      own distinct reasons, `"Platform is missing from filename"` and
+      `"Release is missing from filename"`, but only the platform half had a
+      test; added
+      `test_unparseable_rpm_metadata_is_excluded_with_a_specific_reason`
+      (2026-09-17) in `giso-webui/tests/test_platform_compatibility.py`
+      pinning both, including a wholly unparseable `totally-unparseable.rpm`.
+- [x] ambiguous metadata — metadata that parses cleanly but yields more than
+      one valid reading, where the honest answer is to say so rather than
+      pick one. All three real cases were already implemented and are now
+      each pinned by a test:
+      • two base ISOs → `discover()` returns "More than one base ISO was
+        found; keep one ISO or select it in Expert settings" and never
+        auto-selects (`test_two_isos_are_reported_as_ambiguous_rather_than_silently_resolved`,
+        added 2026-09-17, plus the live DOM verification in
+        `07-BUG-AUDIT-TODO.md`);
+      • same RPM filename, different content → "another RPM has the same
+        filename but different content. Remove the unwanted copy."
+        (`test_different_duplicate_rpms_are_rejected`, and the live
+        duplicate-DOM verification);
+      • two versions of one component for one CSC → "Multiple versions of
+        {component} for {CSC} are selected; keep one RPM"
+        (`test_multiple_versions_of_same_component_and_fix_are_rejected`).
+      In every case the build is blocked until the operator resolves it —
+      the system states the ambiguity instead of guessing past it.
 - [x] gisobuild's own RPM dependency-check failures — added 2026-09-16 after
       a real production build failed with a genuine missing-dependency error
       (Cisco's own GISO documentation: "the child RPM is dependent on the
