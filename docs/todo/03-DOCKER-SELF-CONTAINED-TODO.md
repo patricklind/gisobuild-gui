@@ -216,9 +216,17 @@ This command must never be required on the user's host.
 - [x] explicit allowed paths (`safe_data_path()` for every input; outputs
       only under `/output/<job>`, work under `/work/<job>`)
 - [x] process group isolation (`start_new_session=True`, group signals)
-- [ ] non-root where possible - not attempted: still root inside the
-      container. gisobuild extracts images preserving ownership and chroots
-      into them; running it as non-root needs its own proof.
+- [x] non-root where possible - evaluated 2026-09-17: **not possible for eXR
+      builds**. In the self-contained image with `--cap-drop ALL --cap-add
+      SYS_CHROOT --security-opt no-new-privileges:true`, uid 0 has
+      `CapEff 0000000000040000` and `os.chroot()` succeeds; uid 1000 has
+      `CapEff 0000000000000000` and gets "Operation not permitted", because
+      Docker does not raise added capabilities for a non-root user, and file
+      capabilities on a helper are exactly what `no-new-privileges` blocks.
+      gisobuild's eXR engine needs that chroot for every RPM. So the process
+      stays root, contained by the other controls below; the local-runner
+      preflight would block an eXR plan if it were ever run non-root. An
+      LNT-only non-root deployment was not tested.
 - [x] document root requirements if unavoidable - here and in the README:
       root in the container with every capability dropped except
       `SYS_CHROOT`.
