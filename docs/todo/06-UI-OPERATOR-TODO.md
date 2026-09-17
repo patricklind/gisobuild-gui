@@ -559,3 +559,14 @@ read today.
       RPM's filename left exactly that 1 of 6 total rows visible, and
       clearing the filter restored all 6. Full 220-test suite passes, ruff
       clean, Graphify refreshed.
+
+- [x] Build preview before starting (2026-09-17) — "Show build preview" renders
+      the BuildPlan itself: platform, release, base ISO, packages discovered /
+      included / excluded, the excluded counts per status code, the expected
+      outputs, READY TO BUILD or BLOCKED with each blocker, and the exact
+      gisobuild command the plan would run (`plan.generated_command`, built
+      without touching disk or Docker). Start renders the same panel from the
+      plan it confirms. Tests:
+      `test_build_preview_shows_the_counts_and_the_command_before_building`,
+      `test_build_plan_carries_the_command_it_would_run_and_its_package_counts`,
+      `test_build_plan_without_a_runnable_command_still_reports_its_blockers`.

@@ -1873,6 +1873,21 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
     return blockers, warnings
 
 
+def planned_command_preview(payload: dict) -> str:
+    """The gisobuild command this plan would run, for review before starting.
+
+    Exactly what `create_job()` would execute, put through the same redaction
+    the finished build report uses. Best-effort: a plan that cannot produce a
+    command (a blocked plan, or Docker unreachable in the socket deployment)
+    still has to be returned with its blockers, so the preview is simply
+    omitted rather than turning a preview into an error.
+    """
+    try:
+        return command_preview(build_command(payload, "preview", stage=False))
+    except Exception:  # noqa: BLE001 - a preview must never fail the plan
+        return ""
+
+
 def package_decisions(excluded: list[dict]) -> list[dict]:
     """One structured row per package left out of the build.
 
@@ -2096,6 +2111,7 @@ def create_build_plan(payload: dict) -> dict:
     return {
         "fingerprint": fingerprint,
         "inventory_revision": revision,
+        "generated_command": planned_command_preview(payload),
         "ready": not blockers,
         "iso": iso,
         "engine": profile["engine"] if profile else None,
@@ -2870,8 +2886,17 @@ def child_mount_args() -> list[str]:
     return args
 
 
-def build_command(payload: dict, job_id: str) -> list[str]:
-    if GISO_RUNNER == "local":
+def build_command(payload: dict, job_id: str, *, stage: bool = True) -> list[str]:
+    """The command a build runs, and (with stage=True) the repository it needs.
+
+    stage=False builds the same gisobuild arguments without touching the disk
+    or the Docker daemon, for showing an operator what a plan would run before
+    they start it: no staged repository copy and no runner prefix, which the
+    preview strips anyway (see command_preview()).
+    """
+    if not stage:
+        command = [str(TOOL / "src/gisobuild.py")]
+    elif GISO_RUNNER == "local":
         command = [GISOBUILD_PYTHON, str(TOOL / "src/gisobuild.py")]
     else:
         command = [
@@ -2919,10 +2944,11 @@ def build_command(payload: dict, job_id: str) -> list[str]:
                 command += [option, str(safe_data_path(payload[key]))]
         if payload.get("auto_repo", True) and selected_rpms:
             staged_repo = WORK / job_id / "repo"
-            staged_repo.mkdir(parents=True, exist_ok=True)
-            for package in selected_rpms:
-                source = safe_data_path(package["relative_path"])
-                shutil.copy2(source, staged_repo / package["basename"])
+            if stage:
+                staged_repo.mkdir(parents=True, exist_ok=True)
+                for package in selected_rpms:
+                    source = safe_data_path(package["relative_path"])
+                    shutil.copy2(source, staged_repo / package["basename"])
             command += ["--repo", str(staged_repo)]
         for key, option in LIST_OPTIONS.items():
             if key == "repo" and payload.get("auto_repo", True):

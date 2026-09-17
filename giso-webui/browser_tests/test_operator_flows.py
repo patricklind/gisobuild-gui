@@ -116,6 +116,26 @@ class OperatorFlowTests(unittest.TestCase):
 
     # -- scenarios -------------------------------------------------------
 
+    def test_build_preview_shows_the_counts_and_the_command_before_building(self):
+        # Step 8 of the operator workflow: everything the operator needs to
+        # decide, from the same BuildPlan Start uses - no build is started.
+        for name in (self.ISO, self.ROUTING, self.BGP, self.OTHER_RELEASE):
+            self.write(name)
+        self.open()
+        expect(self.page.locator("#smu-plan-state")).to_have_text("Calculated")
+        self.page.locator("#preview-build").click()
+        preview = self.page.locator("#build-preview")
+        expect(preview).to_be_visible()
+        expect(preview.locator(".preview-grid")).to_contain_text("READY TO BUILD")
+        expect(preview.locator(".preview-grid")).to_contain_text("ASR9K")
+        expect(preview.locator(".preview-grid")).to_contain_text("7.3.2")
+        expect(preview.locator(".preview-statuses")).to_have_text("Excluded by reason: 1 wrong release")
+        rows = preview.locator(".preview-grid dd")
+        self.assertEqual([rows.nth(index).inner_text() for index in (3, 4, 5)], ["3", "2", "1"])
+        preview.locator("summary", has_text="gisobuild command").click()
+        expect(preview.locator(".command-preview")).to_contain_text("gisobuild.py --iso asr9k-x64-7.3.2.iso")
+        expect(self.page.locator("#job-status")).to_have_text("Not started")
+
     def test_automatic_selection(self):
         for name in (self.ISO, self.ROUTING, self.BGP, self.OTHER_RELEASE):
             self.write(name)
@@ -279,6 +299,23 @@ class OperatorFlowTests(unittest.TestCase):
         expect(self.page.locator("[name=package_selection_mode][value=manual]")).to_be_checked()
         expect(self.rpm_box(self.ROUTING)).not_to_be_checked()
         expect(self.rpm_box(self.BGP)).to_be_checked()
+
+    def test_a_proxy_error_page_is_reported_as_a_status_not_rendered_into_the_page(self):
+        # A real deployment behind Cloudflare put a whole 502 HTML page into
+        # the upload row because the response body was used as the message.
+        self.open()
+        self.page.route("**/api/uploads/init", lambda route: route.fulfill(
+            status=502, content_type="text/html",
+            body="<!DOCTYPE html><html><head><title>502: Bad gateway</title></head>"
+                 "<body>Bad gateway<div>Cloudflare Ray ID: abc123</div></body></html>"))
+        self.page.set_input_files("#file-upload", files=[{
+            "name": "router.cfg", "mimeType": "text/plain", "buffer": b"hostname r1\n"}])
+        row = self.page.locator(".upload-row")
+        expect(row).to_contain_text("HTTP 502", timeout=15000)
+        text = row.inner_text()
+        for fragment in ("DOCTYPE", "<html", "Cloudflare Ray ID", "cf-wrapper"):
+            self.assertNotIn(fragment, text)
+        self.assertIn("may be restarting", text)
 
     def test_upload_retries_a_dropped_chunk_and_finishes(self):
         self.open()

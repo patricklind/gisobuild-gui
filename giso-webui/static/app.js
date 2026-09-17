@@ -19,11 +19,27 @@ const selectedPackages = () => lines(
     ? $('[name=pkglist_override]').value
     : $('[name=pkglist]').value
 );
+// A reply that is not this application's JSON came from something in front of
+// it - a proxy, a load balancer, or the service being restarted. A real
+// deployment behind Cloudflare rendered a whole 502 HTML page inside the page
+// because that body was used as the message; say what happened instead.
+function gatewayError(response, text) {
+  const trimmed = (text || '').trim();
+  const html = trimmed.startsWith('<') || /<html/i.test(trimmed);
+  if (!response.ok || html || trimmed) {
+    const detail = !html && trimmed && trimmed.length <= 200 ? ` ${trimmed}` : '';
+    return `The service did not return a valid response (HTTP ${response.status} ${response.statusText || ''}`
+      .trimEnd() + ').' + detail
+      + (response.status >= 502 ? ' It may be restarting, or a proxy in front of it could not reach it.' : '');
+  }
+  return `HTTP ${response.status}`;
+}
+
 const api = (url, options = {}) => fetch(url, options).then(async response => {
   const text = await response.text();
   let body = {};
   try { body = text ? JSON.parse(text) : {}; }
-  catch { body = {error: text || `HTTP ${response.status}`}; }
+  catch { body = {error: gatewayError(response, text)}; }
   if (!response.ok) throw new Error(body.error || 'An unexpected error occurred');
   return body;
 });
@@ -809,7 +825,11 @@ async function health() {
 async function loadVersion() {
   try {
     const info = await api('/api/version');
-    const engine = `${info.gisobuild_image}${info.gisobuild_commit ? ` @ ${info.gisobuild_commit}` : ''}`;
+    // The local runner has no builder image: gisobuild is part of this image,
+    // so name it that way instead of printing "null" (seen in a real
+    // deployment) - gisobuild_image is only set for the socket deployment.
+    const builder = info.gisobuild_image || (info.runner === 'local' ? 'bundled gisobuild' : 'unknown');
+    const engine = `${builder}${info.gisobuild_commit ? ` @ ${info.gisobuild_commit}` : ''}`;
     const revision = info.source_revision && info.source_revision !== 'unknown' ? ` (${info.source_revision.slice(0, 7)})` : '';
     $('#version-info').textContent = `Web UI ${info.app_version}${revision} · Build engine ${engine}`;
   } catch { /* Version info is diagnostic only; a missing line is not an error. */ }
@@ -841,9 +861,7 @@ $('[name=yamlfile]').addEventListener('input', updateBuildAvailability);
 $('[name=iso_override]').addEventListener('input', updateBuildAvailability);
 $('#form-mode').addEventListener('input', updateBuildAvailability);
 
-$('#build-form').addEventListener('submit', async event => {
-  event.preventDefault(); $('#error').textContent = '';
-  const form = new FormData(event.target);
+function buildPayload(form) {
   const yamlMode = form.get('mode') === 'yaml';
   const payload = {
     iso: form.get('iso_override') || form.get('iso'),
@@ -860,11 +878,79 @@ $('#build-form').addEventListener('submit', async event => {
     key_request: form.get('key_request') || '', ownership_vouchers: form.get('ownership_vouchers') || '',
     ownership_certificate: form.get('ownership_certificate') || ''
   };
-  event.target.querySelectorAll('input[type=checkbox]').forEach(box => { payload[box.name] = box.checked; });
+  $('#build-form').querySelectorAll('input[type=checkbox]').forEach(box => { payload[box.name] = box.checked; });
+  return payload;
+}
+
+function statusWord(status) {
+  return STATUS_LABELS[status] || status.toLowerCase().replace(/_/g, ' ');
+}
+
+// The backend decides everything shown here; the page only lays it out. It is
+// the same plan Start sends back for confirmation, so the preview can never
+// describe a different build than the one that runs.
+function renderBuildPreview(plan) {
+  const panel = $('#build-preview'), body = $('#build-preview-body');
+  body.replaceChildren(); panel.hidden = false;
+  const summary = plan.package_summary || {};
+  const grid = document.createElement('dl'); grid.className = 'preview-grid';
+  [['Platform', plan.platform ? String(plan.platform).toUpperCase() : 'Not detected'],
+   ['IOS XR release', plan.release || 'Not detected'],
+   ['Base ISO', plan.iso?.relative_path || '—'],
+   ['Packages discovered', String(summary.discovered ?? 0)],
+   ['Included', String(summary.included ?? 0)],
+   ['Excluded', String(summary.excluded ?? 0)],
+   ['Expected output', plan.expected_outputs?.usb ? 'Golden ISO and USB boot package' : 'Golden ISO'],
+   ['Status', plan.ready ? 'READY TO BUILD' : 'BLOCKED']].forEach(([label, value]) => {
+    const term = document.createElement('dt'); term.textContent = label;
+    const detail = document.createElement('dd'); detail.textContent = value;
+    grid.append(term, detail);
+  });
+  body.appendChild(grid);
+  const counts = Object.entries(summary.by_status || {});
+  if (counts.length) {
+    const line = document.createElement('p'); line.className = 'preview-statuses';
+    line.textContent = 'Excluded by reason: '
+      + counts.map(([status, count]) => count + ' ' + statusWord(status)).join(' · ');
+    body.appendChild(line);
+  }
+  (plan.blockers || []).forEach(text => {
+    const row = document.createElement('p'); row.className = 'error'; row.textContent = text;
+    body.appendChild(row);
+  });
+  if (plan.generated_command) {
+    const details = document.createElement('details');
+    const heading = document.createElement('summary');
+    heading.textContent = 'Show the gisobuild command this plan will run';
+    const pre = document.createElement('pre'); pre.className = 'command-preview';
+    pre.textContent = plan.generated_command;
+    details.append(heading, pre); body.appendChild(details);
+  }
+}
+
+$('#preview-build').addEventListener('click', async () => {
+  $('#error').textContent = '';
+  const button = $('#preview-build'); button.disabled = true; button.textContent = 'Checking…';
+  try {
+    const plan = await api('/api/build-plan', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(buildPayload(new FormData($('#build-form')))),
+    });
+    renderUnsatisfiedDependencies(plan);
+    renderBuildPreview(plan);
+  } catch (error) { $('#error').textContent = error.message; }
+  finally { button.disabled = false; button.textContent = 'Show build preview'; }
+});
+
+$('#build-form').addEventListener('submit', async event => {
+  event.preventDefault(); $('#error').textContent = '';
+  const form = new FormData(event.target);
+  const payload = buildPayload(form);
   const button = $('#start-build'); button.disabled = true; button.textContent = 'Starting…';
   try {
     const plan = await api('/api/build-plan', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
     renderUnsatisfiedDependencies(plan);
+    renderBuildPreview(plan);
     if (!plan.ready) {
       // A dependency problem gets the dedicated panel above (which names each
       // package and what the base image ships) rather than being flattened

@@ -1456,6 +1456,20 @@ each test failed before its fix:
       what to do. Test:
       `test_input_that_cannot_be_deleted_does_not_fail_an_archived_build`.
 
+## P2 — UI defects seen in the live deployment (2026-09-17)
+
+- [x] The version line read `Build engine null @ 0388af2989bb`: the page
+      printed `gisobuild_image`, which is null for the local runner because
+      gisobuild is part of the image. It now reads "bundled gisobuild" when
+      `/api/version` reports `runner: local`.
+- [x] A Cloudflare `502 Bad gateway` page was rendered into the upload row,
+      HTML markup and all, because `api()` used any non-JSON response body as
+      the error message. `gatewayError()` now reports the status instead
+      ("The service did not return a valid response (HTTP 502 Bad Gateway). It
+      may be restarting, or a proxy in front of it could not reach it."), never
+      the body, and only appends short plain-text bodies. Test:
+      `test_a_proxy_error_page_is_reported_as_a_status_not_rendered_into_the_page`.
+
 ## Required regression-test additions
 
 - [x] cancel during builder preparation/pull

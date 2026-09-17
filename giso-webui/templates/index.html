@@ -111,6 +111,11 @@
             <div id="yaml-mode" hidden><label>YAML file<input name="yamlfile" list="yaml-files"></label></div>
           </details>
           <button id="start-build" class="primary build-button" type="submit" disabled>Waiting for Cisco files…</button>
+          <button id="preview-build" class="secondary" type="button">Show build preview</button>
+          <section id="build-preview" class="build-preview" hidden aria-live="polite">
+            <h3>Build preview</h3>
+            <div id="build-preview-body"></div>
+          </section>
           <p id="error" class="error" role="alert"></p>
         </form>
       </section>

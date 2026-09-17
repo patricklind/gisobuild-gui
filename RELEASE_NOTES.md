@@ -3,7 +3,7 @@
 Published releases and generated change logs are available on the
 [GitHub Releases page](https://github.com/patricklind/gisobuild-gui/releases).
 The latest published version is
-[v0.0.5](https://github.com/patricklind/gisobuild-gui/releases/tag/v0.0.5).
+[v0.0.6](https://github.com/patricklind/gisobuild-gui/releases/tag/v0.0.6).
 
 ## Unreleased
 

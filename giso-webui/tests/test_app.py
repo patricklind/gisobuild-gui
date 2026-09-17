@@ -2189,6 +2189,41 @@ class GisoWebTests(unittest.TestCase):
             self.assertTrue(module.process_has_capability(module.CAP_SYS_CHROOT))
             self.assertFalse(module.process_has_capability(0))
 
+    def test_build_plan_carries_the_command_it_would_run_and_its_package_counts(self):
+        (self.data / "ncs5500-mini-x-25.1.2.iso").write_bytes(b"CD001 image")
+        (self.data / "ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm").write_bytes(b"rpm")
+        (self.data / "ncs5500-mpls-1.0.0.0-r2601.CSCwu99999.x86_64.rpm").write_bytes(b"rpm")
+        with patch.object(module, "is_iso9660_image", return_value=True), \
+                patch.object(module, "inspect_iso_architecture", return_value=frozenset({"x86_64"})), \
+                patch.object(module, "build_environment_blockers", side_effect=lambda: ([], [])), \
+                patch.object(module, "GISO_RUNNER", "local"), \
+                patch.object(module, "GISOBUILD_PYTHON", sys.executable):
+            plan = self.client.post("/api/build-plan", json={
+                "iso": "ncs5500-mini-x-25.1.2.iso", "label": "PREVIEW",
+                "automatic_smu_selection": True,
+            }).get_json()
+
+        self.assertTrue(plan["ready"], plan["blockers"])
+        # The exact invocation, redacted the same way the finished build report
+        # redacts it, so an operator can check it before starting.
+        self.assertTrue(plan["generated_command"].startswith("gisobuild.py --iso ncs5500-mini-x-25.1.2.iso"),
+                        plan["generated_command"])
+        self.assertIn("--label PREVIEW", plan["generated_command"])
+        self.assertEqual(plan["package_summary"],
+                         {"discovered": 2, "included": 1, "excluded": 1,
+                          "by_status": {"WRONG_RELEASE": 1}})
+        excluded = plan["excluded_packages"][0]
+        self.assertEqual([excluded["status"], excluded["platform"], excluded["release"],
+                          excluded["architecture"], excluded["csc"], excluded["included"]],
+                         ["WRONG_RELEASE", "ncs5500", "r2601", "x86_64", "CSCwu99999", False])
+        self.assertEqual(excluded["source"], "iso-metadata+rpm-filename")
+
+    def test_build_plan_without_a_runnable_command_still_reports_its_blockers(self):
+        with patch.object(module, "build_command", side_effect=RuntimeError("Docker is unreachable")):
+            plan = self.client.post("/api/build-plan", json={"iso": "missing.iso"}).get_json()
+        self.assertEqual(plan["generated_command"], "")
+        self.assertTrue(plan["blockers"])
+
     def test_build_plan_is_blocked_when_gisobuild_or_docker_is_unavailable(self):
         (self.data / "base.iso").write_bytes(b"iso")
         payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": []}
