@@ -1400,6 +1400,38 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm", excluded[renamed.name])
         self.assertNotIn(honest.name, excluded)
 
+    def test_inventory_reports_where_each_rpm_identity_comes_from(self):
+        confirmed = self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
+        renamed = self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"
+        unreadable = self.data / "ncs5500-dpa-1.0.0.5-r2512.CSCtest00002.x86_64.rpm"
+        for path in (confirmed, renamed, unreadable):
+            path.write_bytes(path.name.encode())
+        header = {"name": "ncs5500-bgp", "version": "1.0.0.1",
+                  "release": "r2512.CSCtest00001", "arch": "x86_64"}
+
+        def metadata(path):
+            identity = None if path.name == unreadable.name else header
+            return {"identity": identity, "requires": [], "provides": []}
+
+        with patch("app.rpm_dependency_metadata", side_effect=metadata):
+            items = {item["basename"]: item for item in module.inventory_files()}
+            blockers = module.selection_integrity_blockers([renamed.name, confirmed.name])
+        self.assertEqual((items[confirmed.name]["metadata_source"],
+                          items[confirmed.name]["metadata_confidence"]), ("rpm-header", "high"))
+        self.assertEqual(items[renamed.name]["metadata_confidence"], "mismatch")
+        self.assertEqual(items[renamed.name]["metadata_name"], confirmed.name)
+        self.assertEqual((items[unreadable.name]["metadata_source"],
+                          items[unreadable.name]["metadata_confidence"]), ("filename", "low"))
+        # Manual mode may not build a file its own header contradicts.
+        self.assertEqual(len(blockers), 1, blockers)
+        self.assertIn(renamed.name, blockers[0])
+        self.assertIn("header says it is", blockers[0])
+
+    def test_manual_package_list_blocks_and_labels_header_mismatches(self):
+        source = (Path(module.__file__).parent / "static/manual-packages.js").read_text()
+        self.assertIn("file.metadata_confidence === 'mismatch'", source)
+        self.assertIn("identity confirmed by RPM header", source)
+
     def _smu_readme(self, smu, rpms):
         # Same layout as a real Cisco SMU README: tab-indented "<rpm> <md5>"
         # lines under "RPMS:", terminated by a line with only a tab.

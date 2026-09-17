@@ -21,7 +21,19 @@
     });
   }
 
+  // Where the platform/release identity shown for this file comes from; the
+  // backend sets metadata_confidence from the RPM header (see
+  // file_metadata_provenance() in app.py).
+  function metadataText(file) {
+    if (file.metadata_confidence === 'high') return 'identity confirmed by RPM header';
+    if (file.metadata_confidence === 'mismatch') return `RPM header says ${file.metadata_name}`;
+    return 'identity from filename only';
+  }
+
   function appendPackage(section, file, options = {}) {
+    if (!options.reason && file.metadata_confidence === 'mismatch') {
+      options = {...options, reason: 'Blocked: the filename does not match the package inside it.'};
+    }
     const reason = options.reason || (file.conflict
       ? 'Blocked: another RPM has the same filename but different content. Remove the unwanted copy.'
       : 'Compatible RPM without a detected CSC group');
@@ -39,7 +51,7 @@
     strong.textContent = file.name;
     const small = document.createElement('small');
     const provenance = file.provenance || [file.relative_path || file.path];
-    const identity = `SHA-256 ${file.sha256.slice(0, 12)}…`;
+    const identity = `SHA-256 ${file.sha256.slice(0, 12)}…; ${metadataText(file)}`;
     small.textContent = file.conflict
       ? `${reason} ${identity}; source: ${file.relative_path || file.path}`
       : file.identicalCopies > 1

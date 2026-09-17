@@ -942,6 +942,34 @@ def inventory_id(relative_path: str, sha256: str) -> str:
     return f"file_{identity[:24]}"
 
 
+def file_metadata_provenance(path: Path) -> tuple[str, str, str | None]:
+    """Where this file's platform/release identity comes from: (source, confidence, name).
+
+    "high" only when the artifact's own embedded metadata confirmed it - an
+    RPM header whose NAME-VERSION-RELEASE.ARCH equals the filename, or an ISO
+    whose iosxr_image_mdata.yml names a known platform and release.
+    "mismatch" when the header contradicts the filename (name is what the
+    header says). Everything else is "low": identity is the filename alone.
+    Both readers are cached by path, size and mtime.
+    """
+    suffix = path.suffix.lower()
+    if suffix == ".rpm" and not path.name.lower().endswith(".src.rpm"):
+        identity = rpm_dependency_metadata(path).get("identity")
+        if identity:
+            canonical = rpm_filename_mismatch(path)
+            if canonical:
+                return "rpm-header", "mismatch", canonical
+            return "rpm-header", "high", None
+    elif suffix == ".iso":
+        try:
+            name, from_metadata = iso_identity(path)
+        except OSError:
+            from_metadata = False
+        if from_metadata:
+            return "iso-metadata", "high", name
+    return "filename", "low", None
+
+
 def inventory_files() -> list[dict]:
     """Build the canonical, browser-safe inventory for supported input files."""
     supported = {".iso", ".rpm", ".tar", ".tgz", ".yaml", ".yml", ".cfg",
@@ -964,6 +992,7 @@ def inventory_files() -> list[dict]:
                 continue
             extraction_dir = top_level_extraction_dir(path)
             source_archive = archive_source_for_extraction(extraction_dir) if extraction_dir else None
+            metadata_source, metadata_confidence, metadata_name = file_metadata_provenance(path)
             physical.append({
                 "id": inventory_id(relative_path, sha256),
                 "basename": name,
@@ -973,8 +1002,9 @@ def inventory_files() -> list[dict]:
                 "sha256": sha256,
                 "source": "tar" if path.parent != DATA else "upload",
                 "extracted_from": source_archive.name if source_archive else None,
-                "metadata_source": "filename",
-                "metadata_confidence": "low",
+                "metadata_source": metadata_source,
+                "metadata_confidence": metadata_confidence,
+                "metadata_name": metadata_name,
                 "lifecycle": "READY",
                 "type": suffix,
             })
@@ -1259,7 +1289,7 @@ def create_build_plan(payload: dict) -> dict:
             )
             blockers.extend(compatibility["issues"])
             warnings.extend(compatibility["warnings"])
-            blockers.extend(manifest_blockers([item["basename"] for item in selected]))
+            blockers.extend(selection_integrity_blockers([item["basename"] for item in selected]))
             if not recommendation["package_groups"]:
                 recommendation["package_groups"] = compatibility["package_groups"]
                 recommendation["component_conflicts"] = compatibility["component_conflicts"]
@@ -1810,15 +1840,26 @@ def _screened_rpms() -> tuple[list[str], set[str], dict[str, str]]:
     return readable, superseded, smu_manifest_problems(readable, texts)
 
 
-def manifest_blockers(selected_names: list[str]) -> list[str]:
-    """Selected RPMs their own Cisco README proves unusable - for manual selection.
+def selection_integrity_blockers(selected_names: list[str]) -> list[str]:
+    """Selected RPMs the workspace itself proves unusable - for manual selection.
 
-    Automatic selection never picks these (active_rpm_names() drops them), so
-    this only fires when an operator chose one by hand; manual mode may
-    override inference, never a failure the workspace already proves.
+    Two proofs: the RPM's own header names a different package than its
+    filename (rpm_filename_mismatch()), or its Cisco SMU README shows the fix
+    incomplete or the file altered (smu_manifest_problems()). Automatic
+    selection never picks these (active_rpm_names() drops them), so this only
+    fires when an operator chose one by hand; manual mode may override
+    inference, never a failure the workspace already proves.
     """
+    wanted = set(selected_names)
+    blockers = []
+    for rpm in sorted(DATA.rglob("*.rpm")):
+        if rpm.name in wanted:
+            canonical = rpm_filename_mismatch(rpm)
+            if canonical:
+                blockers.append(f"{rpm.name}: its own RPM header says it is {canonical}")
     problems = _screened_rpms()[2]
-    return [f"{name}: {problems[name]}" for name in sorted(set(selected_names)) if name in problems]
+    blockers.extend(f"{name}: {problems[name]}" for name in sorted(wanted) if name in problems)
+    return blockers
 
 
 def active_rpm_names() -> tuple[list[str], set[str]]:
@@ -1975,7 +2016,7 @@ def build_command(payload: dict, job_id: str) -> list[str]:
             identity_name, selected_names, iso_architectures=iso_architectures,
             full_candidate_packages=candidates,
         )
-        issues = smu_check["issues"] + manifest_blockers(selected_names)
+        issues = smu_check["issues"] + selection_integrity_blockers(selected_names)
         if issues:
             raise ValueError("SMU compatibility check failed: " + "; ".join(issues))
         command += ["--iso", str(iso_path)]
@@ -2445,7 +2486,7 @@ def compatibility():
             identity_name, package_names, iso_architectures=iso_architectures,
             full_candidate_packages=active_rpm_names()[0],
         )
-        readme_issues = manifest_blockers(package_names)
+        readme_issues = selection_integrity_blockers(package_names)
         if readme_issues:
             smu["issues"] = sorted(set(smu["issues"]) | set(readme_issues))
             smu["compatible"] = False

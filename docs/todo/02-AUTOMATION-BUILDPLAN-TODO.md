@@ -201,10 +201,23 @@ new reason.
       `CSCxxxxxxx` suffix) whenever the header is readable.
 - [x] component - same as CSC ID: the header `NAME` equals the filename's
       component whenever the header is readable.
-- [ ] metadata confidence - not per RPM. The build report's confidence grid
-      is per build; there is no per-package "header-verified vs
-      filename-only" flag exposed to the UI yet (the unreadable-header
-      fallback is silent).
+- [x] metadata confidence - per file since 2026-09-17:
+      `file_metadata_provenance()` sets each inventory item's
+      `metadata_source`/`metadata_confidence` (previously hardcoded
+      `filename`/`low` for everything): `rpm-header`/`high` when the header
+      matches the filename, `rpm-header`/`mismatch` plus `metadata_name`
+      when it contradicts it, `iso-metadata`/`high` when the ISO's own
+      metadata names a known platform and release, else `filename`/`low`.
+      The manual package list shows it per RPM and disables a mismatched
+      one; `selection_integrity_blockers()` also blocks a mismatched RPM
+      in manual mode in all three gates. Tests:
+      `test_inventory_reports_where_each_rpm_identity_comes_from`,
+      `test_manual_package_list_blocks_and_labels_header_mismatches`.
+      Live, `--rm` container, real NCS5500 25.1.2 content: 34/34 RPMs
+      `rpm-header`/`high`, the ISO `iso-metadata`/`high`; renaming the
+      CSCwu14807 RPM to `r2612` gave `mismatch` with the true name and a
+      manual blocker. `inventory_files()` 8.97 s cold (dominated by the
+      existing SHA-256 of the 2.2 GB ISO), 0.00 s warm.
 
 ## TAR/TGZ handling
 
@@ -256,7 +269,7 @@ this session was retained afterward per `SECURITY.md`.
       a README-listed RPM missing, and (b) a member whose MD5 differs from
       the README, plus its siblings. Automatic selection drops them via
       `active_rpm_names()` and `add_superseded_exclusions()` explains each;
-      a manual selection gets a plan blocker (`manifest_blockers()`) and
+      a manual selection gets a plan blocker (`selection_integrity_blockers()`) and
       `/api/compatibility` reports it as incompatible. The earlier
       same-inventory case (`full_candidate_packages`) is unchanged.
       Tests: `test_fix_missing_a_readme_listed_rpm_is_excluded_with_what_is_missing`,
