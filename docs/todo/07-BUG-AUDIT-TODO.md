@@ -238,7 +238,20 @@ TODO:
       refuse the build through the one existing gate, and
       `renderUnsatisfiedDependencies()` shows each one in the dedicated
       panel naming every package that needs it and what the base image
-      actually ships.
+      actually ships. Extended the same day to the Step 2 live review
+      (`discover()` and `/api/smu/recommendation`), so the operator sees it
+      before committing rather than on the Start-build click; made
+      affordable by caching `rpm_dependency_metadata()` on
+      `(path, size, mtime)`, measured at +0.75s on a cold `/api/inputs`
+      against the real 34-RPM workspace (9.27s -> 10.02s, both dominated by
+      hashing the 2.2 GB ISO) and ~0 warm.
+      Known imprecision, in the "required by" attribution only and never in
+      whether to block: RPM resolves a transaction to the newest candidate
+      per package name, so a superseded sibling in the same selection never
+      reaches its own dependency evaluation upstream, while this lists every
+      selected package that *declares* the requirement. Modelling that would
+      mean reimplementing RPM version ordering, so the attribution is
+      deliberately over-inclusive rather than approximated.
       **Kept deliberately narrow to avoid false positives** — the reason the
       earlier "explain only" decision was made. A requirement is reported
       only when (1) it is an exact `=` constraint, (2) its name is one the

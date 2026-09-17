@@ -7648,7 +7648,7 @@
       "node_kind": "heading",
       "norm_label": "a csc group's \"select all\" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L677"
+      "source_location": "L690"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_a_single_failed_archive_policy_cycle_crashed_the_maintenance_daemon_entirely_2026_09_16",
@@ -7660,7 +7660,7 @@
       "node_kind": "heading",
       "norm_label": "a single failed archive-policy cycle crashed the maintenance daemon entirely (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L951"
+      "source_location": "L964"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_a_stale_partial_file_from_a_crashed_download_made_the_next_attempt_fail_too_2026_09_16",
@@ -7672,7 +7672,7 @@
       "node_kind": "heading",
       "norm_label": "a stale partial file from a crashed download made the next attempt fail too (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1218"
+      "source_location": "L1231"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_api_inputs_can_race_cleanup_deletion",
@@ -7684,7 +7684,7 @@
       "node_kind": "heading",
       "norm_label": "`/api/inputs` can race cleanup/deletion",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L832"
+      "source_location": "L845"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_app_js_and_manual_packages_js_both_defined_the_manual_package_list_logic_one_of_them_dead_2026_09_16",
@@ -7696,7 +7696,7 @@
       "node_kind": "heading",
       "norm_label": "app.js and manual-packages.js both defined the manual-package-list logic, one of them dead (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L455"
+      "source_location": "L468"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_archive_maintenance_runs_in_a_separate_process_with_no_cross_process_lock_2026_09_16",
@@ -7708,7 +7708,7 @@
       "node_kind": "heading",
       "norm_label": "archive maintenance runs in a separate process with no cross-process lock (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L886"
+      "source_location": "L899"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_archive_retention_days_max_archive_bytes_were_never_validated_2026_09_16",
@@ -7720,7 +7720,7 @@
       "node_kind": "heading",
       "norm_label": "`archive_retention_days`/`max_archive_bytes` were never validated (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L273"
+      "source_location": "L286"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_bridge_smu_presence_check_can_produce_substring_false_positives",
@@ -7732,7 +7732,7 @@
       "node_kind": "heading",
       "norm_label": "bridge-smu presence check can produce substring false positives",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L767"
+      "source_location": "L780"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_cancellation_during_image_pull_cannot_reliably_cancel_the_build",
@@ -7744,7 +7744,7 @@
       "node_kind": "heading",
       "norm_label": "cancellation during image pull cannot reliably cancel the build",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L315"
+      "source_location": "L328"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_cancelled_build_may_still_archive_output_and_delete_inputs",
@@ -7756,7 +7756,7 @@
       "node_kind": "heading",
       "norm_label": "cancelled build may still archive output and delete inputs",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L330"
+      "source_location": "L343"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_ci_ran_the_unit_test_suite_on_the_github_actions_host_python_instead_of_inside_the_built_container",
@@ -7768,7 +7768,7 @@
       "node_kind": "heading",
       "norm_label": "ci ran the unit test suite on the github actions host python instead of inside the built container",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1140"
+      "source_location": "L1153"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_detailed_dependency_check_defaulted_to_off_for_no_real_reason_2026_09_16",
@@ -7792,7 +7792,7 @@
       "node_kind": "heading",
       "norm_label": "dns-rebinding toctou in the cisco download ssrf guard (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1257"
+      "source_location": "L1270"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_filename_heuristics_can_report_confidence_stronger_than_the_evidence_supports",
@@ -7804,7 +7804,7 @@
       "node_kind": "heading",
       "norm_label": "filename heuristics can report confidence stronger than the evidence supports",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L797"
+      "source_location": "L810"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_gisobuild_commit_silently_returned_null_due_to_git_s_ownership_check_2026_09_16",
@@ -7816,7 +7816,7 @@
       "node_kind": "heading",
       "norm_label": "`gisobuild_commit()` silently returned null due to git's ownership check (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1035"
+      "source_location": "L1048"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_hardware_alias_matching_used_loose_substrings_instead_of_word_boundaries",
@@ -7828,7 +7828,7 @@
       "node_kind": "heading",
       "norm_label": "hardware alias matching used loose substrings instead of word boundaries",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L781"
+      "source_location": "L794"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_mandatory_docker_pull_makes_builds_depend_on_registry_availability_even_when_the_builder_image_is_already_cached",
@@ -7840,7 +7840,7 @@
       "node_kind": "heading",
       "norm_label": "mandatory docker pull makes builds depend on registry availability even when the builder image is already cached",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L992"
+      "source_location": "L1005"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_manual_package_ui_collapses_duplicate_rpm_basenames_before_the_operator_can_inspect_them",
@@ -7852,7 +7852,7 @@
       "node_kind": "heading",
       "norm_label": "manual package ui collapses duplicate rpm basenames before the operator can inspect them",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L642"
+      "source_location": "L655"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_multiple_isos_can_result_in_the_frontend_silently_selecting_the_first_iso",
@@ -7864,7 +7864,7 @@
       "node_kind": "heading",
       "norm_label": "multiple isos can result in the frontend silently selecting the first iso",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L429"
+      "source_location": "L442"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_no_free_space_check_exists_for_the_volumes_a_build_actually_writes_to_found_2026_09_16_fixed_2026_09_17",
@@ -7888,7 +7888,7 @@
       "node_kind": "heading",
       "norm_label": "ownership vouchers/certificate could be submitted one without the other with no warning (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L717"
+      "source_location": "L730"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p0_p1_build_lifecycle_and_destructive_cleanup",
@@ -7900,7 +7900,7 @@
       "node_kind": "heading",
       "norm_label": "p0/p1 \u2014 build lifecycle and destructive cleanup",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L313"
+      "source_location": "L326"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_misconfiguration_can_silently_destroy_archived_artifacts",
@@ -7912,7 +7912,7 @@
       "node_kind": "heading",
       "norm_label": "p1 \u2014 misconfiguration can silently destroy archived artifacts",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L271"
+      "source_location": "L284"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_misleading_ui_status",
@@ -7936,7 +7936,7 @@
       "node_kind": "heading",
       "norm_label": "p1/p2 \u2014 platform and compatibility validation",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L715"
+      "source_location": "L728"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_wrong_file_package_selection",
@@ -7948,7 +7948,7 @@
       "node_kind": "heading",
       "norm_label": "p1 \u2014 wrong file/package selection",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L427"
+      "source_location": "L440"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_ci_process_fidelity",
@@ -7960,7 +7960,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 ci process fidelity",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1138"
+      "source_location": "L1151"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_graphify_repository_correctness",
@@ -7972,7 +7972,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 graphify / repository correctness",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1123"
+      "source_location": "L1136"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
@@ -7984,7 +7984,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 inventory consistency and races",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L830"
+      "source_location": "L843"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_tooling_reliability",
@@ -7996,7 +7996,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 tooling reliability",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1033"
+      "source_location": "L1046"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p3_cisco_download_hardening_residual_deferred",
@@ -8008,7 +8008,7 @@
       "node_kind": "heading",
       "norm_label": "p3 \u2014 cisco download hardening (residual, deferred)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1255"
+      "source_location": "L1268"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_post_build_cleanup_could_delete_an_unselected_duplicate_basename_rpm_2026_09_16",
@@ -8020,7 +8020,7 @@
       "node_kind": "heading",
       "norm_label": "post-build cleanup could delete an unselected duplicate-basename rpm (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L396"
+      "source_location": "L409"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_required_regression_test_additions",
@@ -8032,7 +8032,7 @@
       "node_kind": "heading",
       "norm_label": "required regression-test additions",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1301"
+      "source_location": "L1314"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_rpm_processor_architecture_is_not_checked_against_the_selected_iso",
@@ -8044,7 +8044,7 @@
       "node_kind": "heading",
       "norm_label": "rpm processor architecture is not checked against the selected iso",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L509"
+      "source_location": "L522"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_rpm_selection_uses_a_glob_expression_instead_of_an_exact_package_identity",
@@ -8056,7 +8056,7 @@
       "node_kind": "heading",
       "norm_label": "rpm selection uses a glob expression instead of an exact package identity",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L627"
+      "source_location": "L640"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_ruff_is_installed_unpinned_in_ci_so_its_rule_set_can_change_without_a_code_change",
@@ -8068,7 +8068,7 @@
       "node_kind": "heading",
       "norm_label": "`ruff` is installed unpinned in ci, so its rule set can change without a code change",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1074"
+      "source_location": "L1087"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_successful_build_deletes_unrelated_files_from_the_entire_upload_workspace",
@@ -8080,7 +8080,7 @@
       "node_kind": "heading",
       "norm_label": "successful build deletes unrelated files from the entire upload workspace",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L367"
+      "source_location": "L380"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_superseded_rpms_were_silently_dropped_instead_of_being_explained_2026_09_16",
@@ -8092,7 +8092,7 @@
       "node_kind": "heading",
       "norm_label": "superseded rpms were silently dropped instead of being explained (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1185"
+      "source_location": "L1198"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_target_release_can_remain_stale_after_the_selected_iso_changes",
@@ -8104,7 +8104,7 @@
       "node_kind": "heading",
       "norm_label": "target release can remain stale after the selected iso changes",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L865"
+      "source_location": "L878"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_the_base_iso_already_tells_us_which_packages_versions_it_ships_found_and_fixed_2026_09_17",
@@ -8140,7 +8140,7 @@
       "node_kind": "heading",
       "norm_label": "the immutable buildplan preview did not apply the rpm/iso architecture check",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L543"
+      "source_location": "L556"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_the_start_build_disabled_hint_could_name_a_requirement_that_was_already_satisfied_2026_09_16",
@@ -8176,7 +8176,7 @@
       "node_kind": "heading",
       "norm_label": "tracked graphify output is stale relative to current main",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1125"
+      "source_location": "L1138"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_upgrade_matrix_platform_normalization_is_inconsistent",
@@ -8188,7 +8188,7 @@
       "node_kind": "heading",
       "norm_label": "upgrade-matrix platform normalization is inconsistent",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L753"
+      "source_location": "L766"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo",
@@ -9124,7 +9124,7 @@
       "node_kind": "heading",
       "norm_label": "confidence display",
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L400"
+      "source_location": "L416"
     },
     {
       "id": "docs_todo_06_ui_operator_todo_expert_settings",
@@ -9184,7 +9184,7 @@
       "node_kind": "heading",
       "norm_label": "search and filtering (`docs/ai-master-prompt.md` section 55)",
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L445"
+      "source_location": "L461"
     },
     {
       "id": "docs_todo_06_ui_operator_todo_step_1_files",
@@ -19573,7 +19573,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L400",
+      "source_location": "L416",
       "weight": 1.0
     },
     {
@@ -19584,7 +19584,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/06-UI-OPERATOR-TODO.md",
-      "source_location": "L445",
+      "source_location": "L461",
       "weight": 1.0
     },
     {
@@ -19606,7 +19606,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L315",
+      "source_location": "L328",
       "weight": 1.0
     },
     {
@@ -19617,7 +19617,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L330",
+      "source_location": "L343",
       "weight": 1.0
     },
     {
@@ -19628,7 +19628,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L367",
+      "source_location": "L380",
       "weight": 1.0
     },
     {
@@ -19639,7 +19639,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L396",
+      "source_location": "L409",
       "weight": 1.0
     },
     {
@@ -19650,7 +19650,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L273",
+      "source_location": "L286",
       "weight": 1.0
     },
     {
@@ -19716,7 +19716,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L717",
+      "source_location": "L730",
       "weight": 1.0
     },
     {
@@ -19727,7 +19727,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L753",
+      "source_location": "L766",
       "weight": 1.0
     },
     {
@@ -19738,7 +19738,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L767",
+      "source_location": "L780",
       "weight": 1.0
     },
     {
@@ -19749,7 +19749,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L781",
+      "source_location": "L794",
       "weight": 1.0
     },
     {
@@ -19760,7 +19760,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L797",
+      "source_location": "L810",
       "weight": 1.0
     },
     {
@@ -19771,7 +19771,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L429",
+      "source_location": "L442",
       "weight": 1.0
     },
     {
@@ -19782,7 +19782,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L455",
+      "source_location": "L468",
       "weight": 1.0
     },
     {
@@ -19793,7 +19793,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L509",
+      "source_location": "L522",
       "weight": 1.0
     },
     {
@@ -19804,7 +19804,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L543",
+      "source_location": "L556",
       "weight": 1.0
     },
     {
@@ -19815,7 +19815,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L627",
+      "source_location": "L640",
       "weight": 1.0
     },
     {
@@ -19826,7 +19826,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L642",
+      "source_location": "L655",
       "weight": 1.0
     },
     {
@@ -19837,7 +19837,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L677",
+      "source_location": "L690",
       "weight": 1.0
     },
     {
@@ -19848,7 +19848,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1140",
+      "source_location": "L1153",
       "weight": 1.0
     },
     {
@@ -19859,7 +19859,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1185",
+      "source_location": "L1198",
       "weight": 1.0
     },
     {
@@ -19870,7 +19870,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1218",
+      "source_location": "L1231",
       "weight": 1.0
     },
     {
@@ -19881,51 +19881,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1125",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
-      "target": "docs_todo_07_bug_audit_todo_api_inputs_can_race_cleanup_deletion",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L832",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
-      "target": "docs_todo_07_bug_audit_todo_target_release_can_remain_stale_after_the_selected_iso_changes",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L865",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
-      "target": "docs_todo_07_bug_audit_todo_archive_maintenance_runs_in_a_separate_process_with_no_cross_process_lock_2026_09_16",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L886",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
-      "target": "docs_todo_07_bug_audit_todo_a_single_failed_archive_policy_cycle_crashed_the_maintenance_daemon_entirely_2026_09_16",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L951",
+      "source_location": "L1138",
       "weight": 1.0
     },
     {
@@ -19936,7 +19892,51 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L992",
+      "source_location": "L1005",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
+      "target": "docs_todo_07_bug_audit_todo_api_inputs_can_race_cleanup_deletion",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L845",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
+      "target": "docs_todo_07_bug_audit_todo_target_release_can_remain_stale_after_the_selected_iso_changes",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L878",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
+      "target": "docs_todo_07_bug_audit_todo_archive_maintenance_runs_in_a_separate_process_with_no_cross_process_lock_2026_09_16",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L899",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_07_bug_audit_todo_p2_inventory_consistency_and_races",
+      "target": "docs_todo_07_bug_audit_todo_a_single_failed_archive_policy_cycle_crashed_the_maintenance_daemon_entirely_2026_09_16",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
+      "source_location": "L964",
       "weight": 1.0
     },
     {
@@ -19947,7 +19947,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1035",
+      "source_location": "L1048",
       "weight": 1.0
     },
     {
@@ -19958,7 +19958,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1074",
+      "source_location": "L1087",
       "weight": 1.0
     },
     {
@@ -19969,7 +19969,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1257",
+      "source_location": "L1270",
       "weight": 1.0
     },
     {
@@ -19980,7 +19980,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1033",
+      "source_location": "L1046",
       "weight": 1.0
     },
     {
@@ -19991,7 +19991,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1123",
+      "source_location": "L1136",
       "weight": 1.0
     },
     {
@@ -20002,7 +20002,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1138",
+      "source_location": "L1151",
       "weight": 1.0
     },
     {
@@ -20013,7 +20013,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1255",
+      "source_location": "L1268",
       "weight": 1.0
     },
     {
@@ -20024,7 +20024,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1301",
+      "source_location": "L1314",
       "weight": 1.0
     },
     {
@@ -20035,7 +20035,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L271",
+      "source_location": "L284",
       "weight": 1.0
     },
     {
@@ -20046,7 +20046,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L313",
+      "source_location": "L326",
       "weight": 1.0
     },
     {
@@ -20057,7 +20057,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L427",
+      "source_location": "L440",
       "weight": 1.0
     },
     {
@@ -20079,7 +20079,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L715",
+      "source_location": "L728",
       "weight": 1.0
     },
     {
@@ -20090,7 +20090,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L830",
+      "source_location": "L843",
       "weight": 1.0
     },
     {
@@ -27527,5 +27527,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "83158bc0c2486bb607f51d7632e507acecf7c741"
+  "built_at_commit": "88a781114cc63aade55eafeff19942913821ed00"
 }

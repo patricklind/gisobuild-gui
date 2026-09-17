@@ -371,6 +371,22 @@ Every exclusion must explain why:
         (`test_multiple_versions_of_same_component_and_fix_are_rejected`).
       In every case the build is blocked until the operator resolves it —
       the system states the ambiguity instead of guessing past it.
+- [x] dependencies that cannot be satisfied — added 2026-09-17, the
+      *pre-build* counterpart to the entry below. Where that one explains a
+      failure gisobuild already hit, this one prevents the build from
+      starting: `missing_package_dependencies()` compares each selected
+      RPM's own `Requires` (read from the RPM header) against the base
+      image's own shipped package list (read from `iosxr_image_mdata.yml`),
+      and a provably unsatisfiable exact-version requirement becomes a
+      BuildPlan blocker shown in Step 2's "Fix before building" list, naming
+      the requirement, which packages need it, what the base image actually
+      ships, and what to do ("download the Cisco SMU that provides it, or
+      remove the package that needs it"). Validated against the operator's
+      own real content: their exact failing 24-RPM selection is now refused
+      up front with the same five requirements their real gisobuild log
+      reported, while a base-bundle-only build still passes with zero
+      blockers. Full detail and the deliberate anti-false-positive rules are
+      in `07-BUG-AUDIT-TODO.md`.
 - [x] gisobuild's own RPM dependency-check failures — added 2026-09-16 after
       a real production build failed with a genuine missing-dependency error
       (Cisco's own GISO documentation: "the child RPM is dependent on the
