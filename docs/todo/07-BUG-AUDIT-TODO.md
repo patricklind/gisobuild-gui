@@ -313,7 +313,23 @@ Race:
 TODO:
 
 - [x] Check cancellation state before verification, archive and destructive cleanup.
-- [ ] Make finalization idempotent and state-machine driven. (State transitions are explicit; archive replay/idempotency remains.)
+- [ ] Make finalization idempotent and state-machine driven. (State
+      transitions are explicit; archive replay/idempotency remains.)
+      **Investigated 2026-09-17 — still open, but not currently reachable.**
+      `archive_giso_artifacts_and_cleanup()` is not idempotent by
+      construction: `archive_dir.mkdir(parents=True, exist_ok=False)` means a
+      second call for the same `job_id` raises `FileExistsError` rather than
+      recognising the work as already done. What stops that from being a live
+      bug today is that nothing ever calls it twice: it has exactly one
+      caller (`run_job()`'s success path), and after a restart
+      `initialize_job_store()` marks a previously-running job `interrupted`
+      rather than resuming or replaying finalization — there is no retry
+      path anywhere. So this is latent, not active. Making it genuinely
+      idempotent only becomes meaningful alongside a resume/replay mechanism
+      (which would also need to decide whether a half-written archive dir is
+      trustworthy); building the guard first, with no caller that can
+      exercise it, would be untestable scaffolding. Worth doing *with* that
+      work, not before it.
 - [x] Add regression test for cancellation during finalization.
 
 ### Successful build deletes unrelated files from the entire upload workspace
@@ -548,17 +564,33 @@ Not done / follow-up:
   "unknown" architecture set and are not blocked — confirm whether upstream
   LNT ISOs always carry a same-architecture repo, or whether a second LNT
   metadata source should be added.
-- [ ] Tracked Graphify output (`graphify-out/`) was **not** refreshed for this
-  change. Incremental `graphify --update` in a fresh worktree could not reuse
-  the primary checkout's gitignored manifest/semantic cache (0 of ~38 doc
-  files hit cache even after copying `graphify-out/manifest.json` and
-  `graphify-out/cache/` over), so it would have needed a near-full re-extraction
-  of the docs corpus for a small change. Per `AI-INSTRUCTIONS.md`'s explicit
-  allowance ("If Graphify cannot be run ... state that clearly ... do not
-  pretend it was refreshed"), this is stated here instead. Follow-up: make
-  `graphify --update` cache-portable across worktrees (the manifest/cache
-  keys should not depend on the worktree's absolute path), then refresh
-  `graphify-out/` for `app.py`/`platform_validation.py` in a later change.
+  **Blocked on evidence, not on effort** (2026-09-17): answering this needs a
+  real LNT image (Cisco 8000 / NCS 5700 / NCS 1010 / NCS 540L class). The eXR
+  half of this question *was* settled this session against a real licensed
+  NCS5500 image (see the item above); the only Cisco content available here
+  is that same eXR distribution, so the LNT half cannot be answered the same
+  honest way. Note the current behaviour is already the safe one: an
+  undetectable architecture reports `UNKNOWN` and does **not** block an
+  otherwise-valid image (`test_unknown_iso_architecture_does_not_block_selection`),
+  so the risk is a missed cross-check, never a false rejection. Re-open with a
+  real LNT ISO to hand.
+- [x] Tracked Graphify output (`graphify-out/`) was **not** refreshed for this
+  change — resolved 2026-09-17, and the original obstacle turned out to be
+  worktree-specific, not a Graphify defect. The note below described a fresh
+  worktree that could not reuse the primary checkout's gitignored
+  manifest/semantic cache (0 of ~38 doc files hit). Working directly in the
+  primary checkout, `docker run … gisobuild-tooling graphify update .` runs in
+  seconds and has been re-run after every code change since, including the
+  ones that originally carried this caveat (`app.py`,
+  `platform_validation.py`), so the tracked output is current. The
+  cache-portability follow-up is a Graphify-upstream ergonomics wish, not an
+  open defect in this repository, and is not tracked here any further.
+  Original note, kept for context: incremental `graphify --update` in a fresh
+  worktree could not reuse the primary checkout's cache even after copying
+  `graphify-out/manifest.json` and `graphify-out/cache/` over, so it would
+  have needed a near-full re-extraction of the docs corpus for a small
+  change; per `AI-INSTRUCTIONS.md`'s explicit allowance it was stated rather
+  than faked.
 
 ### RPM selection uses a glob expression instead of an exact package identity
 
@@ -776,7 +808,25 @@ A file disappearing between directory enumeration and `stat()` can cause a reque
 
 TODO:
 
-- [ ] Use the persistent inventory model instead of live filesystem walking for every request.
+- [ ] Use the persistent inventory model instead of live filesystem walking
+      for every request — open, but flagged 2026-09-17 as **conflicting with
+      a deliberate decision recorded elsewhere**, so it should not be
+      actioned without resolving that first.
+      `04-STATE-SECURITY-OBSERVABILITY-TODO.md` states the live rescan is
+      itself a correctness property: "no cached copy can go stale relative to
+      the files an operator actually uploaded/deleted." A persistent index
+      would trade that for speed and introduce a new invalidation problem
+      (files can be added or removed outside the app — the operator's own
+      workflow does exactly this with mounted volumes). The race this item
+      was originally filed under is already handled by the other, checked
+      sub-items (disappearing files are tolerated, with a concurrency
+      regression test). So the remaining benefit is performance, and
+      `inventory_files()`'s cost is already bounded by `checksum_cache`
+      keyed on `(path, size, mtime_ns)` — the expensive part (hashing
+      multi-GB files) does not repeat. Recommend either closing this as
+      "won't do, by design" or re-filing it with a concrete measured
+      performance problem; do not implement it purely because it is written
+      down here.
 - [x] Until then, synchronize discovery with destructive workspace operations or tolerate disappearing files safely.
 - [x] Add concurrency regression test: discover while cleanup/delete occurs.
 
@@ -917,10 +967,36 @@ A temporary registry/network outage can therefore block a build even when a vali
 
 TODO:
 
-- [ ] Remove this dependency as part of the self-contained image design.
-- [ ] During migration, define an explicit pull policy and safe cached-image fallback.
-- [ ] Pin builder identity by digest/commit rather than mutable tag semantics.
-- [ ] Add offline/cached-builder regression test if nested Docker remains during transition.
+- [ ] Remove this dependency as part of the self-contained image design —
+      genuinely open, and deliberately owned by
+      `03-DOCKER-SELF-CONTAINED-TODO.md` rather than here: removing the
+      Docker-socket/nested-builder model is that file's whole subject
+      (bundled gisobuild runtime, no `/var/run/docker.sock`, no child
+      builder container). Tracked there; not duplicated as an independent
+      work item in the bug audit.
+- [ ] During migration, define an explicit pull policy and safe cached-image
+      fallback — same owner as above. Today `run_job()` pulls before each
+      build and fails the job on pull failure; deciding when a locally
+      cached builder image may be used instead is part of the migration
+      design, not a standalone bug fix.
+- [x] Pin builder identity by digest/commit rather than mutable tag
+      semantics — supported and verified 2026-09-17, as a deployment opt-in
+      rather than a changed default. `validate_image_reference()` accepts a
+      `repo@sha256:…` reference and it reaches the real `docker run` command
+      unchanged (`test_builder_image_can_be_pinned_by_digest`). To pin, set
+      `GISO_IMAGE` in the deployment environment; the digest currently in use
+      on the operator's own server, taken from a real build log, is
+      `ciscogisobuild/cisco-xr-gisobuild@sha256:be282c7a76b03820d7bdd6c8b8cc0d4a54a5b6207143f089123b32e245018bf3`.
+      The compose default is deliberately left as the `:2.3.4` tag: changing
+      it would repoint a running deployment's builder as a side effect of a
+      documentation-driven change, which is the operator's call, not this
+      audit's. `GET /api/version` already surfaces whichever reference is
+      actually in use, so a tag-pinned deployment is visible rather than
+      silent.
+- [ ] Add offline/cached-builder regression test if nested Docker remains
+      during transition — conditional on the pull-policy decision above
+      (there is nothing to assert until "may a cached image be used, and
+      when" has an answer). Left open with that dependency stated.
 
 ## P2 — Tooling reliability
 
@@ -1182,6 +1258,13 @@ TODO:
 - [ ] If this trust model ever changes (e.g. download URLs sourced from
       somewhere less trusted than Cisco's own API), connect by IP with
       explicit SNI/hostname verification instead of resolve-then-request.
+      **Standing conditional, not a backlog item** (noted 2026-09-17): its
+      precondition is false today — download URLs come only from Cisco's own
+      authenticated API — so there is nothing to implement now and this
+      checkbox can never be "completed" in the current design. It is kept
+      deliberately unchecked as a trip-wire: whoever introduces a
+      less-trusted URL source is the one who must action it. Do not treat it
+      as outstanding work when assessing whether this file is finished.
 
 ## Required regression-test additions
 

@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-17)
 
 ## Corpus Check
-- 49 files · ~74,270 words
+- 49 files · ~75,644 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 14 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 1)
 
 ## Summary
-- 892 nodes · 1408 edges · 59 communities (39 shown, 14 thin omitted)
+- 894 nodes · 1411 edges · 59 communities (39 shown, 14 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 24 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b74ac705`
+- Built from commit: `25badb0b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -44,7 +44,7 @@
 - AGENTS.md
 - Path
 - AI Master Prompt — Cisco IOS-XR GISO Build Web UI
-- releasing.md
+- Release process
 - TODO — Concrete Bug Audit
 - TODO — Self-contained Docker Image
 - TODO — Automation, Inventory & BuildPlan
@@ -71,7 +71,7 @@
 - iso_architectures_from_mdata
 
 ## God Nodes (most connected - your core abstractions)
-1. `GisoWebTests` - 168 edges
+1. `GisoWebTests` - 169 edges
 2. `PlatformCompatibilityTests` - 35 edges
 3. `BuildScriptTests` - 26 edges
 4. `validate_smu_selection()` - 25 edges
@@ -189,7 +189,7 @@ Nodes (18): AI Master Prompt — Cisco IOS-XR GISO Build Web UI, Artifacts and r
 
 ### Community 31 - "TODO — Concrete Bug Audit"
 Cohesion: 0.04
-Nodes (45): A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16), A single failed archive-policy cycle crashed the maintenance daemon entirely (2026-09-16), A stale partial file from a crashed download made the next attempt fail too (2026-09-16), `/api/inputs` can race cleanup/deletion, app.js and manual-packages.js both defined the manual-package-list logic, one of them dead (2026-09-16), Archive maintenance runs in a separate process with no cross-process lock (2026-09-16), `ARCHIVE_RETENTION_DAYS`/`MAX_ARCHIVE_BYTES` were never validated (2026-09-16), Bridge-SMU presence check can produce substring false positives (+37 more)
+Nodes (46): A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16), A single failed archive-policy cycle crashed the maintenance daemon entirely (2026-09-16), A stale partial file from a crashed download made the next attempt fail too (2026-09-16), `/api/inputs` can race cleanup/deletion, app.js and manual-packages.js both defined the manual-package-list logic, one of them dead (2026-09-16), Archive maintenance runs in a separate process with no cross-process lock (2026-09-16), `ARCHIVE_RETENTION_DAYS`/`MAX_ARCHIVE_BYTES` were never validated (2026-09-16), Bridge-SMU presence check can produce substring false positives (+38 more)
 
 ### Community 32 - "TODO — Self-contained Docker Image"
 Cohesion: 0.11
@@ -256,8 +256,8 @@ Cohesion: 0.50
 Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked code graph from tracked files and compare it…, tracked_files(), verify_ignore_policy()
 
 ## Knowledge Gaps
-- **233 isolated node(s):** `inputs`, `platformProfiles`, `VOLUME_LABELS`, `CONFIDENCE_LABELS`, `READY_CHECK_LABELS` (+228 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 473 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **234 isolated node(s):** `inputs`, `platformProfiles`, `VOLUME_LABELS`, `CONFIDENCE_LABELS`, `READY_CHECK_LABELS` (+229 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 474 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -268,7 +268,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `CiscoSoftwareClient` connect `CiscoDownloadError` to `run_cisco_download`, `app.py`?**
   _High betweenness centrality (0.028) - this node is a cross-community bridge._
 - **What connects `inputs`, `platformProfiles`, `VOLUME_LABELS` to the rest of the system?**
-  _233 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _234 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `GisoWebTests` be split into smaller, more focused modules?**
   _Cohesion score 0.01904761904761905 - nodes in this community are weakly interconnected._
 - **Should `CiscoDownloadError` be split into smaller, more focused modules?**

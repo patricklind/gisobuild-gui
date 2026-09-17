@@ -742,6 +742,24 @@ class GisoWebTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Docker image reference"):
             module.validate_image_reference("--privileged")
 
+    @patch("app.child_mount_args", return_value=[])
+    def test_builder_image_can_be_pinned_by_digest(self, _mounts):
+        # 07-BUG-AUDIT-TODO.md asks for the builder to be pinnable by digest
+        # rather than a mutable tag (":2.3.4" can be repointed upstream at
+        # any time, so two builds "on the same version" are not provably the
+        # same builder). This proves the deployment-level opt-in works: a
+        # repo@sha256:... reference validates and reaches the real docker
+        # run command unchanged.
+        digest = ("ciscogisobuild/cisco-xr-gisobuild@sha256:"
+                  "be282c7a76b03820d7bdd6c8b8cc0d4a54a5b6207143f089123b32e245018bf3")
+        self.assertEqual(module.validate_image_reference(digest), digest)
+        (self.data / "base.iso").write_bytes(b"iso")
+        with patch("app.IMAGE", digest):
+            command = module.build_command(
+                {"iso": "base.iso", "platform": "ncs5500", "pkglist": []}, "digest-job"
+            )
+        self.assertIn(digest, command)
+
     def test_negative_archive_retention_days_is_rejected(self):
         # A negative value pushes enforce_archive_policy()'s cutoff into the
         # future, which would delete every archive - including one just
