@@ -373,6 +373,11 @@ Path(config["record"]).write_text(json.dumps({
 }))
 print("Gisobuild starting (local)", flush=True)
 if config.get("mode") == "slow":
+    out = Path(args[args.index("--out-directory") + 1])
+    (out / "tmpextract" / "boot").mkdir(parents=True, exist_ok=True)  # like gisobuild's ISO extraction
+    (out / "logs").mkdir(parents=True, exist_ok=True)
+    (out / "logs" / "gisobuild.log").write_text("started\n")
+    (out / "system_image.iso").write_bytes(b"inner image")
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
     Path(config["child_pid"]).write_text(str(child.pid))
     print("Validating inputs", flush=True)
@@ -469,6 +474,9 @@ class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
         self.assertLess(time.monotonic() - started, 15)  # SIGTERM was enough
         self.assertFalse(process_is_running(leader))
         self.assertFalse(process_is_running(child), "gisobuild's own child process survived")
+        self.assertFalse((module.OUTPUT / job_id / "tmpextract").exists())
+        self.assertFalse((module.OUTPUT / job_id / "system_image.iso").exists())
+        self.assertTrue((module.OUTPUT / job_id / "logs" / "gisobuild.log").exists())
         self.assertTrue(iso.exists())
         self.assertFalse((module.ARCHIVE / job_id).exists())
 

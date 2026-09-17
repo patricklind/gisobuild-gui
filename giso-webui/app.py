@@ -2982,13 +2982,28 @@ def discard_job_work_directory(job_id: str) -> None:
 
     /work/<job> holds only copies (the staged RPM repository) and gisobuild's
     temporary files, so nothing is lost: the inputs stay in the upload volume
-    and gisobuild's logs stay in /output/<job>. A successful build already
+    and gisobuild's logs stay in /output/<job>. The image extraction
+    directories a killed gisobuild leaves in /output/<job> go too. A successful build already
     removes it during archiving; failed and cancelled builds left it behind,
     easily several GiB each.
     """
     work = (WORK / job_id).resolve()
     if work.parent == WORK.resolve():
         shutil.rmtree(work, ignore_errors=True)
+    # gisobuild extracts the image into tmp* directories and an inner
+    # system_image.iso inside its output directory and removes them itself -
+    # unless it was killed. No ISO from an unsuccessful build is usable (a
+    # successful one is archived, not discarded), so ISOs go too; logs and
+    # small metadata stay for diagnosis.
+    output = (OUTPUT / job_id).resolve()
+    if output.parent == OUTPUT.resolve() and output.is_dir():
+        for entry in output.iterdir():
+            if entry.is_symlink():
+                continue
+            if entry.is_dir() and entry.name.startswith("tmp"):
+                shutil.rmtree(entry, ignore_errors=True)
+            elif entry.is_file() and entry.suffix.lower() == ".iso":
+                entry.unlink(missing_ok=True)
 
 
 def run_job(job_id: str, command: list[str]) -> None:
@@ -4206,6 +4221,9 @@ def cancel_job(job_id: str):
     process_was_running = process is not None and process.poll() is None
     if process_was_running and GISO_RUNNER == "local":
         terminate_process_group(process)
+        # The whole group is gone, so nothing writes here any more; clean up
+        # before reporting "cancelled" rather than racing run_job() to it.
+        discard_job_work_directory(job_id)
     elif process_was_running:
         process.terminate()
         try:

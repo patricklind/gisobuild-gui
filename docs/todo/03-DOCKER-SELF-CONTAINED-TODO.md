@@ -254,6 +254,16 @@ This command must never be required on the user's host.
       build fails, errors or is cancelled; success already removed it while
       archiving. Inputs stay in `/uploads`, gisobuild logs in `/output/<job>`.
       Asserted in the dependency-failure and cancellation integration tests.
+      Real-engine check (self-contained image, NCS5500 bundle, cancelled 75 s
+      into the build): during the build gisobuild (pid 26) and its
+      `zcat | cpio` shell child were running and `/output/<job>` held 7.1 GiB
+      of `tmp*` extraction directories and an inner `system_image.iso`, which
+      a killed gisobuild never removes. After cancel: status and stage
+      `cancelled`, no gisobuild process left, `/work` empty, and
+      `/output/<job>` down to 32 KiB (`logs/gisobuild.log-…` only), because
+      the cleanup now also removes `tmp*` directories and ISO files of an
+      unsuccessful job and runs inside `cancel_job()` once the process group
+      is gone (no race with the "cancelled" status).
 - [x] persist `cancelled`
 
 ## Version endpoint
