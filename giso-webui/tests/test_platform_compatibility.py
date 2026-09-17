@@ -1,4 +1,5 @@
 import ast
+import os
 import re
 import unittest
 from pathlib import Path
@@ -17,16 +18,33 @@ from platform_validation import (
 )
 
 
+def upstream_gisobuild_file(test: unittest.TestCase, relative: str) -> Path:
+    """A file from the pinned upstream gisobuild source, or skip the test.
+
+    Looked up under TOOL_ROOT (the self-contained image bundles the pinned
+    commit at /opt/gisobuild) and then the developer checkout
+    `.gisobuild-tool`. Neither exists in a plain CI checkout, so CI runs these
+    tests inside the self-contained image with REQUIRE_UPSTREAM_GISOBUILD=1,
+    which turns a missing source into a failure instead of a skip.
+    """
+    roots = [os.environ.get("TOOL_ROOT"), Path(__file__).parents[2] / ".gisobuild-tool"]
+    for root in filter(None, roots):
+        candidate = Path(root) / relative
+        if candidate.is_file():
+            return candidate
+    if os.environ.get("REQUIRE_UPSTREAM_GISOBUILD") == "1":
+        test.fail(f"pinned gisobuild source not found: {relative}")
+    test.skipTest("pinned gisobuild source is not available")
+    raise AssertionError("unreachable")
+
+
 class PlatformCompatibilityTests(unittest.TestCase):
     def test_exr_usb_support_matches_the_pinned_upstream_usb_scripts(self):
         # Upstream's eXR engine builds a USB boot zip exactly for the platforms
         # listed in src/exrmod/usb_zip/platform_scripts.yaml; PLATFORMS' "usb"
         # flag drives the plan's expected outputs, so it must not drift. (ncs1001
         # once claimed USB support upstream never had.)
-        scripts = (Path(__file__).parents[2]
-                   / ".gisobuild-tool/src/exrmod/usb_zip/platform_scripts.yaml")
-        if not scripts.exists():
-            self.skipTest("pinned gisobuild checkout is not mounted")
+        scripts = upstream_gisobuild_file(self, "src/exrmod/usb_zip/platform_scripts.yaml")
         upstream = {line.split(":", 1)[0].strip() for line in scripts.read_text().splitlines()
                     if line.strip() and not line.lstrip().startswith("#") and ":" in line}
         local = {key for key, profile in PLATFORMS.items()
@@ -46,10 +64,7 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # or (less likely but possible) accepting one upstream no longer
         # does. See 01-PLATFORM-UPSTREAM-TODO.md "Stop using a locally
         # maintained list as the authoritative support list".
-        engine_path = (
-            Path(__file__).parents[2]
-            / ".gisobuild-tool/src/exrmod/gisobuild_exr_engine.py"
-        )
+        engine_path = upstream_gisobuild_file(self, "src/exrmod/gisobuild_exr_engine.py")
         source = engine_path.read_text()
         match = re.search(r"SUPPORTED_PLATFORMS\s*=\s*(\[[^\]]*\])", source)
         self.assertIsNotNone(

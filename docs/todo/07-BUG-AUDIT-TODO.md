@@ -1415,6 +1415,26 @@ each test failed before its fix:
       328.6 s, archiving 51.7 s. Before this change the same workspace could
       not be built at all.
 
+## P1 — CI would fail on a clean checkout (2026-09-17)
+
+- [x] `test_exr_platform_list_matches_the_pinned_upstream_engine` read
+      `.gisobuild-tool/src/exrmod/gisobuild_exr_engine.py` unconditionally,
+      but `.gisobuild-tool/` is git-ignored, so on a fresh CI checkout it
+      raised `FileNotFoundError` and failed "Run tests inside the built
+      container" (reproduced locally by masking the checkout with an empty
+      mount: `FAILED (errors=1, skipped=1)`). Its USB sibling skipped
+      instead, so neither upstream-drift guard actually ran in CI. Both now
+      use `upstream_gisobuild_file()`, which looks under `TOOL_ROOT` (the
+      self-contained image bundles the pinned commit) and then the developer
+      checkout, and skips otherwise - unless `REQUIRE_UPSTREAM_GISOBUILD=1`,
+      which fails instead. CI gained "Check platform support against the
+      bundled upstream gisobuild", running `test_platform_compatibility.py`
+      inside the freshly built self-contained image with that flag. Evidence:
+      masked checkout `OK (skipped=2)`; masked plus the flag
+      `FAILED (failures=2)`; the CI step command in the self-contained image:
+      both drift tests `ok`, 35 tests OK; actionlint clean. Not yet observed
+      on GitHub Actions (nothing is pushed from this environment).
+
 ## Required regression-test additions
 
 - [x] cancel during builder preparation/pull

@@ -89,6 +89,11 @@ jobs:
             --build-arg SOURCE_REVISION="$GITHUB_SHA" -t giso-webui-selfcontained .
           docker run --rm giso-webui-selfcontained \
             python3 /opt/gisobuild/src/gisobuild.py --help > /dev/null
+      - name: Check platform support against the bundled upstream gisobuild
+        run: |
+          docker run --rm -v "$PWD:/project:ro" -w /project/giso-webui \
+            -e REQUIRE_UPSTREAM_GISOBUILD=1 -e PYTHONDONTWRITEBYTECODE=1 giso-webui-selfcontained \
+            python3.12 -m unittest discover -s tests -p test_platform_compatibility.py -v
       - name: Scan self-contained image for fixable HIGH/CRITICAL vulnerabilities
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \

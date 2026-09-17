@@ -308,6 +308,11 @@ Run (`.github/workflows/ci.yml`):
 
 - [x] Python tests — "Run tests inside the built container" step
       (`giso-webui/tests` via `unittest discover`, matching `docs/testing.md`).
+- [x] upstream-drift tests in CI — "Check platform support against the
+      bundled upstream gisobuild" runs the platform/USB sync tests inside the
+      self-contained image with `REQUIRE_UPSTREAM_GISOBUILD=1` (a missing
+      source fails, never skips); see `07-BUG-AUDIT-TODO.md` "CI would fail on
+      a clean checkout".
 - [x] JS/DOM tests — "Run browser tests (Playwright/Chromium in Docker)"
       step in `.github/workflows/ci.yml` (added 2026-09-17; actionlint and
       hadolint pass locally in their containers). Not yet observed running

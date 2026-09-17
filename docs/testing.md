@@ -67,6 +67,8 @@ docker build --platform linux/amd64 -f docker/selfcontained.Dockerfile -t giso-w
 
 # unit + synthetic integration tests
 docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui giso-webui-giso-webui python -B -m unittest discover -s tests
+# platform/USB lists against the pinned upstream gisobuild bundled in the self-contained image
+docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui -e REQUIRE_UPSTREAM_GISOBUILD=1 -e PYTHONDONTWRITEBYTECODE=1 giso-webui-selfcontained python3.12 -m unittest discover -s tests -p test_platform_compatibility.py
 # browser tests
 docker run --rm -v "$(pwd):/work:ro" -e PYTHONDONTWRITEBYTECODE=1 gisobuild-browser-tests python3 -m unittest discover -s browser_tests
 # lint (incl. flake8-bandit security rules) and dependency audit
