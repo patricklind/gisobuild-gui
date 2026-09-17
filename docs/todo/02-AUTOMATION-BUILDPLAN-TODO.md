@@ -22,7 +22,9 @@ Create one canonical inventory model.
       record of which files came from a Cisco download. Low priority: no
       frontend code reads this field at all yet, so nothing currently
       depends on the distinction.
-- [x] metadata source/confidence (currently explicit low-confidence filename metadata)
+- [x] metadata source/confidence - real per file since 2026-09-17
+      (`file_metadata_provenance()`: `rpm-header`, `iso-metadata` or
+      `filename`; see "RPM inspection").
 - [ ] lifecycle state
 
 Suggested lifecycle:
@@ -82,6 +84,13 @@ Why this isn't a quick pass-through, and wasn't implemented in this pass:
   otherwise-buildable image.
 - Only applies to LNT; eXR platform/release detection would still need its
   own investigation (likely `gisobuild_exr_engine.py`/`isotools_exr.py`).
+
+Blocked on test material (2026-09-17): the only real image available to
+this work is the eXR NCS5500 25.1.2 bundle. `isols.py` needs a signed LNT
+ISO - it verifies and runs `image.py` from inside the image - and eXR
+platform profiles report `only_support_pids: false`, so neither the
+prototype nor the picklist can be verified against real content yet. A
+synthetic ISO cannot stand in, because the signature check is the point.
 
 TODO:
 
