@@ -379,6 +379,15 @@ Optional:
 
 Package-selection or build-runner changes must not merge unless:
 
+Status 2026-09-17: for automated merges this is enforced by construction -
+`auto-merge.yml` merges only after the `CI` workflow succeeds, and that
+workflow runs the unit + synthetic integration + platform-fixture suite, the
+browser suite, the production and self-contained image builds and scans.
+Whether a *manual* merge on GitHub is held to the same gate depends on branch
+protection for `main`, a repository setting that could not be read from here
+(`gh` is not authenticated in this environment), so the items stay open until
+someone confirms "require status checks to pass" includes `CI`.
+
 - [ ] unit tests pass
 - [ ] integration tests pass
 - [ ] Docker image builds
