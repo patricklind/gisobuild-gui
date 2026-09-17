@@ -253,6 +253,51 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(module.cisco_download_jobs["job"]["files"], [])
         self.assertFalse(first.exists())
 
+    @patch("app.cisco_client")
+    def test_cisco_downloads_are_recorded_as_such_in_the_inventory(self, client):
+        # A .tar.gz Cisco bundle whose name is already taken, plus a plain ISO.
+        (self.data / "8000-x64-24.3.1-CSCab12345.tar.gz").write_bytes(b"older copy")
+        (self.data / "manual.iso").write_bytes(b"uploaded by hand")
+        bundle = io.BytesIO()
+        with tarfile.open(fileobj=bundle, mode="w:gz") as archive:
+            info = tarfile.TarInfo("xr-cdp-24.3.1v1.0.1-1.x86_64.rpm")
+            info.size = 3
+            archive.addfile(info, io.BytesIO(b"rpm"))
+
+        def download(_url, target, **_kwargs):
+            content = bundle.getvalue() if target.name.endswith(".tar.gz") else b"cisco iso"
+            target.write_bytes(content)
+            return SimpleNamespace(path=target, size=len(content),
+                                   sha256=hashlib.sha256(content).hexdigest())
+
+        client.return_value.download.side_effect = download
+        selected = [
+            {"guid": "A", "name": "8000-x64-24.3.1-CSCab12345.tar.gz", "size": 1, "md5": "", "sha512": ""},
+            {"guid": "B", "name": "8000-x64-24.3.1.iso", "size": 1, "md5": "", "sha512": ""},
+        ]
+        downloads = [{"imageGuid": "A", "url": "https://download.cisco.com/a"},
+                     {"imageGuid": "B", "url": "https://download.cisco.com/b"}]
+        module.cisco_download_jobs["job"] = {"id": "job", "status": "downloading", "created": time.time(),
+                                             "progress": 0, "files": [], "error": ""}
+        module.run_cisco_download("job", {}, selected, downloads)
+        self.assertEqual(module.cisco_download_jobs["job"]["status"], "ready",
+                         module.cisco_download_jobs["job"]["error"])
+
+        items = {item["relative_path"]: item for item in module.inventory_files()}
+        renamed = next(p for p in items if p.startswith("8000-x64-24.3.1-CSCab12345-") and p.endswith(".tar.gz"))
+        self.assertEqual(items[renamed]["source"], "cisco-download")
+        extracted = next(p for p in items if p.endswith("xr-cdp-24.3.1v1.0.1-1.x86_64.rpm"))
+        self.assertEqual(items[extracted]["source"], "cisco-download")
+        self.assertEqual(items["8000-x64-24.3.1.iso"]["source"], "cisco-download")
+        self.assertEqual(items["manual.iso"]["source"], "upload")
+        self.assertEqual(items["8000-x64-24.3.1-CSCab12345.tar.gz"]["source"], "upload")
+
+        # Replaced content is no longer the Cisco download it was recorded as.
+        (self.data / "8000-x64-24.3.1.iso").write_bytes(b"swapped by hand")
+        module.checksum_cache.clear()
+        items = {item["relative_path"]: item for item in module.inventory_files()}
+        self.assertEqual(items["8000-x64-24.3.1.iso"]["source"], "upload")
+
     @patch("app.threading.Thread")
     @patch("app.cisco_client")
     def test_cisco_k9_only_flow_does_not_require_eula(self, client, thread):

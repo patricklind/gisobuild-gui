@@ -117,6 +117,13 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
         ("CREATE TABLE IF NOT EXISTS activity "
          "(id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL NOT NULL, text TEXT NOT NULL)"),
     )),
+    # Where a workspace file came from, when the filesystem cannot tell:
+    # a Cisco download lands next to manual uploads.
+    (2, (
+        ("CREATE TABLE IF NOT EXISTS file_provenance "
+         "(relative_path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, source TEXT NOT NULL, "
+         "recorded REAL NOT NULL)"),
+    )),
 )
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1][0]
 store_schema_problem: str | None = None
@@ -1215,11 +1222,51 @@ def file_metadata_provenance(path: Path) -> tuple[str, str, str | None]:
     return "filename", "low", None
 
 
+def file_source(path: Path, relative_path: str, sha256: str, source_archive: Path | None,
+                provenance: dict[str, tuple[str, str]]) -> str:
+    """upload, tar, or cisco-download - recorded provenance wins only while the content matches."""
+    recorded = provenance.get(relative_path)
+    if recorded and recorded[0] == sha256:
+        return recorded[1]
+    if source_archive is not None:
+        archive = provenance.get(rel_data(source_archive))
+        if archive and archive[1] == "cisco-download":
+            return "cisco-download"
+    return "tar" if path.parent != DATA else "upload"
+
+
+def record_provenance(path: Path, sha256: str, source: str) -> None:
+    """Remember where a workspace file came from (see file_provenance)."""
+    initialize_job_store()
+    if store_schema_problem:
+        return
+    with store_lock, sqlite3.connect(JOB_DB) as database:
+        database.execute(
+            "INSERT INTO file_provenance (relative_path, sha256, source, recorded) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(relative_path) DO UPDATE SET sha256 = excluded.sha256, "
+            "source = excluded.source, recorded = excluded.recorded",
+            (rel_data(path), sha256, source, time.time()),
+        )
+
+
+def recorded_provenance() -> dict[str, tuple[str, str]]:
+    """{relative path: (sha256, source)}; empty when the store is unavailable."""
+    if store_schema_problem or not JOB_DB.exists():
+        return {}
+    try:
+        with store_lock, sqlite3.connect(JOB_DB) as database:
+            rows = database.execute("SELECT relative_path, sha256, source FROM file_provenance").fetchall()
+    except sqlite3.Error:
+        return {}
+    return {path: (sha256, source) for path, sha256, source in rows}
+
+
 def inventory_files() -> list[dict]:
     """Build the canonical, browser-safe inventory for supported input files."""
     supported = {".iso", ".rpm", *ARCHIVE_SUFFIXES, ".yaml", ".yml", ".cfg",
                  ".ini", ".sh", ".cms", ".json"}
     physical: list[dict] = []
+    provenance = recorded_provenance()
     for root, names, filenames in os.walk(DATA):
         names[:] = [name for name in names
                     if name != ".parts" and not name.startswith("output_gisobuild")]
@@ -1245,7 +1292,7 @@ def inventory_files() -> list[dict]:
                 "relative_path": relative_path,
                 "size": stat.st_size,
                 "sha256": sha256,
-                "source": "tar" if path.parent != DATA else "upload",
+                "source": file_source(path, relative_path, sha256, source_archive, provenance),
                 "extracted_from": source_archive.name if source_archive else None,
                 "metadata_source": metadata_source,
                 "metadata_confidence": metadata_confidence,
@@ -2858,6 +2905,7 @@ def health():
 EXPECTED_TABLE_COLUMNS = {
     "jobs": {"id", "data", "updated"},
     "activity": {"id", "created", "text"},
+    "file_provenance": {"relative_path", "sha256", "source", "recorded"},
 }
 startup_self_test_logged = False
 
@@ -3232,8 +3280,9 @@ def run_cisco_download(job_id: str, search: dict, selected: list[dict], download
                 raise CiscoDownloadError("Cisco did not return a download URL")
             name = upload_name(item["name"])
             target = DATA / name
-            if target.exists():
-                target = DATA / f"{target.stem}-{uuid.uuid4().hex[:8]}{target.suffix}"
+            while target.exists() or (extraction_path(target) and extraction_path(target).exists()):
+                stem, suffix = split_upload_name(name)
+                target = DATA / f"{stem}-{uuid.uuid4().hex[:8]}{suffix}"
             def update_progress(written: int, total: int, file_number: int = number) -> None:
                 file_fraction = written / total if total else 0
                 progress = int(((file_number - 1 + file_fraction) / len(selected)) * 100)
@@ -3250,6 +3299,7 @@ def run_cisco_download(job_id: str, search: dict, selected: list[dict], download
                 progress=update_progress,
             )
             created_files.append(result.path)
+            record_provenance(result.path, result.sha256, "cisco-download")
             extracted = extract_cisco_archive(result.path)
             with cisco_lock:
                 job["files"].append({"name": result.path.name, "size": result.size,

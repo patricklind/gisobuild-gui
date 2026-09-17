@@ -13,15 +13,16 @@ Create one canonical inventory model.
       layout. Treat this as intentionally out of scope, not an oversight.
 - [x] size
 - [x] SHA-256
-- [ ] source (`upload`, `tar`, `cisco-download`) — partially implemented:
-      `inventory_files()` only distinguishes `"tar"` (inside an extracted
-      directory) from `"upload"` (a direct child of `DATA`). A
-      Cisco-downloaded file also lands as a direct child of `DATA`
-      (`run_cisco_download()`'s `target = DATA / name`), so it is
-      indistinguishable from a manual upload today — there is no persistent
-      record of which files came from a Cisco download. Low priority: no
-      frontend code reads this field at all yet, so nothing currently
-      depends on the distinction.
+- [x] source (`upload`, `tar`, `cisco-download`) — completed 2026-09-17.
+      Cisco downloads landed next to manual uploads with nothing recording
+      their origin. `run_cisco_download()` now records each verified file in
+      a `file_provenance` table (job store schema version 2, added through
+      the new migrations); `inventory_files()` reports `cisco-download` for
+      it and for everything extracted from it, but only while the SHA-256
+      still matches, so a file replaced by hand reverts to `upload`. The
+      same change fixed the Cisco download's rename-on-collision, which split
+      `.tar.gz` like uploads once did and ignored an existing extraction
+      directory. Test: `test_cisco_downloads_are_recorded_as_such_in_the_inventory`.
 - [x] metadata source/confidence - real per file since 2026-09-17
       (`file_metadata_provenance()`: `rpm-header`, `iso-metadata` or
       `filename`; see "RPM inspection").
