@@ -27,6 +27,10 @@ jobs:
             ruff check giso-webui/app.py giso-webui/cisco_download.py \
             giso-webui/maintenance.py giso-webui/platform_validation.py \
             giso-webui/tests giso-webui/browser_tests staging scripts --cache-dir=/tmp/ruff-cache
+      - name: Check docs and scripts for host-side project tooling
+        run: |
+          docker run --rm -v "$PWD:/project:ro" -w /project gisobuild-tooling \
+            python -B scripts/check_docker_only.py
       - name: Validate Graphify freshness and artifact exclusions
         run: |
           docker run --rm -v "$PWD:/project" -w /project gisobuild-tooling \

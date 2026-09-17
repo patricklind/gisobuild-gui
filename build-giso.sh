@@ -169,7 +169,7 @@ DOCKER_ARGS=(
   -v "$STAGING/repo:/input/repo:ro"
   -v "$OUTPUT_DIR:/output"
   "$DOCKER_IMAGE"
-  /app/gisobuild/gisobuild.py
+  /app/gisobuild/gisobuild.py  # docker-only: allow - element of the docker run array above
   --iso /input/base.iso
   --repo /input/repo
   --pkglist

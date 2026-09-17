@@ -154,20 +154,30 @@ the archive.
 
 ### Direct `gisobuild.py` workflow
 
-The upstream tool supports CLI and YAML input. A representative CLI build is:
+The upstream tool supports CLI and YAML input. Run it inside a container, never
+on the workstation. With the self-contained image
+(`docker/selfcontained.Dockerfile`), which bundles the pinned gisobuild, a
+representative CLI build is:
 
 ```bash
-./src/gisobuild.py \
-  --iso /absolute/path/to/base.iso \
-  --repo /absolute/path/to/rpm-repository \
+docker run --rm --platform linux/amd64 --cap-add SYS_CHROOT \
+  -v /absolute/path/to/inputs:/inputs:ro -v /absolute/path/to/output:/output \
+  giso-webui-selfcontained python3 /opt/gisobuild/src/gisobuild.py \
+  --iso /inputs/base.iso \
+  --repo /inputs/rpm-repository \
   --pkglist package-one.rpm package-two.rpm \
   --label CHANGE_1234 \
-  --out-directory /absolute/path/to/output \
+  --out-directory /output/change-1234 \
   --create-checksum \
   --clean
 ```
 
-Use `./src/gisobuild.py --help` from the checked-out version before building.
+Check the options of the bundled version first:
+
+```bash
+docker run --rm --platform linux/amd64 giso-webui-selfcontained python3 /opt/gisobuild/src/gisobuild.py --help
+```
+
 Do not copy architecture-specific options between platforms without confirming
 support. The upstream `gisobuild_options.yaml` file is the starting template for
 YAML-driven builds.

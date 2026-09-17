@@ -62,8 +62,8 @@ up front (see "Security").
 
 Make the Docker-only rule enforceable rather than documentation-only.
 
-- [ ] inventory every README, script, Makefile/task file, CI command, developer guide, and agent instruction for host-side project commands
-- [ ] replace host `python`, `pytest`, staging, Graphify, lint, audit, frontend, and build examples with `docker compose run`, `docker compose exec`, or dedicated tooling-container commands
+- [x] inventory every README, script, Makefile/task file, CI command, developer guide, and agent instruction for host-side project commands - 2026-09-17: `scripts/check_docker_only.py` scans every tracked Markdown shell block and shell script (no Makefile/task files exist; workflows run in CI). First run: 9 hits; 4 were prose forbidding a command (inline spans are no longer scanned), 1 was a bash-array `docker run` element (`build-giso.sh`, allow-marked with a reason), and 2 real host instructions were rewritten (see next item).
+- [x] replace host `python`, `pytest`, staging, Graphify, lint, audit, frontend, and build examples with `docker compose run`, `docker compose exec`, or dedicated tooling-container commands - `GISOBUILD-GUIDE.md`'s direct `./src/gisobuild.py` build now runs in `giso-webui-selfcontained`; `staging/README.md`'s rehearsal runs in `gisobuild-tooling`.
 - [ ] add a documented developer command set for common operations
 - [ ] add a dedicated tooling/test service or image where the application image is not appropriate
 - [ ] ensure Graphify runs in Docker
@@ -72,7 +72,7 @@ Make the Docker-only rule enforceable rather than documentation-only.
 - [ ] ensure linters/security scanners/dependency audits run in Docker or dedicated CI containers
 - [ ] ensure database migrations run in Docker
 - [ ] ensure all IOS-XR/gisobuild inspection and build commands run in Docker
-- [ ] add CI/static checks that flag new documentation/scripts which invoke known project tooling directly on the host where practical
+- [x] add CI/static checks that flag new documentation/scripts which invoke known project tooling directly on the host where practical - "Check docs and scripts for host-side project tooling" step in `ci.yml`; tests `test_host_commands_are_flagged_and_containerised_ones_are_not`, `test_this_repository_passes`.
 - [ ] document that missing container dependencies must be fixed in Dockerfiles rather than installed on the workstation
 
 Host-side operations may be limited to Docker/Compose lifecycle, Git/source-control operations, editor/browser usage, and Git/worktree coordination helpers that are proven not to execute project runtime/tooling code.

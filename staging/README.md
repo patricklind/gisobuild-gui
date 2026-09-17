@@ -18,7 +18,7 @@ install apply rollback reload
 install commit
 EOF
 
-python3 staging/rehearse.py
+docker run --rm -v "$(pwd):/project:ro" -w /project/staging gisobuild-tooling python -B rehearse.py
 ```
 
 A successful automated rehearsal ends with:
