@@ -706,6 +706,12 @@ def _initialize_job_store() -> bool:
                 log_was_redacted = redacted_log != raw_log
                 restored["log"] = redacted_log
                 if restored.get("status") in ACTIVE_JOB_STATUSES:
+                    if GISO_RUNNER == "local":
+                        # The build process died with the previous service
+                        # process, so its scratch and extraction data are
+                        # orphaned. (A Docker builder container can outlive
+                        # the web service; its data is left alone.)
+                        discard_job_work_directory(job_id)
                     restored.update(
                         status="interrupted",
                         phase="Interrupted by service restart",

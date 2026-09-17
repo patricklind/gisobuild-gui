@@ -883,6 +883,28 @@ class GisoWebTests(unittest.TestCase):
         module.checksum_cache.clear()
         self.assertNotEqual(module.file_checksums(image)["sha256"], first["sha256"])
 
+    def test_restart_discards_orphaned_build_data_only_for_the_local_runner(self):
+        for runner, expect_removed in (("local", True), ("docker", False)):
+            with self.subTest(runner=runner):
+                job_id = f"job-{runner}"
+                (module.WORK / job_id / "repo").mkdir(parents=True)
+                (module.OUTPUT / job_id / "tmpabc").mkdir(parents=True)
+                (module.OUTPUT / job_id / "logs").mkdir()
+                module.STATE.mkdir(parents=True, exist_ok=True)
+                module.store_initialized = False
+                module.initialize_job_store()
+                with sqlite3.connect(module.JOB_DB) as database:
+                    database.execute("INSERT OR REPLACE INTO jobs VALUES (?, ?, ?)",
+                                     (job_id, json.dumps({"status": "running", "log": ""}), time.time()))
+                module.jobs.clear()
+                module.store_initialized = False
+                with patch.object(module, "GISO_RUNNER", runner):
+                    module.initialize_job_store()
+                self.assertEqual(module.jobs[job_id]["status"], "interrupted")
+                self.assertEqual((module.WORK / job_id).exists(), not expect_removed)
+                self.assertEqual((module.OUTPUT / job_id / "tmpabc").exists(), not expect_removed)
+                self.assertTrue((module.OUTPUT / job_id / "logs").exists())
+
     def test_cleanup_rejects_running_build(self):
         module.jobs["job"] = {"id": "job", "status": "running", "created": 1, "updated": 1}
         response = self.client.post("/api/cleanup")
