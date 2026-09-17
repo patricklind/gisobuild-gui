@@ -13,20 +13,24 @@ Core principle:
 - [x] Start the application with `docker compose up -d`
 - [x] Upload/select one IOS XR ISO
 - [x] Upload/select RPM/SMU/TAR files or use Cisco download integration
-- [x] Automatically inspect ISO metadata — `inspect_iso_architecture()`
-      (processor architecture only; platform/release still come from the
-      filename, see the "Confidence display" honesty note in
-      `06-UI-OPERATOR-TODO.md`).
+- [x] Automatically inspect ISO metadata — architecture, and for eXR also
+      platform/release from the image's own `iosxr_image_mdata.yml`
+      (`iso_identity()`), plus the ISO 9660 signature. LNT platform/release
+      still come from the filename (`isols.py` route blocked on having a
+      real LNT image; see `02-AUTOMATION-BUILDPLAN-TODO.md`).
 - [x] Automatically determine eXR vs LNT — `platform_profile()["engine"]`,
       derived from the detected/selected platform.
-- [x] Automatically determine release/platform/capabilities — filename
-      inference plus `capabilities_for_platform()`; platform/release are
-      `INFERRED`, not upstream-metadata-`VERIFIED` (same honesty note).
-- [x] Automatically extract TAR/TGZ safely — `upload_complete()`'s
+- [x] Automatically determine release/platform/capabilities — metadata for
+      eXR, filename inference otherwise, plus `capabilities_for_platform()`
+      aligned with upstream's CLI maps (incl. the eXR/LNT USB difference).
+- [x] Automatically extract TAR/TGZ/TAR.GZ safely — `upload_complete()`'s
       symlink/hardlink/absolute-path/member-count/size-limit checks.
-- [ ] Automatically inspect RPM metadata — not implemented; RPM
-      architecture/release/CSC are all filename-derived, no RPM header
-      parser exists (tracked as future work in `06-UI-OPERATOR-TODO.md`).
+- [x] Automatically inspect RPM metadata — 2026-09-17: each RPM's header
+      (name, version, release, arch, requires, provides) via read-only
+      `rpm -qp`; renamed files, unreadable files, incomplete fixes and MD5
+      mismatches against Cisco's SMU README are excluded with reasons, and
+      unsatisfiable dependencies block the plan naming the prerequisite SMU.
+      Signature metadata is not read (gisobuild checks signatures itself).
 - [x] Automatically group RPMs by CSC — `package_groups`/`smuGroupCard()`.
 - [x] Automatically exclude incompatible packages with reasons — wrong
       platform/release/architecture, superseded, and duplicate-conflict all
@@ -60,13 +64,14 @@ Core principle:
       tables; a restart marks any active job `"interrupted"` rather than
       leaving it stuck. Uploads and in-flight Cisco downloads are the
       remaining process-local-only state (see `04-STATE-SECURITY-OBSERVABILITY-TODO.md`).
-- [ ] Run without `/var/run/docker.sock` — explicitly deferred; requires the
-      security review and self-contained-image rewrite tracked in
-      `03-DOCKER-SELF-CONTAINED-TODO.md`.
-- [ ] Run without an external `.gisobuild-tool` checkout — `build_command()`
-      still runs `/tool/src/gisobuild.py` from the mounted checkout inside
-      the build container rather than a path baked into `IMAGE`; same
-      dependency as above.
+- [x] Run without `/var/run/docker.sock` — 2026-09-17: the self-contained
+      deployment (`docker/selfcontained.Dockerfile`,
+      `giso-webui/compose.selfcontained.yaml`, `GISO_RUNNER=local`) built a
+      real NCS5500 25.1.2 Golden ISO with no socket, read-only root and only
+      `SYS_CHROOT`. The original socket deployment is still the documented
+      default (see `03-DOCKER-SELF-CONTAINED-TODO.md`).
+- [x] Run without an external `.gisobuild-tool` checkout — same deployment:
+      gisobuild is baked into the image at a pinned, verified commit.
 
 ## Major workstreams
 
@@ -75,15 +80,21 @@ Core principle:
 - [ ] Canonical package/inventory model
 - [ ] Upstream-driven platform/capability model
 - [ ] ISO metadata inspection
-- [ ] RPM metadata inspection
+- [ ] RPM metadata inspection — header identity/dependencies done; RPM
+      signature metadata still open
 - [ ] CSC grouping and supersedence model
-- [ ] Unified automatic/manual selection engine
+- [x] Unified automatic/manual selection engine (`02-AUTOMATION-BUILDPLAN-TODO.md`)
 - [x] Immutable BuildPlan
 - [x] Inventory revision + stale-state prevention
-- [ ] Self-contained Docker image
-- [ ] GisoBuildRunner abstraction
+- [ ] Self-contained Docker image — built and proven with a real eXR build;
+      open: LNT unexercised, non-root, source tree hash, default switch
+- [x] GisoBuildRunner abstraction — `GISO_RUNNER` docker/local in
+      `build_command()`/`run_job()`/`cancel_job()`, integration-tested for
+      both and proven live for local
 - [ ] Persistent state/database
-- [ ] Artifact verification/reporting
+- [x] Artifact verification/reporting — byte-for-byte + SHA-256 archive
+      verification, `build-report.json`, error taxonomy for failures, stage
+      timings and builder provenance in the report
 - [ ] Security hardening
 - [ ] Comprehensive tests
 - [ ] CI/CD and image publishing
@@ -114,29 +125,33 @@ See `07-BUG-AUDIT-TODO.md` for detailed scenarios and required regression tests.
 
 ## Suggested implementation order
 
-- [ ] Phase 0 — lock down current bugs with regression tests from `07-BUG-AUDIT-TODO.md`
-- [ ] Phase 1 — tests + package identity model
-- [ ] Phase 2 — inventory + BuildPlan
-- [ ] Phase 3 — metadata-based ISO/RPM detection
-- [ ] Phase 4 — unified automatic/manual CSC selection
-- [ ] Phase 5 — GisoBuildRunner abstraction
-- [ ] Phase 6 — self-contained Docker image
-- [ ] Phase 7 — remove Docker socket/nested builder
+- [x] Phase 0 — lock down current bugs with regression tests from `07-BUG-AUDIT-TODO.md`
+- [x] Phase 1 — tests + package identity model (unit, integration, browser, platform fixtures)
+- [x] Phase 2 — inventory + BuildPlan
+- [ ] Phase 3 — metadata-based ISO/RPM detection — done for eXR ISOs and all RPMs; LNT ISO metadata open
+- [x] Phase 4 — unified automatic/manual CSC selection
+- [x] Phase 5 — GisoBuildRunner abstraction
+- [x] Phase 6 — self-contained Docker image (real build proven)
+- [ ] Phase 7 — remove Docker socket/nested builder — possible and proven; the socket deployment is still the default
 - [ ] Phase 8 — persistent state/inventory DB
 - [ ] Phase 9 — UI simplification
 - [ ] Phase 10 — security/observability hardening
 
 ## Acceptance criteria
 
-- [ ] Generic eXR support
-- [ ] Generic LNT support
-- [ ] Capability-driven UI
+- [x] Generic eXR support — all 12 upstream eXR platforms through the real
+      BuildPlan (synthetic fixtures), `exr-generic` override, real NCS5500 builds
+- [ ] Generic LNT support — LNT naming, options and USB handling follow
+      upstream and are fixture-tested, but no real LNT image has been built
+- [x] Capability-driven UI (`updatePlatformControls()` from upstream-aligned capabilities)
 - [ ] Upstream-driven platform support
-- [ ] Unknown-but-upstream-supported platforms are not blocked
+- [x] Unknown-but-upstream-supported platforms are not blocked (`exr-generic`/`lnt-generic`,
+      `test_unknown_future_platform_pauses_automatic_selection_until_overridden`)
 - [ ] No hard dependency on static router lists
-- [ ] No Docker socket required
-- [ ] No separate gisobuild checkout required
-- [ ] Regression coverage for all bugs fixed
-- [ ] No destructive cleanup outside the active BuildPlan
-- [ ] Build lifecycle transitions are race-safe and cancellable
-- [ ] Graphify output is current for code-changing merges
+- [x] No Docker socket required (self-contained deployment, real build)
+- [x] No separate gisobuild checkout required (same)
+- [x] Regression coverage for all bugs fixed (each fix in `07-BUG-AUDIT-TODO.md` names its test)
+- [x] No destructive cleanup outside the active BuildPlan (`cleanup_paths` from the plan; integration tests)
+- [x] Build lifecycle transitions are race-safe and cancellable (operation/job locks, plan fingerprint,
+      cancellation tests for pull, build, finalization, and local process groups)
+- [x] Graphify output is current for code-changing merges (CI freshness check)
