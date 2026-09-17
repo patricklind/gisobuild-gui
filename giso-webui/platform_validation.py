@@ -586,3 +586,53 @@ def validate_platform_options(payload: dict) -> dict:
     if errors:
         raise ValueError("; ".join(errors))
     return profile
+
+
+# One vocabulary for why a package is not in the build, so the API, the page
+# and the build report agree. The first pattern that matches a reason decides;
+# ordering matters where reasons overlap (a superseded fix also mentions a
+# component). UNKNOWN is deliberately last: it means the file could not be
+# identified well enough to judge, which is never an automatic inclusion.
+PACKAGE_STATUSES = (
+    ("WRONG_PLATFORM", re.compile(r"different platform|belongs to .* platform", re.IGNORECASE)),
+    ("WRONG_RELEASE", re.compile(r"different ios xr release|belongs to ios xr", re.IGNORECASE)),
+    ("WRONG_ARCHITECTURE", re.compile(r"processor architecture", re.IGNORECASE)),
+    ("CONFLICT", re.compile(r"more than one fix|conflict", re.IGNORECASE)),
+    ("SUPERSEDED", re.compile(r"supersed", re.IGNORECASE)),
+    ("MISSING_DEPENDENCY", re.compile(r"depend|requires|needs |nothing provides|prerequisite|"
+                                     r"cannot be installed|part of csc", re.IGNORECASE)),
+    ("DUPLICATE", re.compile(r"duplicate|another copy|same version", re.IGNORECASE)),
+    ("INVALID", re.compile(r"md5|incomplete fix|cannot read|does not match the package inside|"
+                           r"from the same fix", re.IGNORECASE)),
+    ("UNKNOWN", re.compile(r"missing from filename|could not be", re.IGNORECASE)),
+)
+
+
+def classify_exclusion(reason: str) -> str:
+    """The status code for one exclusion reason (see PACKAGE_STATUSES)."""
+    for status, pattern in PACKAGE_STATUSES:
+        if pattern.search(reason or ""):
+            return status
+    return "MANUAL_REVIEW_REQUIRED"
+
+
+def describe_package(name: str) -> dict:
+    """Everything a filename alone says about a package, for the status table."""
+    csc = re.search(r"\.(CSC[A-Za-z0-9]+)\.", name, re.IGNORECASE)
+    architecture = RPM_ARCHITECTURE.search(name)
+    release = lnt_rpm_release(name)
+    if not release:
+        # eXR names carry the release as a compact tag (r2512 for 25.1.2); keep
+        # the tag verbatim so the table never implies a release Cisco did not
+        # write, and let the reason text explain the comparison.
+        tag = RPM_RELEASE.search(name)
+        release = f"r{tag.group('release')}" if tag else None
+    return {
+        "name": name,
+        "platform": infer_platform(name),
+        "release": release,
+        "architecture": (normalize_architecture(architecture.group("architecture"))
+                         if architecture else None),
+        # Cisco writes CSCxx12345; keep the filename's own spelling.
+        "csc": csc.group(1) if csc else None,
+    }

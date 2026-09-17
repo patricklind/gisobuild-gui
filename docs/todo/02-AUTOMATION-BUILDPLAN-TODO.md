@@ -390,6 +390,23 @@ Create an explicit supersedence model.
 
 Never silently exclude without a reason.
 
+- [x] one status vocabulary for every decision (2026-09-17). Each excluded
+      package now carries a status code from
+      `platform_validation.PACKAGE_STATUSES` - WRONG_PLATFORM, WRONG_RELEASE,
+      WRONG_ARCHITECTURE, CONFLICT, SUPERSEDED, MISSING_DEPENDENCY, DUPLICATE,
+      INVALID, UNKNOWN, with MANUAL_REVIEW_REQUIRED as the only fallback -
+      together with the identity its filename carries (platform, release,
+      architecture, CSC) and which check decided it (`source`). One
+      `finalize_recommendation()` adds them, so the inventory response, the
+      recommendation endpoint and the BuildPlan cannot describe the same
+      package differently, and every response also carries a `summary`
+      (`discovered`, `included`, `excluded`, `by_status`) for the build
+      preview. The page shows the counts in the exclusion heading and a status
+      chip per row, all from the backend. Tests:
+      `test_every_reason_the_selection_engine_writes_maps_to_a_status`,
+      `test_describe_package_reads_identity_from_both_naming_schemes`,
+      browser `test_automatic_selection`.
+
 ## Unified selection engine
 
 - [x] automatic mode and manual mode use the same backend model - both are

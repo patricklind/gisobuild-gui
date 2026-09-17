@@ -123,12 +123,16 @@ class OperatorFlowTests(unittest.TestCase):
         expect(self.page.locator("#smu-plan-state")).to_have_text("Calculated")
         expect(self.page.locator("#smu-auto-plan-title")).to_have_text("2 matching RPMs selected")
         expect(self.page.locator("#rpm-check p")).to_have_text("2 compatible RPMs selected · 1 excluded")
+        # The summary counts by the backend status codes, and every row carries
+        # its own status so a large package set can be read at a glance.
         excluded = self.page.locator("#smu-plan-details details summary",
-                                     has_text="incompatible RPM excluded automatically")
-        expect(excluded).to_have_text("1 incompatible RPM excluded automatically")
+                                     has_text="excluded automatically")
+        expect(excluded).to_have_text("1 RPM excluded automatically (1 wrong release)")
         excluded.click()
         expect(self.page.locator(".excluded-package")).to_have_text(
-            f"{self.OTHER_RELEASE} — Different IOS XR release")
+            f"wrong release{self.OTHER_RELEASE} — Different IOS XR release")
+        self.assertEqual(self.page.locator(".excluded-package").get_attribute("data-status"),
+                         "WRONG_RELEASE")
         self.assertEqual(self.page.input_value("[name=pkglist]").splitlines(),
                          sorted([self.BGP, self.ROUTING]))
 

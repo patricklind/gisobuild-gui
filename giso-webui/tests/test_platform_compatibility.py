@@ -11,6 +11,8 @@ from platform_validation import (
     PLATFORMS,
     capabilities_for_platform,
     check_upgrade_matrix,
+    classify_exclusion,
+    describe_package,
     infer_platform,
     infer_platform_pid,
     normalize_platform,
@@ -39,6 +41,43 @@ def upstream_gisobuild_file(test: unittest.TestCase, relative: str) -> Path:
         test.fail(f"pinned gisobuild source not found: {relative}")
     test.skipTest("pinned gisobuild source is not available")
     raise AssertionError("unreachable")
+
+
+class PackageStatusTests(unittest.TestCase):
+    def test_every_reason_the_selection_engine_writes_maps_to_a_status(self):
+        # The engine's own wording, not invented examples: if a reason is
+        # reworded without updating PACKAGE_STATUSES, it must still be
+        # classified, and MANUAL_REVIEW_REQUIRED is the only safe fallback.
+        expected = {
+            "Different platform": "WRONG_PLATFORM",
+            "Different IOS XR release": "WRONG_RELEASE",
+            "Processor architecture does not match the base ISO": "WRONG_ARCHITECTURE",
+            "Platform is missing from filename": "UNKNOWN",
+            "Release is missing from filename": "UNKNOWN",
+            "More than one fix changes this component; Cisco supersedence decides which remains":
+                "CONFLICT",
+            "Superseded by a newer fix per Cisco supersedence notes": "SUPERSEDED",
+            "Needs ncs5500-dpa-1.0.0.0-r2512.CSCwt13701 which nothing provides": "MISSING_DEPENDENCY",
+            "MD5 does not match the Cisco README for ncs5500-25.1.2.CSCwu14807": "INVALID",
+            "The service cannot read this file; fix its ownership": "INVALID",
+        }
+        for reason, status in expected.items():
+            self.assertEqual(classify_exclusion(reason), status, reason)
+        self.assertEqual(classify_exclusion("a reason nobody has written yet"),
+                         "MANUAL_REVIEW_REQUIRED")
+        self.assertEqual(classify_exclusion(""), "MANUAL_REVIEW_REQUIRED")
+
+    def test_describe_package_reads_identity_from_both_naming_schemes(self):
+        exr = describe_package("ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm")
+        self.assertEqual(exr, {"name": "ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm",
+                               "platform": "ncs5500", "release": "r2512",
+                               "architecture": "x86_64", "csc": "CSCwu14807"})
+        lnt = describe_package("xr-cdp-24.3.1v1.0.0-1.x86_64.rpm")
+        self.assertEqual(lnt["release"], "24.3.1")
+        self.assertIsNone(lnt["csc"])
+        unknown = describe_package("some-file.rpm")
+        self.assertEqual([unknown["platform"], unknown["release"], unknown["csc"]],
+                         [None, None, None])
 
 
 class PlatformCompatibilityTests(unittest.TestCase):

@@ -36,6 +36,8 @@ from platform_validation import (
     PLATFORMS,
     RPM_ARCHITECTURE,
     check_upgrade_matrix,
+    classify_exclusion,
+    describe_package,
     infer_platform,
     infer_platform_pid,
     normalize_architecture,
@@ -1297,6 +1299,21 @@ def iso_identity(iso_path: Path) -> tuple[str, bool]:
     return iso_path.name, False
 
 
+# Which check produced a decision, so the table can say where it came from
+# instead of implying every judgement is a filename guess.
+EXCLUSION_SOURCES = {
+    "WRONG_PLATFORM": "iso-metadata+rpm-filename",
+    "WRONG_RELEASE": "iso-metadata+rpm-filename",
+    "WRONG_ARCHITECTURE": "iso-contents+rpm-filename",
+    "SUPERSEDED": "smu-readme",
+    "CONFLICT": "rpm-header",
+    "DUPLICATE": "rpm-header",
+    "MISSING_DEPENDENCY": "rpm-header+iso-contents",
+    "INVALID": "rpm-header+smu-readme",
+    "UNKNOWN": "rpm-filename",
+    "MANUAL_REVIEW_REQUIRED": "rpm-filename",
+}
+
 CSC_IN_FILENAME = re.compile(r"\.(CSC[A-Za-z0-9]+)\.", re.IGNORECASE)
 
 
@@ -1856,6 +1873,55 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
     return blockers, warnings
 
 
+def package_decisions(excluded: list[dict]) -> list[dict]:
+    """One structured row per package left out of the build.
+
+    The reason text stays as written - it is what the operator reads - and
+    gains the status code, the identity the filename carries and which check
+    decided it, so the page, the API and the build report describe the same
+    decision instead of each re-deriving it.
+    """
+    rows = []
+    for entry in excluded:
+        status = classify_exclusion(entry.get("reason", ""))
+        rows.append({
+            **describe_package(entry.get("name", "")),
+            "status": status,
+            "reason": entry.get("reason", ""),
+            "included": False,
+            "source": EXCLUSION_SOURCES.get(status, "rpm-filename"),
+            **{key: value for key, value in entry.items() if key not in {"name", "reason"}},
+        })
+    return sorted(rows, key=lambda row: (row["status"], row["name"]))
+
+
+def finalize_recommendation(recommendation: dict) -> dict:
+    """Give one recommendation its status rows and counts, in place.
+
+    Every consumer - the inventory response, the recommendation endpoint and
+    the BuildPlan - goes through here, so the review step and the plan can
+    never describe the same package differently.
+    """
+    recommendation["summary"] = package_summary(
+        recommendation.get("selected", []), recommendation.get("excluded", []))
+    recommendation["excluded"] = package_decisions(recommendation.get("excluded", []))
+    return recommendation
+
+
+def package_summary(selected: list[str], excluded: list[dict]) -> dict:
+    """Counts for the build preview: what was found, kept and left out, and why."""
+    by_status: dict[str, int] = {}
+    for entry in excluded:
+        status = classify_exclusion(entry.get("reason", ""))
+        by_status[status] = by_status.get(status, 0) + 1
+    return {
+        "discovered": len(selected) + len(excluded),
+        "included": len(selected),
+        "excluded": len(excluded),
+        "by_status": dict(sorted(by_status.items())),
+    }
+
+
 def create_build_plan(payload: dict) -> dict:
     """Create one immutable, backend-owned build decision from current inventory."""
     inventory = inventory_files()
@@ -2038,7 +2104,8 @@ def create_build_plan(payload: dict) -> dict:
         "capabilities": profile["capabilities"] if profile else {},
         "selected_packages": selected,
         "selected_csc_groups": recommendation["package_groups"],
-        "excluded_packages": recommendation["excluded"],
+        "excluded_packages": package_decisions(recommendation["excluded"]),
+        "package_summary": package_summary(selected, recommendation["excluded"]),
         "component_conflicts": recommendation["component_conflicts"],
         "options": options,
         "config_files": config_files,
@@ -2720,6 +2787,7 @@ def discover() -> dict:
     )
     evidence = selection_evidence(isos[0] if len(isos) == 1 else None,
                                   recommendation.get("selected", []))
+    finalize_recommendation(recommendation)
     recommendation["warnings"] = reword_dependency_warning(recommendation.get("warnings", []), evidence)
     recommendation["confidence"] = confidence_report(
         evidence=evidence,
@@ -3636,6 +3704,7 @@ def smu_recommendation():
             unsatisfied_dependencies_for_recommendation(iso, recommendation.get("selected", []))
         )
         evidence = selection_evidence(iso, recommendation.get("selected", []))
+        finalize_recommendation(recommendation)
         recommendation["warnings"] = reword_dependency_warning(recommendation.get("warnings", []), evidence)
         recommendation["confidence"] = confidence_report(
             evidence=evidence,

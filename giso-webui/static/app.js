@@ -325,12 +325,20 @@ function applySmuRecommendation(plan) {
     }
   }
   if (plan.excluded?.length) {
-    const excluded=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent=`${plan.excluded.length} incompatible RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically`;
+    const excluded=document.createElement('details'); const summary=document.createElement('summary');
+    const counts=plan.summary?.by_status || {};
+    const breakdown=Object.entries(counts).map(([status,count])=>`${count} ${STATUS_LABELS[status] || status.toLowerCase().replace(/_/g,' ')}`).join(' · ');
+    summary.textContent=`${plan.excluded.length} RPM${plan.excluded.length === 1 ? '' : 's'} excluded automatically${breakdown ? ` (${breakdown})` : ''}`;
     const list=document.createElement('ul');
     plan.excluded.forEach(item=>{
       const row=document.createElement('li'); row.className='excluded-package';
-      row.dataset.search=`${item.name} ${item.reason}`.toLowerCase();
-      row.textContent=`${item.name} — ${item.reason}`; list.appendChild(row);
+      const status=item.status || 'MANUAL_REVIEW_REQUIRED';
+      row.dataset.search=`${item.name} ${item.reason} ${status}`.toLowerCase();
+      row.dataset.status=status;
+      const tag=document.createElement('span'); tag.className='package-status';
+      tag.textContent=STATUS_LABELS[status] || status.toLowerCase().replace(/_/g,' ');
+      row.append(tag, document.createTextNode(`${item.name} — ${item.reason}`));
+      list.appendChild(row);
     });
     excluded.append(summary,list); details.appendChild(excluded);
   }
@@ -730,6 +738,21 @@ const READY_CHECK_LABELS = {
   disk: 'disk space is critically low',
 };
 // Startup self-test checks not already covered by the keys above.
+// The backend decides every package status (platform_validation.PACKAGE_STATUSES);
+// the page only gives each code a short human label.
+const STATUS_LABELS = {
+  WRONG_PLATFORM: 'wrong platform',
+  WRONG_RELEASE: 'wrong release',
+  WRONG_ARCHITECTURE: 'wrong architecture',
+  CONFLICT: 'conflict',
+  SUPERSEDED: 'superseded',
+  MISSING_DEPENDENCY: 'missing dependency',
+  DUPLICATE: 'duplicate',
+  INVALID: 'invalid file',
+  UNKNOWN: 'unidentified',
+  MANUAL_REVIEW_REQUIRED: 'manual review',
+};
+
 const SELF_TEST_LABELS = {
   runner_binary: 'the build runner is not installed',
   database_schema: 'the job database schema is not usable',

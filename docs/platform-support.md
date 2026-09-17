@@ -62,6 +62,13 @@ block the build instead. Multiple versions of one component and CSC are
 rejected; RPMs sharing a CSC identifier are displayed as one package group, and
 overlapping CSC fixes for one component are flagged for supersedence review.
 
+Every package left out is reported with a status code (`WRONG_PLATFORM`,
+`WRONG_RELEASE`, `WRONG_ARCHITECTURE`, `CONFLICT`, `SUPERSEDED`,
+`MISSING_DEPENDENCY`, `DUPLICATE`, `INVALID`, `UNKNOWN`, or
+`MANUAL_REVIEW_REQUIRED`), the reason in plain words, the platform, release,
+architecture and CSC its filename carries, and which check decided it. The API
+also returns the counts behind those statuses, and the page shows them.
+
 These are pre-checks. Dependency closure is checked only for exact-version
 requirements, signatures are read but not verified, and supersedence order and
 PID support are not decided here. Cisco `gisobuild` performs the full
