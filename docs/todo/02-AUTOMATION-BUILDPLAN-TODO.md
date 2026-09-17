@@ -577,9 +577,10 @@ repo's `.gisobuild-tool` mounted it returned no blockers.
 - [x] duplicate conflicts resolved - `resolve_rpm_identifiers()` raises
       "Conflicting RPM identities selected", which becomes a blocker
       (`test_different_duplicate_rpms_are_rejected`).
-- [ ] CSC completeness checked - partial multi-component bundles are
-      reported (`full_candidate_packages`), but see "warn/block incomplete
-      CSC groups" above for the case that is still open.
+- [x] CSC completeness checked - partial selection of present members
+      (`full_candidate_packages`) and, since 2026-09-17, fixes whose Cisco SMU
+      README lists RPMs that were never uploaded or whose MD5 differs
+      (`selection_integrity_blockers()`); see "CSC grouping".
 - [x] disk space sufficient - `build_space_blockers()` for uploads, work and
       output volumes.
 - [x] gisobuild available - `gisobuild_tool_available()`
@@ -591,6 +592,11 @@ repo's `.gisobuild-tool` mounted it returned no blockers.
 - [x] no conflicting job - uploads, Cisco download, active job and running
       build container
       (`test_build_plan_is_blocked_by_the_same_conditions_start_build_refuses`).
-- [ ] expected outputs supported - `expected_outputs` is computed from the
-      platform capabilities but never blocks; nothing rejects an option the
-      engine does not support at plan time beyond `validate_platform_options()`.
+- [x] expected outputs supported - 2026-09-17: `expected_outputs` now follows
+      upstream per engine (eXR: USB zip exactly for platforms in
+      `usb_zip/platform_scripts.yaml`, pinned by
+      `test_exr_usb_support_matches_the_pinned_upstream_usb_scripts`; LNT:
+      USB unless `--skip-usb-image`), `validate_platform_options()` blocks
+      options the engine does not support (`OPTION_UNSUPPORTED`), and the
+      real self-contained NCS5500 build produced exactly the predicted ISO +
+      USB zip.
