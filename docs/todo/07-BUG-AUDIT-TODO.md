@@ -124,9 +124,9 @@ no customization → "Waiting for a customization (packages, config files,
 or bridging fixes)…"; customization present, no ISO → "Waiting for an
 ISO…". Full suite green (207 tests); ruff and Graphify clean.
 
-### No free-space check exists for the volumes a build actually writes to (found 2026-09-16, not fixed here)
+### No free-space check exists for the volumes a build actually writes to (found 2026-09-16, fixed 2026-09-17)
 
-Current behavior:
+Current behavior (before this fix):
 
 Every existing `shutil.disk_usage(...).free < ... + MIN_FREE_BYTES` guard in
 `giso-webui/app.py` (upload init, upload chunk, TAR/Cisco-archive extraction,
@@ -153,18 +153,43 @@ anywhere.
 
 TODO:
 
-- [ ] Measure free space on `WORK_ROOT` and `OUTPUT_ROOT` (in addition to
+- [x] Measure free space on `WORK_ROOT` and `OUTPUT_ROOT` (in addition to
       `DATA_ROOT`) somewhere the operator can see it before starting a
-      build, and in whatever pre-build gate is added.
-- [ ] Consider adding a real `MIN_FREE_BYTES`-style guard against
-      `WORK_ROOT`/`OUTPUT_ROOT` before `run_job()` starts a build, mirroring
-      the existing upload-time guards, so a build that cannot possibly
-      finish is refused up front instead of failing partway through.
-- [ ] Add a regression test proving a build is refused (or at least clearly
+      build, and in whatever pre-build gate is added — `build_volume_free_bytes()`
+      in `giso-webui/app.py` reports all three, exposed as
+      `volume_free_bytes` on `GET /api/storage` and on every BuildPlan, and
+      rendered per-volume by `renderDiskEstimate()` in the Step 2 review
+      ("… 0.0 GiB free on build output · 92.9 GiB free on uploads · 92.9 GiB
+      free on build working"). A volume that cannot be measured is omitted
+      rather than reported as full, so an unmeasurable mount can never
+      fabricate a blocker.
+- [x] Consider adding a real `MIN_FREE_BYTES`-style guard against
+      `WORK_ROOT`/`OUTPUT_ROOT` before `run_job()` starts a build — done, and
+      placed earlier than proposed: `build_space_blockers()` feeds
+      `create_build_plan()`'s existing `blockers` list, so a short volume
+      blocks the plan itself. That means the Step 2 review, the "Start
+      build" confirmation and `POST /api/jobs` (which refuses any plan that
+      is not `ready`) all reject it through one gate, instead of a separate
+      last-second check inside `run_job()` that the operator would only
+      discover after committing to the build. The requirement is the same
+      `estimated_output_bytes + MIN_FREE_BYTES` the Step 2 estimate already
+      displayed — one number, not a second competing one.
+- [x] Add a regression test proving a build is refused (or at least clearly
       warned) when the output/work volume is nearly full, independent of
-      how much free space the uploads volume has.
-- [ ] Update `06-UI-OPERATOR-TODO.md`'s "free disk estimate" entry once this
-      lands, since its own scope-limit note references this item.
+      how much free space the uploads volume has —
+      `test_build_is_blocked_when_the_output_volume_is_nearly_full` and
+      `test_build_is_blocked_when_the_working_volume_is_nearly_full` in
+      `giso-webui/tests/test_app.py` patch `shutil.disk_usage` for *only*
+      that one volume (uploads deliberately left with real free space), plus
+      `test_storage_reports_free_space_for_every_build_volume`. Confirmed
+      live end-to-end against a throwaway container whose `/output` was a
+      1 MiB tmpfs while uploads/work had ~93 GiB:
+      `POST /api/build-plan` → `"ready": false` with
+      "Not enough free space on the build output volume: 1 MiB free, 512 MiB
+      needed", `POST /api/jobs` refused with the same message, and the Step 2
+      disk line showed all three volumes separately.
+- [x] Update `06-UI-OPERATOR-TODO.md`'s "free disk estimate" entry once this
+      lands, since its own scope-limit note references this item — done.
 
 ## P1 — Misconfiguration can silently destroy archived artifacts
 

@@ -1094,6 +1094,61 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(plan["ready"], plan)
         self.assertTrue(any("CSCTEST00001" in blocker for blocker in plan["blockers"]), plan["blockers"])
 
+    def test_build_is_blocked_when_the_output_volume_is_nearly_full(self):
+        # Every disk guard before this measured the uploads volume only, so a
+        # deployment whose giso-output volume was full could start a build
+        # that had nowhere to write its own image and failed partway through.
+        # This proves the output volume alone is enough to block, with the
+        # uploads volume deliberately reported as having plenty of room.
+        (self.data / "base.iso").write_bytes(b"iso")
+        real_disk_usage = shutil.disk_usage
+
+        def fake_disk_usage(path):
+            if Path(path) == module.OUTPUT:
+                return SimpleNamespace(total=0, used=0, free=1024)
+            return real_disk_usage(path)
+
+        with patch("app.shutil.disk_usage", side_effect=fake_disk_usage):
+            response = self.client.post("/api/build-plan", json={
+                "iso": "base.iso", "platform": "ncs5500", "pkglist": [],
+                "automatic_smu_selection": False, "auto_repo": True,
+            })
+
+        plan = response.get_json()
+        self.assertFalse(plan["ready"], plan)
+        self.assertTrue(
+            any("build output volume" in blocker for blocker in plan["blockers"]),
+            plan["blockers"],
+        )
+
+    def test_build_is_blocked_when_the_working_volume_is_nearly_full(self):
+        (self.data / "base.iso").write_bytes(b"iso")
+        real_disk_usage = shutil.disk_usage
+
+        def fake_disk_usage(path):
+            if Path(path) == module.WORK:
+                return SimpleNamespace(total=0, used=0, free=1024)
+            return real_disk_usage(path)
+
+        with patch("app.shutil.disk_usage", side_effect=fake_disk_usage):
+            response = self.client.post("/api/build-plan", json={
+                "iso": "base.iso", "platform": "ncs5500", "pkglist": [],
+                "automatic_smu_selection": False, "auto_repo": True,
+            })
+
+        plan = response.get_json()
+        self.assertFalse(plan["ready"], plan)
+        self.assertTrue(
+            any("build working volume" in blocker for blocker in plan["blockers"]),
+            plan["blockers"],
+        )
+
+    def test_storage_reports_free_space_for_every_build_volume(self):
+        response = self.client.get("/api/storage")
+        volumes = response.get_json()["volume_free_bytes"]
+        self.assertEqual(set(volumes), {"uploads", "work", "output"})
+        self.assertTrue(all(isinstance(value, int) for value in volumes.values()), volumes)
+
     def test_manual_mode_with_zero_packages_is_a_valid_ready_plan(self):
         # 05-TESTING-CI-TODO.md flagged this as an untested, unclear case
         # ("manual mode empty-selection bug"). Verified here, not fixed: a

@@ -217,8 +217,12 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("function renderDiskEstimate()", script)
         render_fn = script[script.index("function renderDiskEstimate()"):]
         render_fn = render_fn[:render_fn.index("\n}\n")]
+        # storageInfo.volume_free_bytes covers every volume a build touches
+        # (uploads/work/output); disk_free_bytes stays as the fallback for a
+        # backend that predates that field.
+        self.assertIn("storageInfo.volume_free_bytes", render_fn)
         self.assertIn("storageInfo.disk_free_bytes", render_fn)
-        self.assertIn("this may not be enough space", render_fn)
+        self.assertIn("not enough space on the", render_fn)
         # Loaded once at plan-calculation time and once when storage usage
         # arrives, in whichever order those two independent requests finish.
         self.assertIn("renderDiskEstimate()", script[script.index("function applySmuRecommendation(plan)"):script.index("\nfunction smuGroupCard")])

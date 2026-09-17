@@ -865,6 +865,14 @@ def create_build_plan(payload: dict) -> dict:
         except ValueError as exc:
             blockers.append(str(exc))
 
+    # The estimate the Step 2 UI already showed (base ISO + selected RPMs) is
+    # the best lower bound available for what this build has to write, so use
+    # the same figure for the real gate rather than inventing a second one.
+    estimated_output_bytes = (iso["size"] if iso else 0) + sum(
+        item.get("size", 0) for item in selected
+    )
+    blockers.extend(build_space_blockers(estimated_output_bytes))
+
     release = recommendation.get("release") or (
         validate_smu_selection(iso_name, [])["iso_release"] if iso else None
     )
@@ -916,6 +924,8 @@ def create_build_plan(payload: dict) -> dict:
             "usb": bool(profile and profile["capabilities"].get("usb_image")
                         and not payload.get("skip_usb_image")),
         },
+        "estimated_output_bytes": estimated_output_bytes,
+        "volume_free_bytes": build_volume_free_bytes(),
     }
 
 
@@ -927,6 +937,54 @@ def giso_artifact_candidates(job_dir: Path) -> list[Path]:
         if any(tag in path.name.lower() for tag in ("golden", "giso"))
     ]
     return images + [path for path in job_dir.rglob("*.zip") if "usb" in path.name.lower()]
+
+
+def build_volume_free_bytes() -> dict[str, int]:
+    """Free space on every volume a build actually touches, not just uploads.
+
+    Every MIN_FREE_BYTES guard before this measured DATA (the uploads
+    volume) exclusively, but giso-webui/compose.yaml defines giso-uploads,
+    giso-work and giso-output as three separate named volumes: gisobuild
+    extracts and builds in WORK and writes the finished image to OUTPUT.
+    A deployment that sizes those independently could start a build with
+    plenty of "free" upload space and no room to write its own output,
+    failing partway through with no advance warning - see
+    07-BUG-AUDIT-TODO.md.
+
+    Volumes that resolve to the same filesystem (the common single-disk
+    deployment) simply report the same number; this does not try to
+    de-duplicate them, because which mount is which is exactly what an
+    operator needs to see when they are *not* the same.
+    """
+    volumes = {"uploads": DATA, "work": WORK, "output": OUTPUT}
+    free: dict[str, int] = {}
+    for name, path in volumes.items():
+        try:
+            free[name] = shutil.disk_usage(path).free
+        except OSError:
+            # A volume that cannot be measured must not take the whole page
+            # (or a build) down; report it as unknown and let the caller
+            # decide. build_space_blockers() treats a missing key as "not
+            # provably short", never as "definitely full".
+            continue
+    return free
+
+
+def build_space_blockers(required_bytes: int = 0) -> list[str]:
+    """Name every build volume that cannot fit this build, for the pre-build gate.
+
+    Returns operator-facing strings (empty when fine) rather than raising,
+    so create_build_plan() can fold them into the same blockers list every
+    other pre-build problem already uses.
+    """
+    needed = required_bytes + MIN_FREE_BYTES
+    labels = {"uploads": "uploads", "work": "build working", "output": "build output"}
+    return [
+        f"Not enough free space on the {labels[name]} volume: "
+        f"{free // 1024**2} MiB free, {needed // 1024**2} MiB needed"
+        for name, free in sorted(build_volume_free_bytes().items())
+        if free < needed
+    ]
 
 
 def archive_size(path: Path) -> int:
@@ -1712,6 +1770,7 @@ def storage():
     archive_used = archive_size(ARCHIVE) if ARCHIVE.is_dir() else 0
     return jsonify(
         disk_free_bytes=shutil.disk_usage(DATA).free,
+        volume_free_bytes=build_volume_free_bytes(),
         archive_used_bytes=archive_used,
         archive_quota_bytes=MAX_ARCHIVE_BYTES,
         archive_retention_days=ARCHIVE_RETENTION_DAYS,

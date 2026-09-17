@@ -119,20 +119,18 @@ Show:
       plan or the storage figure changes) and shows it as a persistent line
       under the Step 2 flow, turning red with an explicit warning when the
       estimate exceeds free space.
-      **Known limit**: `/api/storage`'s `disk_free_bytes` measures the
-      uploads volume (`DATA_ROOT`) — the same one `MIN_FREE_BYTES` already
-      gates uploads against. `giso-webui/compose.yaml` defines `giso-work`
-      and `giso-output` as separate named Docker volumes from `giso-uploads`,
-      and nothing in `app.py` measures free space on either of those today —
-      gisobuild actually extracts/builds in `WORK_ROOT` and writes the final
-      artifact to `OUTPUT_ROOT`, so a host that happens to size those volumes
-      differently from the uploads volume would get a misleading "enough
-      space" answer here. The estimate text says "on the uploads volume"
-      rather than implying it covers the whole build, and the low-space
-      warning explicitly says the working/output volumes are not measured -
-      but adding a real check there (and to the existing `MIN_FREE_BYTES`
-      gate itself, which has the identical blind spot) is real follow-up
-      work, not done here. Verified by
+      **Former known limit, closed 2026-09-17**: this originally measured
+      only the uploads volume (`DATA_ROOT`), while gisobuild actually
+      extracts/builds in `WORK_ROOT` and writes its artifact to
+      `OUTPUT_ROOT` — separate named Docker volumes a host can size
+      independently, so a full build volume could still read as "enough
+      space". `build_volume_free_bytes()` now measures all three and
+      `build_space_blockers()` turns a short one into a real BuildPlan
+      blocker (see `07-BUG-AUDIT-TODO.md`, "No free-space check exists for
+      the volumes a build actually writes to"), so the estimate line lists
+      each volume separately and a genuinely full working/output volume
+      refuses the build up front instead of failing partway through.
+      Originally verified by
       `test_disk_estimate_is_shown_during_review_and_uses_already_loaded_data`
       in `giso-webui/tests/test_build_script.py`, and confirmed live: booted
       a throwaway container, uploaded a real file, saw the estimate render

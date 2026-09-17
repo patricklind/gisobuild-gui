@@ -174,17 +174,29 @@ function estimatedOutputBytes(plan) {
   return iso.size + packageBytes;
 }
 
+const VOLUME_LABELS = {uploads: 'uploads', work: 'build working', output: 'build output'};
+
 function renderDiskEstimate() {
   const el=$('#disk-estimate');
   if (!el) return;
   const estimate=estimatedOutputBytes(inputs.recommendation);
   if (estimate === null || !storageInfo) { el.hidden=true; el.textContent=''; return; }
-  const short=storageInfo.disk_free_bytes < estimate;
+  // /api/storage now reports every volume a build touches, not just uploads:
+  // gisobuild extracts into the working volume and writes its image to the
+  // output volume, which a deployment can size independently.
+  const volumes=storageInfo.volume_free_bytes
+    || {uploads: storageInfo.disk_free_bytes};
+  const entries=Object.entries(volumes);
+  const shortVolumes=entries.filter(([, free]) => free < estimate);
   el.hidden=false;
-  el.className=`disk-estimate${short ? ' bad' : ''}`;
-  el.textContent=`Estimated output ~${formatGiB(estimate)} GiB (base ISO + selected RPMs) · `
-    + `${formatGiB(storageInfo.disk_free_bytes)} GiB free on the uploads volume`
-    + (short ? ' — this may not be enough space. The build also uses separate working and output volumes, which are not measured here.' : '.');
+  el.className=`disk-estimate${shortVolumes.length ? ' bad' : ''}`;
+  const freeText=entries
+    .map(([name, free]) => `${formatGiB(free)} GiB free on ${VOLUME_LABELS[name] || name}`)
+    .join(' · ');
+  el.textContent=`Estimated output ~${formatGiB(estimate)} GiB (base ISO + selected RPMs) · ${freeText}`
+    + (shortVolumes.length
+      ? ` — not enough space on the ${shortVolumes.map(([name]) => VOLUME_LABELS[name] || name).join(' and ')} volume(s); the build will be blocked until space is freed.`
+      : '.');
 }
 
 function applySmuRecommendation(plan) {
