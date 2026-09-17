@@ -250,6 +250,8 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.assertEqual(job["failure"]["code"], "DEPENDENCY_ERROR")
         self.assertEqual([e["stage"] for e in module.jobs[job["id"]]["stages"]],
                          ["preflight", "preparing_builder", "building", "verifying", "failed"])
+        # Scratch space (staged repo copies) is gone; gisobuild's output dir is not touched.
+        self.assertFalse((module.WORK / job["id"]).exists())
         self.assertEqual(job["missing_dependencies"], [{
             "requirement": "ncs5500-dpa = 1.0.0.5",
             "required_by": "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64",
@@ -296,6 +298,7 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.assertEqual(job["status"], "cancelled")
         self.assertIn("Build cancelled by user.", job["log"])
         self.assertEqual(job["stage"], "cancelled")
+        self.assertFalse((module.WORK / job_id).exists())
         self.assertNotIn("verifying", [e["stage"] for e in job["stages"]])
         self.assertEqual(self.stops_file.read_text().split(), [f"giso-build-{job_id}"])
         self.assertFalse((module.ARCHIVE / job_id).exists())

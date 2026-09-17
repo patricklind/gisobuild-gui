@@ -241,8 +241,11 @@ This command must never be required on the user's host.
 - [x] forced termination if needed (SIGKILL to the group)
 - [x] no orphan processes (`test_cancelling_a_local_build_leaves_no_orphan_processes`
       kills a child that gisobuild itself spawned)
-- [ ] cleanup work directory - `/work/<job>` is not removed on cancel (nor
-      on failure); retention is still manual via "Clear workspace".
+- [x] cleanup work directory - 2026-09-17: `discard_job_work_directory()`
+      removes `/work/<job>` (staged RPM copies, gisobuild temp files) when a
+      build fails, errors or is cancelled; success already removed it while
+      archiving. Inputs stay in `/uploads`, gisobuild logs in `/output/<job>`.
+      Asserted in the dependency-failure and cancellation integration tests.
 - [x] persist `cancelled`
 
 ## Version endpoint

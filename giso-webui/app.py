@@ -2543,6 +2543,20 @@ def enter_stage(job_id: str, stage: str, at: float | None = None) -> None:
         job["stage"] = stage
 
 
+def discard_job_work_directory(job_id: str) -> None:
+    """Remove a finished job's scratch space when no image came out of it.
+
+    /work/<job> holds only copies (the staged RPM repository) and gisobuild's
+    temporary files, so nothing is lost: the inputs stay in the upload volume
+    and gisobuild's logs stay in /output/<job>. A successful build already
+    removes it during archiving; failed and cancelled builds left it behind,
+    easily several GiB each.
+    """
+    work = (WORK / job_id).resolve()
+    if work.parent == WORK.resolve():
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def run_job(job_id: str, command: list[str]) -> None:
     with job_lock:
         job_started = jobs[job_id]["created"]
@@ -2661,6 +2675,8 @@ def run_job(job_id: str, command: list[str]) -> None:
                                     phase="Complete" if success else "Build failed")
             job_snapshot = dict(jobs[job_id])
         enter_stage(job_id, "complete" if success else "failed")
+        if not success:
+            discard_job_work_directory(job_id)
         persist_job(job_id)
         if success:
             write_build_report(job_id, job_snapshot, artifacts)
@@ -2669,6 +2685,7 @@ def run_job(job_id: str, command: list[str]) -> None:
                   duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
     except BuildCancelled:
         enter_stage(job_id, "cancelled")
+        discard_job_work_directory(job_id)
         with job_lock:
             job_processes.pop(job_id, None)
             jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
@@ -2681,6 +2698,7 @@ def run_job(job_id: str, command: list[str]) -> None:
         with job_lock:
             cancelled = jobs[job_id]["status"] in {"cancelling", "cancelled"}
         enter_stage(job_id, "cancelled" if cancelled else "failed")
+        discard_job_work_directory(job_id)
         with job_lock:
             job_processes.pop(job_id, None)
             if jobs[job_id]["status"] in {"cancelling", "cancelled"}:

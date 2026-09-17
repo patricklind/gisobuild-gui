@@ -1024,15 +1024,22 @@ A temporary registry/network outage can therefore block a build even when a vali
 
 TODO:
 
-- [ ] Remove this dependency as part of the self-contained image design —
+- [x] Remove this dependency as part of the self-contained image design —
+      **done 2026-09-17** in `03-DOCKER-SELF-CONTAINED-TODO.md`: the
+      self-contained deployment needs no socket and built a real NCS5500
+      Golden ISO that way. Original note:
       genuinely open, and deliberately owned by
       `03-DOCKER-SELF-CONTAINED-TODO.md` rather than here: removing the
       Docker-socket/nested-builder model is that file's whole subject
       (bundled gisobuild runtime, no `/var/run/docker.sock`, no child
       builder container). Tracked there; not duplicated as an independent
       work item in the bug audit.
-- [ ] During migration, define an explicit pull policy and safe cached-image
-      fallback — same owner as above. Today `run_job()` pulls before each
+- [x] During migration, define an explicit pull policy and safe cached-image
+      fallback — **done 2026-09-17**: pull before each build; on pull failure
+      or timeout use the host's cached copy (identical when digest-pinned,
+      warned as possibly older when a tag), record `builder_image.source`,
+      and fail clearly when nothing is cached (see `05-TESTING-CI-TODO.md`).
+      Original note, same owner as above. Today `run_job()` pulls before each
       build and fails the job on pull failure; deciding when a locally
       cached builder image may be used instead is part of the migration
       design, not a standalone bug fix.
@@ -1050,8 +1057,11 @@ TODO:
       audit's. `GET /api/version` already surfaces whichever reference is
       actually in use, so a tag-pinned deployment is visible rather than
       silent.
-- [ ] Add offline/cached-builder regression test if nested Docker remains
-      during transition — conditional on the pull-policy decision above
+- [x] Add offline/cached-builder regression test if nested Docker remains
+      during transition — **done 2026-09-17**:
+      `test_image_pull_timeout_uses_a_cached_builder_image`,
+      `test_registry_outage_builds_with_the_cached_builder_image`,
+      `test_registry_outage_without_a_cached_image_fails_clearly`. Original note: — conditional on the pull-policy decision above
       (there is nothing to assert until "may a cached image be used, and
       when" has an answer). Left open with that dependency stated.
 
