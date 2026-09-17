@@ -167,6 +167,28 @@ class OperatorFlowTests(unittest.TestCase):
             "Builder ciscogisobuild/cisco-xr-gisobuild:2.3.4 · cached copy on this host "
             "(registry unreachable) · sha256:bebebebebebe")
 
+    def test_failed_build_says_what_went_wrong_and_what_to_do(self):
+        module.jobs["broken"] = {
+            "id": "broken", "status": "failed", "created": 1, "updated": 2, "finished": 2,
+            "progress": 40, "phase": "Build failed", "exit_code": 1, "artifacts": [],
+            "log": "error: Failed dependencies:\n\tncs5500-dpa = 1.0.0.5 is needed by "
+                   "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64\n",
+        }
+        self.open()
+        status = self.page.locator("#friendly-status")
+        expect(status).to_contain_text("A selected package needs a package version that nothing provides.")
+        expect(status).to_contain_text("Download the Cisco SMU named in the message")
+
+    def test_blocked_start_names_the_problem_and_the_fix(self):
+        self.write(self.ISO)
+        self.write(self.ROUTING)
+        self.open()
+        # The workspace changes after review: the ISO disappears before Start.
+        (module.DATA / self.ISO).unlink()
+        self.page.locator("#start-build").click()
+        expect(self.page.locator("#error")).to_contain_text(
+            "A selected input is not in the workspace. Check files again and reselect the base ISO")
+
     def test_manual_csc_selection(self):
         for name in (self.ISO, self.ROUTING, self.BGP, self.OSPF):
             self.write(name)

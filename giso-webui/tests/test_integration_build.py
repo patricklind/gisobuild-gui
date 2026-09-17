@@ -238,6 +238,7 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
 
         self.assertEqual(job["status"], "failed")
         self.assertEqual(job["exit_code"], 1)
+        self.assertEqual(job["failure"]["code"], "DEPENDENCY_ERROR")
         self.assertEqual(job["missing_dependencies"], [{
             "requirement": "ncs5500-dpa = 1.0.0.5",
             "required_by": "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64",

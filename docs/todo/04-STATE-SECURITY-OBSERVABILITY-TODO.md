@@ -277,30 +277,45 @@ Every event should support:
 
 ## Error taxonomy
 
-Implement codes such as:
+Implemented 2026-09-17 for everything that stops a build: `ERROR_TAXONOMY`,
+`classify_error()` and `classify_job_failure()` in `giso-webui/app.py`.
+`/api/build-plan` returns `issues` (one structured entry per blocker,
+alongside the existing `blockers` strings) and a failed job carries
+`failure`. The page shows the human message and suggested action for a
+failed build and for a blocked Start. Classification works on the app's own
+message formats; `test_real_blocker_messages_map_to_error_codes` generates
+each message through the real code paths (not hand-typed strings) so a
+reworded message that loses its code fails the test. Browser:
+`test_failed_build_says_what_went_wrong_and_what_to_do`,
+`test_blocked_start_names_the_problem_and_the_fix`.
 
-- [ ] `UPLOAD_ERROR`
-- [ ] `ARCHIVE_ERROR`
-- [ ] `ISO_METADATA_ERROR`
-- [ ] `PLATFORM_AMBIGUOUS`
-- [ ] `RELEASE_MISMATCH`
-- [ ] `RPM_METADATA_ERROR`
-- [ ] `RPM_ARCH_MISMATCH`
-- [ ] `CSC_INCOMPLETE`
-- [ ] `DUPLICATE_CONFLICT`
-- [ ] `DEPENDENCY_ERROR`
-- [ ] `GISOBUILD_ERROR`
-- [ ] `OUTPUT_VALIDATION_ERROR`
-- [ ] `STORAGE_ERROR`
-- [ ] `CISCO_AUTH_ERROR`
+- [ ] `UPLOAD_ERROR` - upload endpoints still return plain `error` strings
+- [ ] `ARCHIVE_ERROR` - archive endpoints still return plain `error` strings
+- [x] `ISO_METADATA_ERROR`
+- [x] `PLATFORM_AMBIGUOUS`
+- [x] `RELEASE_MISMATCH`
+- [x] `RPM_METADATA_ERROR` (header/filename mismatch, unreadable file, README MD5)
+- [x] `RPM_ARCH_MISMATCH`
+- [x] `CSC_INCOMPLETE`
+- [x] `DUPLICATE_CONFLICT`
+- [x] `DEPENDENCY_ERROR` (plan blockers and gisobuild's own log)
+- [x] `GISOBUILD_ERROR`
+- [x] `OUTPUT_VALIDATION_ERROR` (exit 0 without an ISO - the real
+      "Nothing to do" case found in `03-DOCKER-SELF-CONTAINED-TODO.md`)
+- [x] `STORAGE_ERROR`
+- [ ] `CISCO_AUTH_ERROR` - Cisco download endpoints not classified yet
+
+Added because real blockers needed them: `PLATFORM_MISMATCH`,
+`INPUT_MISSING`, `OPTION_UNSUPPORTED`, `ENVIRONMENT_ERROR`; unmatched text
+falls back to `BUILD_PLAN_BLOCKED` with the message itself.
 
 Return:
 
-- [ ] code
-- [ ] human_message
-- [ ] technical_message
-- [ ] recoverable
-- [ ] suggested_action
+- [x] code
+- [x] human_message
+- [x] technical_message (always the exact original message)
+- [x] recoverable (every current code is recoverable by the operator)
+- [x] suggested_action
 
 ## Health and readiness
 

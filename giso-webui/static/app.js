@@ -813,7 +813,11 @@ $('#build-form').addEventListener('submit', async event => {
       if (plan.unsatisfied_dependencies?.length) {
         throw new Error('This build cannot succeed - see the missing dependencies listed above.');
       }
-      throw new Error(`BuildPlan is blocked: ${plan.blockers.join('; ')}`);
+      const first = plan.issues?.[0];
+      const more = plan.blockers.length > 1 ? ` (${plan.blockers.length - 1} more below)` : '';
+      throw new Error(first
+        ? `${first.human_message} ${first.suggested_action}${more} — ${first.technical_message}`
+        : `BuildPlan is blocked: ${plan.blockers.join('; ')}`);
     }
     const usbText = plan.expected_outputs.usb ? 'A USB boot image is expected.' : 'No USB boot image is expected for these settings.';
     const overrideWarnings = [];
@@ -982,7 +986,9 @@ async function poll() {
       queued: 'Waiting for the current build slot to free up. Only one build can run at a time.',
       cancelling: 'Stopping the build. This can take a few seconds while gisobuild shuts down.',
     };
-    $('#friendly-status').textContent = friendlyStatusByJobStatus[job.status] || 'The build is running. You may leave this page open or return later.';
+    $('#friendly-status').textContent = job.status === 'failed' && job.failure
+      ? `${job.failure.human_message} ${job.failure.suggested_action}`
+      : friendlyStatusByJobStatus[job.status] || 'The build is running. You may leave this page open or return later.';
     renderMissingDependencies(job);
     const artifacts = $('#artifacts'); artifacts.replaceChildren();
     job.artifacts.forEach(artifact => {

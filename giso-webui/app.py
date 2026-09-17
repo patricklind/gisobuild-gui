@@ -381,11 +381,104 @@ def append_activity(text: str) -> None:
         )
 
 
+# One vocabulary for everything that stops a build, so the page can say what
+# kind of problem it is and what to do, not only repeat a sentence. Ordered:
+# the first pattern that matches a message wins. human_message is short and
+# stable per code; technical_message is always the exact original text.
+ERROR_TAXONOMY: tuple[tuple[str, re.Pattern, bool, str, str], ...] = tuple(
+    (code, re.compile(pattern, re.IGNORECASE), recoverable, human, action)
+    for code, pattern, recoverable, human, action in (
+        ("DEPENDENCY_ERROR", r"is required by .* no selected package provides|is needed by",
+         True, "A selected package needs a package version that nothing provides.",
+         "Download the Cisco SMU named in the message (or the one that provides the package), "
+         "or remove the package that needs it."),
+        ("CSC_INCOMPLETE", r"Incomplete fix|is a multi-component fix",
+         True, "A Cisco fix is only partly present.",
+         "Upload every RPM of the fix (its SMU tar), or deselect the whole fix."),
+        ("RPM_METADATA_ERROR", r"RPM header says|cannot read this file|MD5 does not match|failed its README checksum",
+         True, "An RPM is not what its name or its Cisco README says it is.",
+         "Re-download the file from Cisco and upload it again unchanged."),
+        ("DUPLICATE_CONFLICT", r"Conflicting RPM identities|Multiple versions of .* are selected",
+         True, "Two different files claim to be the same package.",
+         "Delete the unwanted copy so each package exists once."),
+        ("RPM_ARCH_MISMATCH", r"processor architecture",
+         True, "An RPM is built for a different processor family than the base image.",
+         "Use the RPMs for the base image's architecture."),
+        ("RELEASE_MISMATCH", r"does not match IOS XR|built for IOS XR|more than one IOS XR release|release could not be detected",
+         True, "A package belongs to a different IOS XR release than the base image.",
+         "Use SMUs for the base image's release, or a base image for the SMUs' release."),
+        ("PLATFORM_AMBIGUOUS", r"platform could not be detected|Select the platform family|Unsupported platform family",
+         True, "The platform family could not be determined.",
+         "Select the platform in Expert settings > Image identity."),
+        ("PLATFORM_MISMATCH", r": platform .* does not match",
+         True, "A package is for a different platform than the base image.",
+         "Remove packages for other platforms."),
+        ("ISO_METADATA_ERROR", r"not an ISO 9660 image",
+         True, "The base image file is not an ISO image.",
+         "Upload the Cisco base ISO itself, not an archive or a renamed file."),
+        ("INPUT_MISSING", r"Select one ISO that exists|was not found|must be an inventory ID|Input does not exist",
+         True, "A selected input is not in the workspace.",
+         "Check files again and reselect the base ISO and packages."),
+        ("OPTION_UNSUPPORTED", r"not supported by the|is supported only for|Automatic USB output is not supported",
+         True, "A build option does not apply to this platform.",
+         "Turn the option off in Expert settings."),
+        ("STORAGE_ERROR", r"Not enough free (disk )?space",
+         True, "There is not enough free disk space for this build.",
+         "Free space (clear the workspace or old archives) or enlarge the named volume."),
+        ("ENVIRONMENT_ERROR", r"gisobuild is not available|Docker CLI|interpreter for gisobuild|SYS_CHROOT|already running|Wait for|could not be pulled",
+         True, "The build service is not ready to run this build right now.",
+         "Wait for the running activity to finish, or fix the service setup named in the message."),
+    )
+)
+
+
+def classify_error(message: str) -> dict:
+    """Structured form of one blocker or failure message (see ERROR_TAXONOMY)."""
+    for code, pattern, recoverable, human, action in ERROR_TAXONOMY:
+        if pattern.search(message):
+            return {"code": code, "human_message": human, "technical_message": message,
+                    "recoverable": recoverable, "suggested_action": action}
+    return {"code": "BUILD_PLAN_BLOCKED", "human_message": message, "technical_message": message,
+            "recoverable": True, "suggested_action": "Resolve the problem described, then check again."}
+
+
+def classify_job_failure(job: dict) -> dict | None:
+    """Why a finished job failed, in the same structure as plan blockers."""
+    if job.get("status") != "failed":
+        return None
+    log = job.get("log", "")
+    missing = parse_missing_dependencies(log)
+    if missing:
+        first = missing[0]
+        return classify_error(f"{first['requirement']} is needed by {first['required_by']}")
+    for line in reversed(log.splitlines()):
+        if line.startswith("ERROR: "):
+            detail = classify_error(line[len("ERROR: "):])
+            if detail["code"] != "BUILD_PLAN_BLOCKED":
+                return detail
+            break
+    if job.get("exit_code") == 0:
+        return {"code": "OUTPUT_VALIDATION_ERROR",
+                "human_message": "gisobuild finished without producing a Golden ISO.",
+                "technical_message": "Exit status 0 but no .iso in the output directory",
+                "recoverable": True,
+                "suggested_action": "Open the technical details: gisobuild usually says why it had "
+                                    "nothing to build (for example no usable RPMs)."}
+    code = job.get("exit_code")
+    return {"code": "GISOBUILD_ERROR",
+            "human_message": "gisobuild reported an error and did not finish the image.",
+            "technical_message": f"gisobuild exited with status {code}" if code is not None
+            else job.get("error") or "The build stopped before gisobuild completed",
+            "recoverable": True,
+            "suggested_action": "Open the technical details and fix the first error gisobuild reports."}
+
+
 def public_job(job: dict, *, include_log: bool = True) -> dict:
     private = PRIVATE_JOB_FIELDS | (set() if include_log else {"log"})
     result = {key: value for key, value in job.items() if key not in private}
     if job.get("status") == "failed":
         result["missing_dependencies"] = parse_missing_dependencies(job.get("log", ""))
+        result["failure"] = classify_job_failure(job)
     return result
 
 
@@ -1462,6 +1555,7 @@ def create_build_plan(payload: dict) -> dict:
         "gisobuild_commit": tool_commit,
         "confidence": confidence,
         "blockers": sorted(set(blockers)),
+        "issues": [classify_error(message) for message in sorted(set(blockers))],
         "warnings": sorted(set(warnings)),
         "expected_outputs": {
             "iso": True,

@@ -1822,6 +1822,63 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn(dependency_line, check["smu"]["issues"])
         self.assertIn(dependency_line, plan["blockers"])
 
+    def test_real_blocker_messages_map_to_error_codes(self):
+        from platform_validation import validate_smu_selection
+        iso = "ncs5500-mini-x-25.1.2.iso"
+        produced = {
+            "DEPENDENCY_ERROR": module.dependency_blocker_text({
+                "requirement": "ncs5500-dpa = 1.0.0.5", "required_by": ["a.rpm"],
+                "base_image_has": "1.0.0.0"}),
+            "RELEASE_MISMATCH": validate_smu_selection(
+                iso, ["ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"])["issues"][0],
+            "PLATFORM_MISMATCH": next(i for i in validate_smu_selection(
+                iso, ["asr9k-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"])["issues"] if "platform" in i),
+            "DUPLICATE_CONFLICT": validate_smu_selection(iso, [
+                "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm",
+                "ncs5500-bgp-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"])["issues"][0],
+            "RPM_ARCH_MISMATCH": validate_smu_selection(
+                iso, ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"],
+                iso_architectures=frozenset({"aarch64"}))["issues"][0],
+        }
+        with patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=1)):
+            produced["STORAGE_ERROR"] = module.build_space_blockers(10)[0]
+        (self.data / "base.iso").write_bytes(b"iso")
+        self.iso_signature.stop()
+        try:
+            plan = module.create_build_plan({"iso": "base.iso", "platform": "asr9k", "pkglist": [],
+                                             "full_iso": True})
+            missing = module.create_build_plan({"iso": "gone.iso", "pkglist": []})
+            unknown = module.create_build_plan({"iso": "base.iso", "pkglist": [],
+                                                "automatic_smu_selection": True})
+        finally:
+            self.iso_signature.start()
+        by_code = {issue["code"]: issue for issue in plan["issues"]}
+        self.assertIn("ISO_METADATA_ERROR", by_code)
+        self.assertIn("OPTION_UNSUPPORTED", by_code)
+        self.assertEqual({i["code"] for i in missing["issues"]}, {"INPUT_MISSING"})
+        self.assertIn("PLATFORM_AMBIGUOUS", {i["code"] for i in unknown["issues"]})
+        for code, message in produced.items():
+            detail = module.classify_error(message)
+            self.assertEqual(detail["code"], code, message)
+            self.assertEqual(detail["technical_message"], message)
+            self.assertTrue(detail["human_message"] and detail["suggested_action"])
+            self.assertIs(detail["recoverable"], True)
+        self.assertEqual(len(plan["issues"]), len(plan["blockers"]))
+
+    def test_job_failures_are_classified(self):
+        dependency = {"status": "failed", "exit_code": 1,
+                      "log": "\tncs5500-dpa = 1.0.0.5 is needed by ncs5500-routing-1.0.0.2-r2512.x86_64\n"}
+        nothing = {"status": "failed", "exit_code": 0, "log": "Info: Nothing to do\n"}
+        crashed = {"status": "failed", "exit_code": 2, "log": "Traceback ...\n"}
+        no_builder = {"status": "failed", "log": "\nERROR: The builder image could not be pulled "
+                                                  "(exited with status 1) and is not cached on this host: x\n"}
+        self.assertEqual(module.classify_job_failure(dependency)["code"], "DEPENDENCY_ERROR")
+        self.assertEqual(module.classify_job_failure(nothing)["code"], "OUTPUT_VALIDATION_ERROR")
+        self.assertEqual(module.classify_job_failure(crashed)["code"], "GISOBUILD_ERROR")
+        self.assertIn("status 2", module.classify_job_failure(crashed)["technical_message"])
+        self.assertEqual(module.classify_job_failure(no_builder)["code"], "ENVIRONMENT_ERROR")
+        self.assertIsNone(module.classify_job_failure({"status": "success"}))
+
     def test_build_plan_returns_blockers_instead_of_enabling_invalid_build(self):
         response = self.client.post("/api/build-plan", json={
             "iso": "missing.iso", "platform": "asr9k", "pkglist": [],
