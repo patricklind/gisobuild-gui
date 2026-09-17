@@ -107,6 +107,9 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}
             ghcr.io/${{ github.repository }}:latest
+          build-args: |
+            SOURCE_REVISION=${{ github.sha }}
+            APP_VERSION=${{ env.RELEASE_TAG }}
           provenance: mode=max
           sbom: true
       - name: Create GitHub release

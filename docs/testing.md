@@ -52,6 +52,36 @@ docker run --rm -v "$(pwd):/work:ro" -e PYTHONDONTWRITEBYTECODE=1 \
   gisobuild-browser-tests python3 -m unittest discover -s browser_tests -v
 ```
 
+### Developer command reference
+
+Everything runs in a container; the host needs only Docker, Git, an editor and
+a browser. If a command needs a tool that is missing, add it to the relevant
+Dockerfile instead of installing it on the workstation.
+
+```bash
+# images (once, and after Dockerfile changes)
+docker build -f docker/tooling.Dockerfile -t gisobuild-tooling .
+docker compose -f giso-webui/compose.yaml build giso-webui
+docker build -f docker/browser-tests.Dockerfile -t gisobuild-browser-tests .
+docker build --platform linux/amd64 -f docker/selfcontained.Dockerfile -t giso-webui-selfcontained .
+
+# unit + synthetic integration tests
+docker run --rm -v "$(pwd):/project:ro" -w /project/giso-webui giso-webui-giso-webui python -B -m unittest discover -s tests
+# browser tests
+docker run --rm -v "$(pwd):/work:ro" -e PYTHONDONTWRITEBYTECODE=1 gisobuild-browser-tests python3 -m unittest discover -s browser_tests
+# lint (incl. flake8-bandit security rules) and dependency audit
+docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling ruff check giso-webui staging scripts --cache-dir=/tmp/ruff-cache
+docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling pip-audit -r giso-webui/requirements.txt
+# no host-side tooling in docs/scripts
+docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling python -B scripts/check_docker_only.py
+# code graph refresh (needs a writable mount)
+docker run --rm -v "$(pwd):/project" -w /project gisobuild-tooling graphify update .
+# staging rehearsal
+docker run --rm -v "$(pwd):/project:ro" -w /project/staging gisobuild-tooling python -B rehearse.py
+# image vulnerability scan
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.65.0 image --severity HIGH,CRITICAL --ignore-unfixed giso-webui-giso-webui:latest
+```
+
 Workflow and Dockerfile changes should also pass Actionlint and Hadolint —
 both already run as containers (`docker run --rm ... rhysd/actionlint:1.7.7`,
 `docker run --rm -i hadolint/hadolint:2.12.0 < <file>`), matching

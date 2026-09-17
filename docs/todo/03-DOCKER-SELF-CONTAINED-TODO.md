@@ -14,15 +14,15 @@ The user's local computer must never become part of the application runtime or p
 
 No host-side project execution:
 
-- [ ] no host Python/pip/pytest/Ruff
-- [ ] no host Node/npm/pnpm/yarn project tooling
-- [ ] no host Graphify
-- [ ] no host gisobuild execution
-- [ ] no host IOS-XR ISO/RPM inspection tools
-- [ ] no host staging/rehearsal scripts
-- [ ] no host database migration/maintenance commands
-- [ ] no host package installation for project dependencies
-- [ ] no host release/build/security tooling
+- [x] no host Python/pip/pytest/Ruff — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
+- [x] no host Node/npm/pnpm/yarn project tooling — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
+- [x] no host Graphify — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
+- [x] no host gisobuild execution — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
+- [x] no host IOS-XR ISO/RPM inspection tools — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
+- [x] no host staging/rehearsal scripts — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
+- [x] no host database migration/maintenance commands — schema migrations run inside the app on start (`apply_schema_migrations()`); archive maintenance is its own container
+- [x] no host package installation for project dependencies — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
+- [x] no host release/build/security tooling — 2026-09-17: documented commands contain none (`scripts/check_docker_only.py`, CI-enforced), and this whole session's work ran tests, lint, audits, scans, Graphify, staging and builds only in containers
 
 No external runtime dependencies:
 
@@ -64,16 +64,16 @@ Make the Docker-only rule enforceable rather than documentation-only.
 
 - [x] inventory every README, script, Makefile/task file, CI command, developer guide, and agent instruction for host-side project commands - 2026-09-17: `scripts/check_docker_only.py` scans every tracked Markdown shell block and shell script (no Makefile/task files exist; workflows run in CI). First run: 9 hits; 4 were prose forbidding a command (inline spans are no longer scanned), 1 was a bash-array `docker run` element (`build-giso.sh`, allow-marked with a reason), and 2 real host instructions were rewritten (see next item).
 - [x] replace host `python`, `pytest`, staging, Graphify, lint, audit, frontend, and build examples with `docker compose run`, `docker compose exec`, or dedicated tooling-container commands - `GISOBUILD-GUIDE.md`'s direct `./src/gisobuild.py` build now runs in `giso-webui-selfcontained`; `staging/README.md`'s rehearsal runs in `gisobuild-tooling`.
-- [ ] add a documented developer command set for common operations
-- [ ] add a dedicated tooling/test service or image where the application image is not appropriate
-- [ ] ensure Graphify runs in Docker
-- [ ] ensure staging/rehearsal runs in Docker
-- [ ] ensure integration and unit tests run in Docker
-- [ ] ensure linters/security scanners/dependency audits run in Docker or dedicated CI containers
-- [ ] ensure database migrations run in Docker
-- [ ] ensure all IOS-XR/gisobuild inspection and build commands run in Docker
+- [x] add a documented developer command set for common operations — "Developer command reference" in `docs/testing.md`
+- [x] add a dedicated tooling/test service or image where the application image is not appropriate — `docker/tooling.Dockerfile` (ruff, pip-audit, Graphify, staging) and `docker/browser-tests.Dockerfile` (Playwright)
+- [x] ensure Graphify runs in Docker — `gisobuild-tooling graphify update .`, used after every code change this session
+- [x] ensure staging/rehearsal runs in Docker — `gisobuild-tooling python -B rehearse.py`: "PASS: full staged upgrade and rollback rehearsal" (2026-09-17)
+- [x] ensure integration and unit tests run in Docker — unit, synthetic integration, platform fixture and browser suites all run only in images
+- [x] ensure linters/security scanners/dependency audits run in Docker or dedicated CI containers — ruff (+bandit rules), pip-audit, Trivy, Syft, hadolint, actionlint all containerised
+- [x] ensure database migrations run in Docker — inside the application container
+- [x] ensure all IOS-XR/gisobuild inspection and build commands run in Docker — isoinfo/rpm in the app image; gisobuild in the builder or self-contained image; guide rewritten
 - [x] add CI/static checks that flag new documentation/scripts which invoke known project tooling directly on the host where practical - "Check docs and scripts for host-side project tooling" step in `ci.yml`; tests `test_host_commands_are_flagged_and_containerised_ones_are_not`, `test_this_repository_passes`.
-- [ ] document that missing container dependencies must be fixed in Dockerfiles rather than installed on the workstation
+- [x] document that missing container dependencies must be fixed in Dockerfiles rather than installed on the workstation — `docs/testing.md` command reference
 
 Host-side operations may be limited to Docker/Compose lifecycle, Git/source-control operations, editor/browser usage, and Git/worktree coordination helpers that are proven not to execute project runtime/tooling code.
 
@@ -141,12 +141,12 @@ Suggested stages:
 
 Provide a dedicated container where appropriate for development-only tooling that should not bloat production runtime.
 
-- [ ] Graphify
-- [ ] Ruff/linting
-- [ ] dependency/security auditing
-- [ ] staging/rehearsal
-- [ ] developer utilities
-- [ ] frontend tooling if applicable
+- [x] Graphify — `docker/tooling.Dockerfile`
+- [x] Ruff/linting — `docker/tooling.Dockerfile`
+- [x] dependency/security auditing — `docker/tooling.Dockerfile`
+- [x] staging/rehearsal — `docker/tooling.Dockerfile`
+- [x] developer utilities — `gisobuild-tooling` + `scripts/check_docker_only.py`
+- [x] frontend tooling if applicable — `docker/browser-tests.Dockerfile` (no JS build step exists)
 
 The tooling container must use the repository through a controlled bind mount and must not install dependencies on the host.
 
@@ -291,16 +291,16 @@ image this file targets does not exist yet; these apply to it too):
 
 ## Compose
 
-- [ ] one primary runtime service where practical
-- [ ] dedicated tooling/test service if needed
-- [ ] persistent volumes
-- [ ] secrets mounted as files
-- [ ] healthcheck
-- [ ] readiness check
-- [ ] no Docker socket in the final architecture
-- [ ] no external tool checkout
-- [ ] commands for test/lint/Graphify/staging that execute entirely inside containers
-- [ ] no requirement for host Python, Node, RPM tools, ISO tools, or gisobuild dependencies
+- [x] one primary runtime service where practical — `compose.selfcontained.yaml`: `giso-webui` plus the small `archive-maintenance`
+- [x] dedicated tooling/test service if needed — tooling and browser-test images rather than compose services
+- [x] persistent volumes — uploads, work, output, archive, state
+- [x] secrets mounted as files — `/run/secrets` read-only with `CISCO_CLIENT_*_FILE`
+- [x] healthcheck — image `HEALTHCHECK`
+- [x] readiness check — `/api/ready` incl. the startup self-test
+- [x] no Docker socket in the final architecture — self-contained compose
+- [x] no external tool checkout — self-contained compose
+- [x] commands for test/lint/Graphify/staging that execute entirely inside containers — `docs/testing.md` command reference
+- [x] no requirement for host Python, Node, RPM tools, ISO tools, or gisobuild dependencies — self-contained image carries them
 
 ## Developer experience acceptance criteria
 
@@ -316,16 +316,16 @@ docker compose run --rm <tooling-service> <graphify-command>
 docker compose exec <service> <maintenance-command>
 ```
 
-- [ ] document all common commands
+- [x] document all common commands — `docs/testing.md` command reference, README deployment sections
 - [ ] verify clean-machine workflow with no host Python/Node/project packages
-- [ ] verify local test suite entirely in containers
-- [ ] verify Graphify entirely in containers
-- [ ] verify staging/rehearsal entirely in containers
-- [ ] verify real gisobuild workflow requires no host tooling other than Docker
+- [x] verify local test suite entirely in containers — 304 unit/integration and 17 browser tests run only in containers (2026-09-17)
+- [x] verify Graphify entirely in containers — see above
+- [x] verify staging/rehearsal entirely in containers — rehearsal PASS in `gisobuild-tooling`
+- [x] verify real gisobuild workflow requires no host tooling other than Docker — the real NCS5500 self-contained build used only Docker plus `curl` against the API
 
 ## Optional publishing
 
 Prepare for:
 
-- [ ] `ghcr.io/patricklind/gisobuild-gui:<version>`
-- [ ] `ghcr.io/patricklind/gisobuild-gui:latest`
+- [x] `ghcr.io/patricklind/gisobuild-gui:<version>` — configured in `release.yml` (now with source revision and version build args); publishing not observed from this environment
+- [x] `ghcr.io/patricklind/gisobuild-gui:latest` — same
