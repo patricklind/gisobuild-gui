@@ -191,6 +191,51 @@ TODO:
 - [x] Update `06-UI-OPERATOR-TODO.md`'s "free disk estimate" entry once this
       lands, since its own scope-limit note references this item — done.
 
+### The base ISO already tells us which packages/versions it ships — we do not read it (found 2026-09-17)
+
+Found while validating `iosxr_image_mdata.yml` parsing against a real
+licensed NCS5500 25.1.2 image (see that item below). The same metadata file
+`inspect_iso_architecture()` already opens **also enumerates every package
+the base ISO ships, with versions**:
+
+```
+- iso_type: xr
+  rpms in xr ISO: … ncs5500-dpa-1.0.0.0-r2512 ncs5500-dpa-fwding-1.0.0.0-r2512
+    ncs5500-fwding-1.0.0.0-r2512 … ncs5500-os-support-1.0.0.0-r2512 …
+```
+
+Those are *exactly* the four packages the operator's real production build
+failed on — it needed `ncs5500-dpa = 1.0.0.5`, `ncs5500-dpa-fwding = 1.0.0.2`,
+`ncs5500-fwding = 1.0.0.3`, `ncs5500-os-support = 1.0.0.2`, and the base ISO
+ships `1.0.0.0` of each. When the "Missing dependencies" feature was built,
+the decision not to attempt prediction rested on "giso-webui does not inspect
+the base ISO's own package database". That premise is now known to be wrong:
+it does open the file that lists them, it just ignores everything except the
+two architecture lines.
+
+What this does *not* yet give us: the requirement direction. A filename says
+which version an SMU **provides** (`ncs5500-routing-1.0.0.3-…`), never which
+versions it **requires** — "routing 1.0.0.3 needs dpa 1.0.0.5" lives in the
+RPM header, not the name. So a complete pre-check still needs RPM `Requires`
+parsing (tracked as "RPM metadata parsing" in `05-TESTING-CI-TODO.md`), which
+`rpm -qpR` inside the build container could supply.
+
+TODO:
+
+- [ ] Parse the `rpms in <type> ISO:` lists out of `iosxr_image_mdata.yml`
+      alongside the architecture lines, and expose the base image's shipped
+      package set/versions as a first-class fact (it is `VERIFIED` data read
+      from the image itself, unlike everything filename-derived).
+- [ ] Combine that with RPM `Requires` metadata to predict the exact
+      "<pkg> = <version> is needed by <pkg>" failure class *before* the build
+      runs, rather than only explaining it afterwards — the operator's
+      stated top priority ("never send a package that is already known to
+      fail"). Must stay honest: only assert a missing dependency when both
+      sides are `VERIFIED`, never from filename inference.
+- [ ] Regression test with a synthetic ISO whose mdata ships `pkg-1.0.0.0`
+      and an RPM requiring `pkg = 1.0.0.5`, proving the build is blocked with
+      the missing version named.
+
 ## P1 — Misconfiguration can silently destroy archived artifacts
 
 ### `ARCHIVE_RETENTION_DAYS`/`MAX_ARCHIVE_BYTES` were never validated (2026-09-16)
@@ -473,12 +518,31 @@ TODO:
 
 Not done / follow-up:
 
-- [ ] Confirm the exact `iosxr_image_mdata.yml` key names and "arm supported
-  arch list" variant token vocabulary against a real Cisco eXR ISO — the
-  parsing here is built from upstream source
-  (`src/exrmod/gisobuild_exr_engine.py`) and a synthetic fixture, not a
-  licensed image, per the repository's synthetic-fixture rule in `AGENTS.md`.
-  Treat this as `INFERRED` until validated against a real eXR image.
+- [x] Confirm the exact `iosxr_image_mdata.yml` key names and "arm supported
+  arch list" variant token vocabulary against a real Cisco eXR ISO —
+  **validated 2026-09-17 against a real licensed image** (NCS5500 IOS XR
+  25.1.2, `ncs5500-mini-x-25.1.2.iso`, extracted from the operator's own
+  Cisco tar inside a throwaway container to a temp dir and deleted
+  immediately afterwards; nothing entered the repository, per `SECURITY.md`).
+  Findings, all confirming the parsing built from upstream source:
+  • Both key names are exact. Line 1 of the real file is
+    `arm supported arch list: arm`; the very last line (1189) is
+    `x86_64 supported arch list: xr_f_x86 all any noarch x86_64 corei7_64 fretta_x86`.
+    `ISO_MDATA_ARM_LIST`/`ISO_MDATA_X86_64_LIST` match both — note they must
+    stay `re.MULTILINE` and unanchored to file position, since the two keys
+    sit at opposite ends of a 1189-line file.
+  • Real variant-token vocabulary is now known, not guessed:
+    `x86_64` → `x86_64` and `corei7_64` → `x86_64` resolve through
+    `ARCH_ALIASES`; `arm` → `aarch64`. The remaining real tokens
+    (`xr_f_x86`, `fretta_x86` — NCS5500 platform codenames — and the
+    `all`/`any`/`noarch` wildcards) correctly resolve to `None` and are
+    ignored rather than mistaken for processor families.
+  • End-to-end: `inspect_iso_architecture()` on the real image returns
+    exactly `['aarch64', 'x86_64']`.
+  This item's `INFERRED` caveat is therefore lifted for eXR: the ISO
+  architecture fact is genuinely `VERIFIED` against real Cisco metadata, not
+  just against a synthetic fixture. (The LNT side below remains unvalidated —
+  no real LNT image was available.)
 - [ ] LNT images that ship no RPMs directly on the ISO (metadata-only /
   bundle-reference images, if any exist upstream) will report an empty,
   "unknown" architecture set and are not blocked — confirm whether upstream
