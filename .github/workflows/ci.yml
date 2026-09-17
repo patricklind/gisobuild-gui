@@ -79,6 +79,18 @@ jobs:
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/sbom:/out" anchore/syft:v1.33.0 giso-webui-giso-webui:latest \
             -o spdx-json=/out/giso-webui.spdx.json -q
+      - name: Build self-contained image (bundled gisobuild, no Docker socket)
+        run: |
+          docker build --platform linux/amd64 -f docker/selfcontained.Dockerfile \
+            --build-arg SOURCE_REVISION="$GITHUB_SHA" -t giso-webui-selfcontained .
+          docker run --rm giso-webui-selfcontained \
+            python3 /opt/gisobuild/src/gisobuild.py --help > /dev/null
+      - name: Scan self-contained image for fixable HIGH/CRITICAL vulnerabilities
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.65.0 image --quiet --scanners vuln \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            giso-webui-selfcontained:latest
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:

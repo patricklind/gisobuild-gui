@@ -34,6 +34,9 @@ RUN dnf -y install epel-release \
         python3.12 python3.12-pip \
     && python3 -m pip install --no-cache-dir dataclasses==0.8 defusedxml==0.7.1 \
         packaging==21.3 PyYAML==6.0.1 \
+    # vim-minimal comes with the base image, is not used by gisobuild or the
+    # app, and carries fixed HIGH CVEs (Trivy, 2026-09-17).
+    && dnf -y remove vim-minimal \
     && dnf clean all && rm -rf /var/cache/dnf
 
 WORKDIR /opt/app

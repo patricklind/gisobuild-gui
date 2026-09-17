@@ -83,6 +83,11 @@ Study:
 
 - [x] upstream `Dockerfile` - `almalinux:8.10` + `setup/prep_dependency.sh`;
       the self-contained image uses the same base (amd64 manifest digest).
+      Trivy (same CI gate as the socket image) first found seven fixed HIGH
+      CVEs, all in the base image's unused `vim-minimal`; it is removed and
+      the rescan passes with `--exit-code 1`. CI now builds this image,
+      checks `gisobuild.py --help` in it and scans it (actionlint-clean; not
+      yet observed on GitHub Actions).
 - [x] `setup/prep_dependency.sh` - its Red Hat package list is installed
       as-is; its `pip install --user` is replaced by a system-wide install at
       the versions `ciscogisobuild/cisco-xr-gisobuild:2.3.4` ships
