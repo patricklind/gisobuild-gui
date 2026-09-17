@@ -41,13 +41,13 @@ Core principle:
       the live inventory at job creation (`confirmed_plan_fingerprint`).
 - [x] Show warnings/blockers before build — fixed 2026-09-16
       (`recommend_smu_selection()` was silently dropping its own computed
-      `warnings`); still only itemized in full at the final confirmation,
-      not the entire time during Step 2 review (open gap, see
-      `06-UI-OPERATOR-TODO.md`'s Step 2 checklist).
-- [x] Build using bundled/pinned upstream gisobuild — `IMAGE` is pinned to
-      `ciscogisobuild/cisco-xr-gisobuild:2.3.4` by default and validated as
-      a well-formed reference; "bundled" (no external `.gisobuild-tool`
-      checkout) is not done, see below.
+      `warnings`); blockers, warnings and dependency problems are itemized
+      during Step 2 review as well as at Start (`06-UI-OPERATOR-TODO.md`),
+      now with an error code and suggested action per problem.
+- [x] Build using bundled/pinned upstream gisobuild — socket deployment:
+      `IMAGE` pinned to `ciscogisobuild/cisco-xr-gisobuild:2.3.4`;
+      self-contained deployment: gisobuild bundled at a verified commit
+      (see below).
 - [x] Verify output artifacts — `giso_artifact_candidates()` plus a
       byte-for-byte + SHA-256 comparison between source and archived copy
       before anything is deleted.
