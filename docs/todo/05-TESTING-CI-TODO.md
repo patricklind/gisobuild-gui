@@ -179,10 +179,35 @@ upload
 → archive
 ```
 
-- [ ] eXR integration
-- [ ] LNT integration
-- [ ] cancellation state-machine integration
-- [ ] multiple-build-inventory isolation integration
+Implemented 2026-09-17 in `giso-webui/tests/test_integration_build.py` (runs
+in the normal unit-test discovery, ~1 s). Everything from the upload
+endpoints to the archive is real code; only the docker CLI is a small fake
+executable that answers `inspect`/`ps`/`pull`/`stop` and, for `run`, records
+its arguments and behaves like gisobuild (streams output, writes a Golden ISO
+to `--out-directory`, fails the RPM dependency check, or runs until stopped).
+Running it also exposed a real leak, now fixed: `run_job()` never closed the
+build container's stdout pipe (one descriptor per build, left to the garbage
+collector).
+
+- [x] eXR integration - `test_exr_build_runs_the_plan_archives_the_image_and_cleans_inputs`:
+      ISO and a Cisco-style SMU tar (RPM + README manifest) through
+      `/api/uploads`, extraction, `/api/inputs` recommendation, `POST
+      /api/jobs`, engine arguments (`--iso`, staged `--repo`, `--label`,
+      `--out-directory`, volume mounts, no docker.sock), success, archive,
+      input cleanup, and job state restored from SQLite after dropping
+      memory. Failure path: `test_exr_dependency_failure_is_reported_and_inputs_are_kept`.
+- [x] LNT integration - `test_lnt_build_passes_lnt_only_options_to_the_engine`
+      (`8000` platform, `--xrconfig`, `--remove-packages`, engine `lnt`,
+      nothing staged when nothing is selected).
+- [x] cancellation state-machine integration -
+      `test_cancelling_a_running_build_stops_the_container_and_keeps_inputs`
+      (running → `DELETE` → `docker stop giso-build-<id>` → cancelled, no
+      archive, inputs kept, second cancel refused with 409).
+- [x] multiple-build-inventory isolation integration -
+      `test_consecutive_builds_use_only_their_own_inventory`.
+
+Not covered: a real `gisobuild` or builder image (see the licensed-ISO
+acceptance level in `docs/testing.md`).
 
 ## Browser/DOM tests
 
@@ -279,10 +304,10 @@ Run (`.github/workflows/ci.yml`):
       `giso-webui/browser_tests`.
 - [x] Docker build — "Build production container" step
       (`docker compose build giso-webui`).
-- [ ] synthetic eXR integration — no test actually drives a (mocked)
-      `gisobuild` invocation end-to-end; `staging/rehearse.py` exercises the
-      IOS XR CLI install/rollback simulator, which is a different thing.
-- [ ] synthetic LNT integration — same gap.
+- [x] synthetic eXR integration — `tests/test_integration_build.py`, run by
+      the existing "Run tests inside the built container" step (see
+      "Integration test" above).
+- [x] synthetic LNT integration — same file and step.
 - [ ] SBOM generation — not implemented.
 - [x] Graphify freshness validation for code-changing PRs
 

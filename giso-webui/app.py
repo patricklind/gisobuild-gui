@@ -2261,8 +2261,11 @@ def run_job(job_id: str, command: list[str]) -> None:
             jobs[job_id]["container_pid"] = proc.pid
         if proc.stdout is None:
             raise RuntimeError("Build container output stream is unavailable")
-        for line in proc.stdout:
-            append_log(job_id, line)
+        # Close the pipe explicitly: iterating it to EOF does not, so every
+        # build otherwise left a descriptor for the garbage collector.
+        with proc.stdout:
+            for line in proc.stdout:
+                append_log(job_id, line)
         code = proc.wait()
         with job_lock:
             job_processes.pop(job_id, None)
