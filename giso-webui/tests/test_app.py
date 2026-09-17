@@ -50,11 +50,15 @@ class GisoWebTests(unittest.TestCase):
         # own tests against a real genisoimage-built image.
         self.iso_signature = patch("app.is_iso9660_image", return_value=True)
         self.iso_signature.start()
+        # Never ask a real Docker daemon about images from a unit test.
+        self.cached_image = patch("app.local_builder_image_id", return_value=None)
+        self.cached_image.start()
         self.disk_usage = patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=100 * 1024**3))
         self.disk_usage.start()
         self.client = module.app.test_client()
 
     def tearDown(self):
+        self.cached_image.stop()
         self.iso_signature.stop()
         self.tool_available.stop()
         self.disk_usage.stop()
@@ -2666,8 +2670,33 @@ class GisoWebTests(unittest.TestCase):
         with patch.object(module, "GISO_PULL_TIMEOUT_SECONDS", 10):
             module.run_job("job", [module.DOCKER_BIN, "run"])
         self.assertEqual(module.jobs["job"]["status"], "failed")
+        self.assertIn("could not be pulled (timed out after 10 seconds) and is not cached",
+                      module.jobs["job"]["log"])
         pull.terminate.assert_called_once_with()
         pull.wait.assert_called_once_with(timeout=20)
+
+    @patch("app.subprocess.Popen")
+    def test_image_pull_timeout_uses_a_cached_builder_image(self, popen):
+        pull = MagicMock()
+        pull.communicate.side_effect = module.subprocess.TimeoutExpired(
+            [module.DOCKER_BIN, "pull"], 10
+        )
+        build = SimpleNamespace(pid=123, stdout=io.StringIO("built\n"), wait=lambda: 0)
+        popen.side_effect = [pull, build]
+        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
+                              "updated": 1, "log": "", "progress": 3,
+                              "phase": "Preparing", "artifacts": []}
+        cached = "sha256:" + "ab" * 32
+        with patch.object(module, "GISO_PULL_TIMEOUT_SECONDS", 10), \
+                patch.object(module, "IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4"), \
+                patch("app.local_builder_image_id", return_value=cached):
+            module.run_job("job", [module.DOCKER_BIN, "run"])
+        job = module.jobs["job"]
+        self.assertIn("built", job["log"])  # the build itself ran
+        self.assertEqual(job["builder_image"], {"reference": "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
+                                                "id": cached, "source": "cache"})
+        self.assertIn("using the copy already on this host", job["log"])
+        self.assertIn("may be older than the registry's", job["log"])
 
     @patch("app.subprocess.Popen")
     def test_run_job_honors_cancellation_during_image_pull(self, popen):

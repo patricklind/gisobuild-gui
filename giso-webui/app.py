@@ -2236,6 +2236,19 @@ def prepare_destructive_finalization(job_id: str) -> None:
         jobs[job_id]["status"] = "committing"
 
 
+def local_builder_image_id() -> str | None:
+    """Docker's ID for the builder image if this host already has it, else None."""
+    try:
+        result = subprocess.run(
+            [DOCKER_BIN, "image", "inspect", "--format", "{{.Id}}", IMAGE],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    image_id = result.stdout.strip()
+    return image_id if result.returncode == 0 and image_id.startswith("sha256:") else None
+
+
 def run_job(job_id: str, command: list[str]) -> None:
     with job_lock:
         job_started = jobs[job_id]["created"]
@@ -2255,22 +2268,49 @@ def run_job(job_id: str, command: list[str]) -> None:
         with job_lock:
             job_processes[job_id] = pull
             jobs[job_id]["process_phase"] = "pulling"
+        pull_failure = None
         try:
             pull_output, _ = pull.communicate(timeout=GISO_PULL_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             pull.terminate()
             pull.wait(timeout=20)
-            raise
+            pull_output, pull_failure = "", f"timed out after {GISO_PULL_TIMEOUT_SECONDS} seconds"
         finally:
             with job_lock:
                 job_processes.pop(job_id, None)
         if cancellation_requested(job_id):
             raise BuildCancelled("Build cancelled during image preparation")
-        if pull.returncode:
-            raise subprocess.CalledProcessError(pull.returncode, pull.args, output=pull_output)
         if pull_output:
             append_log(job_id, pull_output)
-        log_event("image_pull_completed", job_id=job_id)
+        if pull_failure is None and pull.returncode:
+            pull_failure = f"exited with status {pull.returncode}"
+        # Registry access is not a build input: when the pull fails, a builder
+        # image this host already holds is used instead of failing every build
+        # during a registry or network outage. A digest-pinned reference is
+        # content-addressed, so the cached copy is exactly what would have been
+        # pulled; a tag-only one may lag the registry, which the log says.
+        image_id = local_builder_image_id()
+        if pull_failure:
+            if image_id is None:
+                raise RuntimeError(
+                    f"The builder image could not be pulled ({pull_failure}) and is not cached "
+                    f"on this host: {IMAGE}"
+                )
+            pinned = "@sha256:" in IMAGE
+            append_log(job_id, (
+                f"\nWARNING: pulling the builder image {pull_failure}; using the copy already "
+                f"on this host ({image_id[:19]}). "
+                + ("The reference is digest-pinned, so it is identical.\n" if pinned else
+                   "The reference is a tag, so this copy may be older than the registry's.\n")
+            ))
+            log_event("image_pull_fallback_to_cache", job_id=job_id, pinned=pinned)
+        else:
+            log_event("image_pull_completed", job_id=job_id)
+        with job_lock:
+            jobs[job_id]["builder_image"] = {
+                "reference": IMAGE, "id": image_id,
+                "source": "cache" if pull_failure else "registry",
+            }
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, bufsize=1, start_new_session=True)
         with job_lock:

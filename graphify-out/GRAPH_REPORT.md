@@ -1,17 +1,17 @@
 # Graph Report - work  (2026-09-17)
 
 ## Corpus Check
-- 52 files · ~88,741 words
+- 52 files · ~89,334 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 15 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 2)
 
 ## Summary
-- 1043 nodes · 1727 edges · 64 communities (41 shown, 15 thin omitted)
+- 1048 nodes · 1740 edges · 61 communities (40 shown, 13 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 31 edges (avg confidence: 0.87)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c2d75fa9`
+- Built from commit: `ac474f62`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -64,17 +64,14 @@
 - Path
 - check_graphify_freshness.py
 - SyntheticBuildIntegrationTests
-- RuntimeError
 - staging/README.md
 - create_build_plan
-- MaintenanceTests
-- explain_with_prerequisites
+- add_superseded_exclusions
 - inspect_iso_shipped_packages
 - find_cisco_images
-- iso_architectures_from_mdata
 
 ## God Nodes (most connected - your core abstractions)
-1. `GisoWebTests` - 203 edges
+1. `GisoWebTests` - 204 edges
 2. `PlatformCompatibilityTests` - 35 edges
 3. `create_build_plan()` - 27 edges
 4. `validate_smu_selection()` - 26 edges
@@ -100,7 +97,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (64 total, 15 thin omitted)
+## Communities (61 total, 13 thin omitted)
 
 ### Community 2 - "CiscoDownloadError"
 Cohesion: 0.07
@@ -115,8 +112,8 @@ Cohesion: 0.08
 Nodes (25): 1. Determine the platform and install architecture, 2. Validate the supported upgrade path, 3. Prepare the build inputs, 4. Build the GISO, 5. Validate the build output, 6. Prepare the router and change window, 7. Install the GISO, 8. Post-upgrade validation (+17 more)
 
 ### Community 5 - "PlatformCompatibilityTests"
-Cohesion: 0.06
-Nodes (25): iso_architectures_from_listing(), Fall back to the ISO's own RPM repository when no eXR metadata file exists. LNT…, _bundle_files_by_csc(), capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), GisoBuildCapabilities, infer_platform() (+17 more)
+Cohesion: 0.07
+Nodes (22): _bundle_files_by_csc(), capabilities_for_platform(), check_upgrade_matrix(), matrix_platform(), GisoBuildCapabilities, infer_platform(), is_lnt_platform(), lnt_rpm_release() (+14 more)
 
 ### Community 7 - "System architecture"
 Cohesion: 0.13
@@ -227,20 +224,20 @@ Cohesion: 0.50
 Nodes (3): Files, TODO roadmap for AI-assisted development, Update policy
 
 ### Community 47 - "app.py"
-Cohesion: 0.08
-Nodes (42): errorhandler, get, activity(), archive_checksums(), archive_delete(), archive_download(), archive_list(), bad_request() (+34 more)
+Cohesion: 0.09
+Nodes (37): errorhandler, get, activity(), archive_checksums(), archive_delete(), archive_download(), archive_list(), bad_request() (+29 more)
 
 ### Community 48 - "create_job"
-Cohesion: 0.11
-Nodes (38): after_request, delete, Exception, append_activity(), append_log(), build_environment_blockers(), build_plan(), cancel_job() (+30 more)
+Cohesion: 0.10
+Nodes (40): after_request, delete, Exception, append_activity(), append_log(), build_environment_blockers(), build_plan(), cancel_job() (+32 more)
 
 ### Community 49 - "enforce_archive_policy"
 Cohesion: 0.11
-Nodes (18): before_request, archive_size(), archive_timestamp(), build_space_blockers(), build_volume_free_bytes(), enforce_archive_policy(), expire_upload_sessions(), initialize_job_store() (+10 more)
+Nodes (15): before_request, archive_size(), archive_timestamp(), build_space_blockers(), build_volume_free_bytes(), enforce_archive_policy(), expire_upload_sessions(), Free space on every volume a build actually touches, not just uploads. Every… (+7 more)
 
 ### Community 52 - "Path"
-Cohesion: 0.13
-Nodes (23): archive_giso_artifacts_and_cleanup(), archive_source_for_extraction(), archive_suffix(), build_cleanup_paths(), command_preview(), extract_cisco_archive(), extraction_path(), file_sha256() (+15 more)
+Cohesion: 0.08
+Nodes (37): archive_giso_artifacts_and_cleanup(), archive_source_for_extraction(), archive_suffix(), build_cleanup_paths(), BuildCancelled, cancellation_requested(), child_mount_args(), command_preview() (+29 more)
 
 ### Community 53 - "check_graphify_freshness.py"
 Cohesion: 0.50
@@ -250,17 +247,13 @@ Nodes (7): check(), main(), normalized_graph(), Path, Regenerate the tracked cod
 Cohesion: 0.24
 Nodes (4): Synthetic end-to-end build integration: the real job pipeline, a fake engine.…, The real browser upload protocol: init, chunked PUT, complete., A Cisco-style SMU tar: the RPMs plus a README whose RPMS block lists them., SyntheticBuildIntegrationTests
 
-### Community 55 - "RuntimeError"
-Cohesion: 0.20
-Nodes (10): BuildCancelled, child_mount_args(), prepare_destructive_finalization(), RuntimeError, Stop a build lifecycle without converting cancellation into failure., Share only required storage with the build container, never docker.sock., Commit the final state transition before any owned input is removed., validate_archive_retention_days() (+2 more)
-
 ### Community 57 - "create_build_plan"
 Cohesion: 0.08
-Nodes (49): active_rpm_names(), add_superseded_exclusions(), build_command(), cisco_text(), compatibility(), confidence_report(), create_build_plan(), current_inventory_revision() (+41 more)
+Nodes (43): active_rpm_names(), build_command(), cisco_text(), compatibility(), confidence_report(), create_build_plan(), current_inventory_revision(), dependency_blocker_text() (+35 more)
 
-### Community 59 - "explain_with_prerequisites"
-Cohesion: 0.25
-Nodes (8): explain_with_prerequisites(), Every bounded-size .txt in the workspace - Cisco ships one README per SMU., {SMU name: {rpm basename: md5}} from each Cisco SMU README's "RPMS:" block.…, {SMU name: {package name: prerequisite SMU name}} from each README. A Cisco SMU…, Name the Cisco SMU that supplies each unsatisfiable requirement, when a README…, smu_readme_manifests(), smu_readme_prerequisites(), smu_readme_texts()
+### Community 59 - "add_superseded_exclusions"
+Cohesion: 0.11
+Nodes (24): add_superseded_exclusions(), explain_with_prerequisites(), file_checksums(), file_metadata_provenance(), A package's containing directory names the Cisco supersedence identifier it…, Explain, rather than silently drop, RPMs active_rpm_names() already filtered…, Every bounded-size .txt in the workspace - Cisco ships one README per SMU., {SMU name: {rpm basename: md5}} from each Cisco SMU README's "RPMS:" block.… (+16 more)
 
 ### Community 60 - "inspect_iso_shipped_packages"
 Cohesion: 0.33
@@ -268,14 +261,14 @@ Nodes (6): inspect_iso_shipped_packages(), iso_shipped_packages_from_mdata(), Ma
 
 ## Knowledge Gaps
 - **235 isolated node(s):** `inputs`, `platformProfiles`, `VOLUME_LABELS`, `CONFIDENCE_LABELS`, `READY_CHECK_LABELS` (+230 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 518 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 519 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `IsoArchitectureInspectionTests`, `.test_discover_tolerates_file_removed_during_scan`, `.test_build_waits_for_tar_extraction_to_finish`, `._smu_fix`, `.upload`, `dict`, `Path`, `.test_failed_multi_file_cisco_download_removes_partial_results`?**
-  _High betweenness centrality (0.151) - this node is a cross-community bridge._
+- **Why does `GisoWebTests` connect `GisoWebTests` to `patch`, `IsoArchitectureInspectionTests`, `.test_discover_tolerates_file_removed_during_scan`, `.test_inventory_reports_where_each_rpm_identity_comes_from`, `.upload`, `._smu_fix`, `dict`, `Path`, `.test_failed_multi_file_cisco_download_removes_partial_results`?**
+  _High betweenness centrality (0.144) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `patch` (e.g. with `.setUpClass()` and `.test_dependency_blocker_names_the_prerequisite_smu()`) actually correct?**
   _`patch` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inputs`, `platformProfiles`, `VOLUME_LABELS` to the rest of the system?**

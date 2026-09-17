@@ -42,7 +42,15 @@ if command == "inspect":
 elif command == "ps":
     pass  # no build container running
 elif command == "pull":
+    if os.environ.get("FAKE_PULL") == "fail":
+        print("Error response from daemon: registry unreachable")
+        sys.exit(1)
     print("Status: Image is up to date for " + args[-1])
+elif command == "image" and args[1:2] == ["inspect"]:
+    if os.environ.get("FAKE_IMAGE_CACHED", "1") == "0":
+        print("Error: No such image: " + args[-1], file=sys.stderr)
+        sys.exit(1)
+    print("sha256:" + "c0" * 32)
 elif command == "stop":
     with open(os.environ["FAKE_DOCKER_STOPS"], "a") as handle:
         handle.write(args[-1] + "\n")
@@ -185,6 +193,7 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
 
         self.assertEqual(job["status"], "success", job.get("log"))
         self.assertEqual(job["exit_code"], 0)
+        self.assertEqual(module.jobs[job_id]["builder_image"]["source"], "registry")
         self.assertIn("Gisobuild starting", job["log"])
         self.assertIn("Golden ISO build complete", job["log"])
 
@@ -305,6 +314,32 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
                          ["ncs5500-golden-x-25.1.2-FIRST.iso"])
         self.assertEqual(sorted(path.name for path in (module.ARCHIVE / second_id).glob("*.iso")),
                          ["ncs5500-golden-x-25.1.2-SECOND.iso"])
+
+
+    def test_registry_outage_builds_with_the_cached_builder_image(self):
+        self.write(self.ISO)
+        self.write(self.ROUTING)
+        with patch.dict(os.environ, {"FAKE_PULL": "fail"}), \
+                patch.object(module, "IMAGE", "ciscogisobuild/cisco-xr-gisobuild@sha256:" + "be" * 32):
+            job = self.wait_for_job(self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
+                                                      "pkglist": []}))
+        self.assertEqual(job["status"], "success", job.get("log"))
+        self.assertIn("registry unreachable", job["log"])
+        self.assertIn("digest-pinned, so it is identical", job["log"])
+        self.assertEqual(module.jobs[job["id"]]["builder_image"]["source"], "cache")
+        self.assertEqual(module.jobs[job["id"]]["builder_image"]["id"], "sha256:" + "c0" * 32)
+
+    def test_registry_outage_without_a_cached_image_fails_clearly(self):
+        iso = self.write(self.ISO)
+        rpm = self.write(self.ROUTING)
+        with patch.dict(os.environ, {"FAKE_PULL": "fail", "FAKE_IMAGE_CACHED": "0"}):
+            job = self.wait_for_job(self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
+                                                      "pkglist": []}))
+        self.assertEqual(job["status"], "failed")
+        self.assertIn("could not be pulled (exited with status 1) and is not cached", job["log"])
+        self.assertFalse(self.args_file.exists())  # the engine never ran
+        self.assertTrue(iso.exists())
+        self.assertTrue(rpm.exists())
 
 
 if __name__ == "__main__":

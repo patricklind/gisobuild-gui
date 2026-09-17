@@ -176,7 +176,22 @@ Mandatory regression coverage for:
 - [x] bridge-SMU near-match does not satisfy exact package/CSC presence
 - [x] discovery remains safe while cleanup/delete runs concurrently
 - [x] auto-derived target release refreshes when base ISO changes
-- [ ] cached builder behavior is defined when registry access fails during the migration period
+- [x] cached builder behavior is defined when registry access fails during the migration period
+      - defined and implemented 2026-09-17. Before, any failed or timed-out
+      `docker pull` failed the build even with the builder image already on
+      the host. Now `run_job()` falls back to the local copy
+      (`local_builder_image_id()`, `docker image inspect --format {{.Id}}`),
+      logs a WARNING that says whether the reference is digest-pinned
+      (identical content) or a tag (may lag the registry), and records
+      `builder_image: {reference, id, source: "registry"|"cache"}` on the
+      job; with no cached copy the build fails naming both facts and the
+      engine never runs. Tests: `test_image_pull_timeout_uses_a_cached_builder_image`,
+      `test_image_pull_timeout_marks_build_failed`,
+      `test_registry_outage_builds_with_the_cached_builder_image`,
+      `test_registry_outage_without_a_cached_image_fails_clearly`. Checked
+      against the real Docker daemon: the cached
+      `ciscogisobuild/cisco-xr-gisobuild:2.3.4` resolves to
+      `sha256:be282c7a76b0…` and a missing reference to `None`.
 
 See `07-BUG-AUDIT-TODO.md` for the implementation details and failure scenarios behind these tests.
 
