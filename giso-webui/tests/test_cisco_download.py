@@ -66,7 +66,7 @@ class CiscoDownloadTests(unittest.TestCase):
             result = client.download(
                 "https://download.cisco.com/file.iso", Path(directory) / "file.iso",
                 expected_size=len(payload), max_bytes=1024,
-                expected_md5=hashlib.md5(payload).hexdigest(),
+                expected_md5=hashlib.md5(payload, usedforsecurity=False).hexdigest(),
                 expected_sha512=hashlib.sha512(payload).hexdigest(),
                 progress=lambda written, total: progress.append((written, total)),
             )

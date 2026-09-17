@@ -26,7 +26,7 @@ jobs:
           docker run --rm -v "$PWD:/project:ro" -w /project gisobuild-tooling \
             ruff check giso-webui/app.py giso-webui/cisco_download.py \
             giso-webui/maintenance.py giso-webui/platform_validation.py \
-            giso-webui/tests staging scripts --cache-dir=/tmp/ruff-cache
+            giso-webui/tests giso-webui/browser_tests staging scripts --cache-dir=/tmp/ruff-cache
       - name: Validate Graphify freshness and artifact exclusions
         run: |
           docker run --rm -v "$PWD:/project" -w /project gisobuild-tooling \

@@ -260,10 +260,23 @@ Run (`.github/workflows/ci.yml`):
       the repo-root `ruff.toml` (also fixed 2026-09-16, see the same
       `07-BUG-AUDIT-TODO.md` entry) — both the ruff *version* and the rule
       *selection* it runs are now reproducible.
-- [ ] formatting check — ruff lints but nothing runs `ruff format --check`
-      or an equivalent formatter gate.
-- [ ] static security checks — no bandit/semgrep-equivalent step; ruff's
-      default rule set is not the same as an explicit security ruleset.
+- [ ] formatting check — deliberately still open. `ruff format --check`
+      (2026-09-17) would reformat 13 of 16 Python files, `app.py` wholesale;
+      adopting a formatter is a one-off whole-repo rewrite that should land
+      on its own, not inside feature work, so no gate is added yet.
+- [x] static security checks — 2026-09-17: `ruff.toml` now extends the
+      pinned selection with the whole flake8-bandit `S` family, so the
+      existing "Lint Python" CI step is the security gate. Ignored with a
+      written reason: `S603` (every subprocess call is list-form, never
+      `shell=True`) and `S607` (`git`/`genisoimage` by PATH inside pinned
+      images). The eight other findings were reviewed one by one: `S105`
+      on `TOKEN_URL` (a URL), `S310` on Cisco API constants and on URLs
+      already checked by `_validate_download_url()` (https, allowlisted
+      host, global addresses only), and on `scripts/e2e_real_iso.py`'s
+      validated origin - each carries a justified `noqa`; the three `S324`
+      test MD5s now pass `usedforsecurity=False`. `ruff check giso-webui
+      staging scripts` passes; the CI lint now also covers
+      `giso-webui/browser_tests`.
 - [x] Docker build — "Build production container" step
       (`docker compose build giso-webui`).
 - [ ] synthetic eXR integration — no test actually drives a (mocked)

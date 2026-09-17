@@ -10,6 +10,18 @@
 # here on regardless of what future ruff versions default to.
 
 [lint]
+# Security gate (added 2026-09-17, docs/todo/05-TESTING-CI-TODO.md "static
+# security checks"): the whole flake8-bandit "S" family on top of the pinned
+# defaults below. Two rules are ignored with a reason, not silently:
+#   S603 - every subprocess call here passes an argument list, never
+#          shell=True, and no argument is an unvalidated request value; the
+#          rule fires on every list-form call regardless.
+#   S607 - "git"/"genisoimage" by PATH is intended inside the pinned images;
+#          absolute paths are configured where they matter (DOCKER_BIN,
+#          ISOINFO_BIN, RPM_BIN).
+# Any other S finding must be fixed or carry a noqa with its justification.
+extend-select = ["S"]
+ignore = ["S603", "S607"]
 select = [
     "ASYNC100",
     "ASYNC105",

@@ -1463,7 +1463,7 @@ class GisoWebTests(unittest.TestCase):
     def _smu_fix(self, smu, contents, uploaded):
         directory = self.data / smu
         directory.mkdir()
-        rpms = {name: hashlib.md5(body).hexdigest() for name, body in contents.items()}
+        rpms = {name: hashlib.md5(body, usedforsecurity=False).hexdigest() for name, body in contents.items()}
         (directory / f"{smu}.txt").write_text(self._smu_readme(smu, rpms))
         for name in uploaded:
             (directory / name).write_bytes(contents[name])
@@ -1504,7 +1504,7 @@ class GisoWebTests(unittest.TestCase):
         # Layout of a real Cisco README: SMU-level prerequisites, then per
         # package under CONSTITUENT SMU DETAILS.
         (directory / f"{smu}.txt").write_text(
-            self._smu_readme(smu, {rpm: hashlib.md5(b"rpm").hexdigest()})
+            self._smu_readme(smu, {rpm: hashlib.md5(b"rpm", usedforsecurity=False).hexdigest()})
             + "          ncs5500-25.1.2.CSCtest00099\n\n"
             "Supercedes:              \n          ncs5500-25.1.2.CSCtest00099   Partial\n\n"
             "CONSTITUENT SMU DETAILS:\n\nSource Packages:         ncs5500-infra\n"

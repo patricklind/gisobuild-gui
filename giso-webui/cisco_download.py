@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-TOKEN_URL = "https://id.cisco.com/oauth2/default/v1/token"
+TOKEN_URL = "https://id.cisco.com/oauth2/default/v1/token"  # noqa: S105 - an endpoint URL, not a secret
 METADATA_URL = "https://apix.cisco.com/software/v4.0/metadata/pidrelease"
 DOWNLOAD_URL = "https://apix.cisco.com/software/v4.0/download/pidimage"
 EULA_URL = "https://apix.cisco.com/software/v4.0/compliance/eula"
@@ -109,7 +109,8 @@ class CiscoSoftwareClient:
         headers = {"Accept": "application/json", "Content-Type": content_type}
         if authenticated:
             headers["Authorization"] = f"Bearer {self._access_token()}"
-        request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        # url is always one of the https Cisco API constants above.
+        request = urllib.request.Request(url, data=body, headers=headers, method="POST")  # noqa: S310
         try:
             with self._opener.open(request, timeout=self.timeout) as response:
                 data = response.read(2 * 1024 * 1024 + 1)
@@ -218,7 +219,8 @@ class CiscoSoftwareClient:
         try:
             for _ in range(6):
                 self._validate_download_url(current)
-                request = urllib.request.Request(current, data=body, headers=headers, method=method)
+                # Validated just above: https, allowlisted host, global IPs only.
+                request = urllib.request.Request(current, data=body, headers=headers, method=method)  # noqa: S310
                 try:
                     response = self._opener.open(request, timeout=self.timeout)
                 except urllib.error.HTTPError as exc:

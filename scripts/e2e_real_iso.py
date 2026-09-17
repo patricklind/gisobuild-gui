@@ -18,8 +18,8 @@ ACTIVE_STATUSES = {"queued", "running", "cancelling"}
 def request(url: str, *, method: str = "GET", data: bytes | None = None) -> dict | list:
     headers = {"Content-Type": "application/json"} if data and method == "POST" else {}
     # The operator-selected origin is validated to HTTP(S) before any request.
-    with urllib.request.urlopen(  # nosec B310
-        urllib.request.Request(url, data=data, headers=headers, method=method), timeout=120
+    with urllib.request.urlopen(  # nosec B310  # noqa: S310
+        urllib.request.Request(url, data=data, headers=headers, method=method), timeout=120  # noqa: S310
     ) as response:
         return json.load(response)
 
