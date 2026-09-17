@@ -598,5 +598,6 @@ repo's `.gisobuild-tool` mounted it returned no blockers.
       `test_exr_usb_support_matches_the_pinned_upstream_usb_scripts`; LNT:
       USB unless `--skip-usb-image`), `validate_platform_options()` blocks
       options the engine does not support (`OPTION_UNSUPPORTED`), and the
-      real self-contained NCS5500 build produced exactly the predicted ISO +
-      USB zip.
+      real self-contained NCS5500 build produced ISO + USB zip, which the
+      plan predicted wrongly then (it honoured `--skip-usb-image`) and the
+      corrected logic now predicts.
