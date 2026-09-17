@@ -40,15 +40,26 @@ orchestrator's restart policy should watch. `/api/ready` returns HTTP 503 when
 Docker, required storage mounts, the state database, free disk space, or the
 local `gisobuild` tool entry point is unavailable — use it to decide whether
 to route traffic or investigate a degraded-but-alive container, not whether to
-restart it. Image pulls are bounded by `GISO_PULL_TIMEOUT_SECONDS` (600
-seconds by default); a timeout marks the job failed and preserves uploaded
-inputs for diagnosis or retry.
+restart it. Its `self_test` object names each startup check (gisobuild, runner
+binary, job store schema, writable volumes, configuration, free space, CPU
+architecture) with a short reason. Image pulls are bounded by
+`GISO_PULL_TIMEOUT_SECONDS` (600 seconds by default); if the pull fails or times
+out, a builder image already on the host is used and the job log says so (a
+digest-pinned reference is identical; a tag may be older). Without a cached
+image the job fails and uploaded inputs are preserved.
 
 The application accepts one build at a time. A separate maintenance service
 removes complete archives older than 30 days and then removes the oldest
 complete archives until combined ISO/USB use is at or below 50 GiB. Both values
-are configurable in `.env`. Incomplete upload sessions expire after 24 hours by
-default (`UPLOAD_SESSION_TTL=86400`), which also removes their partial files.
+are configurable in `.env`. Incomplete upload sessions survive a service
+restart and can be resumed by selecting the same file again; they expire after
+24 hours by default (`UPLOAD_SESSION_TTL=86400`), which also removes their
+partial files. A session idle for `UPLOAD_ACTIVE_SECONDS` (600) no longer blocks
+builds or cleanup.
+
+The self-contained deployment is operated the same way with
+`-f giso-webui/compose.selfcontained.yaml`; it needs no `.gisobuild-tool`
+checkout and no Docker socket.
 
 ## Stop and upgrade
 
@@ -96,11 +107,14 @@ licensed and protected appropriately. Test restore procedures periodically.
 
 | Symptom | Check | Safe action |
 | --- | --- | --- |
-| `/api/ready` fails | `docker info`, `/tool/src/gisobuild.py`, mounted storage, the state database, free disk space, and web logs | Restore the failed dependency; do not expose the service remotely |
+| `/api/ready` fails | Its `self_test` details, `docker info` (socket deployment), gisobuild presence, mounted storage, the state database, free disk space, and web logs | Restore the failed dependency; do not expose the service remotely |
+| Build plan says the job store cannot be used | Web log `job_store_schema_unsupported` | The state volume was written by a newer release; run that release or restore a matching backup |
+| Plan blocked: SYS_CHROOT (self-contained) | Compose `cap_add` | Add `SYS_CHROOT`; gisobuild's eXR engine needs it |
 | `/api/health` fails | Container/process state and web logs | The process itself is down or unresponsive; restart the service |
 | Build will not start | Active jobs/uploads and `giso-build-*` containers | Wait, cancel the active upload, or investigate the surviving build container before cleanup |
 | Job is `interrupted` | Saved log and Docker container list | Reconcile the old container; do not assume the build failed cleanly |
 | Upload rejected | Extension, configured limits, and free space | Correct the input or increase a reviewed limit |
+| Upload paused | Network and service availability | Select the same file again; it resumes from the bytes already received |
 | No USB artifact | Platform matrix and build log | Use the documented platform recovery method |
 | Archive removed | Age and combined archive size | Restore an approved external backup; retention deletion is intentional |
 
