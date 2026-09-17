@@ -415,6 +415,19 @@ Every exclusion must explain why:
 
 ## Confidence display
 
+**Update 2026-09-17:** the grid is now evidence-based beyond the ISO fields.
+RPM architecture is `VERIFIED` when every selected RPM's header confirmed its
+name; CSC grouping is `VERIFIED` when every selected fix RPM is listed (MD5
+checked) in its Cisco SMU README; dependency closure is `PARTIAL` when the
+header-based pre-check ran against the ISO's package list (new badge value,
+explained in the note). Otherwise the older `INFERRED`/`UNKNOWN` values below
+still apply. Test: `test_confidence_is_verified_only_by_evidence_from_the_files`.
+Real NCS5500 25.1.2 bundle + 20 SMUs: platform, release, ISO architecture,
+RPM architecture and CSC grouping `VERIFIED`, dependency closure `PARTIAL`,
+and the "Filename checks cannot prove RPM dependencies" warning replaced by
+one stating the header pre-check ran. The notes below describe the state
+before this update.
+
 Use:
 
 - [x] `VERIFIED`

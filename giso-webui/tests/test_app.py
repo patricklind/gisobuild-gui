@@ -2079,6 +2079,28 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(confidence["iso_architecture"]["value"], "UNKNOWN")
         self.assertEqual(confidence["dependency_closure"]["value"], "UNKNOWN")
 
+    def test_confidence_is_verified_only_by_evidence_from_the_files(self):
+        base = {"resolved_platform": "ncs5500", "platform_manual": False, "release": "25.1.2",
+                "iso_architectures": frozenset({"x86_64"}), "package_groups": [{"csc": "CSCX"}],
+                "has_rpm_selection": True}
+        plain = module.confidence_report(**base)
+        proven = module.confidence_report(**base, evidence={
+            "rpm_headers_verified": True, "csc_groups_verified": True, "dependency_pre_checked": True})
+        self.assertEqual([plain[k]["value"] for k in ("package_architecture", "csc_groups", "dependency_closure")],
+                         ["INFERRED", "INFERRED", "UNKNOWN"])
+        self.assertEqual([proven[k]["value"] for k in ("package_architecture", "csc_groups", "dependency_closure")],
+                         ["VERIFIED", "VERIFIED", "PARTIAL"])
+        self.assertEqual(proven["csc_groups"]["source"], "smu-readme")
+        # No RPMs selected: nothing to verify, whatever the evidence says.
+        empty = module.confidence_report(**{**base, "has_rpm_selection": False, "package_groups": []},
+                                         evidence={"rpm_headers_verified": True, "csc_groups_verified": True,
+                                                   "dependency_pre_checked": True})
+        self.assertEqual(empty["dependency_closure"]["value"], "UNKNOWN")
+        reworded = module.reword_dependency_warning([module.FILENAME_DEPENDENCY_WARNING, "other"],
+                                                    {"dependency_pre_checked": True})
+        self.assertIn("pre-checked from the packages' own headers", reworded[0])
+        self.assertEqual(reworded[1], "other")
+
     def test_build_plan_confidence_marks_filename_derived_fields_as_inferred(self):
         # Platform, release and CSC grouping all come from filename regexes,
         # not from parsing the artifact itself, so none of them may be

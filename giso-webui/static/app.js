@@ -368,7 +368,7 @@ function confidenceGrid(confidence) {
   });
   section.appendChild(grid);
   const note=document.createElement('p'); note.className='confidence-note';
-  note.textContent='VERIFIED means it was read from the file itself; INFERRED means it was guessed from a filename; MANUAL means the operator explicitly declared it without confirming the exact platform; UNKNOWN means it could not be determined here.';
+  note.textContent='VERIFIED means it was read from the files themselves; INFERRED means it was guessed from a filename; PARTIAL means part of it was checked here and gisobuild checks the rest; MANUAL means the operator explicitly declared it without confirming the exact platform; UNKNOWN means it could not be determined here.';
   section.appendChild(note);
   return section;
 }

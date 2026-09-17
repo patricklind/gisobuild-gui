@@ -1404,18 +1404,67 @@ def current_inventory_revision(items: list[dict] | None = None) -> str:
     return hashlib.sha256(json.dumps(state, sort_keys=True).encode()).hexdigest()[:24]
 
 
+FILENAME_DEPENDENCY_WARNING = (
+    "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs the authoritative dependency check"
+)
+
+
+def selection_evidence(iso_relative_path: str | None, selected_names: list[str]) -> dict:
+    """What the selected RPMs' own metadata confirmed, for confidence_report().
+
+    rpm_headers_verified: every selected RPM's header matched its filename, so
+    architecture and CSC tag are read from the package itself. csc_groups_verified:
+    every selected RPM is listed in a Cisco SMU README (with its MD5 checked).
+    dependency_pre_checked: headers were readable and the base image's package
+    list is known, so missing_package_dependencies() really ran on this set.
+    """
+    names = [name for name in selected_names if name.lower().endswith(".rpm")]
+    evidence = {"rpm_headers_verified": False, "csc_groups_verified": False,
+                "dependency_pre_checked": False}
+    if not names:
+        return evidence
+    by_name = {item["basename"]: item for item in inventory_files() if item["type"] == ".rpm"}
+    evidence["rpm_headers_verified"] = all(
+        by_name.get(name, {}).get("metadata_confidence") == "high" for name in names)
+    # Only RPMs that belong to a fix (carry a CSC ID) have a README; optional
+    # base-image packages are not CSC groups and need none.
+    listed = {rpm for rpms in smu_readme_manifests(smu_readme_texts()).values() for rpm in rpms}
+    fixes = [name for name in names if re.search(r"\.CSC[A-Za-z0-9]+\.", name)]
+    evidence["csc_groups_verified"] = bool(fixes) and all(name in listed for name in fixes)
+    if evidence["rpm_headers_verified"] and iso_relative_path:
+        try:
+            iso_path = safe_data_path(iso_relative_path)
+            evidence["dependency_pre_checked"] = iso_path.is_file() and bool(
+                inspect_iso_shipped_packages(iso_path))
+        except (OSError, ValueError):
+            pass
+    return evidence
+
+
+def reword_dependency_warning(warnings: list[str], evidence: dict) -> list[str]:
+    """Replace the filename-only dependency caveat once the header pre-check really ran."""
+    if not evidence.get("dependency_pre_checked"):
+        return warnings
+    return [("RPM dependencies were pre-checked from the packages' own headers against the base "
+             "image's package list; Cisco gisobuild still performs the complete dependency check")
+            if warning == FILENAME_DEPENDENCY_WARNING else warning for warning in warnings]
+
+
 def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
                       release: str | None, iso_architectures: frozenset[str],
                       package_groups: list, has_rpm_selection: bool,
                       matched_pid: str | None = None,
-                      identity_from_metadata: bool = False) -> dict:
+                      identity_from_metadata: bool = False,
+                      evidence: dict | None = None) -> dict:
     """Report how each detected fact was derived, never presenting a guess as verified.
 
-    Only iso_architecture is read from the artifact's own contents (see
-    inspect_iso_architecture) and can honestly be called VERIFIED. Platform,
-    release, RPM architecture and CSC grouping are all read from filenames,
-    so they stay INFERRED even when the operator picked the platform
-    manually; dependency closure is never computed here at all.
+    A fact is VERIFIED only when the artifacts themselves confirmed it: ISO
+    architecture from the image's contents, platform/release from its
+    embedded metadata, RPM architecture from every selected RPM's header, CSC
+    grouping from Cisco's SMU READMEs (see selection_evidence()). Otherwise it
+    is INFERRED from filenames. Dependency closure is at most PARTIAL: the
+    pre-check covers exact requirements against the ISO's package list, and
+    only gisobuild runs the complete RPM transaction check.
 
     A platform of exr-generic/lnt-generic is a third case, distinct from
     both: it is not a filename guess (INFERRED) and not a real, named
@@ -1450,6 +1499,10 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     if matched_pid and not platform_is_generic:
         platform_detail += f" Matched hardware PID/SKU spelling: {matched_pid.upper()}."
     release_verified = identity_from_metadata and bool(release)
+    evidence = evidence or {}
+    headers = has_rpm_selection and evidence.get("rpm_headers_verified", False)
+    readmes = bool(package_groups) and evidence.get("csc_groups_verified", False)
+    pre_checked = has_rpm_selection and evidence.get("dependency_pre_checked", False)
     return {
         "platform": {
             "value": platform_value,
@@ -1475,21 +1528,28 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
                       "unreadable image, or no recognizable architecture markers).",
         },
         "package_architecture": {
-            "value": "INFERRED" if has_rpm_selection else "UNKNOWN",
-            "source": "rpm-filename-suffix",
-            "detail": "Read from each RPM filename's architecture suffix; not parsed from the "
-                      "RPM header.",
+            "value": "VERIFIED" if headers else "INFERRED" if has_rpm_selection else "UNKNOWN",
+            "source": "rpm-header" if headers else "rpm-filename-suffix",
+            "detail": ("Every selected RPM's own header confirmed its name, version, release and "
+                       "architecture." if headers else
+                       "Read from each RPM filename's architecture suffix; not confirmed by every "
+                       "RPM header."),
         },
         "csc_groups": {
-            "value": "INFERRED" if package_groups else "UNKNOWN",
-            "source": "rpm-filename-pattern",
-            "detail": "CSC identifiers and component grouping are read from RPM filenames.",
+            "value": "VERIFIED" if readmes else "INFERRED" if package_groups else "UNKNOWN",
+            "source": "smu-readme" if readmes else "rpm-filename-pattern",
+            "detail": ("Every selected RPM is listed, with a matching MD5, in its Cisco SMU README."
+                       if readmes else
+                       "CSC identifiers and component grouping are read from RPM filenames."),
         },
         "dependency_closure": {
-            "value": "UNKNOWN",
-            "source": "none",
-            "detail": "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs "
-                      "the authoritative dependency check during the build.",
+            "value": "PARTIAL" if pre_checked else "UNKNOWN",
+            "source": "rpm-header-vs-iso-packages" if pre_checked else "none",
+            "detail": ("Exact-version requirements from the RPM headers were checked against the "
+                       "base image's package list and the selection; Cisco gisobuild performs the "
+                       "complete dependency check during the build." if pre_checked else
+                       "RPM dependencies could not be pre-checked here; Cisco gisobuild performs "
+                       "the authoritative dependency check during the build."),
         },
     }
 
@@ -1687,7 +1747,11 @@ def create_build_plan(payload: dict) -> dict:
         validate_smu_selection(identity_name, [])["iso_release"] if iso else None
     )
     resolved_platform = (profile["id"] if profile else None) or recommendation.get("platform")
+    evidence = selection_evidence(iso["relative_path"] if iso else None,
+                                  [item["basename"] for item in selected])
+    warnings = reword_dependency_warning(warnings, evidence)
     confidence = confidence_report(
+        evidence=evidence,
         resolved_platform=resolved_platform,
         platform_manual=bool(payload.get("platform")),
         release=release,
@@ -2370,7 +2434,11 @@ def discover() -> dict:
         unsatisfied_dependencies_for_recommendation(isos[0], recommendation.get("selected", []))
         if len(isos) == 1 else []
     )
+    evidence = selection_evidence(isos[0] if len(isos) == 1 else None,
+                                  recommendation.get("selected", []))
+    recommendation["warnings"] = reword_dependency_warning(recommendation.get("warnings", []), evidence)
     recommendation["confidence"] = confidence_report(
+        evidence=evidence,
         resolved_platform=recommendation.get("platform"),
         platform_manual=False,
         release=recommendation.get("release"),
@@ -3204,7 +3272,10 @@ def smu_recommendation():
         recommendation["unsatisfied_dependencies"] = (
             unsatisfied_dependencies_for_recommendation(iso, recommendation.get("selected", []))
         )
+        evidence = selection_evidence(iso, recommendation.get("selected", []))
+        recommendation["warnings"] = reword_dependency_warning(recommendation.get("warnings", []), evidence)
         recommendation["confidence"] = confidence_report(
+            evidence=evidence,
             resolved_platform=recommendation.get("platform"),
             platform_manual=False,
             release=recommendation.get("release"),
