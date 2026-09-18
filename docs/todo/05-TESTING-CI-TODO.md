@@ -324,10 +324,33 @@ Run (`.github/workflows/ci.yml`):
       the repo-root `ruff.toml` (also fixed 2026-09-16, see the same
       `07-BUG-AUDIT-TODO.md` entry) — both the ruff *version* and the rule
       *selection* it runs are now reproducible.
-- [ ] formatting check — deliberately still open. `ruff format --check`
-      (2026-09-17) would reformat 13 of 16 Python files, `app.py` wholesale;
-      adopting a formatter is a one-off whole-repo rewrite that should land
-      on its own, not inside feature work, so no gate is added yet.
+- [x] formatting check — landed on its own 2026-09-18, as the 2026-09-17
+      note said it should: `ruff format` applied repo-wide (18 files
+      reformatted - `app.py` and the test files wholesale, plus `staging/`
+      and `scripts/`), pure style, no logic change. `.github/workflows/ci.yml`
+      gained a "Check Python formatting" step running `ruff format --check`
+      over the same path set as "Lint Python", so it cannot drift back out
+      of formatted state unnoticed.
+
+      One real interaction the reformat surfaced: two `# noqa: S310`
+      comments (`giso-webui/cisco_download.py`, `scripts/e2e_real_iso.py`)
+      were pinned to a specific line, and reformatting moved the code they
+      suppressed to a different line, making one directive `RUF100`-unused
+      while the violation it used to cover became newly active - a real
+      correctness gap the formatter adoption would have silently introduced
+      into the existing security-lint gate (see "static security checks"
+      above) if merged as pure formatting without checking `ruff check`
+      alongside `ruff format --check`. Fixed by moving/adding the `noqa` to
+      the line the violation is now attributed to, not by suppressing more
+      broadly.
+
+      Verified 2026-09-18 in the containerized `giso-webui-giso-webui`
+      image per `AGENTS.md`: full suite green - 338 passed, 3 skipped
+      (same pre-existing `.gisobuild-tool`/`TOOL_ROOT`-dependent skips) -
+      confirming the reformat changed no behavior. `ruff format --check`
+      and `ruff check` both clean (only the pre-existing, unrelated
+      `EXE002` Windows-mount finding also present on untouched files).
+      `actionlint` on the changed `ci.yml`: clean.
 - [x] static security checks — 2026-09-17: `ruff.toml` now extends the
       pinned selection with the whole flake8-bandit `S` family, so the
       existing "Lint Python" CI step is the security gate. Ignored with a

@@ -9,7 +9,9 @@ if INTERVAL_SECONDS < 60:
 
 
 def main() -> None:
-    print(f"Archive maintenance started; interval_seconds={INTERVAL_SECONDS}", flush=True)
+    print(
+        f"Archive maintenance started; interval_seconds={INTERVAL_SECONDS}", flush=True
+    )
     while True:
         try:
             removed = enforce_archive_policy()
@@ -20,10 +22,16 @@ def main() -> None:
             # a crash-loop here would silently stop archive retention/quota
             # enforcement with no external signal - skip this cycle and retry
             # on the next interval instead.
-            print(f"Archive policy check failed, will retry next interval: {exc}", flush=True)
+            print(
+                f"Archive policy check failed, will retry next interval: {exc}",
+                flush=True,
+            )
         else:
             if removed:
-                print(f"Archive policy removed {len(removed)} expired or over-quota job(s)", flush=True)
+                print(
+                    f"Archive policy removed {len(removed)} expired or over-quota job(s)",
+                    flush=True,
+                )
             else:
                 print("Archive policy checked; no files removed", flush=True)
         time.sleep(INTERVAL_SECONDS)

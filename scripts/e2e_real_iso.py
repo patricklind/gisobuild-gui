@@ -19,7 +19,8 @@ def request(url: str, *, method: str = "GET", data: bytes | None = None) -> dict
     headers = {"Content-Type": "application/json"} if data and method == "POST" else {}
     # The operator-selected origin is validated to HTTP(S) before any request.
     with urllib.request.urlopen(  # nosec B310  # noqa: S310
-        urllib.request.Request(url, data=data, headers=headers, method=method), timeout=120  # noqa: S310
+        urllib.request.Request(url, data=data, headers=headers, method=method),  # noqa: S310
+        timeout=120,
     ) as response:
         return json.load(response)
 
@@ -27,10 +28,15 @@ def request(url: str, *, method: str = "GET", data: bytes | None = None) -> dict
 def validate_origin(value: str, parser: argparse.ArgumentParser) -> str:
     base = value.rstrip("/")
     parsed = urlsplit(base)
-    if (parsed.scheme not in {"http", "https"}
-            or not parsed.hostname
-            or parsed.username or parsed.password
-            or parsed.path not in {"", "/"} or parsed.query or parsed.fragment):
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
         parser.error("--url must be an HTTP(S) origin without credentials or a path")
     return base
 
@@ -38,19 +44,26 @@ def validate_origin(value: str, parser: argparse.ArgumentParser) -> str:
 def upload_path(base: str, path: Path) -> str:
     """Upload one file and return the server-assigned path."""
     size = path.stat().st_size
-    upload = request(f"{base}/api/uploads/init", method="POST",
-                     data=json.dumps({"name": path.name, "size": size}).encode())
+    upload = request(
+        f"{base}/api/uploads/init",
+        method="POST",
+        data=json.dumps({"name": path.name, "size": size}).encode(),
+    )
     upload_id = upload["id"]
     encoded_id = quote(upload_id, safe="")
     offset = 0
     try:
         with path.open("rb") as source:
             while chunk := source.read(CHUNK_BYTES):
-                request(f"{base}/api/uploads/{encoded_id}?offset={offset}",
-                        method="PUT", data=chunk)
+                request(
+                    f"{base}/api/uploads/{encoded_id}?offset={offset}",
+                    method="PUT",
+                    data=chunk,
+                )
                 offset += len(chunk)
-        completed = request(f"{base}/api/uploads/{encoded_id}/complete",
-                            method="POST", data=b"{}")
+        completed = request(
+            f"{base}/api/uploads/{encoded_id}/complete", method="POST", data=b"{}"
+        )
     except Exception:
         try:
             request(f"{base}/api/uploads/session/{encoded_id}", method="DELETE")
@@ -66,10 +79,18 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser.add_argument("--platform", required=True)
     parser.add_argument("--rpm-dir", type=Path, action="append", default=[])
     parser.add_argument("--url", default="http://127.0.0.1:8080")
-    parser.add_argument("--build-timeout", type=int, default=21600,
-                        help="Maximum build wait in seconds (default: 21600)")
-    parser.add_argument("--poll-interval", type=float, default=5,
-                        help="Status polling interval in seconds (default: 5)")
+    parser.add_argument(
+        "--build-timeout",
+        type=int,
+        default=21600,
+        help="Maximum build wait in seconds (default: 21600)",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=5,
+        help="Status polling interval in seconds (default: 5)",
+    )
     return parser, parser.parse_args()
 
 
@@ -85,13 +106,23 @@ def main() -> None:
     base = validate_origin(args.url, parser)
 
     uploaded_iso = upload_path(base, args.iso)
-    rpms = sorted({path for directory in args.rpm_dir for path in directory.rglob("*.rpm")})
+    rpms = sorted(
+        {path for directory in args.rpm_dir for path in directory.rglob("*.rpm")}
+    )
     uploaded_rpms = [Path(upload_path(base, rpm)).name for rpm in rpms]
-    job = request(f"{base}/api/jobs", method="POST", data=json.dumps({
-        "iso": uploaded_iso, "platform": args.platform,
-        "pkglist": uploaded_rpms,
-        "create_checksum": True, "skip_usb_image": False,
-    }).encode())
+    job = request(
+        f"{base}/api/jobs",
+        method="POST",
+        data=json.dumps(
+            {
+                "iso": uploaded_iso,
+                "platform": args.platform,
+                "pkglist": uploaded_rpms,
+                "create_checksum": True,
+                "skip_usb_image": False,
+            }
+        ).encode(),
+    )
     deadline = time.monotonic() + args.build_timeout
     while True:
         status = request(f"{base}/api/jobs/{quote(job['id'], safe='')}")
@@ -110,8 +141,10 @@ def main() -> None:
     ours = [item for item in artifacts if item["job_id"] == job["id"]]
     if not any(item["name"].lower().endswith(".iso") for item in ours):
         raise SystemExit("FAIL: no Golden ISO output")
-    if not any(item["name"].lower().endswith(".zip") and "usb" in item["name"].lower()
-               for item in ours):
+    if not any(
+        item["name"].lower().endswith(".zip") and "usb" in item["name"].lower()
+        for item in ours
+    ):
         raise SystemExit("FAIL: no USB boot output")
     for item in ours:
         encoded_job = quote(item["job_id"], safe="")

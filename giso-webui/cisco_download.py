@@ -23,8 +23,13 @@ EULA_URL = "https://apix.cisco.com/software/v4.0/compliance/eula"
 K9_URL = "https://apix.cisco.com/software/v4.0/compliance/k9"
 ALLOWED_DOWNLOAD_HOSTS = ("cisco.com",)
 BLOCKED_CODES = {
-    "CONTRACT_NOT_AUTH", "CONTRACT_REJECTED", "CONTRACT_ACCESS",
-    "IMG_CONTRACT_REQD", "LOGIN_REQD", "LOGIN_IMG_DWLD", "IP_CHECK_FAIL",
+    "CONTRACT_NOT_AUTH",
+    "CONTRACT_REJECTED",
+    "CONTRACT_ACCESS",
+    "IMG_CONTRACT_REQD",
+    "LOGIN_REQD",
+    "LOGIN_IMG_DWLD",
+    "IP_CHECK_FAIL",
     "K9_REJECTED",
 }
 
@@ -81,22 +86,35 @@ class CiscoSoftwareClient:
 
     @staticmethod
     def _resolve(host: str) -> list[str]:
-        return list({item[4][0] for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)})
+        return list(
+            {
+                item[4][0]
+                for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+            }
+        )
 
     def _access_token(self) -> str:
         with self._token_lock:
             if self._token and self._token[1] > time.monotonic() + 60:
                 return self._token[0]
-            body = urllib.parse.urlencode({
-                "grant_type": "client_credentials",
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-            }).encode()
-            result = self._json_request(TOKEN_URL, body, authenticated=False,
-                                        content_type="application/x-www-form-urlencoded")
+            body = urllib.parse.urlencode(
+                {
+                    "grant_type": "client_credentials",
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                }
+            ).encode()
+            result = self._json_request(
+                TOKEN_URL,
+                body,
+                authenticated=False,
+                content_type="application/x-www-form-urlencoded",
+            )
             token = str(result.get("access_token", ""))
             if not token:
-                raise CiscoDownloadError("Cisco authentication did not return an access token")
+                raise CiscoDownloadError(
+                    "Cisco authentication did not return an access token"
+                )
             try:
                 lifetime = max(120, int(result.get("expires_in", 3600)))
             except (TypeError, ValueError):
@@ -104,8 +122,14 @@ class CiscoSoftwareClient:
             self._token = (token, time.monotonic() + lifetime)
             return token
 
-    def _json_request(self, url: str, body: bytes, *, authenticated: bool = True,
-                      content_type: str = "application/json") -> dict:
+    def _json_request(
+        self,
+        url: str,
+        body: bytes,
+        *,
+        authenticated: bool = True,
+        content_type: str = "application/json",
+    ) -> dict:
         headers = {"Accept": "application/json", "Content-Type": content_type}
         if authenticated:
             headers["Authorization"] = f"Bearer {self._access_token()}"
@@ -146,18 +170,28 @@ class CiscoSoftwareClient:
                 raise CiscoDownloadError(f"Cisco authorization failed: {code}")
 
     def search(self, pid: str, current_release: str, output_release: str) -> dict:
-        payload = {"pid": pid, "currentReleaseVersion": current_release,
-                   "outputReleaseVersion": output_release, "pageIndex": 1, "perPage": 25}
+        payload = {
+            "pid": pid,
+            "currentReleaseVersion": current_release,
+            "outputReleaseVersion": output_release,
+            "pageIndex": 1,
+            "perPage": 25,
+        }
         response = self._json_request(METADATA_URL, json.dumps(payload).encode())
         self._check_errors(response)
         return response
 
-    def request_download(self, pid: str, mdf_id: str, transaction_id: str,
-                         image_guids: list[str]) -> dict:
+    def request_download(
+        self, pid: str, mdf_id: str, transaction_id: str, image_guids: list[str]
+    ) -> dict:
         if not 1 <= len(image_guids) <= 5:
             raise CiscoDownloadError("Select between one and five Cisco images")
-        payload = {"pid": pid, "mdfId": mdf_id, "metadataTransId": transaction_id,
-                   "imageGuids": image_guids}
+        payload = {
+            "pid": pid,
+            "mdfId": mdf_id,
+            "metadataTransId": transaction_id,
+            "imageGuids": image_guids,
+        }
         response = self._json_request(DOWNLOAD_URL, json.dumps(payload).encode())
         self._check_errors(response)
         return response
@@ -166,44 +200,82 @@ class CiscoSoftwareClient:
         payload = {"status": "Accepted", "fileNames": ",".join(file_names)}
         return self._json_request(EULA_URL, json.dumps(payload).encode())
 
-    def accept_k9(self, file_name: str, *, commercial_or_civil: bool,
-                  not_government_or_military: bool) -> dict:
+    def accept_k9(
+        self,
+        file_name: str,
+        *,
+        commercial_or_civil: bool,
+        not_government_or_military: bool,
+    ) -> dict:
         if not commercial_or_civil or not not_government_or_military:
             raise CiscoDownloadError("Cisco K9 declarations must be confirmed")
-        payload = {"status": "Accepted", "fileNames": file_name,
-                   "confirm": "CONFIRM_CHECKED", "busFunction": "COMM_OR_CIVIL",
-                   "govMilCountries": "GOV_OR_MIL_COUNTRIES_NO"}
+        payload = {
+            "status": "Accepted",
+            "fileNames": file_name,
+            "confirm": "CONFIRM_CHECKED",
+            "busFunction": "COMM_OR_CIVIL",
+            "govMilCountries": "GOV_OR_MIL_COUNTRIES_NO",
+        }
         return self._json_request(K9_URL, json.dumps(payload).encode())
 
     def _validate_download_url(self, url: str) -> None:
         parsed = urllib.parse.urlsplit(url)
         host = (parsed.hostname or "").lower().rstrip(".")
-        if parsed.scheme != "https" or parsed.username or parsed.password or parsed.port not in (None, 443):
+        if (
+            parsed.scheme != "https"
+            or parsed.username
+            or parsed.password
+            or parsed.port not in (None, 443)
+        ):
             raise CiscoDownloadError("Cisco returned an unsafe download URL")
-        if not any(host == suffix or host.endswith(f".{suffix}") for suffix in self.allowed_hosts):
+        if not any(
+            host == suffix or host.endswith(f".{suffix}")
+            for suffix in self.allowed_hosts
+        ):
             raise CiscoDownloadError("Cisco returned an unapproved download host")
         try:
             addresses = self.resolver(host)
         except OSError as exc:
-            raise CiscoDownloadError("Cisco download host could not be resolved") from exc
-        if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
-            raise CiscoDownloadError("Cisco download host resolved to an unsafe address")
+            raise CiscoDownloadError(
+                "Cisco download host could not be resolved"
+            ) from exc
+        if not addresses or any(
+            not ipaddress.ip_address(address).is_global for address in addresses
+        ):
+            raise CiscoDownloadError(
+                "Cisco download host resolved to an unsafe address"
+            )
 
-    def download(self, url: str, destination: Path, *, expected_size: int,
-                 max_bytes: int, cloud_token: str = "", expected_md5: str = "",
-                 expected_sha512: str = "",
-                 progress: Callable[[int, int], None] | None = None) -> DownloadResult:
+    def download(
+        self,
+        url: str,
+        destination: Path,
+        *,
+        expected_size: int,
+        max_bytes: int,
+        cloud_token: str = "",
+        expected_md5: str = "",
+        expected_sha512: str = "",
+        progress: Callable[[int, int], None] | None = None,
+    ) -> DownloadResult:
         if expected_size <= 0 or expected_size > max_bytes:
             raise CiscoDownloadError("Cisco file exceeds the configured size limit")
         token = self._access_token()
         if cloud_token:
-            body = urllib.parse.urlencode({"X-Authentication-Control": cloud_token}).encode()
-            method, headers = "POST", {"Content-Type": "application/x-www-form-urlencoded"}
+            body = urllib.parse.urlencode(
+                {"X-Authentication-Control": cloud_token}
+            ).encode()
+            method, headers = (
+                "POST",
+                {"Content-Type": "application/x-www-form-urlencoded"},
+            )
         else:
             parsed = urllib.parse.urlsplit(url)
             query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
             query.append(("access_token", token))
-            url = urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query)))
+            url = urllib.parse.urlunsplit(
+                parsed._replace(query=urllib.parse.urlencode(query))
+            )
             body, method, headers = None, "GET", {}
         temporary = destination.with_name(f".{destination.name}.part")
         # A previous attempt that crashed mid-download (killed process, host
@@ -220,11 +292,15 @@ class CiscoSoftwareClient:
             for _ in range(6):
                 self._validate_download_url(current)
                 # Validated just above: https, allowlisted host, global IPs only.
-                request = urllib.request.Request(current, data=body, headers=headers, method=method)  # noqa: S310
+                request = urllib.request.Request(  # noqa: S310
+                    current, data=body, headers=headers, method=method
+                )
                 try:
                     response = self._opener.open(request, timeout=self.timeout)
                 except urllib.error.HTTPError as exc:
-                    if exc.code not in (301, 302, 303, 307, 308) or not exc.headers.get("Location"):
+                    if exc.code not in (301, 302, 303, 307, 308) or not exc.headers.get(
+                        "Location"
+                    ):
                         raise CiscoDownloadError("Cisco download failed") from exc
                     current = urllib.parse.urljoin(current, exc.headers["Location"])
                     if exc.code in (301, 302, 303):
@@ -236,7 +312,9 @@ class CiscoSoftwareClient:
                     while chunk := response.read(1024 * 1024):
                         written += len(chunk)
                         if written > max_bytes or written > expected_size:
-                            raise CiscoDownloadError("Cisco download exceeded its declared size")
+                            raise CiscoDownloadError(
+                                "Cisco download exceeded its declared size"
+                            )
                         output.write(chunk)
                         for digest in digests.values():
                             digest.update(chunk)
@@ -246,13 +324,25 @@ class CiscoSoftwareClient:
             else:
                 raise CiscoDownloadError("Cisco download redirected too many times")
             if written != expected_size:
-                raise CiscoDownloadError("Cisco download size did not match its metadata")
-            if expected_md5 and digests["md5"].hexdigest().lower() != expected_md5.lower():
+                raise CiscoDownloadError(
+                    "Cisco download size did not match its metadata"
+                )
+            if (
+                expected_md5
+                and digests["md5"].hexdigest().lower() != expected_md5.lower()
+            ):
                 raise CiscoDownloadError("Cisco MD5 checksum did not match")
-            if expected_sha512 and digests["sha512"].hexdigest().lower() != expected_sha512.lower():
+            if (
+                expected_sha512
+                and digests["sha512"].hexdigest().lower() != expected_sha512.lower()
+            ):
                 raise CiscoDownloadError("Cisco SHA-512 checksum did not match")
             temporary.replace(destination)
-            return DownloadResult(destination, written, *(digests[name].hexdigest() for name in ("sha256", "md5", "sha512")))
+            return DownloadResult(
+                destination,
+                written,
+                *(digests[name].hexdigest() for name in ("sha256", "md5", "sha512")),
+            )
         except CiscoDownloadError:
             temporary.unlink(missing_ok=True)
             raise

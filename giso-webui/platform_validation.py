@@ -11,20 +11,38 @@ from pathlib import Path
 # src/utils/gisoglobals.py. LNT uses metadata-driven validation upstream, so
 # its public product families are represented explicitly here for UI checks.
 COMMON_CAPABILITIES = {
-    "repo", "pkglist", "xrconfig", "ztp", "create_checksum",
-    "label", "no_label", "debug",
+    "repo",
+    "pkglist",
+    "xrconfig",
+    "ztp",
+    "create_checksum",
+    "label",
+    "no_label",
+    "debug",
 }
 EXR_CAPABILITIES = COMMON_CAPABILITIES | {
-    "script", "optimize", "x86_only", "bridging_fixes",
+    "script",
+    "optimize",
+    "x86_only",
+    "bridging_fixes",
 }
 # skip_usb_image is LNT-only: upstream's EXR_CLI_DICT_MAP maps it to None and
 # the eXR engine builds a USB zip on its own whenever the platform has a USB
 # script (src/exrmod/usb_zip/platform_scripts.yaml), skipping it otherwise.
 LNT_CAPABILITIES = COMMON_CAPABILITIES | {
-    "skip_usb_image", "remove_packages", "only_support_pids", "verbose_dependency_check",
-    "bridging_fixes", "clear_bridging_fixes", "ownership_vouchers",
-    "ownership_certificate", "clear_ownership_vouchers",
-    "clear_ownership_certificate", "key_request", "clear_key_request", "no_buildinfo",
+    "skip_usb_image",
+    "remove_packages",
+    "only_support_pids",
+    "verbose_dependency_check",
+    "bridging_fixes",
+    "clear_bridging_fixes",
+    "ownership_vouchers",
+    "ownership_certificate",
+    "clear_ownership_vouchers",
+    "clear_ownership_certificate",
+    "key_request",
+    "clear_key_request",
+    "no_buildinfo",
 }
 
 # The eXR identifiers and engine option sets come from the pinned upstream
@@ -42,7 +60,11 @@ PLATFORMS = {
     "ncs560": {"label": "NCS 560", "architecture": "exr", "usb": True},
     "ncs6k": {"label": "NCS 6000", "architecture": "exr", "usb": False},
     "iosxrwb": {"label": "IOS XR Whitebox", "architecture": "exr", "usb": False},
-    "iosxrwbd": {"label": "IOS XR Whitebox Distributed", "architecture": "exr", "usb": True},
+    "iosxrwbd": {
+        "label": "IOS XR Whitebox Distributed",
+        "architecture": "exr",
+        "usb": True,
+    },
     "xrv9k": {"label": "IOS XRv 9000", "architecture": "exr", "usb": False},
     "8000": {"label": "Cisco 8000 / 8800", "architecture": "lnt", "usb": True},
     "ncs1010": {"label": "NCS 1010/1014", "architecture": "lnt", "usb": True},
@@ -60,8 +82,16 @@ PLATFORMS = {
     # set for the chosen engine - no migration/full_iso/other named-platform
     # quirks, which are genuine Cisco/GISO-specific differences this profile
     # cannot know apply.
-    "exr-generic": {"label": "Other eXR platform (manual override)", "architecture": "exr", "usb": False},
-    "lnt-generic": {"label": "Other LNT platform (manual override)", "architecture": "lnt", "usb": False},
+    "exr-generic": {
+        "label": "Other eXR platform (manual override)",
+        "architecture": "exr",
+        "usb": False,
+    },
+    "lnt-generic": {
+        "label": "Other LNT platform (manual override)",
+        "architecture": "lnt",
+        "usb": False,
+    },
 }
 
 GENERIC_PLATFORM_IDS = frozenset({"exr-generic", "lnt-generic"})
@@ -84,16 +114,25 @@ class GisoBuildCapabilities:
     def as_dict(self, known: set[str]) -> dict[str, bool]:
         return {name: self.supports(name) for name in sorted(known)}
 
+
 ALIASES = {
-    "asr9000": "asr9k", "asr9k-x64": "asr9k", "ncs5000": "ncs5k",
-    "ncs6000": "ncs6k", "ncs5700": "ncs57", "cisco8000": "8000",
-    "8800": "8000", "8200": "8000",
+    "asr9000": "asr9k",
+    "asr9k-x64": "asr9k",
+    "ncs5000": "ncs5k",
+    "ncs6000": "ncs6k",
+    "ncs5700": "ncs57",
+    "cisco8000": "8000",
+    "8800": "8000",
+    "8200": "8000",
     # NCS 57C3 hardware SKU spellings seen in Cisco inventory and image metadata.
     # Keep both MODS-SYS and MOD-SYS variants so manual selection and filename
     # inference normalize to the NCS 5700/LNT family rather than failing closed.
-    "ncs-57c3-mods-sys": "ncs57", "ncs57c3modssys": "ncs57",
-    "ncs-57c3-mod-sys": "ncs57", "ncs57c3modsys": "ncs57",
-    "ncs-57c3": "ncs57", "ncs57c3": "ncs57",
+    "ncs-57c3-mods-sys": "ncs57",
+    "ncs57c3modssys": "ncs57",
+    "ncs-57c3-mod-sys": "ncs57",
+    "ncs57c3modsys": "ncs57",
+    "ncs-57c3": "ncs57",
+    "ncs57c3": "ncs57",
 }
 
 RPM_RELEASE = re.compile(r"-r(?P<release>\d{3,6})(?:\.|-)", re.IGNORECASE)
@@ -140,8 +179,12 @@ RPM_ARCHITECTURE = re.compile(
 # naming scheme produced the token, mirroring how normalize_platform() is the
 # single resolver for platform aliases.
 ARCH_ALIASES = {
-    "x86_64": "x86_64", "amd64": "x86_64", "corei7_64": "x86_64",
-    "aarch64": "aarch64", "arm64": "aarch64", "arm": "aarch64",
+    "x86_64": "x86_64",
+    "amd64": "x86_64",
+    "corei7_64": "x86_64",
+    "aarch64": "aarch64",
+    "arm64": "aarch64",
+    "arm": "aarch64",
 }
 
 
@@ -154,13 +197,22 @@ def capabilities_for_platform(platform: str) -> dict[str, bool]:
     """Return the UI/adapter capabilities for one normalized platform."""
     normalized = normalize_platform(platform)
     profile = PLATFORMS[normalized]
-    supported = set(LNT_CAPABILITIES if profile["architecture"] == "lnt" else EXR_CAPABILITIES)
+    supported = set(
+        LNT_CAPABILITIES if profile["architecture"] == "lnt" else EXR_CAPABILITIES
+    )
     supported.update(PLATFORM_CAPABILITY_OVERRIDES.get(normalized, set()))
     if profile["usb"]:
         supported.add("usb_image")
-    known = COMMON_CAPABILITIES | EXR_CAPABILITIES | LNT_CAPABILITIES | {
-        "usb_image", "migration", "full_iso",
-    }
+    known = (
+        COMMON_CAPABILITIES
+        | EXR_CAPABILITIES
+        | LNT_CAPABILITIES
+        | {
+            "usb_image",
+            "migration",
+            "full_iso",
+        }
+    )
     return GisoBuildCapabilities(frozenset(supported)).as_dict(known)
 
 
@@ -235,7 +287,9 @@ def _bundle_files_by_csc(
         if iso_platform and package_platform and package_platform != iso_platform:
             continue
         rpm_release = RPM_RELEASE.search(name)
-        if expected_tag and (not rpm_release or rpm_release.group("release") != expected_tag):
+        if expected_tag and (
+            not rpm_release or rpm_release.group("release") != expected_tag
+        ):
             continue
         component = RPM_COMPONENT.search(name)
         if component:
@@ -265,7 +319,9 @@ def _exr_rpm_subfields(field: str) -> list[tuple[int, object]]:
     subfields: list[tuple[int, object]] = []
     for match in _EXR_SUBFIELD.finditer(field):
         text = match.group("text")
-        subfields.append((0, text) if text is not None else (1, int(match.group("num"))))
+        subfields.append(
+            (0, text) if text is not None else (1, int(match.group("num")))
+        )
     return subfields
 
 
@@ -306,7 +362,9 @@ def compare_exr_rpm_labels(lhs: tuple[str, str], rhs: tuple[str, str]) -> int:
 
 
 def validate_smu_selection(
-    iso: str, packages: list[str], iso_architectures: frozenset[str] | None = None,
+    iso: str,
+    packages: list[str],
+    iso_architectures: frozenset[str] | None = None,
     full_candidate_packages: list[str] | None = None,
 ) -> dict:
     """Check deterministic filename compatibility before upstream dependency resolution.
@@ -358,29 +416,41 @@ def validate_smu_selection(
             tag = rpm_release.group("release")
             releases.add(tag)
             if expected_tag and tag != expected_tag:
-                issues.append(f"{name}: release r{tag} does not match IOS XR {iso_release}")
+                issues.append(
+                    f"{name}: release r{tag} does not match IOS XR {iso_release}"
+                )
         elif lnt_release:
             releases.add(lnt_release.replace(".", ""))
             if iso_release and lnt_release != iso_release:
-                issues.append(f"{name}: built for IOS XR {lnt_release}, not {iso_release}")
+                issues.append(
+                    f"{name}: built for IOS XR {lnt_release}, not {iso_release}"
+                )
         else:
-            warnings.append(f"{name}: release could not be determined from the filename")
+            warnings.append(
+                f"{name}: release could not be determined from the filename"
+            )
         component = RPM_COMPONENT.search(name)
         if component:
             component_name = component.group("component").lower()
             bug = f"CSC{component.group('bug')}".upper()
             components.setdefault(component_name, set()).add(bug)
-            variants.setdefault((component_name, bug), set()).add(component.group("version").lower())
+            variants.setdefault((component_name, bug), set()).add(
+                component.group("version").lower()
+            )
             bundle = bundles.setdefault(bug, {"components": set(), "files": set()})
             bundle["components"].add(component_name)
             bundle["files"].add(name)
         architecture = RPM_ARCHITECTURE.search(name)
         if architecture:
-            canonical_architecture = normalize_architecture(architecture.group("architecture"))
+            canonical_architecture = normalize_architecture(
+                architecture.group("architecture")
+            )
             if canonical_architecture:
                 architectures.add(canonical_architecture)
         elif lnt_release:
-            lnt_architecture = normalize_architecture(LNT_RPM.match(name).group("architecture"))
+            lnt_architecture = normalize_architecture(
+                LNT_RPM.match(name).group("architecture")
+            )
             if lnt_architecture:  # noarch has no processor family to compare
                 architectures.add(lnt_architecture)
     if len(releases) > 1:
@@ -394,14 +464,18 @@ def validate_smu_selection(
         )
     for (component, bug), versions in variants.items():
         if len(versions) > 1:
-            issues.append(f"Multiple versions of {component} for {bug} are selected; keep one RPM")
+            issues.append(
+                f"Multiple versions of {component} for {bug} are selected; keep one RPM"
+            )
     for component, bugs in components.items():
         if len(bugs) > 1:
             warnings.append(
                 f"{component} is changed by {', '.join(sorted(bugs))}; Cisco supersedence data is required to choose between them"
             )
     if full_candidate_packages is not None:
-        full_bundles = _bundle_files_by_csc(full_candidate_packages, iso_platform, expected_tag)
+        full_bundles = _bundle_files_by_csc(
+            full_candidate_packages, iso_platform, expected_tag
+        )
         for bug, bundle in sorted(bundles.items()):
             if len(bundle["components"]) <= 1:
                 continue
@@ -421,24 +495,37 @@ def validate_smu_selection(
     package_groups = []
     for bug, bundle in sorted(bundles.items()):
         names = sorted(bundle["components"])
-        package_groups.append({
-            "csc": bug,
-            "components": names,
-            "files": sorted(bundle["files"]),
-            "count": len(names),
-            "relationship": "Multi-component fix; keep these RPMs together" if len(names) > 1
-            else "Single-component fix",
-        })
+        package_groups.append(
+            {
+                "csc": bug,
+                "components": names,
+                "files": sorted(bundle["files"]),
+                "count": len(names),
+                "relationship": "Multi-component fix; keep these RPMs together"
+                if len(names) > 1
+                else "Single-component fix",
+            }
+        )
     component_conflicts = [
-        {"component": component, "cscs": sorted(bugs),
-         "reason": "More than one fix changes this component; Cisco supersedence decides which remains"}
-        for component, bugs in sorted(components.items()) if len(bugs) > 1
+        {
+            "component": component,
+            "cscs": sorted(bugs),
+            "reason": "More than one fix changes this component; Cisco supersedence decides which remains",
+        }
+        for component, bugs in sorted(components.items())
+        if len(bugs) > 1
     ]
-    return {"compatible": not issues, "iso_release": iso_release, "checked": checked,
-            "issues": sorted(set(issues)), "warnings": sorted(set(warnings)),
-            "package_groups": package_groups, "component_conflicts": component_conflicts,
-            "architectures": sorted(architectures),
-            "iso_architectures": sorted(iso_architectures) if iso_architectures else []}
+    return {
+        "compatible": not issues,
+        "iso_release": iso_release,
+        "checked": checked,
+        "issues": sorted(set(issues)),
+        "warnings": sorted(set(warnings)),
+        "package_groups": package_groups,
+        "component_conflicts": component_conflicts,
+        "architectures": sorted(architectures),
+        "iso_architectures": sorted(iso_architectures) if iso_architectures else [],
+    }
 
 
 def recommend_smu_selection(
@@ -455,10 +542,19 @@ def recommend_smu_selection(
 
     if not iso_platform or not expected_tag:
         missing = "platform" if not iso_platform else "release"
-        return {"ready": False, "selected": [], "excluded": [], "package_groups": [],
-                "component_conflicts": [], "architectures": [], "iso_architectures": [],
-                "warnings": [], "blockers": [], "iso": iso_name,
-                "message": f"The ISO {missing} could not be detected; select it in Expert settings"}
+        return {
+            "ready": False,
+            "selected": [],
+            "excluded": [],
+            "package_groups": [],
+            "component_conflicts": [],
+            "architectures": [],
+            "iso_architectures": [],
+            "warnings": [],
+            "blockers": [],
+            "iso": iso_name,
+            "message": f"The ISO {missing} could not be detected; select it in Expert settings",
+        }
 
     for package in sorted(set(packages)):
         name = Path(package).name
@@ -467,7 +563,8 @@ def recommend_smu_selection(
         rpm_architecture = RPM_ARCHITECTURE.search(name)
         package_architecture = (
             normalize_architecture(rpm_architecture.group("architecture"))
-            if rpm_architecture else None
+            if rpm_architecture
+            else None
         )
         lnt_release = lnt_rpm_release(name) if is_lnt_platform(iso_platform) else None
         if lnt_release:
@@ -475,31 +572,55 @@ def recommend_smu_selection(
             # what suits the router's PIDs, and the filename names no platform
             # family - so only a platform the name *does* carry, the XR release
             # and the processor family can rule a package out here.
-            lnt_architecture = normalize_architecture(LNT_RPM.match(name).group("architecture"))
+            lnt_architecture = normalize_architecture(
+                LNT_RPM.match(name).group("architecture")
+            )
             if package_platform and package_platform != iso_platform:
                 excluded.append({"name": name, "reason": "Different platform"})
             elif lnt_release != iso_release:
                 excluded.append({"name": name, "reason": "Different IOS XR release"})
-            elif (iso_architectures and lnt_architecture
-                  and lnt_architecture not in iso_architectures):
-                excluded.append({"name": name, "reason": "Processor architecture does not match the base ISO"})
+            elif (
+                iso_architectures
+                and lnt_architecture
+                and lnt_architecture not in iso_architectures
+            ):
+                excluded.append(
+                    {
+                        "name": name,
+                        "reason": "Processor architecture does not match the base ISO",
+                    }
+                )
             else:
                 selected.append(name)
         elif not package_platform:
-            excluded.append({"name": name, "reason": "Platform is missing from filename"})
+            excluded.append(
+                {"name": name, "reason": "Platform is missing from filename"}
+            )
         elif package_platform != iso_platform:
             excluded.append({"name": name, "reason": "Different platform"})
         elif rpm_release and rpm_release.group("release") != expected_tag:
             excluded.append({"name": name, "reason": "Different IOS XR release"})
         elif not rpm_release:
-            excluded.append({"name": name, "reason": "Release is missing from filename"})
-        elif (iso_architectures and package_architecture
-              and package_architecture not in iso_architectures):
-            excluded.append({"name": name, "reason": "Processor architecture does not match the base ISO"})
+            excluded.append(
+                {"name": name, "reason": "Release is missing from filename"}
+            )
+        elif (
+            iso_architectures
+            and package_architecture
+            and package_architecture not in iso_architectures
+        ):
+            excluded.append(
+                {
+                    "name": name,
+                    "reason": "Processor architecture does not match the base ISO",
+                }
+            )
         else:
             selected.append(name)
 
-    analysis = validate_smu_selection(iso_name, selected, iso_architectures=iso_architectures)
+    analysis = validate_smu_selection(
+        iso_name, selected, iso_architectures=iso_architectures
+    )
     return {
         "ready": True,
         "selected": selected,
@@ -529,8 +650,13 @@ def recommend_smu_selection(
     }
 
 
-def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
-                         selected_packages: list[str] | None = None) -> dict:
+def check_upgrade_matrix(
+    matrix: dict,
+    source: str,
+    target: str,
+    platform: str,
+    selected_packages: list[str] | None = None,
+) -> dict:
     if not isinstance(matrix, dict) or not isinstance(matrix.get("permitted"), dict):
         raise TypeError("The compatibility matrix has an invalid format")
     targets = matrix["permitted"].get(source, {})
@@ -540,6 +666,7 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
     if not isinstance(candidates, list):
         raise TypeError("The compatibility matrix has an invalid upgrade entry")
     normalized = normalize_platform(platform)
+
     def matrix_platform(item: object) -> str | None:
         if not isinstance(item, dict):
             return None
@@ -548,17 +675,30 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
         except ValueError:
             return None
 
-    match = next((item for item in candidates if matrix_platform(item) == normalized), None)
+    match = next(
+        (item for item in candidates if matrix_platform(item) == normalized), None
+    )
     if not match:
-        return {"permitted": False, "bridge_smus": [], "missing_bridge_smus": [], "caveats": [],
-                "message": f"The matrix does not permit {source} to {target} on {PLATFORMS[normalized]['label']}"}
+        return {
+            "permitted": False,
+            "bridge_smus": [],
+            "missing_bridge_smus": [],
+            "caveats": [],
+            "message": f"The matrix does not permit {source} to {target} on {PLATFORMS[normalized]['label']}",
+        }
     bridge_smus = match.get("bridge_smus") or []
     caveats = match.get("caveats") or []
-    if (not isinstance(bridge_smus, list) or len(bridge_smus) > 100 or
-            not all(isinstance(item, str) and len(item) <= 512 for item in bridge_smus)):
+    if (
+        not isinstance(bridge_smus, list)
+        or len(bridge_smus) > 100
+        or not all(isinstance(item, str) and len(item) <= 512 for item in bridge_smus)
+    ):
         raise ValueError("The compatibility matrix contains invalid bridge SMUs")
-    if (not isinstance(caveats, list) or len(caveats) > 100 or
-            not all(isinstance(item, str) and len(item) <= 4096 for item in caveats)):
+    if (
+        not isinstance(caveats, list)
+        or len(caveats) > 100
+        or not all(isinstance(item, str) and len(item) <= 4096 for item in caveats)
+    ):
         raise ValueError("The compatibility matrix contains invalid caveats")
     selected_names = {Path(item).name.lower() for item in (selected_packages or [])}
     selected_cscs = {
@@ -567,14 +707,21 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
         for token in re.findall(r"CSC[a-z0-9]+", item, re.IGNORECASE)
     }
     missing_bridge_smus = [
-        item for item in bridge_smus
+        item
+        for item in bridge_smus
         if Path(item).name.lower() not in selected_names
-        and not any(token.upper() in selected_cscs
-                    for token in re.findall(r"CSC[a-z0-9]+", item, re.IGNORECASE))
+        and not any(
+            token.upper() in selected_cscs
+            for token in re.findall(r"CSC[a-z0-9]+", item, re.IGNORECASE)
+        )
     ]
-    return {"permitted": True, "bridge_smus": bridge_smus,
-            "missing_bridge_smus": missing_bridge_smus, "caveats": caveats,
-            "message": f"The matrix permits {source} to {target} on {PLATFORMS[normalized]['label']}"}
+    return {
+        "permitted": True,
+        "bridge_smus": bridge_smus,
+        "missing_bridge_smus": missing_bridge_smus,
+        "caveats": caveats,
+        "message": f"The matrix permits {source} to {target} on {PLATFORMS[normalized]['label']}",
+    }
 
 
 # Every build option that a platform's capabilities decide, and the human name
@@ -583,27 +730,39 @@ def check_upgrade_matrix(matrix: dict, source: str, target: str, platform: str,
 # maps), never a platform name written into a condition: a new upstream
 # platform needs a profile entry, not a code change.
 OPTION_CAPABILITIES = {
-    "migration": "migration", "full_iso": "full_iso",
-    "x86_only": "x86_only", "optimize": "optimize", "script": "script",
-    "remove_packages": "remove_packages", "only_support_pids": "only_support_pids",
+    "migration": "migration",
+    "full_iso": "full_iso",
+    "x86_only": "x86_only",
+    "optimize": "optimize",
+    "script": "script",
+    "remove_packages": "remove_packages",
+    "only_support_pids": "only_support_pids",
     "clear_bridging_fixes": "clear_bridging_fixes",
     "verbose_dep_check": "verbose_dependency_check",
     "ownership_vouchers": "ownership_vouchers",
     "ownership_certificate": "ownership_certificate",
     "clear_ownership_vouchers": "clear_ownership_vouchers",
     "clear_ownership_certificate": "clear_ownership_certificate",
-    "key_request": "key_request", "clear_key_request": "clear_key_request",
+    "key_request": "key_request",
+    "clear_key_request": "clear_key_request",
     "no_buildinfo": "no_buildinfo",
 }
 OPTION_LABELS = {
-    "migration": "Migration TAR", "full_iso": "Full ISO", "x86_only": "x86-only packages",
-    "optimize": "Optimized ISO", "script": "Boot script", "remove_packages": "Remove packages",
-    "only_support_pids": "PID filtering", "clear_bridging_fixes": "Clear bridging fixes",
+    "migration": "Migration TAR",
+    "full_iso": "Full ISO",
+    "x86_only": "x86-only packages",
+    "optimize": "Optimized ISO",
+    "script": "Boot script",
+    "remove_packages": "Remove packages",
+    "only_support_pids": "PID filtering",
+    "clear_bridging_fixes": "Clear bridging fixes",
     "verbose_dep_check": "Verbose dependency check",
-    "ownership_vouchers": "Ownership vouchers", "ownership_certificate": "Ownership certificate",
+    "ownership_vouchers": "Ownership vouchers",
+    "ownership_certificate": "Ownership certificate",
     "clear_ownership_vouchers": "Clear ownership vouchers",
     "clear_ownership_certificate": "Clear ownership certificate",
-    "key_request": "Key request", "clear_key_request": "Clear key request",
+    "key_request": "Key request",
+    "clear_key_request": "Clear key request",
     "no_buildinfo": "No build information",
 }
 
@@ -616,7 +775,8 @@ def platforms_supporting(capability: str) -> list[str]:
     platform-specific capability, so naming them would mislead.
     """
     return sorted(
-        PLATFORMS[name]["label"] for name in PLATFORMS
+        PLATFORMS[name]["label"]
+        for name in PLATFORMS
         if name not in GENERIC_PLATFORM_IDS
         and capabilities_for_platform(name).get(capability, False)
     )
@@ -624,9 +784,15 @@ def platforms_supporting(capability: str) -> list[str]:
 
 def validate_platform_options(payload: dict) -> dict:
     requested = payload.get("platform", "")
-    platform = normalize_platform(requested) if requested else infer_platform(payload.get("iso", ""))
+    platform = (
+        normalize_platform(requested)
+        if requested
+        else infer_platform(payload.get("iso", ""))
+    )
     if not platform:
-        raise ValueError("Select the platform family; it could not be inferred from the ISO filename")
+        raise ValueError(
+            "Select the platform family; it could not be inferred from the ISO filename"
+        )
     profile = platform_profile(platform)
     architecture = profile["architecture"]
     errors = []
@@ -643,8 +809,14 @@ def validate_platform_options(payload: dict) -> dict:
         )
     # Only LNT can be told to skip USB, and only LNT would try and fail; the
     # eXR engine simply produces no USB zip for a platform without a script.
-    if architecture == "lnt" and not profile["usb"] and not payload.get("skip_usb_image"):
-        errors.append(f"Automatic USB output is not supported for {profile['label']}; enable Skip USB image")
+    if (
+        architecture == "lnt"
+        and not profile["usb"]
+        and not payload.get("skip_usb_image")
+    ):
+        errors.append(
+            f"Automatic USB output is not supported for {profile['label']}; enable Skip USB image"
+        )
     if errors:
         raise ValueError("; ".join(errors))
     return profile
@@ -656,16 +828,34 @@ def validate_platform_options(payload: dict) -> dict:
 # component). UNKNOWN is deliberately last: it means the file could not be
 # identified well enough to judge, which is never an automatic inclusion.
 PACKAGE_STATUSES = (
-    ("WRONG_PLATFORM", re.compile(r"different platform|belongs to .* platform", re.IGNORECASE)),
-    ("WRONG_RELEASE", re.compile(r"different ios xr release|belongs to ios xr", re.IGNORECASE)),
+    (
+        "WRONG_PLATFORM",
+        re.compile(r"different platform|belongs to .* platform", re.IGNORECASE),
+    ),
+    (
+        "WRONG_RELEASE",
+        re.compile(r"different ios xr release|belongs to ios xr", re.IGNORECASE),
+    ),
     ("WRONG_ARCHITECTURE", re.compile(r"processor architecture", re.IGNORECASE)),
     ("CONFLICT", re.compile(r"more than one fix|conflict", re.IGNORECASE)),
     ("SUPERSEDED", re.compile(r"supersed", re.IGNORECASE)),
-    ("MISSING_DEPENDENCY", re.compile(r"depend|requires|needs |nothing provides|prerequisite|"
-                                     r"cannot be installed|part of csc", re.IGNORECASE)),
+    (
+        "MISSING_DEPENDENCY",
+        re.compile(
+            r"depend|requires|needs |nothing provides|prerequisite|"
+            r"cannot be installed|part of csc",
+            re.IGNORECASE,
+        ),
+    ),
     ("DUPLICATE", re.compile(r"duplicate|another copy|same version", re.IGNORECASE)),
-    ("INVALID", re.compile(r"md5|incomplete fix|cannot read|does not match the package inside|"
-                           r"from the same fix", re.IGNORECASE)),
+    (
+        "INVALID",
+        re.compile(
+            r"md5|incomplete fix|cannot read|does not match the package inside|"
+            r"from the same fix",
+            re.IGNORECASE,
+        ),
+    ),
     ("UNKNOWN", re.compile(r"missing from filename|could not be", re.IGNORECASE)),
 )
 
@@ -693,8 +883,11 @@ def describe_package(name: str) -> dict:
         "name": name,
         "platform": infer_platform(name),
         "release": release,
-        "architecture": (normalize_architecture(architecture.group("architecture"))
-                         if architecture else None),
+        "architecture": (
+            normalize_architecture(architecture.group("architecture"))
+            if architecture
+            else None
+        ),
         # Cisco writes CSCxx12345; keep the filename's own spelling.
         "csc": csc.group(1) if csc else None,
     }

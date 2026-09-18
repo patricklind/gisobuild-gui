@@ -35,20 +35,25 @@ class DockerOnlyCheckTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.root), "add", name], check=True)
 
     def test_host_commands_are_flagged_and_containerised_ones_are_not(self):
-        self.commit("README.md", (
-            "Never run `python -m unittest` on the host.\n"
-            "```bash\n"
-            "python3 staging/rehearse.py\n"
-            "docker run --rm -v \"$PWD:/project:ro\" gisobuild-tooling \\\n"
-            "  python -B scripts/check_docker_only.py\n"
-            "docker compose exec giso-webui python -c 'print(1)'\n"
-            "pip install ruff  # docker-only: allow documenting the old way\n"
-            "```\n"
-            "```text\n"
-            "PASS: rehearsal\n"
-            "```\n"
-        ))
-        self.commit("tool.sh", "#!/bin/bash\n# python3 in a comment is fine\nruff check .\n")
+        self.commit(
+            "README.md",
+            (
+                "Never run `python -m unittest` on the host.\n"
+                "```bash\n"
+                "python3 staging/rehearse.py\n"
+                'docker run --rm -v "$PWD:/project:ro" gisobuild-tooling \\\n'
+                "  python -B scripts/check_docker_only.py\n"
+                "docker compose exec giso-webui python -c 'print(1)'\n"
+                "pip install ruff  # docker-only: allow documenting the old way\n"
+                "```\n"
+                "```text\n"
+                "PASS: rehearsal\n"
+                "```\n"
+            ),
+        )
+        self.commit(
+            "tool.sh", "#!/bin/bash\n# python3 in a comment is fine\nruff check .\n"
+        )
         self.commit("docs/todo/old.md", "```bash\npytest\n```\n")
 
         found = self.checker.violations(self.root)
