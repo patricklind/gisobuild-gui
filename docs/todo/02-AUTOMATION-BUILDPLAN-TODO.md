@@ -692,6 +692,25 @@ Never silently exclude without a reason.
       separately. Full suite green (340 unit/integration tests, 24 browser
       tests, ruff clean, Graphify refreshed).
 
+      **Root-cause DRY fix, same day.** The four bugs above all trace back
+      to one thing: `recommend_smu_selection()` →
+      `add_superseded_exclusions()` → `exclude_unsatisfiable_packages()` →
+      `resolve_component_conflicts()`, in that exact order, was written out
+      separately at four call sites (`create_build_plan()`, `discover()`,
+      `build_command()`'s automatic branch, `POST /api/smu/recommendation`)
+      instead of once - exactly the shape that let two of them drift out of
+      sync unnoticed. Extracted the sequence into one function,
+      `resolve_automatic_recommendation()`, and rewrote all four call sites
+      to use it; a caller with no ISO (`discover()`'s zero/multiple-ISO
+      branches) still gets `add_superseded_exclusions()` alone, matching
+      the original behavior (it only explains files already screened out,
+      independent of any ISO). No future call site can add the steps out
+      of order or with one missing, because there is only one place they
+      are written. Full suite unchanged (340 unit/integration tests, 24
+      browser tests, ruff and `ruff format --check` clean, Graphify
+      refreshed) - the refactor changed no observable behavior, only where
+      the logic lives.
+
       **Full gisobuild run: attempted, not completed, 2026-09-18.** Two
       attempts against the real, complete NCS5500 25.1.2 workspace (base ISO
       + all 12 base `optional-rpms/*` + all 10 SMU tars, 25 selected RPMs)

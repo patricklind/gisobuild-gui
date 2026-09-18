@@ -2483,14 +2483,13 @@ def create_build_plan(payload: dict) -> dict:
         identity_name, identity_from_metadata = iso_identity(iso_path)
         candidates, superseded = active_rpm_names()
         if payload.get("automatic_smu_selection"):
-            recommendation = recommend_smu_selection(
-                identity_name, candidates, iso_architectures=iso_architectures
+            recommendation = resolve_automatic_recommendation(
+                identity_name,
+                candidates,
+                superseded,
+                iso["relative_path"],
+                iso_architectures,
             )
-            recommendation = add_superseded_exclusions(recommendation, superseded)
-            recommendation = exclude_unsatisfiable_packages(
-                recommendation, iso["relative_path"], identity_name, iso_architectures
-            )
-            recommendation = resolve_component_conflicts(recommendation)
             if recommendation.get("ready"):
                 identifiers = recommendation["selected"]
                 if recommendation.get("left_out_for_dependencies") and not identifiers:
@@ -2662,16 +2661,19 @@ def create_build_plan(payload: dict) -> dict:
     return {
         "fingerprint": fingerprint,
         "inventory_revision": revision,
-        # Preview exactly what create_job() would run: the plan's own resolved
-        # identifiers (post add_superseded_exclusions()/
-        # exclude_unsatisfiable_packages()/resolve_component_conflicts()), not
-        # a re-derivation. build_command()'s own automatic_smu_selection
-        # branch calls recommend_smu_selection() alone - without those three
-        # steps - so previewing the raw payload could show packages this plan
-        # already excluded (verified against real Cisco RPMs: an eXR
+        # Preview exactly what create_job() would run: the plan's own
+        # resolve_automatic_recommendation() output, not a re-derivation.
+        # Previewing the raw payload instead (letting build_command() call
+        # its own automatic_smu_selection branch) could show packages this
+        # plan already excluded, since that branch's own re-derivation is a
+        # separate call to the same pipeline and can only agree with this
+        # one if both are given the same inputs - not a risk in itself, but
+        # redundant work and a second place a future edit could desync
+        # (verified against real Cisco RPMs before this was fixed: an eXR
         # component conflict left both the dropped and kept versions in the
-        # preview command). create_job() avoids this the same way: it always
-        # turns automatic selection off and passes the plan's own selection.
+        # preview command). create_job() avoids the redundancy the same way:
+        # it always turns automatic selection off and passes the plan's own
+        # selection.
         "generated_command": planned_command_preview(
             {**payload, "pkglist": identifiers, "automatic_smu_selection": False},
             already_excluded=frozenset(
@@ -3300,6 +3302,53 @@ def resolve_component_conflicts(recommendation: dict) -> dict:
     return recommendation
 
 
+def resolve_automatic_recommendation(
+    identity_name: str,
+    candidates: list[str],
+    superseded: set[str],
+    iso_relative_path: str | None,
+    iso_architectures: frozenset[str] | None,
+) -> dict:
+    """The one, authoritative automatic-selection pipeline.
+
+    ``recommend_smu_selection()`` alone only screens by filename platform,
+    release and architecture. Closing every other known-bad and known-
+    conflicting case needs three more steps, in this order (each narrows
+    what the next one sees): README-declared supersedence
+    (``add_superseded_exclusions()``), an unmet exact-version dependency
+    (``exclude_unsatisfiable_packages()``), and a same-package conflict
+    between two selected SMUs (``resolve_component_conflicts()``).
+
+    Every caller that computes an automatic recommendation must go through
+    this one function, never the four separately - see
+    docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md "SMUs that are incompatible
+    with the rest of the selection" for what happened when two call sites
+    (this app's own bundle-completeness re-check, and a defensive
+    recompute inside ``build_command()``) independently called a subset,
+    drifted out of sync with what this function's real callers do, and, on
+    real signed Cisco RPMs, re-blocked a plan its own conflict resolution
+    had already resolved, showed a wrong preview command, and made
+    ``POST /api/jobs`` reject the exact plan ``POST /api/build-plan`` had
+    just called ready.
+
+    ``add_superseded_exclusions()`` always runs, even with no ISO, since it
+    only explains files ``active_rpm_names()`` already screened out; the
+    other two need a real ISO's dependency/architecture context, so they
+    are skipped when ``iso_relative_path`` is ``None`` (no ISO selected, or
+    more than one - see ``discover()``'s own multi-ISO branches).
+    """
+    recommendation = recommend_smu_selection(
+        identity_name, candidates, iso_architectures=iso_architectures
+    )
+    recommendation = add_superseded_exclusions(recommendation, superseded)
+    if iso_relative_path is not None:
+        recommendation = exclude_unsatisfiable_packages(
+            recommendation, iso_relative_path, identity_name, iso_architectures
+        )
+        recommendation = resolve_component_conflicts(recommendation)
+    return recommendation
+
+
 SUPERSEDENCE_FULL = re.compile(
     r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE
 )
@@ -3563,32 +3612,32 @@ def discover() -> dict:
             identity_name, identity_from_metadata = iso_identity(iso_path)
         except (OSError, ValueError):
             iso_architectures = frozenset()
-        recommendation = recommend_smu_selection(
-            identity_name, candidates, iso_architectures=iso_architectures
+        recommendation = resolve_automatic_recommendation(
+            identity_name, candidates, superseded, isos[0], iso_architectures
         )
         # Platform/release may come from the image's embedded identity, but the
         # operator-facing "iso" is always the real file they uploaded.
         recommendation["iso"] = Path(isos[0]).name
     elif len(isos) > 1:
-        recommendation = {
-            "ready": False,
-            "selected": [],
-            "excluded": [],
-            "message": "More than one base ISO was found; keep one ISO or select it in Expert settings",
-        }
-    else:
-        recommendation = {
-            "ready": False,
-            "selected": [],
-            "excluded": [],
-            "message": "Upload one base ISO before SMUs can be selected",
-        }
-    recommendation = add_superseded_exclusions(recommendation, superseded)
-    if len(isos) == 1:
-        recommendation = exclude_unsatisfiable_packages(
-            recommendation, isos[0], identity_name, iso_architectures
+        recommendation = add_superseded_exclusions(
+            {
+                "ready": False,
+                "selected": [],
+                "excluded": [],
+                "message": "More than one base ISO was found; keep one ISO or select it in Expert settings",
+            },
+            superseded,
         )
-        recommendation = resolve_component_conflicts(recommendation)
+    else:
+        recommendation = add_superseded_exclusions(
+            {
+                "ready": False,
+                "selected": [],
+                "excluded": [],
+                "message": "Upload one base ISO before SMUs can be selected",
+            },
+            superseded,
+        )
     recommendation["unsatisfied_dependencies"] = (
         unsatisfied_dependencies_for_recommendation(
             isos[0], recommendation.get("selected", [])
@@ -3759,25 +3808,15 @@ def build_command(
         identity_name, _ = iso_identity(iso_path)
         candidates, superseded = active_rpm_names()
         if payload.get("automatic_smu_selection"):
-            # Mirrors create_build_plan()'s own automatic path exactly (see
-            # its "SMUs that are incompatible with the rest of the
-            # selection" note): recommend_smu_selection() alone does not
-            # drop superseded, unsatisfiable or same-package-conflict
-            # candidates, so calling it without these three steps would
-            # reproduce the exact bug that fix closed, just on this path
-            # instead. Not reachable today - create_job() and
-            # planned_command_preview() always pass a pre-resolved
-            # pkglist with automatic_smu_selection=False - but this branch
-            # has its own direct test coverage and must stay correct if a
-            # future caller ever does reach it.
-            package_plan = recommend_smu_selection(
-                identity_name, candidates, iso_architectures=iso_architectures
+            # Not reachable today - create_job() and planned_command_preview()
+            # always pass a pre-resolved pkglist with
+            # automatic_smu_selection=False - but this branch has its own
+            # direct test coverage and must stay correct if a future caller
+            # ever does reach it, so it goes through the same, one
+            # authoritative pipeline create_build_plan() uses.
+            package_plan = resolve_automatic_recommendation(
+                identity_name, candidates, superseded, iso, iso_architectures
             )
-            package_plan = add_superseded_exclusions(package_plan, superseded)
-            package_plan = exclude_unsatisfiable_packages(
-                package_plan, iso, identity_name, iso_architectures
-            )
-            package_plan = resolve_component_conflicts(package_plan)
             if not package_plan["ready"]:
                 raise ValueError(package_plan["message"])
             payload["pkglist"] = package_plan["selected"]
@@ -4783,15 +4822,10 @@ def smu_recommendation():
         packages, superseded = active_rpm_names()
         iso_architectures = inspect_iso_architecture(iso_path)
         identity_name, identity_from_metadata = iso_identity(iso_path)
-        recommendation = recommend_smu_selection(
-            identity_name, packages, iso_architectures=iso_architectures
+        recommendation = resolve_automatic_recommendation(
+            identity_name, packages, superseded, iso, iso_architectures
         )
         recommendation["iso"] = iso_path.name
-        recommendation = add_superseded_exclusions(recommendation, superseded)
-        recommendation = exclude_unsatisfiable_packages(
-            recommendation, iso, identity_name, iso_architectures
-        )
-        recommendation = resolve_component_conflicts(recommendation)
         recommendation["unsatisfied_dependencies"] = (
             unsatisfied_dependencies_for_recommendation(
                 iso, recommendation.get("selected", [])
