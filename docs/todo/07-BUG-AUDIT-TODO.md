@@ -358,23 +358,69 @@ Race:
 TODO:
 
 - [x] Check cancellation state before verification, archive and destructive cleanup.
-- [ ] Make finalization idempotent and state-machine driven. (State
-      transitions are explicit; archive replay/idempotency remains.)
-      **Investigated 2026-09-17 — still open, but not currently reachable.**
-      `archive_giso_artifacts_and_cleanup()` is not idempotent by
-      construction: `archive_dir.mkdir(parents=True, exist_ok=False)` means a
-      second call for the same `job_id` raises `FileExistsError` rather than
-      recognising the work as already done. What stops that from being a live
-      bug today is that nothing ever calls it twice: it has exactly one
-      caller (`run_job()`'s success path), and after a restart
-      `initialize_job_store()` marks a previously-running job `interrupted`
-      rather than resuming or replaying finalization — there is no retry
-      path anywhere. So this is latent, not active. Making it genuinely
-      idempotent only becomes meaningful alongside a resume/replay mechanism
-      (which would also need to decide whether a half-written archive dir is
-      trustworthy); building the guard first, with no caller that can
-      exercise it, would be untestable scaffolding. Worth doing *with* that
-      work, not before it.
+- [x] Make finalization idempotent and state-machine driven. Fixed
+      2026-09-18 (maintainer: "det er nok tid nu" - promoted from the
+      2026-09-17 investigation below once the app had grown enough
+      finalization surface area for a repeat call to become plausible, not
+      because a real caller exists yet).
+      `archive_giso_artifacts_and_cleanup()` now writes `ARCHIVE_COMPLETE_MARKER`
+      (`archive-complete.json`, the recorded artifact list) as the last step
+      inside the archive lock, only once every prior step - copy, checksum
+      verify, retention policy, `before_cleanup()` - has succeeded. On entry,
+      an existing `archive_dir` with a valid marker is recognized as already
+      done: the recorded artifacts are returned directly and only the
+      (already-idempotent) housekeeping tail runs, instead of
+      `archive_dir.mkdir(exist_ok=False)` raising `FileExistsError` and the
+      caller reporting an already-succeeded build as failed. An existing
+      `archive_dir` *without* a valid marker was never verified - e.g. this
+      process killed mid-copy, before the marker could be written - and is
+      discarded (`shutil.rmtree`) before archiving again from `job_dir`,
+      rather than trusted. Addresses exactly the concern the 2026-09-17 note
+      raised: the fix is testable directly (call the function twice in a
+      test), without needing the resume/replay *caller* to exist first.
+
+      Deliberately not built: an actual resume/replay mechanism that would
+      call this twice in production. `initialize_job_store()` still marks a
+      previously-running job `interrupted` on restart rather than resuming
+      it - there is still no real caller that exercises this path today.
+      This fix makes a future resume/replay mechanism safe to add without
+      also having to solve idempotency at the same time; it does not itself
+      add that mechanism, which remains a separate, larger follow-up (deciding
+      whether a half-written archive dir is trustworthy is now answered -
+      "no, discard it" - but *when* to retry, and from where, is not).
+
+      Tests added in `giso-webui/tests/test_app.py`:
+      `test_second_call_after_success_replays_cleanup_instead_of_failing`
+      (calls it twice for the same job_id, second call after job_dir/inputs
+      are already gone - as a real retry would see - returns the same
+      artifact list) and
+      `test_crash_interrupted_partial_archive_is_discarded_and_redone` (a
+      marker-less pre-existing archive_dir is discarded, not trusted, and a
+      fresh archive succeeds). All existing
+      `archive_giso_artifacts_and_cleanup()` tests (cleanup, cancellation,
+      retention, unsafe-artifact, large-archive) still pass unchanged.
+      Verified 2026-09-18 in the containerized `giso-webui-giso-webui`
+      image per `AGENTS.md`: full suite green - 340 passed, 3 skipped (same
+      pre-existing `.gisobuild-tool`/`TOOL_ROOT`-dependent skips). `ruff
+      check`: clean (only the same pre-existing, unrelated `EXE002`
+      Windows-mount artifact noted elsewhere in this file).
+
+      Original 2026-09-17 investigation, kept for the record: still open,
+      but not currently reachable. `archive_giso_artifacts_and_cleanup()`
+      is not idempotent by construction: `archive_dir.mkdir(parents=True,
+      exist_ok=False)` means a second call for the same `job_id` raises
+      `FileExistsError` rather than recognising the work as already done.
+      What stops that from being a live bug today is that nothing ever
+      calls it twice: it has exactly one caller (`run_job()`'s success
+      path), and after a restart `initialize_job_store()` marks a
+      previously-running job `interrupted` rather than resuming or
+      replaying finalization — there is no retry path anywhere. So this is
+      latent, not active. Making it genuinely idempotent only becomes
+      meaningful alongside a resume/replay mechanism (which would also need
+      to decide whether a half-written archive dir is trustworthy);
+      building the guard first, with no caller that can exercise it, would
+      be untestable scaffolding. Worth doing *with* that work, not before
+      it.
 - [x] Add regression test for cancellation during finalization.
 
 ### Successful build deletes unrelated files from the entire upload workspace

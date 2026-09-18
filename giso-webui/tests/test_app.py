@@ -3039,6 +3039,52 @@ class GisoWebTests(unittest.TestCase):
         self.assertTrue(job_dir.exists())
         self.assertFalse((module.ARCHIVE / "cancel-finalize").exists())
 
+    def test_second_call_after_success_replays_cleanup_instead_of_failing(self):
+        # docs/todo/07-BUG-AUDIT-TODO.md "Cancelled build may still archive
+        # output and delete inputs": a retry for the same job_id after the
+        # first call fully succeeded must not raise FileExistsError from
+        # archive_dir.mkdir() and be reported as a failed build - it must
+        # recognize the completed archive and just replay the (idempotent)
+        # housekeeping.
+        owned = self.data / "selected.rpm"
+        owned.write_bytes(b"selected")
+        job_dir = self.output / "retry-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+
+        first = module.archive_giso_artifacts_and_cleanup("retry-job", job_dir, [owned])
+        self.assertTrue((module.ARCHIVE / "retry-job" / "archive-complete.json").is_file())
+
+        # A real retry would run after job_dir/owned were already removed by
+        # the first call's own cleanup - simulate exactly that starting state.
+        self.assertFalse(job_dir.exists())
+        self.assertFalse(owned.exists())
+
+        second = module.archive_giso_artifacts_and_cleanup("retry-job", job_dir, [owned])
+
+        self.assertEqual(second, first)
+        self.assertTrue((module.ARCHIVE / "retry-job" / "router-golden.iso").is_file())
+
+    def test_crash_interrupted_partial_archive_is_discarded_and_redone(self):
+        # A directory that exists without the completion marker was never
+        # verified - e.g. this process was killed mid-copy, before the
+        # marker could be written - and must not be trusted as "already
+        # archived"; it is discarded and archived again from job_dir.
+        owned = self.data / "selected.rpm"
+        owned.write_bytes(b"selected")
+        job_dir = self.output / "crashed-job"
+        job_dir.mkdir()
+        (job_dir / "router-golden.iso").write_bytes(b"golden image")
+        stale = module.ARCHIVE / "crashed-job"
+        stale.mkdir(parents=True)
+        (stale / "leftover.tmp").write_bytes(b"partial")
+
+        artifacts = module.archive_giso_artifacts_and_cleanup("crashed-job", job_dir, [owned])
+
+        self.assertEqual([artifact["path"] for artifact in artifacts], ["router-golden.iso"])
+        self.assertFalse((stale / "leftover.tmp").exists())
+        self.assertTrue((stale / "archive-complete.json").is_file())
+
     def test_archive_retention_starts_when_old_source_is_archived(self):
         job_dir = self.output / "old-source-job"
         job_dir.mkdir()

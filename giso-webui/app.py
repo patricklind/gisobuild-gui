@@ -2360,48 +2360,77 @@ def remove_consumed_inputs(cleanup_paths: list[Path] | None) -> list[str]:
     return problems
 
 
+ARCHIVE_COMPLETE_MARKER = "archive-complete.json"
+
+
 def archive_giso_artifacts_and_cleanup(
     job_id: str,
     job_dir: Path,
     cleanup_paths: list[Path] | None = None,
     before_cleanup=None,
 ) -> list[dict]:
-    """Archive verified Golden ISO and USB boot files, then remove build inputs/output."""
-    candidates = giso_artifact_candidates(job_dir)
-    iso_candidates = [path for path in candidates if path.suffix.lower() == ".iso"]
-    if not iso_candidates:
-        raise RuntimeError("No Golden ISO was produced; source files were kept")
-    for source in candidates:
-        if source.is_symlink() or job_dir.resolve() not in source.resolve().parents:
-            raise RuntimeError(f"Unsafe build artifact: {source.name}")
-    candidate_size = sum(path.stat().st_size for path in candidates)
-    if candidate_size > MAX_ARCHIVE_BYTES:
-        raise RuntimeError("The completed GISO artifacts exceed the archive's total size limit; source files were kept")
+    """Archive verified Golden ISO and USB boot files, then remove build inputs/output.
+
+    Idempotent: a second call for the same job_id (a retry after this
+    process was killed - not a Python exception, which already unwinds via
+    the `except` below - between a fully-verified archive and the
+    housekeeping that follows it) recognizes the completed archive by its
+    own `ARCHIVE_COMPLETE_MARKER` and replays only the housekeeping, instead
+    of `archive_dir.mkdir(exist_ok=False)` raising `FileExistsError` and the
+    caller reporting an already-succeeded build as failed. An archive
+    directory that exists *without* the marker is a crash-interrupted
+    partial write - never trustworthy - and is discarded before archiving
+    again from the original build output.
+    """
     archive_dir = ARCHIVE / job_id
-    archived = []
-    with cross_process_archive_lock():
-        archive_dir.mkdir(parents=True, exist_ok=False)
-        try:
-            for source in candidates:
-                destination = archive_dir / source.name
-                if destination.exists():
-                    raise RuntimeError(f"Build artifacts share the filename {source.name}")
-                # The archive retention clock starts when the verified build is archived,
-                # not when an old source file happened to be created.
-                shutil.copyfile(source, destination)
-                digest = file_sha256(destination)
-                if source.stat().st_size != destination.stat().st_size or file_sha256(source) != digest:
-                    raise RuntimeError(f"Archive verification failed for {source.name}")
-                archived.append({"path": source.name, "size": destination.stat().st_size,
-                                 "sha256": digest, "url": f"/archive/{job_id}/{source.name}"})
-            enforce_archive_policy(protected_job_id=job_id)
-            if not archive_dir.is_dir():
-                raise RuntimeError("The completed GISO archive could not be retained")
-            if before_cleanup is not None:
-                before_cleanup()
-        except Exception:
-            shutil.rmtree(archive_dir, ignore_errors=True)
-            raise
+    marker = archive_dir / ARCHIVE_COMPLETE_MARKER
+    archived: list[dict] | None = None
+    if archive_dir.is_dir():
+        with cross_process_archive_lock():
+            try:
+                archived = json.loads(marker.read_text())
+            except (OSError, ValueError):
+                archived = None
+            if archived is None:
+                shutil.rmtree(archive_dir, ignore_errors=True)
+    if archived is None:
+        candidates = giso_artifact_candidates(job_dir)
+        iso_candidates = [path for path in candidates if path.suffix.lower() == ".iso"]
+        if not iso_candidates:
+            raise RuntimeError("No Golden ISO was produced; source files were kept")
+        for source in candidates:
+            if source.is_symlink() or job_dir.resolve() not in source.resolve().parents:
+                raise RuntimeError(f"Unsafe build artifact: {source.name}")
+        candidate_size = sum(path.stat().st_size for path in candidates)
+        if candidate_size > MAX_ARCHIVE_BYTES:
+            raise RuntimeError("The completed GISO artifacts exceed the archive's total size limit; source files were kept")
+        archived = []
+        with cross_process_archive_lock():
+            archive_dir.mkdir(parents=True, exist_ok=False)
+            try:
+                for source in candidates:
+                    destination = archive_dir / source.name
+                    if destination.exists():
+                        raise RuntimeError(f"Build artifacts share the filename {source.name}")
+                    # The archive retention clock starts when the verified build is archived,
+                    # not when an old source file happened to be created.
+                    shutil.copyfile(source, destination)
+                    digest = file_sha256(destination)
+                    if source.stat().st_size != destination.stat().st_size or file_sha256(source) != digest:
+                        raise RuntimeError(f"Archive verification failed for {source.name}")
+                    archived.append({"path": source.name, "size": destination.stat().st_size,
+                                     "sha256": digest, "url": f"/archive/{job_id}/{source.name}"})
+                enforce_archive_policy(protected_job_id=job_id)
+                if not archive_dir.is_dir():
+                    raise RuntimeError("The completed GISO archive could not be retained")
+                if before_cleanup is not None:
+                    before_cleanup()
+                # Written last, only once every prior step verified clean - its
+                # presence is exactly "this archive is complete and trustworthy".
+                marker.write_text(json.dumps(archived))
+            except Exception:
+                shutil.rmtree(archive_dir, ignore_errors=True)
+                raise
     # The artifacts are archived and verified from here on, so the build has
     # succeeded. Removing the inputs it consumed is housekeeping: a file the
     # service cannot delete (foreign ownership, or a directory it may not write
