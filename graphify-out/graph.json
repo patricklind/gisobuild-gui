@@ -11497,7 +11497,7 @@
       "node_kind": "heading",
       "norm_label": "`/api/health`",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L359"
+      "source_location": "L395"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_api_ready",
@@ -11509,7 +11509,7 @@
       "node_kind": "heading",
       "norm_label": "`/api/ready`",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L363"
+      "source_location": "L399"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_caching",
@@ -11521,7 +11521,7 @@
       "node_kind": "heading",
       "norm_label": "caching",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L405"
+      "source_location": "L441"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_cisco_secrets",
@@ -11533,7 +11533,7 @@
       "node_kind": "heading",
       "norm_label": "cisco secrets",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L232"
+      "source_location": "L268"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_concurrency",
@@ -11545,7 +11545,7 @@
       "node_kind": "heading",
       "norm_label": "concurrency",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L113"
+      "source_location": "L149"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_error_taxonomy",
@@ -11557,7 +11557,7 @@
       "node_kind": "heading",
       "norm_label": "error taxonomy",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L302"
+      "source_location": "L338"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_health_and_readiness",
@@ -11569,7 +11569,7 @@
       "node_kind": "heading",
       "norm_label": "health and readiness",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L344"
+      "source_location": "L380"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_job_model",
@@ -11581,7 +11581,7 @@
       "node_kind": "heading",
       "norm_label": "job model",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L76"
+      "source_location": "L112"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_path_security",
@@ -11593,7 +11593,7 @@
       "node_kind": "heading",
       "norm_label": "path security",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L153"
+      "source_location": "L189"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_persistent_state",
@@ -11617,7 +11617,7 @@
       "node_kind": "heading",
       "norm_label": "startup self-test",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L381"
+      "source_location": "L417"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_structured_logging",
@@ -11629,7 +11629,7 @@
       "node_kind": "heading",
       "norm_label": "structured logging",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L260"
+      "source_location": "L296"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_todo_state_security_observability",
@@ -27993,7 +27993,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L359",
+      "source_location": "L395",
       "weight": 1.0
     },
     {
@@ -28004,7 +28004,18 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L363",
+      "source_location": "L399",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_04_state_security_observability_todo_todo_state_security_observability",
+      "target": "docs_todo_04_state_security_observability_todo_job_model",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
+      "source_location": "L112",
       "weight": 1.0
     },
     {
@@ -28015,7 +28026,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L113",
+      "source_location": "L149",
       "weight": 1.0
     },
     {
@@ -28026,7 +28037,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L153",
+      "source_location": "L189",
       "weight": 1.0
     },
     {
@@ -28037,7 +28048,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L232",
+      "source_location": "L268",
       "weight": 1.0
     },
     {
@@ -28048,7 +28059,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L260",
+      "source_location": "L296",
       "weight": 1.0
     },
     {
@@ -28070,7 +28081,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L302",
+      "source_location": "L338",
       "weight": 1.0
     },
     {
@@ -28081,7 +28092,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L344",
+      "source_location": "L380",
       "weight": 1.0
     },
     {
@@ -28092,7 +28103,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L381",
+      "source_location": "L417",
       "weight": 1.0
     },
     {
@@ -28103,18 +28114,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L405",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_04_state_security_observability_todo_todo_state_security_observability",
-      "target": "docs_todo_04_state_security_observability_todo_job_model",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L76",
+      "source_location": "L441",
       "weight": 1.0
     },
     {
@@ -40254,5 +40254,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "29d49880bf6307c5c3f53e61a4103cdca607434d"
+  "built_at_commit": "95a0487775aa50a6770ad47b39557df339a50191"
 }

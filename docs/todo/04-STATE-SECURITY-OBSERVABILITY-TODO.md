@@ -73,6 +73,42 @@ Persist:
       Still in memory only: `cisco_searches` and `cisco_download_jobs`
       (a restart is recorded and the partial removed, not resumed).
 
+      **Investigated 2026-09-18 — closing as by-design, not a gap.** Checked
+      whether the remaining in-memory state is a real "critical state lost"
+      risk like the upload case was before it was fixed, or already safely
+      handled. It is the latter, on both counts this bullet's title cares
+      about:
+      - **No silent data/state loss.** `report_interrupted_transfers()`
+        (`giso-webui/app.py`) already removes any stray Cisco `.part` file on
+        startup and logs it to `/api/activity` as "N Cisco download(s) were
+        interrupted by a service restart; start the download again" - the
+        operator is told, not left guessing at a job that would otherwise
+        show `running` forever. Verified by
+        `test_restart_reports_interrupted_uploads_and_cisco_downloads` in
+        `giso-webui/tests/test_app.py`.
+      - **Resuming would not actually work even with the job dict
+        persisted.** `CiscoSoftwareClient.download()`
+        (`giso-webui/cisco_download.py`) unconditionally deletes any existing
+        `.part` file before it starts (`temporary.unlink(missing_ok=True)`,
+        with a comment explaining why: only one Cisco download runs at a
+        time, so a leftover from a killed process is always discarded, never
+        resumed) and issues a plain `GET`/`POST` with no `Range` header. So
+        persisting `cisco_searches`/`cisco_download_jobs` across a restart
+        would only redraw the same progress bar before the same full-file
+        re-download happened anyway - it would not save the operator any
+        bytes or time, unlike the upload case where the resumed byte offset
+        is real. Adding actual resume (HTTP Range support end to end, plus
+        surviving the OAuth access token's own expiry mid-download) is a
+        materially bigger change than "persist a dict", for a
+        server-to-server transfer from Cisco's own CDN that has not been
+        reported as slow or flaky enough to need it.
+
+      Recommend closing this half of the bullet as "won't do, by design"
+      rather than implementing dict persistence that cannot deliver real
+      resumability. Re-open with a concrete measured pain point (e.g. a large
+      Cisco image over a slow/unreliable path to Cisco's CDN) if one shows up
+      - not purely because the checkbox exists.
+
 ## Job model
 
 Explicit states:
