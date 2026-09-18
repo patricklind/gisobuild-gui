@@ -914,6 +914,25 @@ function renderBuildPreview(plan) {
       + counts.map(([status, count]) => count + ' ' + statusWord(status)).join(' · ');
     body.appendChild(line);
   }
+  // A conflict resolve_component_conflicts() could not decide (a version tie,
+  // mixed vm_type, or missing package_type/vm_type metadata) leaves both
+  // fixes selected side by side for gisobuild's own supersedence to decide -
+  // READY TO BUILD above is still correct, but the operator must see this
+  // before starting, not only in Step 2's live review.
+  if (plan.component_conflicts?.length || plan.warnings?.length) {
+    const warning = document.createElement('div'); warning.className = 'smu-relationship-warning';
+    const heading = document.createElement('b');
+    heading.textContent = 'Review before building'; warning.appendChild(heading);
+    (plan.component_conflicts || []).forEach(item => {
+      const row = document.createElement('p');
+      row.textContent = `${item.component}: ${item.cscs.join(' + ')}. ${item.reason}`;
+      warning.appendChild(row);
+    });
+    (plan.warnings || []).forEach(text => {
+      const row = document.createElement('p'); row.textContent = text; warning.appendChild(row);
+    });
+    body.appendChild(warning);
+  }
   (plan.blockers || []).forEach(text => {
     const row = document.createElement('p'); row.className = 'error'; row.textContent = text;
     body.appendChild(row);

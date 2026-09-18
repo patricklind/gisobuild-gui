@@ -662,6 +662,24 @@ Never silently exclude without a reason.
       Full suite green (340 unit/integration tests, 22 browser tests, `ruff
       check` and `ruff format --check` clean).
 
+      **A second real gap in the build preview, same day.** The preview
+      panel added earlier the same session (`renderBuildPreview()` in
+      `giso-webui/static/app.js`) showed `plan.blockers` but never
+      `plan.warnings` or `plan.component_conflicts` - so a plan
+      `resolve_component_conflicts()` could not decide (a version tie,
+      mixed `vm_type`, or missing `package_type`/`vm_type` metadata) still
+      showed plainly "READY TO BUILD" with no sign that two conflicting
+      fixes remained selected side by side for gisobuild's own
+      supersedence to decide - visible only in Step 2's separate live
+      review, not in the preview meant to show everything before starting.
+      Now renders both under "Review before building" (reusing the same
+      `.smu-relationship-warning` style Step 2 uses). Browser test
+      (confirmed to fail without the fix - the warning panel did not
+      exist - and pass with it):
+      `test_build_preview_shows_an_unresolved_conflict_before_building`.
+      Full suite green (340 unit/integration tests, 23 browser tests, ruff
+      clean, Graphify refreshed).
+
       **Full gisobuild run: attempted, not completed, 2026-09-18.** Two
       attempts against the real, complete NCS5500 25.1.2 workspace (base ISO
       + all 12 base `optional-rpms/*` + all 10 SMU tars, 25 selected RPMs)

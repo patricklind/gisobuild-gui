@@ -146,6 +146,36 @@ class OperatorFlowTests(unittest.TestCase):
         self.assertEqual(
             [rows.nth(index).inner_text() for index in (3, 4, 5)], ["3", "2", "1"]
         )
+
+    def test_build_preview_shows_an_unresolved_conflict_before_building(self):
+        # resolve_component_conflicts() deliberately leaves a version tie
+        # unresolved (never guesses) - the plan still says READY TO BUILD
+        # (both fixes stay selected for gisobuild's own supersedence to
+        # decide), but the operator must see that ambiguity here, not only
+        # in Step 2's live review.
+        tied_a = "asr9k-x64-isis-1.0.0.1-r732.CSCtest00010.x86_64.rpm"
+        tied_b = "asr9k-x64-isis-1.0.0.1-r732.CSCtest00011.x86_64.rpm"
+        for name in (self.ISO, tied_a, tied_b):
+            self.write(name)
+        identity = {
+            "name": "asr9k-x64-isis",
+            "version": "1.0.0.1",
+            "release": "1",
+            "arch": "x86_64",
+            "package_type": "smu",
+            "vm_type": "host",
+        }
+        with patch("app.rpm_dependency_metadata", return_value={"identity": identity}):
+            self.open()
+            expect(self.page.locator("#smu-plan-state")).to_have_text("Calculated")
+            self.page.locator("#preview-build").click()
+        preview = self.page.locator("#build-preview")
+        expect(preview.locator(".preview-grid")).to_contain_text("READY TO BUILD")
+        warning = preview.locator(".smu-relationship-warning")
+        expect(warning).to_contain_text("Review before building")
+        expect(warning).to_contain_text("asr9k-x64-isis")
+        expect(warning).to_contain_text("CSCTEST00010")
+        expect(warning).to_contain_text("CSCTEST00011")
         preview.locator("summary", has_text="gisobuild command").click()
         expect(preview.locator(".command-preview")).to_contain_text(
             "gisobuild.py --iso asr9k-x64-7.3.2.iso"
