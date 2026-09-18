@@ -1698,6 +1698,51 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn(wrong_release, command[pkglist_index + 1 :])
 
     @patch("app.child_mount_args", return_value=[])
+    def test_build_commands_own_automatic_selection_also_resolves_component_conflicts(
+        self, _mounts
+    ):
+        # This branch is not reachable from create_job() or the build preview
+        # today (both always pass a pre-resolved pkglist with
+        # automatic_smu_selection=False - see build_command()'s docstring),
+        # but it has its own direct test above and must not regress into the
+        # exact bug docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md's "SMUs that
+        # are incompatible with the rest of the selection" fixed: calling
+        # recommend_smu_selection() without also resolving conflicts.
+        iso = "ncs5500-mini-x-25.1.2.iso"
+        winner = "ncs5500-bgp-1.0.0.2-r2512.CSCtest00011.x86_64.rpm"
+        loser = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00010.x86_64.rpm"
+        for name in (iso, winner, loser):
+            (self.data / name).write_bytes(b"input")
+
+        def identity_for(path):
+            match = module.RPM_COMPONENT.search(path.name)
+            return {
+                "identity": {
+                    "name": match.group("component"),
+                    "version": match.group("version"),
+                    "release": f"r2512.CSC{match.group('bug')}",
+                    "arch": "x86_64",
+                    "package_type": "smu",
+                    "vm_type": "host",
+                }
+            }
+
+        with patch("app.rpm_dependency_metadata", side_effect=identity_for):
+            command = module.build_command(
+                {
+                    "iso": iso,
+                    "pkglist": [],
+                    "automatic_smu_selection": True,
+                    "auto_repo": True,
+                },
+                "automatic-conflict",
+            )
+
+        pkglist_index = command.index("--pkglist")
+        self.assertIn(winner, command[pkglist_index + 1 :])
+        self.assertNotIn(loser, command[pkglist_index + 1 :])
+
+    @patch("app.child_mount_args", return_value=[])
     def test_build_recalculates_automatic_smu_selection_server_side_for_lnt_platforms(
         self, _mounts
     ):

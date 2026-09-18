@@ -3757,14 +3757,33 @@ def build_command(
         # Must infer from the same identity create_build_plan() used, or the
         # final gate could reject a plan the review step just approved.
         identity_name, _ = iso_identity(iso_path)
-        candidates = active_rpm_names()[0]
+        candidates, superseded = active_rpm_names()
         if payload.get("automatic_smu_selection"):
+            # Mirrors create_build_plan()'s own automatic path exactly (see
+            # its "SMUs that are incompatible with the rest of the
+            # selection" note): recommend_smu_selection() alone does not
+            # drop superseded, unsatisfiable or same-package-conflict
+            # candidates, so calling it without these three steps would
+            # reproduce the exact bug that fix closed, just on this path
+            # instead. Not reachable today - create_job() and
+            # planned_command_preview() always pass a pre-resolved
+            # pkglist with automatic_smu_selection=False - but this branch
+            # has its own direct test coverage and must stay correct if a
+            # future caller ever does reach it.
             package_plan = recommend_smu_selection(
                 identity_name, candidates, iso_architectures=iso_architectures
             )
+            package_plan = add_superseded_exclusions(package_plan, superseded)
+            package_plan = exclude_unsatisfiable_packages(
+                package_plan, iso, identity_name, iso_architectures
+            )
+            package_plan = resolve_component_conflicts(package_plan)
             if not package_plan["ready"]:
                 raise ValueError(package_plan["message"])
             payload["pkglist"] = package_plan["selected"]
+            already_excluded = already_excluded | {
+                entry["name"] for entry in package_plan.get("excluded", [])
+            }
         profile = validate_platform_options({**payload, "iso": identity_name})
         payload["platform"] = profile["id"]
         selected_rpms = resolve_rpm_identifiers(payload.get("pkglist", []))

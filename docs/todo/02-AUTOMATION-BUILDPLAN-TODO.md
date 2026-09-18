@@ -643,6 +643,25 @@ Never silently exclude without a reason.
       LNT section above - LNT filenames carry no CSC ID, so
       `component_conflicts` cannot fire for an LNT selection).
 
+      **Latent copy of the same bug, closed same day.** `build_command()`
+      has its own `automatic_smu_selection` branch (defensive re-derivation
+      if ever called directly with a possibly-stale pkglist - see its own
+      test `test_build_recalculates_automatic_smu_selection_server_side`).
+      It called bare `recommend_smu_selection()` with none of
+      `add_superseded_exclusions()`/`exclude_unsatisfiable_packages()`/
+      `resolve_component_conflicts()`, so a caller reaching this branch with
+      a real component conflict would reproduce the exact bug above on this
+      path. Not reachable today - `create_job()` and the build preview
+      always pass a pre-resolved pkglist with `automatic_smu_selection:
+      False` - but it was a landmine for any future caller. Now runs the
+      same three steps and folds the result into `already_excluded` before
+      its own `validate_smu_selection()` call. Test (confirmed to fail
+      without the fix - both the dropped and kept version present with no
+      resolution at all - and pass with it):
+      `test_build_commands_own_automatic_selection_also_resolves_component_conflicts`.
+      Full suite green (340 unit/integration tests, 22 browser tests, `ruff
+      check` and `ruff format --check` clean).
+
       **Full gisobuild run: attempted, not completed, 2026-09-18.** Two
       attempts against the real, complete NCS5500 25.1.2 workspace (base ISO
       + all 12 base `optional-rpms/*` + all 10 SMU tars, 25 selected RPMs)
