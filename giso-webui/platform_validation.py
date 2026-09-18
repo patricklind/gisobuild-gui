@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from itertools import zip_longest
 from pathlib import Path
 
 # eXR identifiers are synchronized with ios-xr/gisobuild's
@@ -241,6 +242,67 @@ def _bundle_files_by_csc(
             bug = f"CSC{component.group('bug')}".upper()
             bundles.setdefault(bug, set()).add(name)
     return bundles
+
+
+# Ported, not reimplemented, from upstream gisobuild's own eXR supersedence
+# decision, so a decision this app makes agrees with what the eXR engine
+# actually builds (see docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md "SMUs that
+# are incompatible with the rest of the selection"). Source: `_subfield_pattern`
+# / `_iter_rpm_subfields()` / `_compare_rpm_field()` / `_compare_rpm_labels()`
+# in `src/exrmod/gisobuild_exr_engine.py` (BSD-3-Clause, Copyright (c)
+# 2021-2025 Cisco Systems, Inc. and its affiliates), pinned commit
+# 0388af2989bb7022d780a8732dbfbfeb77a70ee7. Deliberately NOT full rpmvercmp -
+# no tilde/caret pre/post-release weighting, and more subfields always beats
+# fewer regardless of what they are (so e.g. "1.0~rc1" sorts *above* "1.0",
+# the opposite of real rpmvercmp) - matching upstream exactly means matching
+# its quirks too. See ExrRpmLabelCompareTests in test_platform_compatibility.py
+# for a test that runs the pinned upstream source itself and fails loudly if
+# a future commit bump changes this algorithm.
+_EXR_SUBFIELD = re.compile(r"[^a-zA-Z0-9]*(?:(?P<text>[a-zA-Z]+)|(?P<num>[0-9]+))")
+
+
+def _exr_rpm_subfields(field: str) -> list[tuple[int, object]]:
+    subfields: list[tuple[int, object]] = []
+    for match in _EXR_SUBFIELD.finditer(field):
+        text = match.group("text")
+        subfields.append((0, text) if text is not None else (1, int(match.group("num"))))
+    return subfields
+
+
+def _compare_exr_rpm_field(lhs: str, rhs: str) -> int:
+    if lhs == rhs:
+        return 0
+    lhs_subfields = _exr_rpm_subfields(lhs)
+    rhs_subfields = _exr_rpm_subfields(rhs)
+    for lhs_sf, rhs_sf in zip_longest(lhs_subfields, rhs_subfields):
+        if lhs_sf == rhs_sf:
+            continue
+        if lhs_sf is None:
+            return -1
+        if rhs_sf is None:
+            return 1
+        return -1 if lhs_sf < rhs_sf else 1
+    return 0
+
+
+def compare_exr_rpm_labels(lhs: tuple[str, str], rhs: tuple[str, str]) -> int:
+    """Compare two eXR RPMs' (version, release), the way gisobuild's own
+    filter_superseded_rpms() does, to predict which one it would keep.
+
+    Epoch is left out: upstream's own call site always passes literal 0 for
+    both sides, which short-circuits _compare_rpm_field's exact-match branch
+    before it would ever really compare an epoch - so epoch plays no role in
+    the real decision either.
+
+    Returns 1 if lhs > rhs (lhs is what gisobuild would keep), -1 if
+    lhs < rhs, 0 if equal.
+    """
+    lhs_version, lhs_release = lhs
+    rhs_version, rhs_release = rhs
+    result = _compare_exr_rpm_field(lhs_version, rhs_version)
+    if result:
+        return result
+    return _compare_exr_rpm_field(lhs_release, rhs_release)
 
 
 def validate_smu_selection(

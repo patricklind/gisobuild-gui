@@ -2,6 +2,7 @@ import ast
 import os
 import re
 import unittest
+from itertools import zip_longest
 from pathlib import Path
 
 from platform_validation import (
@@ -12,6 +13,7 @@ from platform_validation import (
     capabilities_for_platform,
     check_upgrade_matrix,
     classify_exclusion,
+    compare_exr_rpm_labels,
     describe_package,
     infer_platform,
     infer_platform_pid,
@@ -540,6 +542,86 @@ class PlatformCompatibilityTests(unittest.TestCase):
         selected = ["ncs5500-routing-r2612.CSCabc1234.x86_64.rpm"]
         result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", selected)
         self.assertEqual(result["missing_bridge_smus"], [required])
+
+
+class ExrRpmLabelCompareTests(unittest.TestCase):
+    """compare_exr_rpm_labels() vs. the real pinned upstream algorithm.
+
+    See docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md "SMUs that are incompatible
+    with the rest of the selection": eXR's own filter_superseded_rpms() does
+    not use rpmvercmp, so this must be verified against upstream's actual
+    (non-rpmvercmp) comparator, not against version-comparison intuition.
+    """
+
+    @staticmethod
+    def _extract_method(source: str, name: str) -> str:
+        match = re.search(
+            rf"^    def {re.escape(name)}\(.*?\n(?=    def |\Z)",
+            source, re.DOTALL | re.MULTILINE,
+        )
+        if not match:
+            raise AssertionError(f"pinned upstream gisobuild dropped or renamed {name}()")
+        return match.group(0)
+
+    def _upstream_comparator(self):
+        """Execute the real upstream functions from the pinned source itself.
+
+        Deliberately does not trust a static local copy: if a future pinned-
+        commit bump changes this algorithm, this fails loudly instead of
+        compare_exr_rpm_labels() silently drifting out of sync - same intent
+        as test_exr_platform_list_matches_the_pinned_upstream_engine above.
+        """
+        engine_path = upstream_gisobuild_file(self, "src/exrmod/gisobuild_exr_engine.py")
+        source = engine_path.read_text()
+        pattern_match = re.search(
+            r"^_subfield_pattern = re\.compile\(.*?\n\)\n", source, re.DOTALL | re.MULTILINE
+        )
+        if not pattern_match:
+            self.fail("pinned upstream gisobuild dropped or renamed _subfield_pattern")
+        namespace: dict = {"re": re, "zip_longest": zip_longest}
+        exec(pattern_match.group(0), namespace)  # noqa: S102 - trusted pinned source, test-only
+        class_source = "class _Upstream:\n" + "".join(
+            self._extract_method(source, name)
+            for name in ("_iter_rpm_subfields", "_compare_rpm_field", "_compare_rpm_labels")
+        )
+        exec(class_source, namespace)  # noqa: S102 - trusted pinned source, test-only
+        return namespace["_Upstream"]()
+
+    def test_ported_comparator_agrees_with_the_pinned_upstream_source(self):
+        upstream = self._upstream_comparator()
+        cases = [
+            (("1.0.0", "1"), ("1.0.0", "1")),
+            (("1.0.0", "2"), ("1.0.0", "1")),
+            (("1.0.1", "1"), ("1.0.0", "9")),
+            # Same IOS XR release tag, different CSC IDs baked into %{RELEASE} -
+            # the real shape of a same-component conflict between two fixes.
+            (("1.0.0", "r2512.CSCwv36143"), ("1.0.0", "r2512.CSCwu13268")),
+            (("1.0", "1"), ("1.0.0", "1")),
+            # Not rpmvercmp: a tilde suffix is just more subfields, so it
+            # outranks the bare version instead of being a pre-release.
+            (("1.0~rc1", "1"), ("1.0", "1")),
+            (("2.0", "1"), ("1.0~rc1", "1")),
+        ]
+        for lhs, rhs in cases:
+            expected = upstream._compare_rpm_labels([0, lhs[0], lhs[1]], [0, rhs[0], rhs[1]])
+            self.assertEqual(compare_exr_rpm_labels(lhs, rhs), expected, f"{lhs} vs {rhs}")
+            expected_reverse = upstream._compare_rpm_labels([0, rhs[0], rhs[1]], [0, lhs[0], lhs[1]])
+            self.assertEqual(compare_exr_rpm_labels(rhs, lhs), expected_reverse, f"{rhs} vs {lhs}")
+
+    def test_more_subfields_outranks_fewer_regardless_of_content(self):
+        # Documented upstream quirk (see the module docstring in
+        # platform_validation.py): this is why real rpmvercmp must not be
+        # substituted in - it would reverse this exact comparison.
+        self.assertEqual(compare_exr_rpm_labels(("1.0~rc1", "1"), ("1.0", "1")), 1)
+        self.assertEqual(compare_exr_rpm_labels(("1.0", "1"), ("1.0~rc1", "1")), -1)
+
+    def test_equal_labels_compare_equal(self):
+        self.assertEqual(compare_exr_rpm_labels(("1.0.0", "r2512.CSCabc123")
+                                                , ("1.0.0", "r2512.CSCabc123")), 0)
+
+    def test_release_only_breaks_a_version_tie(self):
+        self.assertEqual(compare_exr_rpm_labels(("1.0.0", "2"), ("1.0.0", "1")), 1)
+        self.assertEqual(compare_exr_rpm_labels(("1.0.0", "1"), ("1.0.0", "2")), -1)
 
 
 if __name__ == "__main__":

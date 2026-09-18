@@ -1567,7 +1567,8 @@ class GisoWebTests(unittest.TestCase):
         rpm = self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
         rpm.write_bytes(b"not parsed here")
         output = (
-            "NVRA ncs5500-bgp|1.0.0.1|r2512.CSCtest00001|x86_64\n"
+            "NVRA ncs5500-bgp|1.0.0.1|r2512.CSCtest00001|x86_64|"
+            "Cisco IOS XR,SUPPCARDS:RSP2-RSP3;VMTYPE:host;PACKAGETYPE:smu;XRRELEASE:7.9.1\n"
             "SIGN RSA/SHA256, Sun Jul 26 14:53:45 2026, Key ID 7476b0605746bd08\n"
             "REQ ncs5500-dpa|=|1.0.0.5\n"
             "REQ /bin/sh||\n"
@@ -1585,11 +1586,139 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(metadata["identity"], {
             "name": "ncs5500-bgp", "version": "1.0.0.1",
             "release": "r2512.CSCtest00001", "arch": "x86_64",
+            "package_type": "smu", "vm_type": "host",
         })
         # Only exact, epoch-free constraints are kept.
         self.assertEqual(metadata["signature"], {"algorithm": "RSA/SHA256", "key_id": "7476b0605746bd08"})
         self.assertEqual(metadata["requires"], [("ncs5500-dpa", "1.0.0.5")])
         self.assertEqual(metadata["provides"], [("ncs5500-bgp", "1.0.0.1-r2512.CSCtest00001")])
+
+    def test_rpm_header_group_without_cisco_metadata_yields_no_package_or_vm_type(self):
+        # A non-eXR/non-Cisco RPM's %{GROUP} is just free text (often the RPM
+        # spec default "Unspecified") - it must never be misread as a match.
+        rpm = self.data / "plain-1.0-1.x86_64.rpm"
+        rpm.write_bytes(b"not parsed here")
+        output = "NVRA plain|1.0|1|x86_64|Unspecified\n"
+        module.rpm_metadata_cache.clear()
+        completed = SimpleNamespace(returncode=0, stdout=output)
+        with patch("app.subprocess.run", return_value=completed):
+            metadata = module.rpm_dependency_metadata(rpm)
+        self.assertEqual(metadata["identity"]["package_type"], None)
+        self.assertEqual(metadata["identity"]["vm_type"], None)
+
+    def _conflict_recommendation(self, winner: str, loser: str) -> dict:
+        for name in (winner, loser):
+            (self.data / name).write_bytes(b"x")
+        return {
+            "selected": [winner, loser], "excluded": [],
+            "package_groups": [
+                {"csc": "CSCwv36143", "components": ["ncs5500-bgp"], "files": [winner],
+                 "count": 1, "relationship": "Single-component fix"},
+                {"csc": "CSCwu13268", "components": ["ncs5500-bgp"], "files": [loser],
+                 "count": 1, "relationship": "Single-component fix"},
+            ],
+            "component_conflicts": [
+                {"component": "ncs5500-bgp", "cscs": ["CSCwu13268", "CSCwv36143"],
+                 "reason": "More than one fix changes this component; Cisco supersedence "
+                           "decides which remains"},
+            ],
+        }
+
+    def test_component_conflict_is_resolved_by_real_rpm_version(self):
+        winner = "ncs5500-bgp-1.0.0.2-r2512.CSCwv36143.x86_64.rpm"
+        loser = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
+        recommendation = self._conflict_recommendation(winner, loser)
+        identities = {
+            winner: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
+                     "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
+            loser: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
+                    "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
+        }
+        with patch("app.rpm_dependency_metadata",
+                   side_effect=lambda p: {"identity": identities[p.name]}):
+            result = module.resolve_component_conflicts(recommendation)
+        self.assertEqual(result["selected"], [winner])
+        self.assertEqual(result["component_conflicts"], [])
+        self.assertEqual(len(result["excluded"]), 1)
+        self.assertEqual(result["excluded"][0]["name"], loser)
+        self.assertEqual(module.classify_exclusion(result["excluded"][0]["reason"]), "SUPERSEDED")
+        self.assertIn(winner, result["excluded"][0]["reason"])
+
+    def test_component_conflict_is_not_resolved_across_different_vm_types(self):
+        # A host-VM vs. calvados-VM variant of the same filename component are
+        # NOT the same package to gisobuild - must not be conflated.
+        host = "ncs5500-bgp-1.0.0.2-r2512.CSCwv36143.x86_64.rpm"
+        admin = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
+        recommendation = self._conflict_recommendation(host, admin)
+        identities = {
+            host: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
+                   "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
+            admin: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
+                    "arch": "x86_64", "package_type": "smu", "vm_type": "calvados"},
+        }
+        with patch("app.rpm_dependency_metadata",
+                   side_effect=lambda p: {"identity": identities[p.name]}):
+            result = module.resolve_component_conflicts(recommendation)
+        self.assertEqual(sorted(result["selected"]), sorted([host, admin]))
+        self.assertEqual(result["excluded"], [])
+        self.assertEqual(len(result["component_conflicts"]), 1)
+
+    def test_component_conflict_is_not_resolved_without_package_type_metadata(self):
+        # Neither candidate's %{GROUP} carries Cisco's PACKAGETYPE/VMTYPE
+        # metadata (e.g. a plain, non-eXR RPM) - "cannot determine" must
+        # never be treated as a match.
+        winner = "ncs5500-bgp-1.0.0.2-r2512.CSCwv36143.x86_64.rpm"
+        loser = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
+        recommendation = self._conflict_recommendation(winner, loser)
+        identities = {
+            winner: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
+                     "arch": "x86_64", "package_type": None, "vm_type": None},
+            loser: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
+                    "arch": "x86_64", "package_type": None, "vm_type": None},
+        }
+        with patch("app.rpm_dependency_metadata",
+                   side_effect=lambda p: {"identity": identities[p.name]}):
+            result = module.resolve_component_conflicts(recommendation)
+        self.assertEqual(sorted(result["selected"]), sorted([winner, loser]))
+        self.assertEqual(result["excluded"], [])
+        self.assertEqual(len(result["component_conflicts"]), 1)
+
+    def test_component_conflict_is_not_resolved_when_versions_tie(self):
+        a = "ncs5500-bgp-1.0.0.1-r2512.CSCwv36143.x86_64.rpm"
+        b = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
+        recommendation = self._conflict_recommendation(a, b)
+        identity = {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "1",
+                    "arch": "x86_64", "package_type": "smu", "vm_type": "host"}
+        with patch("app.rpm_dependency_metadata", return_value={"identity": identity}):
+            result = module.resolve_component_conflicts(recommendation)
+        self.assertEqual(sorted(result["selected"]), sorted([a, b]))
+        self.assertEqual(len(result["component_conflicts"]), 1)
+
+    def test_component_conflict_inside_a_multi_component_fix_drops_only_that_file(self):
+        # gisobuild's own filter_superseded_rpms() has no notion of "which
+        # SMU tar an RPM came from" - it supersedes per RPM, so the losing
+        # CSC's *other* component (not contested by anything) must stay
+        # selected even though this specific file is dropped.
+        winner = "ncs5500-bgp-1.0.0.2-r2512.CSCwv36143.x86_64.rpm"
+        loser = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
+        sibling = "ncs5500-dpa-1.0.0.5-r2512.CSCwu13268.x86_64.rpm"
+        recommendation = self._conflict_recommendation(winner, loser)
+        recommendation["selected"].append(sibling)
+        recommendation["package_groups"][1]["components"] = ["ncs5500-bgp", "ncs5500-dpa"]
+        recommendation["package_groups"][1]["files"] = [loser, sibling]
+        recommendation["package_groups"][1]["count"] = 2
+        (self.data / sibling).write_bytes(b"x")
+        identities = {
+            winner: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
+                     "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
+            loser: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
+                    "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
+        }
+        with patch("app.rpm_dependency_metadata", side_effect=lambda p: {"identity": identities[p.name]}):
+            result = module.resolve_component_conflicts(recommendation)
+        self.assertEqual(sorted(result["selected"]), sorted([winner, sibling]))
+        self.assertEqual(result["component_conflicts"], [])
+        self.assertEqual([item["name"] for item in result["excluded"]], [loser])
 
     def test_renamed_rpm_is_excluded_with_the_name_its_header_gives(self):
         # A real Cisco RPM renamed to claim another release: every platform,

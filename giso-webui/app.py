@@ -35,8 +35,10 @@ from platform_validation import (
     ISO_RELEASE,
     PLATFORMS,
     RPM_ARCHITECTURE,
+    RPM_COMPONENT,
     check_upgrade_matrix,
     classify_exclusion,
+    compare_exr_rpm_labels,
     describe_package,
     infer_platform,
     infer_platform_pid,
@@ -980,11 +982,42 @@ def iso_shipped_packages_from_mdata(text: str) -> dict[str, str]:
 
 
 RPM_QUERY_FORMAT = (
-    "NVRA %{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}\n"
+    "NVRA %{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}|%{GROUP}\n"
     "SIGN %{RSAHEADER:pgpsig}\n"
     "[REQ %{REQUIRENAME}|%{REQUIREFLAGS:depflags}|%{REQUIREVERSION}\n]"
     "[PRV %{PROVIDENAME}|%{PROVIDEFLAGS:depflags}|%{PROVIDEVERSION}\n]"
 )
+
+# Cisco's eXR RPM build packs its own PACKAGETYPE/VMTYPE custom tags into the
+# standard %{GROUP} header tag - not as separate rpm tags (a plain `rpm -qp`
+# does not know those custom tag names at all; querying them directly errors
+# the whole --qf call with "unknown tag", confirmed against both this app's
+# pinned rpm builds - Alpine 4.19.1.1 and AlmaLinux 8.10's 4.14.3). Ported
+# from upstream's own populate_mdata() (src/exrmod/gisobuild_exr_engine.py):
+# a Cisco eXR RPM's %{GROUP} looks like
+# "<display name>,SUPPCARDS:...;VMTYPE:host;PACKAGETYPE:smu;...". A non-Cisco
+# or non-eXR RPM's %{GROUP} (e.g. the RPM spec default "Unspecified") has
+# none of this, so this returns (None, None) rather than guessing - "cannot
+# determine" must never be treated as a match. See gisobuild_exr_engine()'s
+# own gate: it only treats %{GROUP} this way when it contains "SUPPCARDS" or
+# "XRRELEASE".
+_EXR_GROUP_CONFIG = re.compile(r"^[^,]*,(?P<config>.+)$")
+
+
+def exr_package_type_and_vm_type(group: str) -> tuple[str | None, str | None]:
+    if not group or ("SUPPCARDS" not in group.upper() and "XRRELEASE" not in group.upper()):
+        return None, None
+    match = _EXR_GROUP_CONFIG.match(group)
+    if not match:
+        return None, None
+    config: dict[str, str] = {}
+    for item in match.group("config").split(";"):
+        item = item.strip()
+        if not item or item.startswith("#"):
+            continue
+        key, _, value = item.partition(":")
+        config[key.strip().upper()] = value.strip()
+    return config.get("PACKAGETYPE") or None, config.get("VMTYPE") or None
 
 
 def rpm_dependency_metadata(rpm_path: Path) -> dict:
@@ -1024,8 +1057,12 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict:
     for line in completed.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES].splitlines():
         tag, _, body = line.partition(" ")
         fields = body.split("|")
-        if tag == "NVRA" and len(fields) == 4 and all(fields):
-            result["identity"] = dict(zip(("name", "version", "release", "arch"), fields))
+        if tag == "NVRA" and len(fields) == 5 and all(fields[:4]):
+            identity = dict(zip(("name", "version", "release", "arch"), fields))
+            package_type, vm_type = exr_package_type_and_vm_type(fields[4])
+            identity["package_type"] = package_type
+            identity["vm_type"] = vm_type
+            result["identity"] = identity
         elif tag == "SIGN":
             # e.g. "RSA/SHA256, Wed Jul  2 22:15:22 2025, Key ID 7476b0605746bd08";
             # "(none)" when unsigned. Read only - verification is gisobuild's.
@@ -1991,6 +2028,7 @@ def create_build_plan(payload: dict) -> dict:
             recommendation = add_superseded_exclusions(recommendation, superseded)
             recommendation = exclude_unsatisfiable_packages(
                 recommendation, iso["relative_path"], identity_name, iso_architectures)
+            recommendation = resolve_component_conflicts(recommendation)
             if recommendation.get("ready"):
                 identifiers = recommendation["selected"]
                 if recommendation.get("left_out_for_dependencies") and not identifiers:
@@ -2555,6 +2593,118 @@ def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dic
     return recommendation
 
 
+def resolve_component_conflicts(recommendation: dict) -> dict:
+    """Drop the losing eXR fix in a same-package conflict, the way gisobuild would.
+
+    See docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md "SMUs that are incompatible
+    with the rest of the selection". gisobuild's own eXR
+    filter_superseded_rpms() groups candidate RPMs by
+    (name, package_type, arch, vm_type) - all four read from the RPM's own
+    header, package_type/vm_type via exr_package_type_and_vm_type() - and
+    keeps the highest version per compare_exr_rpm_labels(), silently. This
+    mirrors that decision instead of leaving both fixes "selected" behind a
+    warning/blocker.
+
+    Resolves per RPM, not per CSC group: only the specific file that carries
+    the contested component is compared and, if it loses, dropped - any
+    other file the same CSC contributes for one of its *other* components
+    (a multi-component fix) is untouched. This matches gisobuild's own
+    granularity (filter_superseded_rpms() supersedes individual packages,
+    with no notion of "the SMU tar they arrived in"), and is safe against
+    this app's own multi-component completeness check
+    (validate_smu_selection()'s `full_candidate_packages` bundle check only
+    ever fires when 2+ of a CSC's components are *partially* selected - once
+    a losing component's file is dropped, exactly one of that CSC's
+    components remains selected, which the check treats as "not a
+    multi-component selection to verify", not as "verified complete").
+
+    When package_type or vm_type cannot be determined for every candidate,
+    or they do not all match, this leaves the conflict alone rather than
+    risk conflating two RPMs gisobuild would not actually treat as the same
+    package (e.g. a host-VM vs. calvados-VM variant sharing a filename
+    component).
+    """
+    conflicts = recommendation.get("component_conflicts") or []
+    if not conflicts:
+        return recommendation
+    groups_by_csc = {group["csc"]: group for group in recommendation.get("package_groups", [])}
+    selected = list(recommendation.get("selected", []))
+    selected_set = set(selected)
+    excluded = list(recommendation.get("excluded", []))
+    by_name: dict[str, Path] | None = None
+    dropped: set[str] = set()
+    remaining_conflicts = []
+    for conflict in conflicts:
+        component, cscs = conflict["component"], conflict["cscs"]
+        candidates = []  # (csc, name, identity)
+        eligible = True
+        for csc in cscs:
+            group = groups_by_csc.get(csc)
+            if not group:
+                eligible = False
+                break
+            component_files = [
+                name for name in group["files"]
+                if name in selected_set
+                and (match := RPM_COMPONENT.search(Path(name).name))
+                and match.group("component").lower() == component
+            ]
+            if len(component_files) != 1:
+                eligible = False
+                break
+            if by_name is None:
+                by_name = {rpm.name: rpm for rpm in DATA.rglob("*.rpm")}
+            path = by_name.get(component_files[0])
+            identity = rpm_dependency_metadata(path).get("identity") if path else None
+            if not identity:
+                eligible = False
+                break
+            candidates.append((csc, component_files[0], identity))
+        if not eligible or len(candidates) < 2:
+            remaining_conflicts.append(conflict)
+            continue
+        keys = {(identity["name"], identity.get("package_type"), identity["arch"], identity.get("vm_type"))
+                for _, _, identity in candidates}
+        if len(keys) != 1 or any(not identity.get("package_type") or not identity.get("vm_type")
+                                  for _, _, identity in candidates):
+            remaining_conflicts.append(conflict)
+            continue
+        best_csc, best_name, best_identity = candidates[0]
+        ambiguous = False
+        for csc, name, identity in candidates[1:]:
+            comparison = compare_exr_rpm_labels(
+                (identity["version"], identity["release"]),
+                (best_identity["version"], best_identity["release"]),
+            )
+            if comparison == 0:
+                ambiguous = True
+                break
+            if comparison > 0:
+                best_csc, best_name, best_identity = csc, name, identity
+        if ambiguous:
+            remaining_conflicts.append(conflict)
+            continue
+        for csc, name, identity in candidates:
+            if name == best_name:
+                continue
+            dropped.add(name)
+            excluded.append({
+                "name": name,
+                "reason": (
+                    f"Superseded by {best_name} on {component} ({best_csc} carries "
+                    f"{best_identity['version']}-{best_identity['release']}, a newer version per "
+                    f"gisobuild's own eXR supersedence rule than {csc}'s "
+                    f"{identity['version']}-{identity['release']}); Cisco supersedence decides "
+                    "which remains"
+                ),
+            })
+    if dropped:
+        recommendation["selected"] = [name for name in selected if name not in dropped]
+        recommendation["excluded"] = sorted(excluded, key=lambda item: item["name"])
+    recommendation["component_conflicts"] = remaining_conflicts
+    return recommendation
+
+
 SUPERSEDENCE_FULL = re.compile(r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE)
 SMU_README_NAME = re.compile(r"^Name:[ \t]+(?P<name>\S+)[ \t]*$", re.MULTILINE)
 SMU_README_RPMS = re.compile(
@@ -2797,6 +2947,7 @@ def discover() -> dict:
     if len(isos) == 1:
         recommendation = exclude_unsatisfiable_packages(
             recommendation, isos[0], identity_name, iso_architectures)
+        recommendation = resolve_component_conflicts(recommendation)
     recommendation["unsatisfied_dependencies"] = (
         unsatisfied_dependencies_for_recommendation(isos[0], recommendation.get("selected", []))
         if len(isos) == 1 else []
@@ -3749,6 +3900,7 @@ def smu_recommendation():
         recommendation = add_superseded_exclusions(recommendation, superseded)
         recommendation = exclude_unsatisfiable_packages(
             recommendation, iso, identity_name, iso_architectures)
+        recommendation = resolve_component_conflicts(recommendation)
         recommendation["unsatisfied_dependencies"] = (
             unsatisfied_dependencies_for_recommendation(iso, recommendation.get("selected", []))
         )

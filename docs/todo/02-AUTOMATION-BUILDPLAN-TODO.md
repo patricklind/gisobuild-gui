@@ -375,7 +375,9 @@ Create an explicit supersedence model.
       version per package in `.gisobuild-tool/src/lnt/builder/_pkgpicker.py`).
       This app does not duplicate that ordering (see the
       `_version_satisfies()` rationale); it stays open because no explicit
-      model in this app records the outcome before the build.
+      model in this app records the outcome before the build - see the
+      "SMUs that are incompatible with the rest of the selection" item below
+      for the 2026-09-18 correction and the verified comparison approach.
 - [x] README metadata — `active_rpm_names()` parses each uploaded SMU's own
       `README.txt`-style file for Cisco's own supersedence notation
       (`<identifier> Full`) and excludes the packages it names. Verified
@@ -402,19 +404,208 @@ Never silently exclude without a reason.
       stay selected - it becomes a warning, or a blocker from
       `validate_smu_selection()` when they carry different versions of one
       component. The operator then has to work out which fix to drop.
-      Required instead: when the system can determine which of the conflicting
-      fixes cannot be used together with the rest, automatic selection drops
-      the losing one (and the rest of its CSC group) with a reason naming the
-      fix that kept the component, exactly as `exclude_unsatisfiable_packages()`
-      already does for dependencies, and only stops the build when the choice
-      cannot be made safely. Manual selection keeps blocking instead of
-      editing. Needs: a rule for which fix wins (Cisco supersedence notes from
-      the SMU README where present, then the newer package version, otherwise
-      "cannot decide safely" -> MANUAL_REVIEW_REQUIRED), the existing status
-      vocabulary (`CONFLICT`, `SUPERSEDED`), and tests covering two fixes on
-      one component with and without supersedence evidence, a three-way
-      conflict, a conflict inside a multi-component fix, and manual mode still
-      blocking.
+
+      Corrected 2026-09-18 (maintainer research): this is not a scenario
+      gisobuild itself fails on - both engines already resolve "two fixes
+      touch the same component" themselves, silently and unconditionally. But
+      a first pass at this research (also 2026-09-18, superseded within the
+      same day - kept below as a record of what turned out to be wrong) assumed
+      both engines pick the winner the same way, via real `rpmvercmp`. They do
+      not, and the difference changes what "mirror gisobuild" requires:
+
+      - **LNT genuinely uses `rpm.labelCompare()`** (true rpmvercmp: epoch,
+        tilde pre-release, caret post-release) - `_highest_pkg_version.py`
+        (`.gisobuild-tool/src/lnt/builder/_highest_pkg_version.py`) is a small
+        standalone script taking `epoch,version,release` tuples as argv,
+        called via subprocess from `_pkgpicker.py`'s `_run_highest_pkg_version()`
+        using `sys.executable` (gisobuild's own platform Python, which has the
+        `rpm` module). But LNT filenames carry no CSC ID at all (see
+        `LNT_RPM`'s docstring above) - this app's own `component_conflicts` is
+        built entirely from the `.CSC<bug>` filename token
+        (`RPM_COMPONENT`), so it can never fire for an LNT selection today.
+        LNT conflict detection would need a different signal than filename
+        parsing (upstream itself groups by dependency "blocks" resolved from
+        RPM Provides/Requires, not filenames - see `_pkgpicker.py`'s
+        `GroupedPackages`/`_add_blocks`) and is out of scope until that exists.
+      - **eXR does not use `rpm.labelCompare()` at all.** `filter_superseded_rpms()`
+        (`.gisobuild-tool/src/exrmod/gisobuild_exr_engine.py`, called from
+        `gisobuild_exr.py:316`, confirmed at the pinned commit
+        `0388af2989bb7022d780a8732dbfbfeb77a70ee7`) groups candidates by
+        `f"{name}.{package_type}.{arch}.{vm_type}"` (all four from the RPM's
+        own header - `package_type`/`vm_type` come from Cisco's custom
+        `PACKAGETYPE`/`VMTYPE` tags, which this app does not currently read at
+        all) and picks the winner with a **hand-rolled comparator** local to
+        that file (`_compare_rpm_labels` → `_compare_rpm_field` →
+        `_iter_rpm_subfields`): it splits `version`/`release` into alternating
+        text/number runs and compares them subfield-by-subfield (fewer
+        subfields is lower; a differing subfield decides by string test for
+        two text runs, integer test for two number runs). This is *not* full
+        rpmvercmp - no tilde-as-prerelease or caret-as-postrelease weighting,
+        so `1.0~rc1` is just the text run `"~rc"` compared lexically, not
+        recognized as "older than 1.0". And critically, eXR's own `%{RELEASE}`
+        header value *is* what this app already reads as `identity["release"]`
+        in `rpm_dependency_metadata()` - confirmed against this app's own test
+        fixture (`test_rpm_header_query_parses_identity_and_exact_dependencies`,
+        `giso-webui/tests/test_app.py`): a real value looks like
+        `"r2512.CSCtest00001"`, i.e. Cisco bakes the CSC ID into the RELEASE
+        tag itself. Comparing two different fixes' `release` strings therefore
+        partly compares their CSC-ID text as an incidental tiebreaker, not a
+        clean "which fix supersedes which" signal.
+
+      Practical effect: mirroring gisobuild for real needs *two different*
+      comparators (one per engine), and eXR's - the only one `component_conflicts`
+      can currently see - is a small, dependency-free, pure-Python algorithm,
+      not something `rpm`/`rpmvercmp` reproduces. The earlier plan below (Lua
+      `rpm --eval vercmp`) is verified to work as a *generic* rpmvercmp, but
+      is the wrong comparator to mirror eXR's actual decision, so it must not
+      be wired into automatic selection as originally planned.
+
+      Done 2026-09-18: ported eXR's exact `_compare_rpm_field()`/
+      `_iter_rpm_subfields()`/`_compare_rpm_labels()` (BSD-3-Clause, Cisco
+      Systems - attributed in the docstring) as
+      `platform_validation.compare_exr_rpm_labels()`, needing no `rpm`
+      binary/module and thus no Dockerfile change. Tests added in
+      `ExrRpmLabelCompareTests` (`giso-webui/tests/test_platform_compatibility.py`):
+      plain unit cases (the `1.0~rc1` vs `1.0` quirk above, equal labels,
+      release-only tie-break) plus a drift test that executes the real
+      pinned-commit source itself (same technique as
+      `test_exr_platform_list_matches_the_pinned_upstream_engine` above) rather
+      than trusting the local port statically. Verified 2026-09-18 inside
+      `giso-webui-giso-webui` (built from `giso-webui/Dockerfile`) per
+      `AGENTS.md`'s required verification: full suite green - 332 passed, 3
+      skipped (missing `.gisobuild-tool`/`TOOL_ROOT`, expected in a plain
+      checkout) - and the drift test forced to actually run (not skip) by
+      mounting a throwaway clone of the pinned upstream commit as `TOOL_ROOT`,
+      confirming `compare_exr_rpm_labels()` agrees with the real source.
+      `ruff check` on the changed files: clean (the only finding, `EXE002`,
+      is pre-existing and identical on untouched `app.py` - a Windows-mount
+      artifact, not a real issue).
+
+      Done 2026-09-18: `PACKAGETYPE`/`VMTYPE` are Cisco custom RPM tags, not
+      real rpm tags a stock `rpm` binary knows - confirmed with `docker run`
+      against both pinned rpm builds that querying them directly with `rpm -qp
+      --qf '%{PACKAGETYPE}'` errors the *entire* `--qf` call ("unknown tag"),
+      which would have silently broken every other field read in the same
+      combined `RPM_QUERY_FORMAT` string (name/version/release/arch too).
+      Reading upstream's own `populate_mdata()`
+      (`.gisobuild-tool/src/exrmod/gisobuild_exr_engine.py`) showed how it
+      actually gets them: Cisco packs both into the standard, always-safe
+      `%{GROUP}` tag as `"<display name>,SUPPCARDS:...;VMTYPE:host;
+      PACKAGETYPE:smu;..."` - confirmed `%{GROUP}` is always queryable
+      (`rpm -q --qf '%{GROUP}'` on an unrelated real package: `EXIT=0`).
+      Ported that same parsing as `exr_package_type_and_vm_type()`
+      (`giso-webui/app.py`): added `%{GROUP}` as a 5th field to
+      `RPM_QUERY_FORMAT`, and `rpm_dependency_metadata()`'s identity now
+      carries `package_type`/`vm_type` (`None` for anything without Cisco's
+      "SUPPCARDS"/"XRRELEASE" marker in `%{GROUP}` - e.g. a plain RPM's
+      "Unspecified" - never guessed).
+
+      Wired `compare_exr_rpm_labels()` into `resolve_component_conflicts()`
+      (`giso-webui/app.py`), called after `exclude_unsatisfiable_packages()`
+      in all three places automatic selection is computed
+      (`discover()`, `create_build_plan()`, `/api/smu/recommendation`).
+      Scope, deliberately narrow: resolves a conflict only when every
+      contending CSC is a single-component fix (group `count == 1`) for
+      *this* component, all candidates share the real four-part key
+      (`name`+`package_type`+`arch`+`vm_type`, with `package_type`/`vm_type`
+      both present on every side), and the version comparison is
+      unambiguous. Otherwise it leaves `component_conflicts` untouched -
+      still today's warning/blocker, never a guess. The dropped file gets a
+      `SUPERSEDED`-classified reason naming the fix that kept the component
+      (`classify_exclusion()` on the message returns `SUPERSEDED`, verified
+      by test). Manual selection is unaffected (only the automatic-selection
+      recommendation is resolved; `validate_smu_selection()`'s own pure
+      filename-based warning/blocker behavior is untouched, so
+      `test_multiple_fixes_for_same_component_require_supersedence_data` and
+      `test_multiple_versions_of_same_component_and_fix_are_rejected` still
+      pass unchanged).
+
+      Revised same day, before this was ever released: the first cut above
+      required every contending CSC to be a *single-component* fix
+      (`group["count"] == 1`), leaving a conflict inside a multi-component
+      fix as today's warning. On reflection that was overcautious - traced
+      through `validate_smu_selection()`'s own bundle-completeness check
+      (the `full_candidate_packages` branch) and confirmed it only ever
+      fires when 2+ of a CSC's components are *partially* selected; once a
+      losing component's single file is dropped, exactly one component of
+      that CSC remains selected, which the check treats as "nothing to
+      verify", not as "verified complete" - so dropping just that one file
+      cannot spuriously trip it. `resolve_component_conflicts()` now
+      resolves per RPM, not per CSC group: for each side of a conflict it
+      finds (via `platform_validation.RPM_COMPONENT`) only the specific
+      selected file that carries the *contested* component and compares
+      those; any other file the same CSC contributes for one of its other
+      components is untouched. This matches gisobuild's own granularity -
+      `filter_superseded_rpms()` supersedes individual packages with no
+      notion of "the SMU tar they arrived in" - so a multi-component fix
+      losing one shared component to a newer fix elsewhere, while remaining
+      the only fix for its other component(s), is now resolved exactly like
+      a single-component conflict: the losing file is dropped and excluded
+      with reason, the rest of that CSC's files stay selected. Test renamed
+      accordingly:
+      `test_component_conflict_inside_a_multi_component_fix_drops_only_that_file`
+      asserts the contested file is dropped and excluded while a sibling
+      file for a different, uncontested component of the same CSC stays in
+      `selected`.
+
+      Verified 2026-09-18 in the containerized `giso-webui-giso-webui` image
+      per `AGENTS.md`: full suite green - 338 passed, 3 skipped (same
+      pre-existing `.gisobuild-tool`/`TOOL_ROOT`-dependent skips). Six
+      `resolve_component_conflicts()` cases plus
+      `test_rpm_header_group_without_cisco_metadata_yields_no_package_or_vm_type`
+      in `giso-webui/tests/test_app.py`: resolves a real conflict, resolves
+      inside a multi-component fix without touching the sibling file, does
+      *not* resolve across different `vm_type`, does *not* resolve without
+      package_type/vm_type metadata, and does *not* resolve a version tie.
+      `ruff check` on the changed files: clean (only the same pre-existing,
+      unrelated `EXE002` Windows-mount artifact noted above). Graphify
+      refreshed (1270 nodes, 2170 edges, 82 communities); diff reviewed, no
+      unexpected architecture changes.
+
+      Not yet exercised: a real Cisco eXR SMU tar end-to-end (the unit tests
+      above use constructed `%{GROUP}` strings modeled on upstream's own
+      parser, not a real signed Cisco RPM) - see "RPM metadata" above for
+      the precedent of validating against real Cisco SMU tars before this is
+      considered fully proven.
+
+      <details><summary>Superseded same-day: the rpmvercmp/Lua-eval plan (kept as a record, not a task list)</summary>
+
+      So the task is not "invent a rule for which fix wins" - it is **make our
+      own automatic-selection output agree with what gisobuild will actually
+      build**: drop the lower version with a reason derived from the same
+      comparison gisobuild uses, instead of leaving both "selected" behind a
+      warning/blocker.
+
+      Version comparison must be a real `rpmvercmp`-equivalent (handles epoch,
+      tilde pre-release, caret post-release), not a naive string/tuple compare
+      - and must not be a hand-rolled reimplementation that then needs its own
+      correctness verification. Checked 2026-09-18: neither runtime image can
+      `import rpm` from the process that runs this app. `giso-webui/Dockerfile`
+      installs only the `rpm` CLI (no `py3-rpm`); confirmed with `docker run
+      python:3.12-alpine sh -c "apk add py3-rpm"` that Alpine's `py3-rpm`
+      package pulls in its own separate `python3` (3.14.7), not the base
+      image's pinned `python:3.12-alpine` interpreter, so `import rpm` still
+      fails there even if the package were added. In
+      `docker/selfcontained.Dockerfile`, `python3-rpm` is bound only to the
+      platform `python3` that gisobuild itself runs on (`GISOBUILD_PYTHON`);
+      the web app runs under a separately pip-installed `python3.12`, which
+      does not have it either.
+
+      Verified working (as a generic rpmvercmp, not as eXR's actual algorithm -
+      see above): shell out to `rpm` for the comparison itself, via its own Lua
+      macro evaluator, e.g. `rpm --eval '%{lua: print(rpm.vercmp("1:1.0-1",
+      "2.0-1"))}'`. Confirmed 2026-09-18 with `docker run` against the exact
+      pinned versions of both images: Alpine `rpm=4.19.1.1-r5`
+      (`giso-webui/Dockerfile`) and AlmaLinux 8.10's `rpm-4.14.3`
+      (`docker/selfcontained.Dockerfile`'s runtime stage) both support
+      `%{lua: ...}` and both return correct results for a plain compare,
+      an epoch tie-break (`1:1.0-1` > `2.0-1`), a tilde pre-release
+      (`1.0~rc1-1` < `1.0-1`), and a caret post-release (`1.0^git1-1` >
+      `1.0-1`). This remains useful context (it is genuinely rpm's own
+      comparator) but is not what decides eXR's real winner, so it is not
+      being wired in.
+
+      </details>
 
 
 - [x] one status vocabulary for every decision (2026-09-17). Each excluded
