@@ -105,7 +105,7 @@ jobs:
             --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
             giso-webui-selfcontained:latest
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: giso-webui-sbom
           path: sbom/giso-webui.spdx.json
