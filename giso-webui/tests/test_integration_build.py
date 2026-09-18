@@ -27,7 +27,7 @@ from unittest.mock import patch
 
 import app as module
 
-FAKE_DOCKER = r'''#!__PYTHON__
+FAKE_DOCKER = r"""#!__PYTHON__
 import json, os, sys
 from pathlib import Path
 
@@ -79,7 +79,7 @@ elif command == "run":
     print("Golden ISO build complete", flush=True)
 else:
     sys.exit(f"fake docker: unsupported command {command!r}")
-'''
+"""
 
 
 class SyntheticBuildIntegrationTests(unittest.TestCase):
@@ -99,8 +99,13 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         module.STATE = (root / "state").resolve()
         module.JOB_DB = module.STATE / "jobs.sqlite3"
         module.store_initialized = False
-        for registry in (module.uploads, module.jobs, module.job_processes,
-                         module.job_persisted_at, module.cisco_download_jobs):
+        for registry in (
+            module.uploads,
+            module.jobs,
+            module.job_processes,
+            module.job_persisted_at,
+            module.cisco_download_jobs,
+        ):
             registry.clear()
         docker = root / "bin" / "docker"
         docker.write_text(FAKE_DOCKER.replace("__PYTHON__", sys.executable))
@@ -109,13 +114,21 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.stops_file = root / "docker-stops.txt"
         self.patches = [
             patch.object(module, "DOCKER_BIN", str(docker)),
-            patch.dict(os.environ, {"FAKE_DOCKER_ARGS": str(self.args_file),
-                                    "FAKE_DOCKER_STOPS": str(self.stops_file),
-                                    "FAKE_OUTPUT_ROOT": str(module.OUTPUT),
-                                    "HOSTNAME": "giso-webui"}),
+            patch.dict(
+                os.environ,
+                {
+                    "FAKE_DOCKER_ARGS": str(self.args_file),
+                    "FAKE_DOCKER_STOPS": str(self.stops_file),
+                    "FAKE_OUTPUT_ROOT": str(module.OUTPUT),
+                    "HOSTNAME": "giso-webui",
+                },
+            ),
             patch("app.gisobuild_tool_available", return_value=True),
             patch("app.is_iso9660_image", return_value=True),
-            patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=100 * 1024**3)),
+            patch(
+                "app.shutil.disk_usage",
+                return_value=SimpleNamespace(free=100 * 1024**3),
+            ),
         ]
         for active in self.patches:
             active.start()
@@ -137,10 +150,17 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
 
     def upload(self, name, content):
         """The real browser upload protocol: init, chunked PUT, complete."""
-        started = self.client.post("/api/uploads/init", json={"name": name, "size": len(content)})
+        started = self.client.post(
+            "/api/uploads/init", json={"name": name, "size": len(content)}
+        )
         self.assertEqual(started.status_code, 200, started.get_json())
         upload_id = started.get_json()["id"]
-        self.assertEqual(self.client.put(f"/api/uploads/{upload_id}?offset=0", data=content).status_code, 200)
+        self.assertEqual(
+            self.client.put(
+                f"/api/uploads/{upload_id}?offset=0", data=content
+            ).status_code,
+            200,
+        )
         completed = self.client.post(f"/api/uploads/{upload_id}/complete")
         self.assertEqual(completed.status_code, 200, completed.get_json())
         return completed.get_json()
@@ -148,10 +168,14 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
     @staticmethod
     def smu_tar(smu, rpms):
         """A Cisco-style SMU tar: the RPMs plus a README whose RPMS block lists them."""
-        listing = "".join(f"\t{name} {hashlib.md5(body, usedforsecurity=False).hexdigest()}\n"
-                          for name, body in rpms.items())
-        readme = (f"Name:                    {smu}\n\nRPMS: \n{listing}\t\n"
-                  "Pre-requisites:          \n").encode()
+        listing = "".join(
+            f"\t{name} {hashlib.md5(body, usedforsecurity=False).hexdigest()}\n"
+            for name, body in rpms.items()
+        )
+        readme = (
+            f"Name:                    {smu}\n\nRPMS: \n{listing}\t\n"
+            "Pre-requisites:          \n"
+        ).encode()
         buffer = io.BytesIO()
         with tarfile.open(fileobj=buffer, mode="w") as archive:
             for name, body in {**rpms, f"{smu}.txt": readme}.items():
@@ -178,18 +202,32 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         # upload -> extract -> inspect -> inventory -> BuildPlan -> engine ->
         # output verification -> archive, through the same endpoints the page uses.
         self.upload(self.ISO, b"synthetic base iso")
-        extracted = self.upload("ncs5500-25.1.2.CSCtest00001.tar", self.smu_tar(
-            "ncs5500-25.1.2.CSCtest00001", {self.ROUTING: b"routing rpm"}))
+        extracted = self.upload(
+            "ncs5500-25.1.2.CSCtest00001.tar",
+            self.smu_tar("ncs5500-25.1.2.CSCtest00001", {self.ROUTING: b"routing rpm"}),
+        )
         self.assertEqual(extracted["extracted"], 2)
         self.write(self.OTHER_RELEASE)
         inputs = self.client.get("/api/inputs").get_json()
         self.assertEqual(inputs["recommended"], [self.ROUTING])
-        iso = next(module.DATA / item["relative_path"] for item in inputs["files"]
-                   if item["type"] == ".iso")
-        rpm = next(module.DATA / item["relative_path"] for item in inputs["files"]
-                   if item["basename"] == self.ROUTING)
-        job_id = self.start_build({"iso": iso.name, "automatic_smu_selection": True,
-                                   "pkglist": [], "label": "INTEGRATION"})
+        iso = next(
+            module.DATA / item["relative_path"]
+            for item in inputs["files"]
+            if item["type"] == ".iso"
+        )
+        rpm = next(
+            module.DATA / item["relative_path"]
+            for item in inputs["files"]
+            if item["basename"] == self.ROUTING
+        )
+        job_id = self.start_build(
+            {
+                "iso": iso.name,
+                "automatic_smu_selection": True,
+                "pkglist": [],
+                "label": "INTEGRATION",
+            }
+        )
         job = self.wait_for_job(job_id)
 
         self.assertEqual(job["status"], "success", job.get("log"))
@@ -197,8 +235,17 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.assertEqual(module.jobs[job_id]["builder_image"]["source"], "registry")
         # Every pipeline step is recorded in order with its own timing.
         stages = module.jobs[job_id]["stages"]
-        self.assertEqual([entry["stage"] for entry in stages],
-                         ["preflight", "preparing_builder", "building", "verifying", "archiving", "complete"])
+        self.assertEqual(
+            [entry["stage"] for entry in stages],
+            [
+                "preflight",
+                "preparing_builder",
+                "building",
+                "verifying",
+                "archiving",
+                "complete",
+            ],
+        )
         self.assertEqual(job["stage"], "complete")
         for earlier, later in itertools.pairwise(stages):
             self.assertLessEqual(earlier["started"], earlier["ended"])
@@ -210,18 +257,24 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         # staged repository holding only the compatible RPM, the label and
         # the per-job output directory.
         args = json.loads(self.args_file.read_text())
-        engine = args[args.index("/tool/src/gisobuild.py") + 1:]
+        engine = args[args.index("/tool/src/gisobuild.py") + 1 :]
         self.assertEqual(engine[engine.index("--iso") + 1], str(iso))
         repo = Path(engine[engine.index("--repo") + 1])
         self.assertEqual(repo, module.WORK / job_id / "repo")
         self.assertEqual(engine[engine.index("--label") + 1], "INTEGRATION")
-        self.assertEqual(engine[engine.index("--out-directory") + 1], f"/output/{job_id}")
+        self.assertEqual(
+            engine[engine.index("--out-directory") + 1], f"/output/{job_id}"
+        )
         self.assertIn("-v", args)
         self.assertIn("giso-output:/output:rw", args)
         self.assertNotIn("/var/run/docker.sock", " ".join(args))
         plan = module.jobs[job_id]["build_plan"]
-        self.assertEqual([item["basename"] for item in plan["selected_packages"]], [self.ROUTING])
-        self.assertIn(self.OTHER_RELEASE, {item["name"] for item in plan["excluded_packages"]})
+        self.assertEqual(
+            [item["basename"] for item in plan["selected_packages"]], [self.ROUTING]
+        )
+        self.assertIn(
+            self.OTHER_RELEASE, {item["name"] for item in plan["excluded_packages"]}
+        )
 
         # Finalization: the image is archived and the consumed inputs removed.
         archived = sorted(path.name for path in (module.ARCHIVE / job_id).iterdir())
@@ -241,21 +294,29 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         iso = self.write(self.ISO)
         rpm = self.write(self.ROUTING)
         with patch.dict(os.environ, {"FAKE_GISOBUILD_MODE": "dependency-failure"}):
-            job_id = self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
-                                       "pkglist": []})
+            job_id = self.start_build(
+                {"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []}
+            )
             job = self.wait_for_job(job_id)
 
         self.assertEqual(job["status"], "failed")
         self.assertEqual(job["exit_code"], 1)
         self.assertEqual(job["failure"]["code"], "DEPENDENCY_ERROR")
-        self.assertEqual([e["stage"] for e in module.jobs[job["id"]]["stages"]],
-                         ["preflight", "preparing_builder", "building", "verifying", "failed"])
+        self.assertEqual(
+            [e["stage"] for e in module.jobs[job["id"]]["stages"]],
+            ["preflight", "preparing_builder", "building", "verifying", "failed"],
+        )
         # Scratch space (staged repo copies) is gone; gisobuild's output dir is not touched.
         self.assertFalse((module.WORK / job["id"]).exists())
-        self.assertEqual(job["missing_dependencies"], [{
-            "requirement": "ncs5500-dpa = 1.0.0.5",
-            "required_by": "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64",
-        }])
+        self.assertEqual(
+            job["missing_dependencies"],
+            [
+                {
+                    "requirement": "ncs5500-dpa = 1.0.0.5",
+                    "required_by": "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64",
+                }
+            ],
+        )
         self.assertFalse((module.ARCHIVE / job_id).exists())
         self.assertTrue(iso.exists())
         self.assertTrue(rpm.exists())
@@ -263,34 +324,46 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
     def test_lnt_build_passes_lnt_only_options_to_the_engine(self):
         self.write("8000-x86_64-24.2.11.iso")
         self.write("router.cfg", b"hostname lnt\n")
-        job_id = self.start_build({
-            "iso": "8000-x86_64-24.2.11.iso", "platform": "8000", "pkglist": [],
-            "automatic_smu_selection": False, "xrconfig": "router.cfg",
-            "remove_packages": ["xr-telnet"], "label": "LNT_SYNTH",
-        })
+        job_id = self.start_build(
+            {
+                "iso": "8000-x86_64-24.2.11.iso",
+                "platform": "8000",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "xrconfig": "router.cfg",
+                "remove_packages": ["xr-telnet"],
+                "label": "LNT_SYNTH",
+            }
+        )
         job = self.wait_for_job(job_id)
 
         self.assertEqual(job["status"], "success", job.get("log"))
         args = json.loads(self.args_file.read_text())
-        engine = args[args.index("/tool/src/gisobuild.py") + 1:]
-        self.assertEqual(engine[engine.index("--xrconfig") + 1], str(module.DATA / "router.cfg"))
+        engine = args[args.index("/tool/src/gisobuild.py") + 1 :]
+        self.assertEqual(
+            engine[engine.index("--xrconfig") + 1], str(module.DATA / "router.cfg")
+        )
         self.assertEqual(engine[engine.index("--remove-packages") + 1], "xr-telnet")
         self.assertNotIn("--repo", engine)  # nothing selected, nothing staged
         self.assertEqual(module.jobs[job_id]["build_plan"]["engine"], "lnt")
-        self.assertTrue((module.ARCHIVE / job_id / "ncs5500-golden-x-25.1.2-LNT_SYNTH.iso").exists())
-
+        self.assertTrue(
+            (module.ARCHIVE / job_id / "ncs5500-golden-x-25.1.2-LNT_SYNTH.iso").exists()
+        )
 
     def test_cancelling_a_running_build_stops_the_container_and_keeps_inputs(self):
         iso = self.write(self.ISO)
         rpm = self.write(self.ROUTING)
         with patch.dict(os.environ, {"FAKE_GISOBUILD_MODE": "slow"}):
-            job_id = self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
-                                       "pkglist": []})
+            job_id = self.start_build(
+                {"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []}
+            )
             deadline = time.monotonic() + 10
             while "Validating inputs" not in module.jobs[job_id]["log"]:
                 self.assertLess(time.monotonic(), deadline, module.jobs[job_id]["log"])
                 time.sleep(0.05)
-            self.assertEqual(self.client.get(f"/api/jobs/{job_id}").get_json()["status"], "running")
+            self.assertEqual(
+                self.client.get(f"/api/jobs/{job_id}").get_json()["status"], "running"
+            )
             response = self.client.delete(f"/api/jobs/{job_id}")
             self.assertEqual(response.status_code, 200, response.get_json())
             job = self.wait_for_job(job_id)
@@ -310,8 +383,16 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
     def test_consecutive_builds_use_only_their_own_inventory(self):
         self.write(self.ISO)
         self.write(self.ROUTING)
-        first = self.wait_for_job(self.start_build({
-            "iso": self.ISO, "automatic_smu_selection": True, "pkglist": [], "label": "FIRST"}))
+        first = self.wait_for_job(
+            self.start_build(
+                {
+                    "iso": self.ISO,
+                    "automatic_smu_selection": True,
+                    "pkglist": [],
+                    "label": "FIRST",
+                }
+            )
+        )
         self.assertEqual(first["status"], "success", first.get("log"))
 
         # The first build consumed its inputs; the second starts from what is
@@ -319,48 +400,79 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.write(self.ISO, b"second base iso")
         second_rpm = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"
         self.write(second_rpm)
-        second_id = self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
-                                      "pkglist": [], "label": "SECOND"})
+        second_id = self.start_build(
+            {
+                "iso": self.ISO,
+                "automatic_smu_selection": True,
+                "pkglist": [],
+                "label": "SECOND",
+            }
+        )
         second = self.wait_for_job(second_id)
         self.assertEqual(second["status"], "success", second.get("log"))
 
         plan = module.jobs[second_id]["build_plan"]
-        self.assertEqual([item["basename"] for item in plan["selected_packages"]], [second_rpm])
-        self.assertNotEqual(plan["iso"]["sha256"], module.jobs[first["id"]]["build_plan"]["iso"]["sha256"])
-        self.assertEqual(sorted(path.name for path in (module.ARCHIVE / first["id"]).glob("*.iso")),
-                         ["ncs5500-golden-x-25.1.2-FIRST.iso"])
-        self.assertEqual(sorted(path.name for path in (module.ARCHIVE / second_id).glob("*.iso")),
-                         ["ncs5500-golden-x-25.1.2-SECOND.iso"])
-
+        self.assertEqual(
+            [item["basename"] for item in plan["selected_packages"]], [second_rpm]
+        )
+        self.assertNotEqual(
+            plan["iso"]["sha256"],
+            module.jobs[first["id"]]["build_plan"]["iso"]["sha256"],
+        )
+        self.assertEqual(
+            sorted(path.name for path in (module.ARCHIVE / first["id"]).glob("*.iso")),
+            ["ncs5500-golden-x-25.1.2-FIRST.iso"],
+        )
+        self.assertEqual(
+            sorted(path.name for path in (module.ARCHIVE / second_id).glob("*.iso")),
+            ["ncs5500-golden-x-25.1.2-SECOND.iso"],
+        )
 
     def test_registry_outage_builds_with_the_cached_builder_image(self):
         self.write(self.ISO)
         self.write(self.ROUTING)
-        with patch.dict(os.environ, {"FAKE_PULL": "fail"}), \
-                patch.object(module, "IMAGE", "ciscogisobuild/cisco-xr-gisobuild@sha256:" + "be" * 32):
-            job = self.wait_for_job(self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
-                                                      "pkglist": []}))
+        with (
+            patch.dict(os.environ, {"FAKE_PULL": "fail"}),
+            patch.object(
+                module, "IMAGE", "ciscogisobuild/cisco-xr-gisobuild@sha256:" + "be" * 32
+            ),
+        ):
+            job = self.wait_for_job(
+                self.start_build(
+                    {"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []}
+                )
+            )
         self.assertEqual(job["status"], "success", job.get("log"))
         self.assertIn("registry unreachable", job["log"])
         self.assertIn("digest-pinned, so it is identical", job["log"])
         self.assertEqual(module.jobs[job["id"]]["builder_image"]["source"], "cache")
-        self.assertEqual(module.jobs[job["id"]]["builder_image"]["id"], "sha256:" + "c0" * 32)
+        self.assertEqual(
+            module.jobs[job["id"]]["builder_image"]["id"], "sha256:" + "c0" * 32
+        )
 
     def test_registry_outage_without_a_cached_image_fails_clearly(self):
         iso = self.write(self.ISO)
         rpm = self.write(self.ROUTING)
         with patch.dict(os.environ, {"FAKE_PULL": "fail", "FAKE_IMAGE_CACHED": "0"}):
-            job = self.wait_for_job(self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
-                                                      "pkglist": []}))
+            job = self.wait_for_job(
+                self.start_build(
+                    {"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []}
+                )
+            )
         self.assertEqual(job["status"], "failed")
-        self.assertIn("could not be pulled (exited with status 1) and is not cached", job["log"])
-        self.assertEqual([e["stage"] for e in job["stages"]], ["preflight", "preparing_builder", "failed"])
+        self.assertIn(
+            "could not be pulled (exited with status 1) and is not cached", job["log"]
+        )
+        self.assertEqual(
+            [e["stage"] for e in job["stages"]],
+            ["preflight", "preparing_builder", "failed"],
+        )
         self.assertFalse(self.args_file.exists())  # the engine never ran
         self.assertTrue(iso.exists())
         self.assertTrue(rpm.exists())
 
 
-FAKE_LOCAL_GISOBUILD = r'''
+FAKE_LOCAL_GISOBUILD = r"""
 import json, os, subprocess, sys, time
 from pathlib import Path
 
@@ -386,7 +498,7 @@ out = Path(args[args.index("--out-directory") + 1])
 out.mkdir(parents=True, exist_ok=True)
 (out / "ncs5500-golden-x-25.1.2-LOCAL.iso").write_bytes(b"synthetic golden iso")
 print("Golden ISO build complete", flush=True)
-'''
+"""
 
 
 def process_is_running(pid: int) -> bool:
@@ -417,22 +529,40 @@ class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
             patch.object(module, "TOOL", tool),
             # Anything that still reached for Docker would fail loudly.
             patch.object(module, "DOCKER_BIN", str(root / "no-docker-here")),
-            patch.dict(os.environ, {"CISCO_CLIENT_SECRET": "must-not-leak",
-                                    "GISOBUILD_COMMIT": "0388af2989bb7022"}),
+            patch.dict(
+                os.environ,
+                {
+                    "CISCO_CLIENT_SECRET": "must-not-leak",
+                    "GISOBUILD_COMMIT": "0388af2989bb7022",
+                },
+            ),
         ]
         for active in local:
             active.start()
         self.patches.extend(local)
 
     def configure(self, **settings):
-        self.config.write_text(json.dumps({"record": str(self.record),
-                                           "child_pid": str(self.child_pid), **settings}))
+        self.config.write_text(
+            json.dumps(
+                {
+                    "record": str(self.record),
+                    "child_pid": str(self.child_pid),
+                    **settings,
+                }
+            )
+        )
 
     def test_local_build_runs_gisobuild_directly_with_a_sanitized_environment(self):
         iso = self.write(self.ISO)
         self.write(self.ROUTING)
-        job_id = self.start_build({"iso": self.ISO, "automatic_smu_selection": True,
-                                   "pkglist": [], "label": "LOCAL"})
+        job_id = self.start_build(
+            {
+                "iso": self.ISO,
+                "automatic_smu_selection": True,
+                "pkglist": [],
+                "label": "LOCAL",
+            }
+        )
         job = self.wait_for_job(job_id)
 
         self.assertEqual(job["status"], "success", job.get("log"))
@@ -440,7 +570,9 @@ class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
         engine = run["argv"][2:]
         self.assertEqual(run["argv"][0], sys.executable)
         self.assertEqual(engine[engine.index("--iso") + 1], str(iso))
-        self.assertEqual(engine[engine.index("--out-directory") + 1], str(module.OUTPUT / job_id))
+        self.assertEqual(
+            engine[engine.index("--out-directory") + 1], str(module.OUTPUT / job_id)
+        )
         self.assertEqual(Path(run["cwd"]), module.WORK / job_id)
         self.assertEqual(run["env"]["TMPDIR"], str(module.WORK / job_id / "tmp"))
         self.assertNotIn("CISCO_CLIENT_SECRET", run["env"])
@@ -448,18 +580,27 @@ class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
         self.assertFalse(self.args_file.exists())  # no docker run happened
         self.assertEqual(module.jobs[job_id]["builder_image"]["source"], "bundled")
         self.assertIn("0388af2989bb", module.jobs[job_id]["builder_image"]["reference"])
-        self.assertTrue((module.ARCHIVE / job_id / "ncs5500-golden-x-25.1.2-LOCAL.iso").exists())
+        self.assertTrue(
+            (module.ARCHIVE / job_id / "ncs5500-golden-x-25.1.2-LOCAL.iso").exists()
+        )
         version = self.client.get("/api/version").get_json()
-        self.assertEqual((version["runner"], version["gisobuild_image"]), ("local", None))
+        self.assertEqual(
+            (version["runner"], version["gisobuild_image"]), ("local", None)
+        )
         self.assertEqual(version["gisobuild_commit"], "0388af2989bb")
 
     def test_cancelling_a_local_build_leaves_no_orphan_processes(self):
         iso = self.write(self.ISO)
         self.write(self.ROUTING)
         self.configure(mode="slow")
-        job_id = self.start_build({"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []})
+        job_id = self.start_build(
+            {"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []}
+        )
         deadline = time.monotonic() + 10
-        while not self.child_pid.exists() or "Validating inputs" not in module.jobs[job_id]["log"]:
+        while (
+            not self.child_pid.exists()
+            or "Validating inputs" not in module.jobs[job_id]["log"]
+        ):
             self.assertLess(time.monotonic(), deadline, module.jobs[job_id]["log"])
             time.sleep(0.05)
         child = int(self.child_pid.read_text())
@@ -473,7 +614,9 @@ class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
         self.assertEqual(job["status"], "cancelled")
         self.assertLess(time.monotonic() - started, 15)  # SIGTERM was enough
         self.assertFalse(process_is_running(leader))
-        self.assertFalse(process_is_running(child), "gisobuild's own child process survived")
+        self.assertFalse(
+            process_is_running(child), "gisobuild's own child process survived"
+        )
         self.assertFalse((module.OUTPUT / job_id / "tmpextract").exists())
         self.assertFalse((module.OUTPUT / job_id / "system_image.iso").exists())
         self.assertTrue((module.OUTPUT / job_id / "logs" / "gisobuild.log").exists())

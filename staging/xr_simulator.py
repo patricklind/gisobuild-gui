@@ -6,16 +6,29 @@ from __future__ import annotations
 import json
 import sys
 
-state = {"version": "7.9.2", "committed": "7.9.2", "pending": None,
-         "rollback": None, "healthy": True}
+state = {
+    "version": "7.9.2",
+    "committed": "7.9.2",
+    "pending": None,
+    "rollback": None,
+    "healthy": True,
+}
 
 
 def execute(command: str) -> dict:
     command = command.strip()
-    if command in {"show version", "show platform", "show redundancy",
-                   "show alarms brief system active"}:
-        return {"ok": True, "command": command, "healthy": state["healthy"],
-                "version": state["version"]}
+    if command in {
+        "show version",
+        "show platform",
+        "show redundancy",
+        "show alarms brief system active",
+    }:
+        return {
+            "ok": True,
+            "command": command,
+            "healthy": state["healthy"],
+            "version": state["version"],
+        }
     if command == "show install request":
         return {"ok": True, "pending": state["pending"]}
     if command.startswith("install package replace "):

@@ -38,11 +38,16 @@ EXEMPT_PREFIXES = ("docs/todo/", "graphify-out/")
 
 
 def tracked_files(root: Path) -> list[str]:
-    output = subprocess.run(["git", "-C", str(root), "ls-files"], capture_output=True,
-                            text=True, check=True).stdout
-    return [name for name in output.splitlines()
-            if name.endswith((".md", ".sh")) and name not in EXEMPT
-            and not name.startswith(EXEMPT_PREFIXES)]
+    output = subprocess.run(
+        ["git", "-C", str(root), "ls-files"], capture_output=True, text=True, check=True
+    ).stdout
+    return [
+        name
+        for name in output.splitlines()
+        if name.endswith((".md", ".sh"))
+        and name not in EXEMPT
+        and not name.startswith(EXEMPT_PREFIXES)
+    ]
 
 
 def logical_lines(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
@@ -66,8 +71,13 @@ def logical_lines(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
 def command_lines(path: Path) -> list[tuple[int, str]]:
     text = path.read_text(encoding="utf-8", errors="replace").splitlines()
     if path.suffix == ".sh":
-        return logical_lines([(i, line) for i, line in enumerate(text, 1)
-                              if line.strip() and not line.lstrip().startswith("#")])
+        return logical_lines(
+            [
+                (i, line)
+                for i, line in enumerate(text, 1)
+                if line.strip() and not line.lstrip().startswith("#")
+            ]
+        )
     commands: list[tuple[int, str]] = []
     fence: str | None = None
     for number, line in enumerate(text, 1):
@@ -94,7 +104,9 @@ def violations(root: Path) -> list[str]:
             docker = CONTAINERISED.search(command)
             if docker and docker.start() < match.start():
                 continue
-            found.append(f"{name}:{number}: `{match.group(1)}` on the host: {command.strip()[:120]}")
+            found.append(
+                f"{name}:{number}: `{match.group(1)}` on the host: {command.strip()[:120]}"
+            )
     return found
 
 
@@ -104,8 +116,10 @@ def main() -> int:
     for line in found:
         print(line)
     if found:
-        print(f"\n{len(found)} host-side tooling command(s); run them in Docker "
-              "(see AGENTS.md) or mark a justified line with '# docker-only: allow <reason>'.")
+        print(
+            f"\n{len(found)} host-side tooling command(s); run them in Docker "
+            "(see AGENTS.md) or mark a justified line with '# docker-only: allow <reason>'."
+        )
         return 1
     print("No host-side project tooling commands found.")
     return 0

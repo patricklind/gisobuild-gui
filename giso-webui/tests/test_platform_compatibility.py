@@ -56,8 +56,7 @@ class PackageStatusTests(unittest.TestCase):
             "Processor architecture does not match the base ISO": "WRONG_ARCHITECTURE",
             "Platform is missing from filename": "UNKNOWN",
             "Release is missing from filename": "UNKNOWN",
-            "More than one fix changes this component; Cisco supersedence decides which remains":
-                "CONFLICT",
+            "More than one fix changes this component; Cisco supersedence decides which remains": "CONFLICT",
             "Superseded by a newer fix per Cisco supersedence notes": "SUPERSEDED",
             "Needs ncs5500-dpa-1.0.0.0-r2512.CSCwt13701 which nothing provides": "MISSING_DEPENDENCY",
             "MD5 does not match the Cisco README for ncs5500-25.1.2.CSCwu14807": "INVALID",
@@ -65,21 +64,32 @@ class PackageStatusTests(unittest.TestCase):
         }
         for reason, status in expected.items():
             self.assertEqual(classify_exclusion(reason), status, reason)
-        self.assertEqual(classify_exclusion("a reason nobody has written yet"),
-                         "MANUAL_REVIEW_REQUIRED")
+        self.assertEqual(
+            classify_exclusion("a reason nobody has written yet"),
+            "MANUAL_REVIEW_REQUIRED",
+        )
         self.assertEqual(classify_exclusion(""), "MANUAL_REVIEW_REQUIRED")
 
     def test_describe_package_reads_identity_from_both_naming_schemes(self):
         exr = describe_package("ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm")
-        self.assertEqual(exr, {"name": "ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm",
-                               "platform": "ncs5500", "release": "r2512",
-                               "architecture": "x86_64", "csc": "CSCwu14807"})
+        self.assertEqual(
+            exr,
+            {
+                "name": "ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm",
+                "platform": "ncs5500",
+                "release": "r2512",
+                "architecture": "x86_64",
+                "csc": "CSCwu14807",
+            },
+        )
         lnt = describe_package("xr-cdp-24.3.1v1.0.0-1.x86_64.rpm")
         self.assertEqual(lnt["release"], "24.3.1")
         self.assertIsNone(lnt["csc"])
         unknown = describe_package("some-file.rpm")
-        self.assertEqual([unknown["platform"], unknown["release"], unknown["csc"]],
-                         [None, None, None])
+        self.assertEqual(
+            [unknown["platform"], unknown["release"], unknown["csc"]],
+            [None, None, None],
+        )
 
 
 class PlatformCompatibilityTests(unittest.TestCase):
@@ -88,12 +98,21 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # listed in src/exrmod/usb_zip/platform_scripts.yaml; PLATFORMS' "usb"
         # flag drives the plan's expected outputs, so it must not drift. (ncs1001
         # once claimed USB support upstream never had.)
-        scripts = upstream_gisobuild_file(self, "src/exrmod/usb_zip/platform_scripts.yaml")
-        upstream = {line.split(":", 1)[0].strip() for line in scripts.read_text().splitlines()
-                    if line.strip() and not line.lstrip().startswith("#") and ":" in line}
-        local = {key for key, profile in PLATFORMS.items()
-                 if profile["architecture"] == "exr" and profile["usb"]
-                 and key not in GENERIC_PLATFORM_IDS}
+        scripts = upstream_gisobuild_file(
+            self, "src/exrmod/usb_zip/platform_scripts.yaml"
+        )
+        upstream = {
+            line.split(":", 1)[0].strip()
+            for line in scripts.read_text().splitlines()
+            if line.strip() and not line.lstrip().startswith("#") and ":" in line
+        }
+        local = {
+            key
+            for key, profile in PLATFORMS.items()
+            if profile["architecture"] == "exr"
+            and profile["usb"]
+            and key not in GENERIC_PLATFORM_IDS
+        }
         self.assertEqual(local, upstream)
 
     def test_exr_platform_list_matches_the_pinned_upstream_engine(self):
@@ -108,16 +127,20 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # or (less likely but possible) accepting one upstream no longer
         # does. See 01-PLATFORM-UPSTREAM-TODO.md "Stop using a locally
         # maintained list as the authoritative support list".
-        engine_path = upstream_gisobuild_file(self, "src/exrmod/gisobuild_exr_engine.py")
+        engine_path = upstream_gisobuild_file(
+            self, "src/exrmod/gisobuild_exr_engine.py"
+        )
         source = engine_path.read_text()
         match = re.search(r"SUPPORTED_PLATFORMS\s*=\s*(\[[^\]]*\])", source)
         self.assertIsNotNone(
-            match, "Could not find SUPPORTED_PLATFORMS in the pinned gisobuild engine - "
-            "has upstream renamed or restructured this list?"
+            match,
+            "Could not find SUPPORTED_PLATFORMS in the pinned gisobuild engine - "
+            "has upstream renamed or restructured this list?",
         )
         upstream_platforms = set(ast.literal_eval(match.group(1)))
         local_exr_platforms = {
-            key for key, profile in PLATFORMS.items()
+            key
+            for key, profile in PLATFORMS.items()
             if profile["architecture"] == "exr" and key not in GENERIC_PLATFORM_IDS
         }
         missing_locally = upstream_platforms - local_exr_platforms
@@ -152,20 +175,24 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # unknown), so validate_platform_options() correctly refuses to
         # proceed until the operator acknowledges that with skip_usb_image -
         # the same gate any other no-USB platform (e.g. ncs5k) goes through.
-        profile = validate_platform_options({
-            "iso": "some-brand-new-platform-mini-x-30.1.1.iso",
-            "platform": "exr-generic",
-            "skip_usb_image": True,
-        })
+        profile = validate_platform_options(
+            {
+                "iso": "some-brand-new-platform-mini-x-30.1.1.iso",
+                "platform": "exr-generic",
+                "skip_usb_image": True,
+            }
+        )
         self.assertEqual(profile["architecture"], "exr")
         self.assertFalse(profile["capabilities"]["migration"])
         self.assertFalse(profile["capabilities"]["full_iso"])
         self.assertFalse(profile["usb"])
-        lnt_profile = validate_platform_options({
-            "iso": "some-brand-new-platform-mini-x-30.1.1.iso",
-            "platform": "lnt-generic",
-            "skip_usb_image": True,
-        })
+        lnt_profile = validate_platform_options(
+            {
+                "iso": "some-brand-new-platform-mini-x-30.1.1.iso",
+                "platform": "lnt-generic",
+                "skip_usb_image": True,
+            }
+        )
         self.assertEqual(lnt_profile["architecture"], "lnt")
         self.assertTrue(lnt_profile["capabilities"]["remove_packages"])
 
@@ -176,7 +203,9 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # itself was discarded - an operator could not tell "we matched your
         # exact NCS-57C3-MOD-SYS" from "we guessed the NCS 5700 family".
         self.assertEqual(infer_platform("NCS-57C3-MOD-SYS-25.1.2.iso"), "ncs57")
-        self.assertEqual(infer_platform_pid("NCS-57C3-MOD-SYS-25.1.2.iso"), "ncs-57c3-mod-sys")
+        self.assertEqual(
+            infer_platform_pid("NCS-57C3-MOD-SYS-25.1.2.iso"), "ncs-57c3-mod-sys"
+        )
         # A filename that matches a canonical platform ID directly carries no
         # separate SKU spelling - the family name *is* what was in the name.
         self.assertEqual(infer_platform("ncs5500-mini-x-25.1.2.iso"), "ncs5500")
@@ -213,26 +242,37 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # The message names the option, the platform that cannot do it and
         # where upstream does offer it - never a hardcoded platform condition.
         with self.assertRaisesRegex(
-                ValueError,
-                r"Remove packages is not supported on NCS 5500 \(EXR build engine\); "
-                r"upstream gisobuild offers it on .+"):
-            validate_platform_options({
-                "iso": "ncs5500-mini-x-26.1.2.iso", "remove_packages": ["optional-pkg"]
-            })
+            ValueError,
+            r"Remove packages is not supported on NCS 5500 \(EXR build engine\); "
+            r"upstream gisobuild offers it on .+",
+        ):
+            validate_platform_options(
+                {
+                    "iso": "ncs5500-mini-x-26.1.2.iso",
+                    "remove_packages": ["optional-pkg"],
+                }
+            )
 
     def test_platform_only_options_are_decided_by_capabilities_not_platform_names(self):
         # migration/full_iso used to be two hardcoded platform comparisons.
-        for option, owner, other in (("migration", "asr9k", "ncs5500"),
-                                     ("full_iso", "xrv9k", "asr9k")):
-            self.assertEqual(platforms_supporting(option),
-                             [PLATFORMS[owner]["label"]], option)
+        for option, owner, other in (
+            ("migration", "asr9k", "ncs5500"),
+            ("full_iso", "xrv9k", "asr9k"),
+        ):
+            self.assertEqual(
+                platforms_supporting(option), [PLATFORMS[owner]["label"]], option
+            )
             validate_platform_options({"platform": owner, option: True})
             with self.assertRaisesRegex(ValueError, "is not supported on"):
                 validate_platform_options({"platform": other, option: True})
         # Every option the validator gates is a real capability of the engines.
-        known = set(capabilities_for_platform("ncs5500")) | set(capabilities_for_platform("8000"))
-        self.assertTrue(set(OPTION_CAPABILITIES.values()) <= known,
-                        set(OPTION_CAPABILITIES.values()) - known)
+        known = set(capabilities_for_platform("ncs5500")) | set(
+            capabilities_for_platform("8000")
+        )
+        self.assertTrue(
+            set(OPTION_CAPABILITIES.values()) <= known,
+            set(OPTION_CAPABILITIES.values()) - known,
+        )
         self.assertEqual(set(OPTION_CAPABILITIES) - set(OPTION_LABELS), set())
 
     def test_adapter_rejects_exr_only_capability_on_lnt_platform(self):
@@ -241,7 +281,9 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # direction - an eXR-only capability (optimize) offered on an LNT
         # platform (Cisco 8000).
         with self.assertRaisesRegex(
-                ValueError, r"Optimized ISO is not supported on Cisco 8000 / 8800 \(LNT build engine\)"):
+            ValueError,
+            r"Optimized ISO is not supported on Cisco 8000 / 8800 \(LNT build engine\)",
+        ):
             validate_platform_options({"platform": "8000", "optimize": True})
 
     def test_ncs57c3_inventory_sku_normalizes_to_ncs57(self):
@@ -260,21 +302,33 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # A real alias occurrence, properly bounded, still resolves.
         self.assertEqual(infer_platform("cisco-8800-mini-x-26.1.2.iso"), "8000")
 
-    def test_automatic_selection_keeps_matching_repository_and_excludes_mismatches(self):
-        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
-            "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
-            "ncs5500-mpls-te-rsvp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
-            "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm",
-            "asr9k-bgp-1.0.0.1-r2612.CSCtest00003.x86_64.rpm",
-            "routing-1.0.0.1-r2612.CSCtest00004.x86_64.rpm",
-        ])
+    def test_automatic_selection_keeps_matching_repository_and_excludes_mismatches(
+        self,
+    ):
+        result = recommend_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            [
+                "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                "ncs5500-mpls-te-rsvp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm",
+                "asr9k-bgp-1.0.0.1-r2612.CSCtest00003.x86_64.rpm",
+                "routing-1.0.0.1-r2612.CSCtest00004.x86_64.rpm",
+            ],
+        )
         self.assertTrue(result["ready"])
         self.assertEqual(len(result["selected"]), 2)
         self.assertEqual(result["package_groups"][0]["count"], 2)
-        self.assertIn("keep these RPMs together", result["package_groups"][0]["relationship"])
-        self.assertEqual({item["reason"] for item in result["excluded"]},
-                         {"Different IOS XR release", "Different platform",
-                          "Platform is missing from filename"})
+        self.assertIn(
+            "keep these RPMs together", result["package_groups"][0]["relationship"]
+        )
+        self.assertEqual(
+            {item["reason"] for item in result["excluded"]},
+            {
+                "Different IOS XR release",
+                "Different platform",
+                "Platform is missing from filename",
+            },
+        )
 
     def test_automatic_selection_surfaces_dependency_check_warning(self):
         # validate_smu_selection() always warns that filename checks cannot
@@ -284,12 +338,19 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # automatic-selection preview (discover()/api/smu/recommendation)
         # never surfaced it, only the separately-triggered /api/compatibility
         # checker did.
-        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
-            "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
-        ])
+        result = recommend_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            [
+                "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+            ],
+        )
         self.assertTrue(result["ready"])
-        self.assertTrue(any("authoritative dependency check" in warning
-                            for warning in result["warnings"]))
+        self.assertTrue(
+            any(
+                "authoritative dependency check" in warning
+                for warning in result["warnings"]
+            )
+        )
 
     def test_unparseable_rpm_metadata_is_excluded_with_a_specific_reason(self):
         # 06-UI-OPERATOR-TODO.md's "Explain decisions" list asks for
@@ -298,10 +359,13 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # is exactly that: the metadata is not *wrong*, it is unreadable,
         # and saying "different release" for it would be a lie. Only the
         # missing-platform half of this had a test.
-        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
-            "ncs5500-bgp-no-release-tag.x86_64.rpm",
-            "totally-unparseable.rpm",
-        ])
+        result = recommend_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            [
+                "ncs5500-bgp-no-release-tag.x86_64.rpm",
+                "totally-unparseable.rpm",
+            ],
+        )
         reasons = {item["name"]: item["reason"] for item in result["excluded"]}
         self.assertEqual(
             reasons["ncs5500-bgp-no-release-tag.x86_64.rpm"],
@@ -322,18 +386,26 @@ class PlatformCompatibilityTests(unittest.TestCase):
         # above for warnings) - so an operator relying on the default
         # automatic-selection preview (discover()/api/smu/recommendation)
         # never saw it until the final "Start build" click failed.
-        result = recommend_smu_selection("ncs5500-mini-x-26.1.2.iso", [
-            "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
-            "ncs5500-mpls-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
-        ])
+        result = recommend_smu_selection(
+            "ncs5500-mini-x-26.1.2.iso",
+            [
+                "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                "ncs5500-mpls-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
+            ],
+        )
         self.assertTrue(result["ready"])
         self.assertEqual(len(result["selected"]), 2)
-        self.assertTrue(any("keep one RPM" in blocker for blocker in result["blockers"]))
+        self.assertTrue(
+            any("keep one RPM" in blocker for blocker in result["blockers"])
+        )
 
     def test_automatic_selection_refuses_to_guess_unknown_iso_release(self):
-        result = recommend_smu_selection("ncs5500-mini-x.iso", [
-            "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
-        ])
+        result = recommend_smu_selection(
+            "ncs5500-mini-x.iso",
+            [
+                "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+            ],
+        )
         self.assertFalse(result["ready"])
         self.assertEqual(result["selected"], [])
 
@@ -362,7 +434,9 @@ class PlatformCompatibilityTests(unittest.TestCase):
             ],
         )
         self.assertTrue(result["compatible"])
-        self.assertTrue(any("supersedence data" in warning for warning in result["warnings"]))
+        self.assertTrue(
+            any("supersedence data" in warning for warning in result["warnings"])
+        )
 
     def test_partial_multi_component_bundle_selection_is_rejected(self):
         # A real gap: CSCtest00001 is a multi-component fix requiring 3 RPMs
@@ -377,7 +451,8 @@ class PlatformCompatibilityTests(unittest.TestCase):
             "ncs5500-routing-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
         ]
         result = validate_smu_selection(
-            "ncs5500-mini-x-26.1.2.iso", full_bundle[:2],
+            "ncs5500-mini-x-26.1.2.iso",
+            full_bundle[:2],
             full_candidate_packages=full_bundle,
         )
         self.assertFalse(result["compatible"])
@@ -392,7 +467,8 @@ class PlatformCompatibilityTests(unittest.TestCase):
             "ncs5500-routing-1.0.0.2-r2612.CSCtest00001.x86_64.rpm",
         ]
         result = validate_smu_selection(
-            "ncs5500-mini-x-26.1.2.iso", full_bundle,
+            "ncs5500-mini-x-26.1.2.iso",
+            full_bundle,
             full_candidate_packages=full_bundle,
         )
         self.assertTrue(result["compatible"])
@@ -431,15 +507,21 @@ class PlatformCompatibilityTests(unittest.TestCase):
                 "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
             ],
         )
-        self.assertEqual(result["package_groups"], [{
-            "csc": "CSCTEST00001", "components": ["ncs5500-bgp", "ncs5500-routing"],
-            "count": 2,
-            "files": [
-                "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
-                "ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+        self.assertEqual(
+            result["package_groups"],
+            [
+                {
+                    "csc": "CSCTEST00001",
+                    "components": ["ncs5500-bgp", "ncs5500-routing"],
+                    "count": 2,
+                    "files": [
+                        "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                        "ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm",
+                    ],
+                    "relationship": "Multi-component fix; keep these RPMs together",
+                }
             ],
-            "relationship": "Multi-component fix; keep these RPMs together",
-        }])
+        )
 
     def test_overlapping_csc_fixes_are_explained(self):
         result = validate_smu_selection(
@@ -449,9 +531,12 @@ class PlatformCompatibilityTests(unittest.TestCase):
                 "ncs5500-routing-1.0.0.2-r2612.CSCtest00002.x86_64.rpm",
             ],
         )
-        self.assertEqual(result["component_conflicts"][0]["component"], "ncs5500-routing")
-        self.assertEqual(result["component_conflicts"][0]["cscs"],
-                         ["CSCTEST00001", "CSCTEST00002"])
+        self.assertEqual(
+            result["component_conflicts"][0]["component"], "ncs5500-routing"
+        )
+        self.assertEqual(
+            result["component_conflicts"][0]["cscs"], ["CSCTEST00001", "CSCTEST00002"]
+        )
 
     def test_mixed_processor_architectures_are_rejected(self):
         result = validate_smu_selection(
@@ -462,7 +547,9 @@ class PlatformCompatibilityTests(unittest.TestCase):
             ],
         )
         self.assertFalse(result["compatible"])
-        self.assertTrue(any("processor architecture" in issue for issue in result["issues"]))
+        self.assertTrue(
+            any("processor architecture" in issue for issue in result["issues"])
+        )
 
     def test_rpm_architecture_mismatched_with_iso_is_rejected(self):
         result = validate_smu_selection(
@@ -471,7 +558,9 @@ class PlatformCompatibilityTests(unittest.TestCase):
             iso_architectures=frozenset({"x86_64"}),
         )
         self.assertFalse(result["compatible"])
-        self.assertTrue(any("processor architecture" in issue for issue in result["issues"]))
+        self.assertTrue(
+            any("processor architecture" in issue for issue in result["issues"])
+        )
         self.assertEqual(result["iso_architectures"], ["x86_64"])
 
     def test_rpm_architecture_matching_iso_is_accepted(self):
@@ -498,7 +587,9 @@ class PlatformCompatibilityTests(unittest.TestCase):
             iso_architectures=frozenset({"aarch64"}),
         )
         self.assertFalse(result["compatible"])
-        self.assertTrue(any("x86_64" in issue and "aarch64" in issue for issue in result["issues"]))
+        self.assertTrue(
+            any("x86_64" in issue and "aarch64" in issue for issue in result["issues"])
+        )
 
     def test_automatic_selection_excludes_wrong_architecture_rpms(self):
         result = recommend_smu_selection(
@@ -510,35 +601,69 @@ class PlatformCompatibilityTests(unittest.TestCase):
             iso_architectures=frozenset({"x86_64"}),
         )
         self.assertTrue(result["ready"])
-        self.assertEqual(result["selected"], ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"])
+        self.assertEqual(
+            result["selected"],
+            ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"],
+        )
         self.assertIn(
-            {"name": "ncs5500-bgp-1.0.0.1-r2612.CSCtest00002.aarch64.rpm",
-             "reason": "Processor architecture does not match the base ISO"},
+            {
+                "name": "ncs5500-bgp-1.0.0.1-r2612.CSCtest00002.aarch64.rpm",
+                "reason": "Processor architecture does not match the base ISO",
+            },
             result["excluded"],
         )
 
     def test_upgrade_matrix_returns_bridge_smus_and_caveats(self):
-        matrix = {"permitted": {"25.1.2": {"26.1.2": [{
-            "platform": "ncs5500", "bridge_smus": ["bridge-placeholder.rpm"],
-            "caveats": ["Synthetic test caveat"],
-        }]}}}
+        matrix = {
+            "permitted": {
+                "25.1.2": {
+                    "26.1.2": [
+                        {
+                            "platform": "ncs5500",
+                            "bridge_smus": ["bridge-placeholder.rpm"],
+                            "caveats": ["Synthetic test caveat"],
+                        }
+                    ]
+                }
+            }
+        }
         result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", [])
         self.assertTrue(result["permitted"])
         self.assertEqual(result["bridge_smus"], ["bridge-placeholder.rpm"])
         self.assertEqual(result["missing_bridge_smus"], ["bridge-placeholder.rpm"])
 
     def test_upgrade_matrix_uses_canonical_platform_normalization(self):
-        matrix = {"permitted": {"25.1.2": {"26.1.2": [{
-            "platform": "NCS-57C3-MODS-SYS", "bridge_smus": [], "caveats": [],
-        }]}}}
+        matrix = {
+            "permitted": {
+                "25.1.2": {
+                    "26.1.2": [
+                        {
+                            "platform": "NCS-57C3-MODS-SYS",
+                            "bridge_smus": [],
+                            "caveats": [],
+                        }
+                    ]
+                }
+            }
+        }
         result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5700", [])
         self.assertTrue(result["permitted"])
 
     def test_bridge_smu_near_match_is_not_accepted(self):
         required = "ncs5500-routing-r2612.CSCabc123.x86_64.rpm"
-        matrix = {"permitted": {"25.1.2": {"26.1.2": [{
-            "platform": "ncs5500", "bridge_smus": [required], "caveats": [],
-        }]}}}
+        matrix = {
+            "permitted": {
+                "25.1.2": {
+                    "26.1.2": [
+                        {
+                            "platform": "ncs5500",
+                            "bridge_smus": [required],
+                            "caveats": [],
+                        }
+                    ]
+                }
+            }
+        }
         selected = ["ncs5500-routing-r2612.CSCabc1234.x86_64.rpm"]
         result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", selected)
         self.assertEqual(result["missing_bridge_smus"], [required])
@@ -557,10 +682,13 @@ class ExrRpmLabelCompareTests(unittest.TestCase):
     def _extract_method(source: str, name: str) -> str:
         match = re.search(
             rf"^    def {re.escape(name)}\(.*?\n(?=    def |\Z)",
-            source, re.DOTALL | re.MULTILINE,
+            source,
+            re.DOTALL | re.MULTILINE,
         )
         if not match:
-            raise AssertionError(f"pinned upstream gisobuild dropped or renamed {name}()")
+            raise AssertionError(
+                f"pinned upstream gisobuild dropped or renamed {name}()"
+            )
         return match.group(0)
 
     def _upstream_comparator(self):
@@ -571,10 +699,14 @@ class ExrRpmLabelCompareTests(unittest.TestCase):
         compare_exr_rpm_labels() silently drifting out of sync - same intent
         as test_exr_platform_list_matches_the_pinned_upstream_engine above.
         """
-        engine_path = upstream_gisobuild_file(self, "src/exrmod/gisobuild_exr_engine.py")
+        engine_path = upstream_gisobuild_file(
+            self, "src/exrmod/gisobuild_exr_engine.py"
+        )
         source = engine_path.read_text()
         pattern_match = re.search(
-            r"^_subfield_pattern = re\.compile\(.*?\n\)\n", source, re.DOTALL | re.MULTILINE
+            r"^_subfield_pattern = re\.compile\(.*?\n\)\n",
+            source,
+            re.DOTALL | re.MULTILINE,
         )
         if not pattern_match:
             self.fail("pinned upstream gisobuild dropped or renamed _subfield_pattern")
@@ -582,7 +714,11 @@ class ExrRpmLabelCompareTests(unittest.TestCase):
         exec(pattern_match.group(0), namespace)  # noqa: S102 - trusted pinned source, test-only
         class_source = "class _Upstream:\n" + "".join(
             self._extract_method(source, name)
-            for name in ("_iter_rpm_subfields", "_compare_rpm_field", "_compare_rpm_labels")
+            for name in (
+                "_iter_rpm_subfields",
+                "_compare_rpm_field",
+                "_compare_rpm_labels",
+            )
         )
         exec(class_source, namespace)  # noqa: S102 - trusted pinned source, test-only
         return namespace["_Upstream"]()
@@ -603,10 +739,18 @@ class ExrRpmLabelCompareTests(unittest.TestCase):
             (("2.0", "1"), ("1.0~rc1", "1")),
         ]
         for lhs, rhs in cases:
-            expected = upstream._compare_rpm_labels([0, lhs[0], lhs[1]], [0, rhs[0], rhs[1]])
-            self.assertEqual(compare_exr_rpm_labels(lhs, rhs), expected, f"{lhs} vs {rhs}")
-            expected_reverse = upstream._compare_rpm_labels([0, rhs[0], rhs[1]], [0, lhs[0], lhs[1]])
-            self.assertEqual(compare_exr_rpm_labels(rhs, lhs), expected_reverse, f"{rhs} vs {lhs}")
+            expected = upstream._compare_rpm_labels(
+                [0, lhs[0], lhs[1]], [0, rhs[0], rhs[1]]
+            )
+            self.assertEqual(
+                compare_exr_rpm_labels(lhs, rhs), expected, f"{lhs} vs {rhs}"
+            )
+            expected_reverse = upstream._compare_rpm_labels(
+                [0, rhs[0], rhs[1]], [0, lhs[0], lhs[1]]
+            )
+            self.assertEqual(
+                compare_exr_rpm_labels(rhs, lhs), expected_reverse, f"{rhs} vs {lhs}"
+            )
 
     def test_more_subfields_outranks_fewer_regardless_of_content(self):
         # Documented upstream quirk (see the module docstring in
@@ -616,8 +760,12 @@ class ExrRpmLabelCompareTests(unittest.TestCase):
         self.assertEqual(compare_exr_rpm_labels(("1.0", "1"), ("1.0~rc1", "1")), -1)
 
     def test_equal_labels_compare_equal(self):
-        self.assertEqual(compare_exr_rpm_labels(("1.0.0", "r2512.CSCabc123")
-                                                , ("1.0.0", "r2512.CSCabc123")), 0)
+        self.assertEqual(
+            compare_exr_rpm_labels(
+                ("1.0.0", "r2512.CSCabc123"), ("1.0.0", "r2512.CSCabc123")
+            ),
+            0,
+        )
 
     def test_release_only_breaks_a_version_tie(self):
         self.assertEqual(compare_exr_rpm_labels(("1.0.0", "2"), ("1.0.0", "1")), 1)

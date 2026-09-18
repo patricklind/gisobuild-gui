@@ -17,13 +17,18 @@ class CiscoDownloadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "secret"
             path.write_text("private\n", encoding="utf-8")
-            with patch.dict(os.environ, {"CISCO_CLIENT_SECRET": "wrong", "CISCO_CLIENT_SECRET_FILE": str(path)}):
+            with patch.dict(
+                os.environ,
+                {"CISCO_CLIENT_SECRET": "wrong", "CISCO_CLIENT_SECRET_FILE": str(path)},
+            ):
                 self.assertEqual(secret_value("CISCO_CLIENT_SECRET"), "private")
 
     def test_token_is_cached_until_close_to_expiry(self):
         client = self.client()
         calls = []
-        client._json_request = lambda *args, **kwargs: calls.append(args) or {"access_token": "token", "expires_in": 3600}
+        client._json_request = lambda *args, **kwargs: (
+            calls.append(args) or {"access_token": "token", "expires_in": 3600}
+        )
         self.assertEqual(client._access_token(), "token")
         self.assertEqual(client._access_token(), "token")
         self.assertEqual(len(calls), 1)
@@ -31,19 +36,26 @@ class CiscoDownloadTests(unittest.TestCase):
     def test_expiring_token_is_renewed(self):
         client = self.client()
         client._token = ("old", 0)
-        client._json_request = lambda *args, **kwargs: {"access_token": "new", "expires_in": 3600}
+        client._json_request = lambda *args, **kwargs: {
+            "access_token": "new",
+            "expires_in": 3600,
+        }
         self.assertEqual(client._access_token(), "new")
 
     def test_private_and_unapproved_download_destinations_are_rejected(self):
         with self.assertRaises(CiscoDownloadError):
             self.client()._validate_download_url("https://example.com/file.iso")
-        client = CiscoSoftwareClient("id", "secret", resolver=lambda host: ["127.0.0.1"])
+        client = CiscoSoftwareClient(
+            "id", "secret", resolver=lambda host: ["127.0.0.1"]
+        )
         with self.assertRaises(CiscoDownloadError):
             client._validate_download_url("https://download.cisco.com/file.iso")
 
     def test_contract_error_is_not_returned_as_a_download(self):
         with self.assertRaisesRegex(CiscoDownloadError, "CONTRACT_REJECTED"):
-            self.client()._check_errors({"exception": {"code": "CONTRACT_REJECTED", "message": "sensitive"}})
+            self.client()._check_errors(
+                {"exception": {"code": "CONTRACT_REJECTED", "message": "sensitive"}}
+            )
 
     def test_download_checks_size_and_all_hashes(self):
         content = b"licensed fixture placeholder"
@@ -52,8 +64,12 @@ class CiscoDownloadTests(unittest.TestCase):
         client._validate_download_url = lambda url: None
 
         class Response:
-            def __enter__(self): return self
-            def __exit__(self, *args): return None
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
             def read(self, size):
                 nonlocal content
                 value, content = content, b""
@@ -64,8 +80,10 @@ class CiscoDownloadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             progress = []
             result = client.download(
-                "https://download.cisco.com/file.iso", Path(directory) / "file.iso",
-                expected_size=len(payload), max_bytes=1024,
+                "https://download.cisco.com/file.iso",
+                Path(directory) / "file.iso",
+                expected_size=len(payload),
+                max_bytes=1024,
                 expected_md5=hashlib.md5(payload, usedforsecurity=False).hexdigest(),
                 expected_sha512=hashlib.sha512(payload).hexdigest(),
                 progress=lambda written, total: progress.append((written, total)),
@@ -80,8 +98,12 @@ class CiscoDownloadTests(unittest.TestCase):
         client._validate_download_url = lambda url: None
 
         class Response:
-            def __enter__(self): return self
-            def __exit__(self, *args): return None
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
             def read(self, size):
                 nonlocal content
                 value, content = content, b""
@@ -91,10 +113,14 @@ class CiscoDownloadTests(unittest.TestCase):
         payload = b"licensed fixture placeholder"
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / "file.iso"
-            destination.with_name(".file.iso.part").write_bytes(b"leftover from a crashed attempt")
+            destination.with_name(".file.iso.part").write_bytes(
+                b"leftover from a crashed attempt"
+            )
             result = client.download(
-                "https://download.cisco.com/file.iso", destination,
-                expected_size=len(payload), max_bytes=1024,
+                "https://download.cisco.com/file.iso",
+                destination,
+                expected_size=len(payload),
+                max_bytes=1024,
             )
             self.assertEqual(result.size, len(payload))
             self.assertEqual(destination.read_bytes(), payload)
@@ -105,16 +131,25 @@ class CiscoDownloadTests(unittest.TestCase):
         client._validate_download_url = lambda url: None
 
         class Response:
-            def __enter__(self): return self
-            def __exit__(self, *args): return None
-            def read(self, size): return b""
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def read(self, size):
+                return b""
 
         client._opener.open = lambda request, timeout: Response()
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / "file.iso"
             with self.assertRaises(CiscoDownloadError):
-                client.download("https://download.cisco.com/file.iso", destination,
-                                expected_size=1, max_bytes=1024)
+                client.download(
+                    "https://download.cisco.com/file.iso",
+                    destination,
+                    expected_size=1,
+                    max_bytes=1024,
+                )
             self.assertFalse(destination.with_name(".file.iso.part").exists())
 
     def test_interrupted_download_is_redacted_and_partial_file_is_removed(self):
@@ -123,16 +158,25 @@ class CiscoDownloadTests(unittest.TestCase):
         client._validate_download_url = lambda url: None
 
         class Response:
-            def __enter__(self): return self
-            def __exit__(self, *args): return None
-            def read(self, size): raise TimeoutError("private upstream detail")
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def read(self, size):
+                raise TimeoutError("private upstream detail")
 
         client._opener.open = lambda request, timeout: Response()
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / "file.iso"
             with self.assertRaisesRegex(CiscoDownloadError, "interrupted") as raised:
-                client.download("https://download.cisco.com/file.iso", destination,
-                                expected_size=1, max_bytes=1024)
+                client.download(
+                    "https://download.cisco.com/file.iso",
+                    destination,
+                    expected_size=1,
+                    max_bytes=1024,
+                )
             self.assertNotIn("private upstream detail", str(raised.exception))
             self.assertFalse(destination.with_name(".file.iso.part").exists())
 
@@ -144,27 +188,40 @@ class CiscoDownloadTests(unittest.TestCase):
         client._validate_download_url = checked.append
 
         class Response:
-            def __enter__(self): return self
-            def __exit__(self, *args): return None
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
             def read(self, size):
                 nonlocal content
                 value, content = content, b""
                 return value
 
         calls = 0
+
         def open_request(request, timeout):
             nonlocal calls
             calls += 1
             if calls == 1:
-                raise urllib.error.HTTPError(request.full_url, 302, "redirect", {
-                    "Location": "https://dl.cisco.com/final.iso"
-                }, None)
+                raise urllib.error.HTTPError(
+                    request.full_url,
+                    302,
+                    "redirect",
+                    {"Location": "https://dl.cisco.com/final.iso"},
+                    None,
+                )
             return Response()
 
         client._opener.open = open_request
         with tempfile.TemporaryDirectory() as directory:
-            client.download("https://download.cisco.com/file.iso", Path(directory) / "file.iso",
-                            expected_size=1, max_bytes=1024)
+            client.download(
+                "https://download.cisco.com/file.iso",
+                Path(directory) / "file.iso",
+                expected_size=1,
+                max_bytes=1024,
+            )
         self.assertEqual(len(checked), 2)
         self.assertEqual(checked[1], "https://dl.cisco.com/final.iso")
 

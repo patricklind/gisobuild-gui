@@ -52,7 +52,12 @@ from werkzeug.exceptions import BadRequest, NotFound, RequestEntityTooLarge
 
 
 def validate_image_reference(value: str) -> str:
-    if not value or len(value) > 512 or value.startswith("-") or any(char.isspace() for char in value):
+    if (
+        not value
+        or len(value) > 512
+        or value.startswith("-")
+        or any(char.isspace() for char in value)
+    ):
         raise RuntimeError("GISO_IMAGE must be a valid Docker image reference")
     return value
 
@@ -118,33 +123,55 @@ store_initialized = False
 # Version 1 is the original layout, and its IF NOT EXISTS makes it adopt a
 # pre-versioning database unchanged.
 SCHEMA_MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
-    (1, (
-        ("CREATE TABLE IF NOT EXISTS jobs "
-         "(id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"),
-        ("CREATE TABLE IF NOT EXISTS activity "
-         "(id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL NOT NULL, text TEXT NOT NULL)"),
-    )),
+    (
+        1,
+        (
+            (
+                "CREATE TABLE IF NOT EXISTS jobs "
+                "(id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"
+            ),
+            (
+                "CREATE TABLE IF NOT EXISTS activity "
+                "(id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL NOT NULL, text TEXT NOT NULL)"
+            ),
+        ),
+    ),
     # Where a workspace file came from, when the filesystem cannot tell:
     # a Cisco download lands next to manual uploads.
-    (2, (
-        ("CREATE TABLE IF NOT EXISTS file_provenance "
-         "(relative_path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, source TEXT NOT NULL, "
-         "recorded REAL NOT NULL)"),
-    )),
+    (
+        2,
+        (
+            (
+                "CREATE TABLE IF NOT EXISTS file_provenance "
+                "(relative_path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, source TEXT NOT NULL, "
+                "recorded REAL NOT NULL)"
+            ),
+        ),
+    ),
     # Browser upload sessions, so a restart does not throw away gigabytes
     # already received; the byte count is re-read from the partial file.
-    (3, (
-        ("CREATE TABLE IF NOT EXISTS upload_sessions "
-         "(id TEXT PRIMARY KEY, name TEXT NOT NULL, size INTEGER NOT NULL, "
-         "temp TEXT NOT NULL, updated REAL NOT NULL)"),
-    )),
+    (
+        3,
+        (
+            (
+                "CREATE TABLE IF NOT EXISTS upload_sessions "
+                "(id TEXT PRIMARY KEY, name TEXT NOT NULL, size INTEGER NOT NULL, "
+                "temp TEXT NOT NULL, updated REAL NOT NULL)"
+            ),
+        ),
+    ),
     # Checksums keyed like the in-memory cache (path, size, mtime in ns), so a
     # restart does not re-hash every multi-GiB image on the first page load.
-    (4, (
-        ("CREATE TABLE IF NOT EXISTS file_checksums "
-         "(path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL, "
-         "md5 TEXT NOT NULL, sha256 TEXT NOT NULL, recorded REAL NOT NULL)"),
-    )),
+    (
+        4,
+        (
+            (
+                "CREATE TABLE IF NOT EXISTS file_checksums "
+                "(path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL, "
+                "md5 TEXT NOT NULL, sha256 TEXT NOT NULL, recorded REAL NOT NULL)"
+            ),
+        ),
+    ),
 )
 # An upload session that has not received a chunk for this long no longer
 # blocks builds, cleanup or Cisco downloads; it stays resumable until
@@ -198,19 +225,44 @@ MAX_ARCHIVE_BYTES = validate_max_archive_bytes(
 )
 UPLOAD_SESSION_TTL = int(os.environ.get("UPLOAD_SESSION_TTL", str(24 * 60 * 60)))
 GISO_PULL_TIMEOUT_SECONDS = int(os.environ.get("GISO_PULL_TIMEOUT_SECONDS", "600"))
-CISCO_DOWNLOAD_TIMEOUT_SECONDS = int(os.environ.get("CISCO_DOWNLOAD_TIMEOUT_SECONDS", "60"))
-ALLOWED_HOSTS = {host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(",") if host.strip()}
+CISCO_DOWNLOAD_TIMEOUT_SECONDS = int(
+    os.environ.get("CISCO_DOWNLOAD_TIMEOUT_SECONDS", "60")
+)
+ALLOWED_HOSTS = {
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost,giso-webui").split(
+        ","
+    )
+    if host.strip()
+}
 ACTIVE_JOB_STATUSES = {"queued", "running", "finalizing", "committing", "cancelling"}
 MIN_FREE_BYTES = 512 * 1024**2
 app.config["MAX_CONTENT_LENGTH"] = MAX_CHUNK_BYTES
 
-if min(MAX_UPLOAD_BYTES, MAX_EXTRACTED_BYTES, MAX_TAR_MEMBERS, MAX_CHUNK_BYTES,
-       MAX_LOG_BYTES, MAX_JOB_HISTORY, ARCHIVE_RETENTION_DAYS, MAX_ARCHIVE_BYTES,
-       UPLOAD_SESSION_TTL, GISO_PULL_TIMEOUT_SECONDS) <= 0 or not ALLOWED_HOSTS:
+if (
+    min(
+        MAX_UPLOAD_BYTES,
+        MAX_EXTRACTED_BYTES,
+        MAX_TAR_MEMBERS,
+        MAX_CHUNK_BYTES,
+        MAX_LOG_BYTES,
+        MAX_JOB_HISTORY,
+        ARCHIVE_RETENTION_DAYS,
+        MAX_ARCHIVE_BYTES,
+        UPLOAD_SESSION_TTL,
+        GISO_PULL_TIMEOUT_SECONDS,
+    )
+    <= 0
+    or not ALLOWED_HOSTS
+):
     raise RuntimeError("Upload, extraction, tar, chunk and log limits must be positive")
 
 PRIVATE_JOB_FIELDS = {
-    "command", "payload", "container_pid", "cleanup_paths", "process_phase",
+    "command",
+    "payload",
+    "container_pid",
+    "cleanup_paths",
+    "process_phase",
 }
 
 
@@ -222,24 +274,33 @@ def cisco_client() -> CiscoSoftwareClient:
     global cisco_api_client
     client_id = secret_value("CISCO_CLIENT_ID")
     client_secret = secret_value("CISCO_CLIENT_SECRET")
-    allowed = tuple(host.strip() for host in os.environ.get(
-        "CISCO_DOWNLOAD_HOSTS", "cisco.com"
-    ).split(",") if host.strip())
+    allowed = tuple(
+        host.strip()
+        for host in os.environ.get("CISCO_DOWNLOAD_HOSTS", "cisco.com").split(",")
+        if host.strip()
+    )
     with cisco_lock:
-        if (cisco_api_client is None or cisco_api_client.client_id != client_id or
-                cisco_api_client.client_secret != client_secret or
-                cisco_api_client.allowed_hosts != allowed):
+        if (
+            cisco_api_client is None
+            or cisco_api_client.client_id != client_id
+            or cisco_api_client.client_secret != client_secret
+            or cisco_api_client.allowed_hosts != allowed
+        ):
             cisco_api_client = CiscoSoftwareClient(
-                client_id, client_secret, timeout=CISCO_DOWNLOAD_TIMEOUT_SECONDS,
+                client_id,
+                client_secret,
+                timeout=CISCO_DOWNLOAD_TIMEOUT_SECONDS,
                 allowed_hosts=allowed,
             )
         return cisco_api_client
 
 
 def cisco_failure(exc: Exception, status_code: int = 400):
-    status = "authorization-required" if str(exc).startswith(
-        "Cisco authorization failed:"
-    ) else "failed"
+    status = (
+        "authorization-required"
+        if str(exc).startswith("Cisco authorization failed:")
+        else "failed"
+    )
     return jsonify(error=str(exc), status=status), status_code
 
 
@@ -248,11 +309,17 @@ def cisco_download_running() -> bool:
         now = time.time()
         for job in cisco_download_jobs.values():
             if now - job["created"] > 3600 and job["status"] in {
-                "authenticating", "downloading", "verifying", "eula-required"
+                "authenticating",
+                "downloading",
+                "verifying",
+                "eula-required",
             }:
                 job.update(status="failed", error="Cisco download session expired")
-        return any(job["status"] in {"authenticating", "downloading", "verifying", "eula-required"}
-                   for job in cisco_download_jobs.values())
+        return any(
+            job["status"]
+            in {"authenticating", "downloading", "verifying", "eula-required"}
+            for job in cisco_download_jobs.values()
+        )
 
 
 def cisco_text(value: object, name: str, *, maximum: int = 256) -> str:
@@ -278,17 +345,28 @@ def find_cisco_images(value: object, context: dict | None = None) -> list[dict]:
                 size = int(value.get("imageSize", value.get("size", 0)))
             except (TypeError, ValueError):
                 size = 0
-            found.append({
-                "guid": str(value["imageGuid"]), "name": str(image_name),
-                "size": size, "release": str(value.get(
-                    "releaseVersion", context.get("releaseVersion", context.get("version", ""))
-                )),
-                "mdf_id": str(value.get("mdfId", context.get("mdfId", ""))),
-                "md5": str(value.get("md5", value.get("Md5", ""))),
-                "sha512": str(value.get("sha512", "")),
-                "encrypted": str(value.get("encryptionSoftwareIndicator", "N")).upper() == "Y",
-                "entitlement": str(value.get("additionalEntitlement", "N")).upper() == "Y",
-            })
+            found.append(
+                {
+                    "guid": str(value["imageGuid"]),
+                    "name": str(image_name),
+                    "size": size,
+                    "release": str(
+                        value.get(
+                            "releaseVersion",
+                            context.get("releaseVersion", context.get("version", "")),
+                        )
+                    ),
+                    "mdf_id": str(value.get("mdfId", context.get("mdfId", ""))),
+                    "md5": str(value.get("md5", value.get("Md5", ""))),
+                    "sha512": str(value.get("sha512", "")),
+                    "encrypted": str(
+                        value.get("encryptionSoftwareIndicator", "N")
+                    ).upper()
+                    == "Y",
+                    "entitlement": str(value.get("additionalEntitlement", "N")).upper()
+                    == "Y",
+                }
+            )
         for nested in value.values():
             found.extend(find_cisco_images(nested, context))
     elif isinstance(value, list):
@@ -315,14 +393,16 @@ ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar")
 def archive_suffix(name: str) -> str | None:
     """The archive suffix a filename ends with (case-insensitive), or None."""
     lowered = name.lower()
-    return next((suffix for suffix in ARCHIVE_SUFFIXES if lowered.endswith(suffix)), None)
+    return next(
+        (suffix for suffix in ARCHIVE_SUFFIXES if lowered.endswith(suffix)), None
+    )
 
 
 def split_upload_name(name: str) -> tuple[str, str]:
     """(stem, suffix) that keeps a multi-part archive suffix like ".tar.gz" intact."""
     suffix = archive_suffix(name)
     if suffix:
-        return name[:-len(suffix)], name[-len(suffix):]
+        return name[: -len(suffix)], name[-len(suffix) :]
     return Path(name).stem, Path(name).suffix
 
 
@@ -340,14 +420,24 @@ def extract_cisco_archive(path: Path) -> int:
                 raise CiscoDownloadError("Cisco archive contains too many files")
             expanded_size = sum(member.size for member in members if member.isfile())
             if expanded_size > MAX_EXTRACTED_BYTES:
-                raise CiscoDownloadError("Cisco archive expands beyond the configured limit")
+                raise CiscoDownloadError(
+                    "Cisco archive expands beyond the configured limit"
+                )
             if shutil.disk_usage(DATA).free < expanded_size + MIN_FREE_BYTES:
-                raise CiscoDownloadError("Not enough free disk space to extract the Cisco archive")
+                raise CiscoDownloadError(
+                    "Not enough free disk space to extract the Cisco archive"
+                )
             root = destination.resolve()
             for member in members:
                 target = (destination / member.name).resolve()
-                if (root not in target.parents and target != root) or member.issym() or member.islnk():
-                    raise CiscoDownloadError("Cisco archive contains an unsafe path or link")
+                if (
+                    (root not in target.parents and target != root)
+                    or member.issym()
+                    or member.islnk()
+                ):
+                    raise CiscoDownloadError(
+                        "Cisco archive contains an unsafe path or link"
+                    )
             archive.extractall(destination, members=members, filter="data")
             return sum(1 for member in members if member.isfile())
     except Exception:
@@ -406,8 +496,10 @@ def parse_missing_dependencies(log: str) -> list[dict]:
     for match in MISSING_DEPENDENCY_PATTERN.finditer(log):
         requirement = match.group("requirement").strip()
         required_by = match.group("required_by").strip()
-        seen.setdefault((requirement, required_by),
-                        {"requirement": requirement, "required_by": required_by})
+        seen.setdefault(
+            (requirement, required_by),
+            {"requirement": requirement, "required_by": required_by},
+        )
     return list(seen.values())
 
 
@@ -436,46 +528,100 @@ def append_activity(text: str) -> None:
 ERROR_TAXONOMY: tuple[tuple[str, re.Pattern, bool, str, str], ...] = tuple(
     (code, re.compile(pattern, re.IGNORECASE), recoverable, human, action)
     for code, pattern, recoverable, human, action in (
-        ("DEPENDENCY_ERROR", r"is required by .* no selected package provides|is needed by",
-         True, "A selected package needs a package version that nothing provides.",
-         ("Download the Cisco SMU named in the message (or the one that provides the package), "
-          "or remove the package that needs it.")),
-        ("CSC_INCOMPLETE", r"Incomplete fix|is a multi-component fix",
-         True, "A Cisco fix is only partly present.",
-         "Upload every RPM of the fix (its SMU tar), or deselect the whole fix."),
-        ("RPM_METADATA_ERROR", r"RPM header says|cannot read this file|MD5 does not match|failed its README checksum",
-         True, "An RPM is not what its name or its Cisco README says it is.",
-         "Re-download the file from Cisco and upload it again unchanged."),
-        ("DUPLICATE_CONFLICT", r"Conflicting RPM identities|Multiple versions of .* are selected",
-         True, "Two different files claim to be the same package.",
-         "Delete the unwanted copy so each package exists once."),
-        ("RPM_ARCH_MISMATCH", r"processor architecture",
-         True, "An RPM is built for a different processor family than the base image.",
-         "Use the RPMs for the base image's architecture."),
-        ("RELEASE_MISMATCH", r"does not match IOS XR|built for IOS XR|more than one IOS XR release|release could not be detected",
-         True, "A package belongs to a different IOS XR release than the base image.",
-         "Use SMUs for the base image's release, or a base image for the SMUs' release."),
-        ("PLATFORM_AMBIGUOUS", r"platform could not be detected|Select the platform family|Unsupported platform family",
-         True, "The platform family could not be determined.",
-         "Select the platform in Expert settings > Image identity."),
-        ("PLATFORM_MISMATCH", r": platform .* does not match",
-         True, "A package is for a different platform than the base image.",
-         "Remove packages for other platforms."),
-        ("ISO_METADATA_ERROR", r"not an ISO 9660 image",
-         True, "The base image file is not an ISO image.",
-         "Upload the Cisco base ISO itself, not an archive or a renamed file."),
-        ("INPUT_MISSING", r"Select one ISO that exists|was not found|must be an inventory ID|Input does not exist",
-         True, "A selected input is not in the workspace.",
-         "Check files again and reselect the base ISO and packages."),
-        ("OPTION_UNSUPPORTED", r"is not supported on|not supported by the|is supported only for|Automatic USB output is not supported",
-         True, "A build option does not apply to this platform.",
-         "Turn the option off in Expert settings."),
-        ("STORAGE_ERROR", r"Not enough free (disk )?space",
-         True, "There is not enough free disk space for this build.",
-         "Free space (clear the workspace or old archives) or enlarge the named volume."),
-        ("ENVIRONMENT_ERROR", r"gisobuild is not available|bundled gisobuild files|job store cannot be used|Docker CLI|interpreter for gisobuild|SYS_CHROOT|already running|Wait for|could not be pulled",
-         True, "The build service is not ready to run this build right now.",
-         "Wait for the running activity to finish, or fix the service setup named in the message."),
+        (
+            "DEPENDENCY_ERROR",
+            r"is required by .* no selected package provides|is needed by",
+            True,
+            "A selected package needs a package version that nothing provides.",
+            (
+                "Download the Cisco SMU named in the message (or the one that provides the package), "
+                "or remove the package that needs it."
+            ),
+        ),
+        (
+            "CSC_INCOMPLETE",
+            r"Incomplete fix|is a multi-component fix",
+            True,
+            "A Cisco fix is only partly present.",
+            "Upload every RPM of the fix (its SMU tar), or deselect the whole fix.",
+        ),
+        (
+            "RPM_METADATA_ERROR",
+            r"RPM header says|cannot read this file|MD5 does not match|failed its README checksum",
+            True,
+            "An RPM is not what its name or its Cisco README says it is.",
+            "Re-download the file from Cisco and upload it again unchanged.",
+        ),
+        (
+            "DUPLICATE_CONFLICT",
+            r"Conflicting RPM identities|Multiple versions of .* are selected",
+            True,
+            "Two different files claim to be the same package.",
+            "Delete the unwanted copy so each package exists once.",
+        ),
+        (
+            "RPM_ARCH_MISMATCH",
+            r"processor architecture",
+            True,
+            "An RPM is built for a different processor family than the base image.",
+            "Use the RPMs for the base image's architecture.",
+        ),
+        (
+            "RELEASE_MISMATCH",
+            r"does not match IOS XR|built for IOS XR|more than one IOS XR release|release could not be detected",
+            True,
+            "A package belongs to a different IOS XR release than the base image.",
+            "Use SMUs for the base image's release, or a base image for the SMUs' release.",
+        ),
+        (
+            "PLATFORM_AMBIGUOUS",
+            r"platform could not be detected|Select the platform family|Unsupported platform family",
+            True,
+            "The platform family could not be determined.",
+            "Select the platform in Expert settings > Image identity.",
+        ),
+        (
+            "PLATFORM_MISMATCH",
+            r": platform .* does not match",
+            True,
+            "A package is for a different platform than the base image.",
+            "Remove packages for other platforms.",
+        ),
+        (
+            "ISO_METADATA_ERROR",
+            r"not an ISO 9660 image",
+            True,
+            "The base image file is not an ISO image.",
+            "Upload the Cisco base ISO itself, not an archive or a renamed file.",
+        ),
+        (
+            "INPUT_MISSING",
+            r"Select one ISO that exists|was not found|must be an inventory ID|Input does not exist",
+            True,
+            "A selected input is not in the workspace.",
+            "Check files again and reselect the base ISO and packages.",
+        ),
+        (
+            "OPTION_UNSUPPORTED",
+            r"is not supported on|not supported by the|is supported only for|Automatic USB output is not supported",
+            True,
+            "A build option does not apply to this platform.",
+            "Turn the option off in Expert settings.",
+        ),
+        (
+            "STORAGE_ERROR",
+            r"Not enough free (disk )?space",
+            True,
+            "There is not enough free disk space for this build.",
+            "Free space (clear the workspace or old archives) or enlarge the named volume.",
+        ),
+        (
+            "ENVIRONMENT_ERROR",
+            r"gisobuild is not available|bundled gisobuild files|job store cannot be used|Docker CLI|interpreter for gisobuild|SYS_CHROOT|already running|Wait for|could not be pulled",
+            True,
+            "The build service is not ready to run this build right now.",
+            "Wait for the running activity to finish, or fix the service setup named in the message.",
+        ),
     )
 )
 
@@ -484,13 +630,25 @@ def classify_error(message: str) -> dict:
     """Structured form of one blocker or failure message (see ERROR_TAXONOMY)."""
     for code, pattern, recoverable, human, action in ERROR_TAXONOMY:
         if pattern.search(message):
-            return {"code": code, "human_message": human, "technical_message": message,
-                    "recoverable": recoverable, "suggested_action": action}
-    return {"code": "BUILD_PLAN_BLOCKED", "human_message": message, "technical_message": message,
-            "recoverable": True, "suggested_action": "Resolve the problem described, then check again."}
+            return {
+                "code": code,
+                "human_message": human,
+                "technical_message": message,
+                "recoverable": recoverable,
+                "suggested_action": action,
+            }
+    return {
+        "code": "BUILD_PLAN_BLOCKED",
+        "human_message": message,
+        "technical_message": message,
+        "recoverable": True,
+        "suggested_action": "Resolve the problem described, then check again.",
+    }
 
 
-CISCO_AUTH_PATTERN = re.compile(r"credential|authori[sz]ation|authenticat|access token", re.IGNORECASE)
+CISCO_AUTH_PATTERN = re.compile(
+    r"credential|authori[sz]ation|authenticat|access token", re.IGNORECASE
+)
 
 
 def classify_api_error(endpoint: str, message: str) -> dict:
@@ -502,25 +660,40 @@ def classify_api_error(endpoint: str, message: str) -> dict:
     detail = classify_error(message)
     if endpoint.startswith("cisco_"):
         if CISCO_AUTH_PATTERN.search(message):
-            return {**detail, "code": "CISCO_AUTH_ERROR",
-                    "human_message": "Cisco did not accept this service's API credentials.",
-                    "suggested_action": "Check the Cisco API client ID and secret configured for "
-                                        "this service, and that the account may download this software."}
-        return detail if detail["code"] != "BUILD_PLAN_BLOCKED" else {
-            **detail, "code": "CISCO_DOWNLOAD_ERROR",
-            "human_message": "The Cisco search or download could not be completed.",
-            "suggested_action": "Check the product ID and releases, then try again."}
+            return {
+                **detail,
+                "code": "CISCO_AUTH_ERROR",
+                "human_message": "Cisco did not accept this service's API credentials.",
+                "suggested_action": "Check the Cisco API client ID and secret configured for "
+                "this service, and that the account may download this software.",
+            }
+        return (
+            detail
+            if detail["code"] != "BUILD_PLAN_BLOCKED"
+            else {
+                **detail,
+                "code": "CISCO_DOWNLOAD_ERROR",
+                "human_message": "The Cisco search or download could not be completed.",
+                "suggested_action": "Check the product ID and releases, then try again.",
+            }
+        )
     if detail["code"] == "STORAGE_ERROR":
         return detail
     if endpoint.startswith("upload") or endpoint == "delete_upload":
-        return {**detail, "code": "UPLOAD_ERROR",
-                "human_message": "The file could not be uploaded or stored.",
-                "suggested_action": "Check the file type and size and upload it again; "
-                                    "wait for any running build or download to finish first."}
+        return {
+            **detail,
+            "code": "UPLOAD_ERROR",
+            "human_message": "The file could not be uploaded or stored.",
+            "suggested_action": "Check the file type and size and upload it again; "
+            "wait for any running build or download to finish first.",
+        }
     if endpoint.startswith("archive"):
-        return {**detail, "code": "ARCHIVE_ERROR",
-                "human_message": "The archived image could not be served or changed.",
-                "suggested_action": "Refresh the archive list; the item may have expired or been removed."}
+        return {
+            **detail,
+            "code": "ARCHIVE_ERROR",
+            "human_message": "The archived image could not be served or changed.",
+            "suggested_action": "Refresh the archive list; the item may have expired or been removed.",
+        }
     return detail
 
 
@@ -532,27 +705,34 @@ def classify_job_failure(job: dict) -> dict | None:
     missing = parse_missing_dependencies(log)
     if missing:
         first = missing[0]
-        return classify_error(f"{first['requirement']} is needed by {first['required_by']}")
+        return classify_error(
+            f"{first['requirement']} is needed by {first['required_by']}"
+        )
     for line in reversed(log.splitlines()):
         if line.startswith("ERROR: "):
-            detail = classify_error(line[len("ERROR: "):])
+            detail = classify_error(line[len("ERROR: ") :])
             if detail["code"] != "BUILD_PLAN_BLOCKED":
                 return detail
             break
     if job.get("exit_code") == 0:
-        return {"code": "OUTPUT_VALIDATION_ERROR",
-                "human_message": "gisobuild finished without producing a Golden ISO.",
-                "technical_message": "Exit status 0 but no .iso in the output directory",
-                "recoverable": True,
-                "suggested_action": "Open the technical details: gisobuild usually says why it had "
-                                    "nothing to build (for example no usable RPMs)."}
-    code = job.get("exit_code")
-    return {"code": "GISOBUILD_ERROR",
-            "human_message": "gisobuild reported an error and did not finish the image.",
-            "technical_message": f"gisobuild exited with status {code}" if code is not None
-            else job.get("error") or "The build stopped before gisobuild completed",
+        return {
+            "code": "OUTPUT_VALIDATION_ERROR",
+            "human_message": "gisobuild finished without producing a Golden ISO.",
+            "technical_message": "Exit status 0 but no .iso in the output directory",
             "recoverable": True,
-            "suggested_action": "Open the technical details and fix the first error gisobuild reports."}
+            "suggested_action": "Open the technical details: gisobuild usually says why it had "
+            "nothing to build (for example no usable RPMs).",
+        }
+    code = job.get("exit_code")
+    return {
+        "code": "GISOBUILD_ERROR",
+        "human_message": "gisobuild reported an error and did not finish the image.",
+        "technical_message": f"gisobuild exited with status {code}"
+        if code is not None
+        else job.get("error") or "The build stopped before gisobuild completed",
+        "recoverable": True,
+        "suggested_action": "Open the technical details and fix the first error gisobuild reports.",
+    }
 
 
 def public_job(job: dict, *, include_log: bool = True) -> dict:
@@ -568,8 +748,10 @@ def apply_schema_migrations(database: sqlite3.Connection) -> str | None:
     """Bring the job store to SCHEMA_VERSION; return a problem instead if it is newer."""
     current = database.execute("PRAGMA user_version").fetchone()[0]
     if current > SCHEMA_VERSION:
-        return (f"the job store has schema version {current}, newer than this release's "
-                f"{SCHEMA_VERSION}")
+        return (
+            f"the job store has schema version {current}, newer than this release's "
+            f"{SCHEMA_VERSION}"
+        )
     for version, statements in SCHEMA_MIGRATIONS:
         if version <= current:
             continue
@@ -587,7 +769,13 @@ def save_upload_session(upload_id: str, item: dict) -> None:
         database.execute(
             "INSERT INTO upload_sessions (id, name, size, temp, updated) VALUES (?, ?, ?, ?, ?) "
             "ON CONFLICT(id) DO UPDATE SET updated = excluded.updated",
-            (upload_id, item["name"], int(item["size"]), item["temp"], float(item["updated"])),
+            (
+                upload_id,
+                item["name"],
+                int(item["size"]),
+                item["temp"],
+                float(item["updated"]),
+            ),
         )
 
 
@@ -609,7 +797,9 @@ def restore_upload_sessions() -> int:
     if store_schema_problem or not JOB_DB.exists():
         return 0
     with store_lock, sqlite3.connect(JOB_DB) as database:
-        rows = database.execute("SELECT id, name, size, temp, updated FROM upload_sessions").fetchall()
+        rows = database.execute(
+            "SELECT id, name, size, temp, updated FROM upload_sessions"
+        ).fetchall()
     restored, gone = 0, []
     parts = (DATA / ".parts").resolve()
     for upload_id, name, size, temp, updated in rows:
@@ -623,10 +813,18 @@ def restore_upload_sessions() -> int:
             gone.append(upload_id)
             continue
         with upload_lock:
-            uploads.setdefault(upload_id, {"id": upload_id, "name": name, "size": int(size),
-                                           "received": received,
-                                           "temp": temp, "updated": float(updated),
-                                           "restored": True})
+            uploads.setdefault(
+                upload_id,
+                {
+                    "id": upload_id,
+                    "name": name,
+                    "size": int(size),
+                    "received": received,
+                    "temp": temp,
+                    "updated": float(updated),
+                    "restored": True,
+                },
+            )
         restored += 1
     for upload_id in gone:
         forget_upload_session(upload_id)
@@ -636,8 +834,10 @@ def restore_upload_sessions() -> int:
 def uploads_in_progress() -> bool:
     """Whether an upload is actively receiving data. Caller holds upload_lock."""
     cutoff = time.time() - UPLOAD_ACTIVE_SECONDS
-    return any(item.get("completing") or item.get("updated", 0) >= cutoff
-               for item in uploads.values())
+    return any(
+        item.get("completing") or item.get("updated", 0) >= cutoff
+        for item in uploads.values()
+    )
 
 
 def report_interrupted_transfers() -> None:
@@ -651,12 +851,19 @@ def report_interrupted_transfers() -> None:
     """
     resumable = restore_upload_sessions()
     with upload_lock:
-        tracked = {Path(item["temp"]).name for item in uploads.values() if item.get("temp")}
-    uploads_cut = (len([p for p in (DATA / ".parts").glob("*.part") if p.name not in tracked])
-                   if (DATA / ".parts").is_dir() else 0)
+        tracked = {
+            Path(item["temp"]).name for item in uploads.values() if item.get("temp")
+        }
+    uploads_cut = (
+        len([p for p in (DATA / ".parts").glob("*.part") if p.name not in tracked])
+        if (DATA / ".parts").is_dir()
+        else 0
+    )
     if resumable:
-        append_activity(f"{resumable} upload(s) were interrupted by a service restart and can be "
-                        "resumed: select the same file again.")
+        append_activity(
+            f"{resumable} upload(s) were interrupted by a service restart and can be "
+            "resumed: select the same file again."
+        )
     cisco_cut = 0
     if DATA.is_dir():
         for partial in DATA.glob(".*.part"):
@@ -666,14 +873,22 @@ def report_interrupted_transfers() -> None:
             except OSError:
                 pass
     if uploads_cut:
-        append_activity(f"{uploads_cut} upload(s) were interrupted by a service restart; "
-                        "upload those files again.")
+        append_activity(
+            f"{uploads_cut} upload(s) were interrupted by a service restart; "
+            "upload those files again."
+        )
     if cisco_cut:
-        append_activity(f"{cisco_cut} Cisco download(s) were interrupted by a service restart; "
-                        "start the download again.")
+        append_activity(
+            f"{cisco_cut} Cisco download(s) were interrupted by a service restart; "
+            "start the download again."
+        )
     if uploads_cut or cisco_cut or resumable:
-        log_event("interrupted_transfers_found", uploads=uploads_cut, cisco_downloads=cisco_cut,
-                  resumable_uploads=resumable)
+        log_event(
+            "interrupted_transfers_found",
+            uploads=uploads_cut,
+            cisco_downloads=cisco_cut,
+            resumable_uploads=resumable,
+        )
 
 
 def initialize_job_store() -> None:
@@ -698,7 +913,8 @@ def _initialize_job_store() -> bool:
                 store_initialized = True
                 return True
             rows = database.execute(
-                "SELECT id, data FROM jobs ORDER BY updated DESC LIMIT ?", (MAX_JOB_HISTORY,)
+                "SELECT id, data FROM jobs ORDER BY updated DESC LIMIT ?",
+                (MAX_JOB_HISTORY,),
             )
             for job_id, raw_data in rows:
                 try:
@@ -709,7 +925,9 @@ def _initialize_job_store() -> bool:
                     continue
                 restored["id"] = job_id
                 raw_log = restored.get("log", "")
-                redacted_log = safe_log_text(raw_log) if isinstance(raw_log, str) else ""
+                redacted_log = (
+                    safe_log_text(raw_log) if isinstance(raw_log, str) else ""
+                )
                 log_was_redacted = redacted_log != raw_log
                 restored["log"] = redacted_log
                 if restored.get("status") in ACTIVE_JOB_STATUSES:
@@ -770,7 +988,11 @@ def persist_job(job_id: str, *, min_interval: float = 0.0) -> None:
         )
     with job_lock:
         removable = sorted(
-            (job for job in jobs.values() if job.get("status") not in ACTIVE_JOB_STATUSES),
+            (
+                job
+                for job in jobs.values()
+                if job.get("status") not in ACTIVE_JOB_STATUSES
+            ),
             key=lambda item: item.get("updated", 0),
         )
         while len(jobs) > MAX_JOB_HISTORY and removable:
@@ -780,24 +1002,35 @@ def persist_job(job_id: str, *, min_interval: float = 0.0) -> None:
                 jobs.pop(removed_id, None)
                 job_persisted_at.pop(removed_id, None)
 
+
 LIST_OPTIONS = {
-    "repo": "--repo", "bridging_fixes": "--bridging-fixes",
-    "pkglist": "--pkglist", "remove_packages": "--remove-packages",
+    "repo": "--repo",
+    "bridging_fixes": "--bridging-fixes",
+    "pkglist": "--pkglist",
+    "remove_packages": "--remove-packages",
     "only_support_pids": "--only-support-pids",
 }
 PATH_OPTIONS = {
-    "iso": "--iso", "xrconfig": "--xrconfig", "ztp_ini": "--ztp-ini",
-    "script": "--script", "key_request": "--key-request",
-    "yamlfile": "--yamlfile", "ownership_vouchers": "--ownership-vouchers",
+    "iso": "--iso",
+    "xrconfig": "--xrconfig",
+    "ztp_ini": "--ztp-ini",
+    "script": "--script",
+    "key_request": "--key-request",
+    "yamlfile": "--yamlfile",
+    "ownership_vouchers": "--ownership-vouchers",
     "ownership_certificate": "--ownership-certificate",
 }
 BOOL_OPTIONS = {
-    "no_label": "--no-label", "create_checksum": "--create-checksum",
-    "x86_only": "--x86-only", "migration": "--migration",
-    "optimize": "--optimize", "full_iso": "--full-iso",
+    "no_label": "--no-label",
+    "create_checksum": "--create-checksum",
+    "x86_only": "--x86-only",
+    "migration": "--migration",
+    "optimize": "--optimize",
+    "full_iso": "--full-iso",
     "skip_usb_image": "--skip-usb-image",
     "clear_bridging_fixes": "--clear-bridging-fixes",
-    "verbose_dep_check": "--verbose-dep-check", "debug": "--debug",
+    "verbose_dep_check": "--verbose-dep-check",
+    "debug": "--debug",
     "clear_key_request": "--clear-key-request",
     "clear_ownership_vouchers": "--clear-ownership-vouchers",
     "clear_ownership_certificate": "--clear-ownership-certificate",
@@ -832,8 +1065,13 @@ def validate_build_payload(body: dict) -> dict:
             raise ValueError(f"{key} is too long")
     for key in LIST_OPTIONS:
         values = payload.get(key, [])
-        if (not isinstance(values, list) or len(values) > 10000
-                or not all(isinstance(value, str) and len(value) <= 4096 for value in values)):
+        if (
+            not isinstance(values, list)
+            or len(values) > 10000
+            or not all(
+                isinstance(value, str) and len(value) <= 4096 for value in values
+            )
+        ):
             raise ValueError(f"{key} must be a list of strings")
     for key in set(BOOL_OPTIONS) | {"auto_repo", "automatic_smu_selection"}:
         if key in payload and not isinstance(payload[key], bool):
@@ -869,7 +1107,8 @@ def persisted_checksums(key: tuple[str, int, int]) -> dict[str, str] | None:
         with store_lock, sqlite3.connect(JOB_DB) as database:
             row = database.execute(
                 "SELECT md5, sha256 FROM file_checksums WHERE path = ? AND size = ? AND mtime_ns = ?",
-                key).fetchone()
+                key,
+            ).fetchone()
     except sqlite3.Error:
         return None
     return {"md5": row[0], "sha256": row[1]} if row else None
@@ -885,11 +1124,13 @@ def persist_checksums(key: tuple[str, int, int], result: dict[str, str]) -> None
                 "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(path) DO UPDATE SET size = excluded.size, "
                 "mtime_ns = excluded.mtime_ns, md5 = excluded.md5, sha256 = excluded.sha256, "
                 "recorded = excluded.recorded",
-                (*key, result["md5"], result["sha256"], time.time()))
+                (*key, result["md5"], result["sha256"], time.time()),
+            )
             database.execute(
                 "DELETE FROM file_checksums WHERE path NOT IN "
                 "(SELECT path FROM file_checksums ORDER BY recorded DESC LIMIT ?)",
-                (PERSISTED_CHECKSUM_ROWS,))
+                (PERSISTED_CHECKSUM_ROWS,),
+            )
     except sqlite3.Error:
         pass
 
@@ -900,8 +1141,11 @@ def file_checksums(path: Path) -> dict[str, str]:
         key = (str(path), stat.st_size, stat.st_mtime_ns)
         if key in checksum_cache:
             return checksum_cache[key]
-        persisted = (persisted_checksums(key)
-                     if stat.st_size >= PERSISTED_CHECKSUM_MIN_BYTES else None)
+        persisted = (
+            persisted_checksums(key)
+            if stat.st_size >= PERSISTED_CHECKSUM_MIN_BYTES
+            else None
+        )
         if persisted:
             checksum_cache[key] = persisted
             return persisted
@@ -952,7 +1196,8 @@ def iso_architectures_from_mdata(text: str) -> frozenset[str]:
 # NCS5500 25.1.2 image - see 07-BUG-AUDIT-TODO.md, "The base ISO already tells
 # us which packages/versions it ships".
 ISO_MDATA_SHIPPED_RPMS = re.compile(
-    r"^\s*rpms in \S+ ISO:\s*(?P<value>\S.*(?:\n\s{2,}\S.*)*)$", re.IGNORECASE | re.MULTILINE
+    r"^\s*rpms in \S+ ISO:\s*(?P<value>\S.*(?:\n\s{2,}\S.*)*)$",
+    re.IGNORECASE | re.MULTILINE,
 )
 SHIPPED_RPM_TOKEN = re.compile(
     r"^(?P<name>[A-Za-z][\w.+-]*?)-(?P<version>\d[\w.]*)-r(?P<release>\d{3,6})(?P<suffix>\.\w+)?$"
@@ -1005,7 +1250,9 @@ _EXR_GROUP_CONFIG = re.compile(r"^[^,]*,(?P<config>.+)$")
 
 
 def exr_package_type_and_vm_type(group: str) -> tuple[str | None, str | None]:
-    if not group or ("SUPPCARDS" not in group.upper() and "XRRELEASE" not in group.upper()):
+    if not group or (
+        "SUPPCARDS" not in group.upper() and "XRRELEASE" not in group.upper()
+    ):
         return None, None
     match = _EXR_GROUP_CONFIG.match(group)
     if not match:
@@ -1047,7 +1294,10 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict:
     try:
         completed = subprocess.run(
             [RPM_BIN, "-qp", "--nosignature", "--qf", RPM_QUERY_FORMAT, str(rpm_path)],
-            capture_output=True, text=True, timeout=RPM_QUERY_TIMEOUT_SECONDS, check=False,
+            capture_output=True,
+            text=True,
+            timeout=RPM_QUERY_TIMEOUT_SECONDS,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return empty
@@ -1066,17 +1316,24 @@ def rpm_dependency_metadata(rpm_path: Path) -> dict:
         elif tag == "SIGN":
             # e.g. "RSA/SHA256, Wed Jul  2 22:15:22 2025, Key ID 7476b0605746bd08";
             # "(none)" when unsigned. Read only - verification is gisobuild's.
-            signed = re.match(r"^(?P<algorithm>[A-Z0-9]+/[A-Z0-9]+),.*Key ID (?P<key>[0-9a-f]+)$", body.strip())
+            signed = re.match(
+                r"^(?P<algorithm>[A-Z0-9]+/[A-Z0-9]+),.*Key ID (?P<key>[0-9a-f]+)$",
+                body.strip(),
+            )
             if signed:
-                result["signature"] = {"algorithm": signed.group("algorithm"),
-                                       "key_id": signed.group("key")}
+                result["signature"] = {
+                    "algorithm": signed.group("algorithm"),
+                    "key_id": signed.group("key"),
+                }
         elif tag in {"REQ", "PRV"} and len(fields) == 3:
             name, operator, version = (field.strip() for field in fields)
             # Only "=" constraints: a bare name, ">=" or "<" cannot be proven
             # unsatisfiable from the facts available here. Epoch-qualified
             # versions are skipped rather than compared imprecisely.
             if operator == "=" and version and ":" not in version:
-                result["requires" if tag == "REQ" else "provides"].append((name, version))
+                result["requires" if tag == "REQ" else "provides"].append(
+                    (name, version)
+                )
     with checksum_lock:
         if len(rpm_metadata_cache) >= 4096:
             rpm_metadata_cache.pop(next(iter(rpm_metadata_cache)))
@@ -1100,8 +1357,10 @@ def rpm_filename_mismatch(rpm_path: Path) -> str | None:
     identity = rpm_dependency_metadata(rpm_path).get("identity")
     if not identity:
         return None
-    canonical = (f"{identity['name']}-{identity['version']}-"
-                 f"{identity['release']}.{identity['arch']}.rpm")
+    canonical = (
+        f"{identity['name']}-{identity['version']}-"
+        f"{identity['release']}.{identity['arch']}.rpm"
+    )
     return None if canonical == rpm_path.name else canonical
 
 
@@ -1174,14 +1433,19 @@ def missing_package_dependencies(
     for name, version, required_by in requirements:
         if name not in iso_shipped:
             continue
-        if any(_version_satisfies(candidate, version)
-               for candidate in provided.get(name, set())):
+        if any(
+            _version_satisfies(candidate, version)
+            for candidate in provided.get(name, set())
+        ):
             continue
-        entry = missing.setdefault((name, version), {
-            "requirement": f"{name} = {version}",
-            "required_by": [],
-            "base_image_has": iso_shipped[name],
-        })
+        entry = missing.setdefault(
+            (name, version),
+            {
+                "requirement": f"{name} = {version}",
+                "required_by": [],
+                "base_image_has": iso_shipped[name],
+            },
+        )
         # Every package that needs it, not just the first one found: the
         # operator has to decide what to remove or fetch, and "three of your
         # SMUs need this" is a different decision from "one does".
@@ -1232,14 +1496,22 @@ def inspect_iso_architecture(iso_path: Path) -> frozenset[str]:
     try:
         mdata = subprocess.run(
             [ISOINFO_BIN, "-R", "-i", str(iso_path), "-x", "/iosxr_image_mdata.yml"],
-            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS, check=False,
+            capture_output=True,
+            text=True,
+            timeout=ISO_MDATA_TIMEOUT_SECONDS,
+            check=False,
         )
         if mdata.returncode == 0 and mdata.stdout.strip():
-            architectures = iso_architectures_from_mdata(mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES])
+            architectures = iso_architectures_from_mdata(
+                mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES]
+            )
         if not architectures:
             listing = subprocess.run(
                 [ISOINFO_BIN, "-R", "-l", "-i", str(iso_path)],
-                capture_output=True, text=True, timeout=ISO_LISTING_TIMEOUT_SECONDS, check=False,
+                capture_output=True,
+                text=True,
+                timeout=ISO_LISTING_TIMEOUT_SECONDS,
+                check=False,
             )
             if listing.returncode == 0:
                 architectures = iso_architectures_from_listing(
@@ -1271,7 +1543,10 @@ def read_iso_mdata(iso_path: Path) -> str:
     try:
         mdata = subprocess.run(
             [ISOINFO_BIN, "-R", "-i", str(iso_path), "-x", "/iosxr_image_mdata.yml"],
-            capture_output=True, text=True, timeout=ISO_MDATA_TIMEOUT_SECONDS, check=False,
+            capture_output=True,
+            text=True,
+            timeout=ISO_MDATA_TIMEOUT_SECONDS,
+            check=False,
         )
         if mdata.returncode == 0 and mdata.stdout.strip():
             text = mdata.stdout[:MAX_ISO_INSPECTION_OUTPUT_BYTES]
@@ -1308,7 +1583,7 @@ def iso_identity_from_mdata(text: str) -> str | None:
     for index, line in enumerate(lines):
         if line.rstrip() != "iso_mdata:":
             continue
-        for following in lines[index + 1:]:
+        for following in lines[index + 1 :]:
             if not following.startswith((" ", "\t")):
                 return None
             match = ISO_MDATA_IDENTITY_NAME.match(following)
@@ -1354,9 +1629,12 @@ EXCLUSION_SOURCES = {
 CSC_IN_FILENAME = re.compile(r"\.(CSC[A-Za-z0-9]+)\.", re.IGNORECASE)
 
 
-def exclude_unsatisfiable_packages(recommendation: dict, iso_relative_path: str | None,
-                                   identity_name: str,
-                                   iso_architectures: frozenset[str] | None) -> dict:
+def exclude_unsatisfiable_packages(
+    recommendation: dict,
+    iso_relative_path: str | None,
+    identity_name: str,
+    iso_architectures: frozenset[str] | None,
+) -> dict:
     """Leave out of an automatic selection what is proven unable to install.
 
     Automatic selection used to keep an RPM whose exact-version requirement
@@ -1374,43 +1652,75 @@ def exclude_unsatisfiable_packages(recommendation: dict, iso_relative_path: str 
     reasons: dict[str, str] = {}
     left_out: list[dict] = []
     for _ in range(len(selected) + 1):
-        unsatisfied = unsatisfied_dependencies_for_recommendation(iso_relative_path, selected)
+        unsatisfied = unsatisfied_dependencies_for_recommendation(
+            iso_relative_path, selected
+        )
         if not unsatisfied:
             break
         drop: dict[str, str] = {}
         for entry in unsatisfied:
             left_out.append(entry)
-            advice = (f"; download Cisco SMU {entry['prerequisite_smu']}"
-                      if entry.get("prerequisite_smu") else "")
-            reason = (f"Needs {entry['requirement']}, which neither the base image "
-                      f"({entry['base_image_has']}) nor any other selected package provides{advice}")
+            advice = (
+                f"; download Cisco SMU {entry['prerequisite_smu']}"
+                if entry.get("prerequisite_smu")
+                else ""
+            )
+            reason = (
+                f"Needs {entry['requirement']}, which neither the base image "
+                f"({entry['base_image_has']}) nor any other selected package provides{advice}"
+            )
             for name in entry["required_by"]:
                 drop.setdefault(name, reason)
-        fixes = {match.group(1).upper() for name in drop if (match := CSC_IN_FILENAME.search(name))}
+        fixes = {
+            match.group(1).upper()
+            for name in drop
+            if (match := CSC_IN_FILENAME.search(name))
+        }
         for name in selected:
             match = CSC_IN_FILENAME.search(name)
             if name not in drop and match and match.group(1).upper() in fixes:
-                drop[name] = (f"Part of {match.group(1).upper()}, left out because another RPM of "
-                              "the same fix cannot be installed")
+                drop[name] = (
+                    f"Part of {match.group(1).upper()}, left out because another RPM of "
+                    "the same fix cannot be installed"
+                )
         reasons.update(drop)
         selected = [name for name in selected if name not in drop]
     if not reasons:
         return recommendation
-    analysis = validate_smu_selection(identity_name, selected, iso_architectures=iso_architectures)
-    downloads = sorted({entry["prerequisite_smu"] for entry in left_out if entry.get("prerequisite_smu")})
+    analysis = validate_smu_selection(
+        identity_name, selected, iso_architectures=iso_architectures
+    )
+    downloads = sorted(
+        {
+            entry["prerequisite_smu"]
+            for entry in left_out
+            if entry.get("prerequisite_smu")
+        }
+    )
     recommendation.update(
         selected=selected,
         package_groups=analysis["package_groups"],
         component_conflicts=analysis["component_conflicts"],
         warnings=analysis["warnings"],
         blockers=analysis["issues"],
-        excluded=sorted(recommendation.get("excluded", [])
-                        + [{"name": name, "reason": reason} for name, reason in sorted(reasons.items())],
-                        key=lambda item: item["name"]),
+        excluded=sorted(
+            recommendation.get("excluded", [])
+            + [
+                {"name": name, "reason": reason}
+                for name, reason in sorted(reasons.items())
+            ],
+            key=lambda item: item["name"],
+        ),
         left_out_for_dependencies=left_out,
-        message=(f"Selected {len(selected)} RPMs that can be installed; {len(reasons)} left out because "
-                 "their dependencies cannot be satisfied"
-                 + (f" (download {', '.join(downloads)} to include them)" if downloads else "")),
+        message=(
+            f"Selected {len(selected)} RPMs that can be installed; {len(reasons)} left out because "
+            "their dependencies cannot be satisfied"
+            + (
+                f" (download {', '.join(downloads)} to include them)"
+                if downloads
+                else ""
+            )
+        ),
     )
     return recommendation
 
@@ -1431,7 +1741,9 @@ def dependency_blocker_text(entry: dict) -> str:
     )
 
 
-def unsatisfied_dependencies_for_recommendation(iso_relative_path: str, selected_names: list[str]) -> list[dict]:
+def unsatisfied_dependencies_for_recommendation(
+    iso_relative_path: str, selected_names: list[str]
+) -> list[dict]:
     """Run the pre-build dependency check for a Step 2 preview selection.
 
     create_build_plan() has resolved inventory records to work with; the live
@@ -1449,7 +1761,9 @@ def unsatisfied_dependencies_for_recommendation(iso_relative_path: str, selected
         shipped = inspect_iso_shipped_packages(iso_path)
     except (OSError, ValueError):
         return []
-    by_name = {item["basename"]: item for item in inventory_files() if item["type"] == ".rpm"}
+    by_name = {
+        item["basename"]: item for item in inventory_files() if item["type"] == ".rpm"
+    }
     selected = [by_name[name] for name in selected_names if name in by_name]
     return missing_package_dependencies(selected, shipped)
 
@@ -1488,8 +1802,13 @@ def file_metadata_provenance(path: Path) -> tuple[str, str, str | None]:
     return "filename", "low", None
 
 
-def file_source(path: Path, relative_path: str, sha256: str, source_archive: Path | None,
-                provenance: dict[str, tuple[str, str]]) -> str:
+def file_source(
+    path: Path,
+    relative_path: str,
+    sha256: str,
+    source_archive: Path | None,
+    provenance: dict[str, tuple[str, str]],
+) -> str:
     """upload, tar, or cisco-download - recorded provenance wins only while the content matches."""
     recorded = provenance.get(relative_path)
     if recorded and recorded[0] == sha256:
@@ -1521,7 +1840,9 @@ def recorded_provenance() -> dict[str, tuple[str, str]]:
         return {}
     try:
         with store_lock, sqlite3.connect(JOB_DB) as database:
-            rows = database.execute("SELECT relative_path, sha256, source FROM file_provenance").fetchall()
+            rows = database.execute(
+                "SELECT relative_path, sha256, source FROM file_provenance"
+            ).fetchall()
     except sqlite3.Error:
         return {}
     return {path: (sha256, source) for path, sha256, source in rows}
@@ -1529,13 +1850,26 @@ def recorded_provenance() -> dict[str, tuple[str, str]]:
 
 def inventory_files() -> list[dict]:
     """Build the canonical, browser-safe inventory for supported input files."""
-    supported = {".iso", ".rpm", *ARCHIVE_SUFFIXES, ".yaml", ".yml", ".cfg",
-                 ".ini", ".sh", ".cms", ".json"}
+    supported = {
+        ".iso",
+        ".rpm",
+        *ARCHIVE_SUFFIXES,
+        ".yaml",
+        ".yml",
+        ".cfg",
+        ".ini",
+        ".sh",
+        ".cms",
+        ".json",
+    }
     physical: list[dict] = []
     provenance = recorded_provenance()
     for root, names, filenames in os.walk(DATA):
-        names[:] = [name for name in names
-                    if name != ".parts" and not name.startswith("output_gisobuild")]
+        names[:] = [
+            name
+            for name in names
+            if name != ".parts" and not name.startswith("output_gisobuild")
+        ]
         root_path = Path(root)
         for name in filenames:
             path = root_path / name
@@ -1549,26 +1883,39 @@ def inventory_files() -> list[dict]:
             except OSError:
                 continue
             extraction_dir = top_level_extraction_dir(path)
-            source_archive = archive_source_for_extraction(extraction_dir) if extraction_dir else None
-            metadata_source, metadata_confidence, metadata_name = file_metadata_provenance(path)
-            signature = (rpm_dependency_metadata(path).get("signature")
-                         if suffix == ".rpm" and metadata_source == "rpm-header" else None)
-            physical.append({
-                "id": inventory_id(relative_path, sha256),
-                "basename": name,
-                "path": relative_path,
-                "relative_path": relative_path,
-                "size": stat.st_size,
-                "sha256": sha256,
-                "source": file_source(path, relative_path, sha256, source_archive, provenance),
-                "extracted_from": source_archive.name if source_archive else None,
-                "metadata_source": metadata_source,
-                "metadata_confidence": metadata_confidence,
-                "metadata_name": metadata_name,
-                "signature": signature,
-                "lifecycle": "READY",
-                "type": suffix,
-            })
+            source_archive = (
+                archive_source_for_extraction(extraction_dir)
+                if extraction_dir
+                else None
+            )
+            metadata_source, metadata_confidence, metadata_name = (
+                file_metadata_provenance(path)
+            )
+            signature = (
+                rpm_dependency_metadata(path).get("signature")
+                if suffix == ".rpm" and metadata_source == "rpm-header"
+                else None
+            )
+            physical.append(
+                {
+                    "id": inventory_id(relative_path, sha256),
+                    "basename": name,
+                    "path": relative_path,
+                    "relative_path": relative_path,
+                    "size": stat.st_size,
+                    "sha256": sha256,
+                    "source": file_source(
+                        path, relative_path, sha256, source_archive, provenance
+                    ),
+                    "extracted_from": source_archive.name if source_archive else None,
+                    "metadata_source": metadata_source,
+                    "metadata_confidence": metadata_confidence,
+                    "metadata_name": metadata_name,
+                    "signature": signature,
+                    "lifecycle": "READY",
+                    "type": suffix,
+                }
+            )
 
     by_basename: dict[str, list[dict]] = {}
     for item in physical:
@@ -1579,7 +1926,11 @@ def inventory_files() -> list[dict]:
         for item in group:
             item["duplicate"] = len(group) > 1
             item["duplicate_kind"] = (
-                "conflict" if len(hashes) > 1 else "identical" if len(group) > 1 else None
+                "conflict"
+                if len(hashes) > 1
+                else "identical"
+                if len(group) > 1
+                else None
             )
             item["provenance"] = paths
     assign_lifecycle(physical)
@@ -1597,7 +1948,9 @@ def assign_lifecycle(items: list[dict]) -> None:
     which have no such checks. Superseded RPMs stay VALID: they are skipped by
     selection, not broken.
     """
-    manifest_problems = _screened_rpms()[2] if any(i["type"] == ".rpm" for i in items) else {}
+    manifest_problems = (
+        _screened_rpms()[2] if any(i["type"] == ".rpm" for i in items) else {}
+    )
     with job_lock:
         in_use: set[str] = set()
         for job in jobs.values():
@@ -1605,10 +1958,14 @@ def assign_lifecycle(items: list[dict]) -> None:
                 plan = job.get("build_plan") or {}
                 if plan.get("iso"):
                     in_use.add(plan["iso"].get("id"))
-                in_use.update(package.get("id") for package in plan.get("selected_packages", []))
+                in_use.update(
+                    package.get("id") for package in plan.get("selected_packages", [])
+                )
     for item in items:
         problems = []
-        if item["type"] == ".iso" and not is_iso9660_image(DATA / item["relative_path"]):
+        if item["type"] == ".iso" and not is_iso9660_image(
+            DATA / item["relative_path"]
+        ):
             problems.append("Not an ISO 9660 image")
         if item["type"] == ".rpm":
             if item.get("metadata_confidence") == "mismatch":
@@ -1641,7 +1998,9 @@ def resolve_rpm_identifiers(identifiers: list[str]) -> list[dict]:
             resolved.append(by_id[identifier])
             continue
         if Path(identifier).name != identifier or glob_metacharacters(identifier):
-            raise ValueError(f"RPM package must be an inventory ID or exact filename: {identifier!r}")
+            raise ValueError(
+                f"RPM package must be an inventory ID or exact filename: {identifier!r}"
+            )
         matches = by_name.get(identifier, [])
         if not matches:
             raise ValueError(f"RPM {identifier!r} was not found")
@@ -1655,14 +2014,19 @@ def resolve_rpm_identifiers(identifiers: list[str]) -> list[dict]:
         selected_by_name.setdefault(item["basename"], set()).add(item["sha256"])
     conflicts = [name for name, hashes in selected_by_name.items() if len(hashes) > 1]
     if conflicts:
-        raise ValueError("Conflicting RPM identities selected: " + ", ".join(sorted(conflicts)))
+        raise ValueError(
+            "Conflicting RPM identities selected: " + ", ".join(sorted(conflicts))
+        )
     return resolved
 
 
 def package_names_for_validation(identifiers: list[str]) -> list[str]:
     """Translate known inventory IDs while allowing filename-only preflight input."""
-    by_id = {item["id"]: item["basename"] for item in inventory_files()
-             if item["type"] == ".rpm"}
+    by_id = {
+        item["id"]: item["basename"]
+        for item in inventory_files()
+        if item["type"] == ".rpm"
+    }
     return [by_id.get(identifier, identifier) for identifier in identifiers]
 
 
@@ -1673,12 +2037,12 @@ def current_inventory_revision(items: list[dict] | None = None) -> str:
     return hashlib.sha256(json.dumps(state, sort_keys=True).encode()).hexdigest()[:24]
 
 
-FILENAME_DEPENDENCY_WARNING = (
-    "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs the authoritative dependency check"
-)
+FILENAME_DEPENDENCY_WARNING = "Filename checks cannot prove RPM dependencies; Cisco gisobuild performs the authoritative dependency check"
 
 
-def selection_evidence(iso_relative_path: str | None, selected_names: list[str]) -> dict:
+def selection_evidence(
+    iso_relative_path: str | None, selected_names: list[str]
+) -> dict:
     """What the selected RPMs' own metadata confirmed, for confidence_report().
 
     rpm_headers_verified: every selected RPM's header matched its filename, so
@@ -1688,23 +2052,36 @@ def selection_evidence(iso_relative_path: str | None, selected_names: list[str])
     list is known, so missing_package_dependencies() really ran on this set.
     """
     names = [name for name in selected_names if name.lower().endswith(".rpm")]
-    evidence = {"rpm_headers_verified": False, "csc_groups_verified": False,
-                "dependency_pre_checked": False}
+    evidence = {
+        "rpm_headers_verified": False,
+        "csc_groups_verified": False,
+        "dependency_pre_checked": False,
+    }
     if not names:
         return evidence
-    by_name = {item["basename"]: item for item in inventory_files() if item["type"] == ".rpm"}
+    by_name = {
+        item["basename"]: item for item in inventory_files() if item["type"] == ".rpm"
+    }
     evidence["rpm_headers_verified"] = all(
-        by_name.get(name, {}).get("metadata_confidence") == "high" for name in names)
+        by_name.get(name, {}).get("metadata_confidence") == "high" for name in names
+    )
     # Only RPMs that belong to a fix (carry a CSC ID) have a README; optional
     # base-image packages are not CSC groups and need none.
-    listed = {rpm for rpms in smu_readme_manifests(smu_readme_texts()).values() for rpm in rpms}
+    listed = {
+        rpm
+        for rpms in smu_readme_manifests(smu_readme_texts()).values()
+        for rpm in rpms
+    }
     fixes = [name for name in names if re.search(r"\.CSC[A-Za-z0-9]+\.", name)]
-    evidence["csc_groups_verified"] = bool(fixes) and all(name in listed for name in fixes)
+    evidence["csc_groups_verified"] = bool(fixes) and all(
+        name in listed for name in fixes
+    )
     if evidence["rpm_headers_verified"] and iso_relative_path:
         try:
             iso_path = safe_data_path(iso_relative_path)
             evidence["dependency_pre_checked"] = iso_path.is_file() and bool(
-                inspect_iso_shipped_packages(iso_path))
+                inspect_iso_shipped_packages(iso_path)
+            )
         except (OSError, ValueError):
             pass
     return evidence
@@ -1714,17 +2091,29 @@ def reword_dependency_warning(warnings: list[str], evidence: dict) -> list[str]:
     """Replace the filename-only dependency caveat once the header pre-check really ran."""
     if not evidence.get("dependency_pre_checked"):
         return warnings
-    return [("RPM dependencies were pre-checked from the packages' own headers against the base "
-             "image's package list; Cisco gisobuild still performs the complete dependency check")
-            if warning == FILENAME_DEPENDENCY_WARNING else warning for warning in warnings]
+    return [
+        (
+            "RPM dependencies were pre-checked from the packages' own headers against the base "
+            "image's package list; Cisco gisobuild still performs the complete dependency check"
+        )
+        if warning == FILENAME_DEPENDENCY_WARNING
+        else warning
+        for warning in warnings
+    ]
 
 
-def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
-                      release: str | None, iso_architectures: frozenset[str],
-                      package_groups: list, has_rpm_selection: bool,
-                      matched_pid: str | None = None,
-                      identity_from_metadata: bool = False,
-                      evidence: dict | None = None) -> dict:
+def confidence_report(
+    *,
+    resolved_platform: str | None,
+    platform_manual: bool,
+    release: str | None,
+    iso_architectures: frozenset[str],
+    package_groups: list,
+    has_rpm_selection: bool,
+    matched_pid: str | None = None,
+    identity_from_metadata: bool = False,
+    evidence: dict | None = None,
+) -> dict:
     """Report how each detected fact was derived, never presenting a guess as verified.
 
     A fact is VERIFIED only when the artifacts themselves confirmed it: ISO
@@ -1750,7 +2139,9 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     # own iosxr_image_mdata.yml (see iso_identity()), not its filename, so they
     # earn VERIFIED - unless the operator overrode the platform, in which case
     # the platform shown is theirs, not the image's.
-    platform_verified = identity_from_metadata and not platform_manual and bool(resolved_platform)
+    platform_verified = (
+        identity_from_metadata and not platform_manual and bool(resolved_platform)
+    )
     if platform_is_generic:
         platform_value = "MANUAL"
     elif platform_verified:
@@ -1758,13 +2149,19 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     else:
         platform_value = "INFERRED" if resolved_platform else "UNKNOWN"
     if platform_is_generic:
-        platform_detail = ("The operator declared a generic engine profile; the real platform "
-                           "identity is unverified and no platform-specific capabilities apply.")
+        platform_detail = (
+            "The operator declared a generic engine profile; the real platform "
+            "identity is unverified and no platform-specific capabilities apply."
+        )
     elif platform_verified:
-        platform_detail = "Read from the ISO's own embedded image metadata, not its filename."
+        platform_detail = (
+            "Read from the ISO's own embedded image metadata, not its filename."
+        )
     else:
-        platform_detail = ("Not cross-checked against ISO metadata; select it manually in Expert "
-                           "settings if the filename guess is wrong.")
+        platform_detail = (
+            "Not cross-checked against ISO metadata; select it manually in Expert "
+            "settings if the filename guess is wrong."
+        )
     if matched_pid and not platform_is_generic:
         platform_detail += f" Matched hardware PID/SKU spelling: {matched_pid.upper()}."
     release_verified = identity_from_metadata and bool(release)
@@ -1775,50 +2172,78 @@ def confidence_report(*, resolved_platform: str | None, platform_manual: bool,
     return {
         "platform": {
             "value": platform_value,
-            "source": ("operator-selected" if platform_manual
-                       else "iso-metadata" if platform_verified
-                       else "iso-filename-pattern" if resolved_platform else "none"),
+            "source": (
+                "operator-selected"
+                if platform_manual
+                else "iso-metadata"
+                if platform_verified
+                else "iso-filename-pattern"
+                if resolved_platform
+                else "none"
+            ),
             "pid": matched_pid,
             "detail": platform_detail,
         },
         "release": {
-            "value": "VERIFIED" if release_verified else "INFERRED" if release else "UNKNOWN",
+            "value": "VERIFIED"
+            if release_verified
+            else "INFERRED"
+            if release
+            else "UNKNOWN",
             "source": "iso-metadata" if release_verified else "iso-filename-pattern",
-            "detail": ("Read from the ISO's own embedded image metadata, not its filename."
-                       if release_verified else
-                       "Read from the ISO filename's release tag; not parsed from ISO metadata."),
+            "detail": (
+                "Read from the ISO's own embedded image metadata, not its filename."
+                if release_verified
+                else "Read from the ISO filename's release tag; not parsed from ISO metadata."
+            ),
         },
         "iso_architecture": {
             "value": "VERIFIED" if iso_architectures else "UNKNOWN",
             "source": "iso-contents" if iso_architectures else "none",
             "detail": "Read directly from the ISO's own metadata/RPM listing."
-                      if iso_architectures else
-                      "Could not be determined from the ISO's contents (isoinfo unavailable, "
-                      "unreadable image, or no recognizable architecture markers).",
+            if iso_architectures
+            else "Could not be determined from the ISO's contents (isoinfo unavailable, "
+            "unreadable image, or no recognizable architecture markers).",
         },
         "package_architecture": {
-            "value": "VERIFIED" if headers else "INFERRED" if has_rpm_selection else "UNKNOWN",
+            "value": "VERIFIED"
+            if headers
+            else "INFERRED"
+            if has_rpm_selection
+            else "UNKNOWN",
             "source": "rpm-header" if headers else "rpm-filename-suffix",
-            "detail": ("Every selected RPM's own header confirmed its name, version, release and "
-                       "architecture." if headers else
-                       "Read from each RPM filename's architecture suffix; not confirmed by every "
-                       "RPM header."),
+            "detail": (
+                "Every selected RPM's own header confirmed its name, version, release and "
+                "architecture."
+                if headers
+                else "Read from each RPM filename's architecture suffix; not confirmed by every "
+                "RPM header."
+            ),
         },
         "csc_groups": {
-            "value": "VERIFIED" if readmes else "INFERRED" if package_groups else "UNKNOWN",
+            "value": "VERIFIED"
+            if readmes
+            else "INFERRED"
+            if package_groups
+            else "UNKNOWN",
             "source": "smu-readme" if readmes else "rpm-filename-pattern",
-            "detail": ("Every selected RPM is listed, with a matching MD5, in its Cisco SMU README."
-                       if readmes else
-                       "CSC identifiers and component grouping are read from RPM filenames."),
+            "detail": (
+                "Every selected RPM is listed, with a matching MD5, in its Cisco SMU README."
+                if readmes
+                else "CSC identifiers and component grouping are read from RPM filenames."
+            ),
         },
         "dependency_closure": {
             "value": "PARTIAL" if pre_checked else "UNKNOWN",
             "source": "rpm-header-vs-iso-packages" if pre_checked else "none",
-            "detail": ("Exact-version requirements from the RPM headers were checked against the "
-                       "base image's package list and the selection; Cisco gisobuild performs the "
-                       "complete dependency check during the build." if pre_checked else
-                       "RPM dependencies could not be pre-checked here; Cisco gisobuild performs "
-                       "the authoritative dependency check during the build."),
+            "detail": (
+                "Exact-version requirements from the RPM headers were checked against the "
+                "base image's package list and the selection; Cisco gisobuild performs the "
+                "complete dependency check during the build."
+                if pre_checked
+                else "RPM dependencies could not be pre-checked here; Cisco gisobuild performs "
+                "the authoritative dependency check during the build."
+            ),
         },
     }
 
@@ -1882,19 +2307,27 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
     if store_schema_problem:
         blockers.append(f"The job store cannot be used: {store_schema_problem}")
     if not gisobuild_tool_available():
-        blockers.append(f"gisobuild is not available ({TOOL / 'src/gisobuild.py'} is missing)")
+        blockers.append(
+            f"gisobuild is not available ({TOOL / 'src/gisobuild.py'} is missing)"
+        )
     integrity = gisobuild_source_integrity()
     if integrity is not None and not integrity[0]:
-        blockers.append(f"The bundled gisobuild files do not match the pinned source ({integrity[1]}); "
-                        "rebuild or pull the image again")
+        blockers.append(
+            f"The bundled gisobuild files do not match the pinned source ({integrity[1]}); "
+            "rebuild or pull the image again"
+        )
     if GISO_RUNNER == "local":
         if not os.access(GISOBUILD_PYTHON, os.X_OK):
-            blockers.append(f"The Python interpreter for gisobuild is not available at {GISOBUILD_PYTHON}")
+            blockers.append(
+                f"The Python interpreter for gisobuild is not available at {GISOBUILD_PYTHON}"
+            )
     elif not os.access(DOCKER_BIN, os.X_OK):
         blockers.append(f"The Docker CLI is not available at {DOCKER_BIN}")
     elif docker_build_running():
-        blockers.append("A build container is already running, or Docker cannot be reached "
-                        "to confirm that none is")
+        blockers.append(
+            "A build container is already running, or Docker cannot be reached "
+            "to confirm that none is"
+        )
     if cisco_download_running():
         blockers.append("Wait for the Cisco download to finish before starting a build")
     with upload_lock:
@@ -1905,8 +2338,10 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
             blockers.append("A build is already running")
     for label, binary in (("isoinfo", ISOINFO_BIN), ("rpm", RPM_BIN)):
         if not os.access(binary, os.X_OK):
-            warnings.append(f"{label} is not available at {binary}; ISO/RPM metadata checks "
-                            f"fall back to filenames")
+            warnings.append(
+                f"{label} is not available at {binary}; ISO/RPM metadata checks "
+                f"fall back to filenames"
+            )
     return blockers, warnings
 
 
@@ -1936,14 +2371,20 @@ def package_decisions(excluded: list[dict]) -> list[dict]:
     rows = []
     for entry in excluded:
         status = classify_exclusion(entry.get("reason", ""))
-        rows.append({
-            **describe_package(entry.get("name", "")),
-            "status": status,
-            "reason": entry.get("reason", ""),
-            "included": False,
-            "source": EXCLUSION_SOURCES.get(status, "rpm-filename"),
-            **{key: value for key, value in entry.items() if key not in {"name", "reason"}},
-        })
+        rows.append(
+            {
+                **describe_package(entry.get("name", "")),
+                "status": status,
+                "reason": entry.get("reason", ""),
+                "included": False,
+                "source": EXCLUSION_SOURCES.get(status, "rpm-filename"),
+                **{
+                    key: value
+                    for key, value in entry.items()
+                    if key not in {"name", "reason"}
+                },
+            }
+        )
     return sorted(rows, key=lambda row: (row["status"], row["name"]))
 
 
@@ -1955,7 +2396,8 @@ def finalize_recommendation(recommendation: dict) -> dict:
     never describe the same package differently.
     """
     recommendation["summary"] = package_summary(
-        recommendation.get("selected", []), recommendation.get("excluded", []))
+        recommendation.get("selected", []), recommendation.get("excluded", [])
+    )
     recommendation["excluded"] = package_decisions(recommendation.get("excluded", []))
     return recommendation
 
@@ -1979,7 +2421,9 @@ def create_build_plan(payload: dict) -> dict:
     inventory = inventory_files()
     revision = current_inventory_revision(inventory)
     blockers, warnings = build_environment_blockers()
-    if bool(payload.get("ownership_vouchers")) != bool(payload.get("ownership_certificate")):
+    if bool(payload.get("ownership_vouchers")) != bool(
+        payload.get("ownership_certificate")
+    ):
         # Mirrors _validate_ovs_and_oc() in .gisobuild-tool/src/lnt/builder/_coordinate.py:
         # gisobuild requires both an ownership certificate and ownership
         # vouchers to be present in the final image, or neither. This is a
@@ -1995,13 +2439,23 @@ def create_build_plan(payload: dict) -> dict:
             "already carries the missing one from an earlier build."
         )
     iso_name = payload.get("iso", "")
-    iso = next((item for item in inventory
-                if item["type"] == ".iso" and item["relative_path"] == iso_name), None)
+    iso = next(
+        (
+            item
+            for item in inventory
+            if item["type"] == ".iso" and item["relative_path"] == iso_name
+        ),
+        None,
+    )
     if not iso:
         blockers.append("Select one ISO that exists in the current inventory")
 
-    recommendation = {"selected": [], "excluded": [], "package_groups": [],
-                      "component_conflicts": []}
+    recommendation = {
+        "selected": [],
+        "excluded": [],
+        "package_groups": [],
+        "component_conflicts": [],
+    }
     selected: list[dict] = []
     profile = None
     iso_architectures: frozenset[str] = frozenset()
@@ -2027,29 +2481,37 @@ def create_build_plan(payload: dict) -> dict:
             )
             recommendation = add_superseded_exclusions(recommendation, superseded)
             recommendation = exclude_unsatisfiable_packages(
-                recommendation, iso["relative_path"], identity_name, iso_architectures)
+                recommendation, iso["relative_path"], identity_name, iso_architectures
+            )
             recommendation = resolve_component_conflicts(recommendation)
             if recommendation.get("ready"):
                 identifiers = recommendation["selected"]
                 if recommendation.get("left_out_for_dependencies") and not identifiers:
-                    blockers.append("Automatic selection left no packages that can be installed; "
-                                    + recommendation["message"])
+                    blockers.append(
+                        "Automatic selection left no packages that can be installed; "
+                        + recommendation["message"]
+                    )
             else:
                 blockers.append(recommendation["message"])
         try:
             selected = resolve_rpm_identifiers(identifiers)
             profile = validate_platform_options({**payload, "iso": identity_name})
             compatibility = validate_smu_selection(
-                identity_name, [item["basename"] for item in selected],
+                identity_name,
+                [item["basename"] for item in selected],
                 iso_architectures=iso_architectures,
                 full_candidate_packages=candidates,
             )
             blockers.extend(compatibility["issues"])
             warnings.extend(compatibility["warnings"])
-            blockers.extend(selection_integrity_blockers([item["basename"] for item in selected]))
+            blockers.extend(
+                selection_integrity_blockers([item["basename"] for item in selected])
+            )
             if not recommendation["package_groups"]:
                 recommendation["package_groups"] = compatibility["package_groups"]
-                recommendation["component_conflicts"] = compatibility["component_conflicts"]
+                recommendation["component_conflicts"] = compatibility[
+                    "component_conflicts"
+                ]
         except ValueError as exc:
             blockers.append(str(exc))
 
@@ -2071,8 +2533,12 @@ def create_build_plan(payload: dict) -> dict:
     # produce an image. In local mode that capability belongs to this very
     # process, so it can be checked before starting; a builder container gets
     # Docker's default set and is not affected.
-    if (GISO_RUNNER == "local" and profile and profile["engine"] == "exr"
-            and process_has_capability(CAP_SYS_CHROOT) is False):
+    if (
+        GISO_RUNNER == "local"
+        and profile
+        and profile["engine"] == "exr"
+        and process_has_capability(CAP_SYS_CHROOT) is False
+    ):
         blockers.append(
             "gisobuild's eXR engine needs the SYS_CHROOT capability, which this container "
             "does not have; add it (compose: cap_add: [SYS_CHROOT]) and restart"
@@ -2089,19 +2555,32 @@ def create_build_plan(payload: dict) -> dict:
     release = recommendation.get("release") or (
         validate_smu_selection(identity_name, [])["iso_release"] if iso else None
     )
-    resolved_platform = (profile["id"] if profile else None) or recommendation.get("platform")
-    unsigned = sorted(item["basename"] for item in selected
-                      if item.get("metadata_source") == "rpm-header" and not item.get("signature"))
+    resolved_platform = (profile["id"] if profile else None) or recommendation.get(
+        "platform"
+    )
+    unsigned = sorted(
+        item["basename"]
+        for item in selected
+        if item.get("metadata_source") == "rpm-header" and not item.get("signature")
+    )
     if unsigned:
-        warnings.append(f"{len(unsigned)} selected RPM(s) carry no RSA header signature "
-                        f"({', '.join(unsigned[:3])}{'…' if len(unsigned) > 3 else ''}); Cisco RPMs are "
-                        "signed, and gisobuild's signature check is expected to reject these")
-    key_ids = {item["signature"]["key_id"] for item in selected if item.get("signature")}
+        warnings.append(
+            f"{len(unsigned)} selected RPM(s) carry no RSA header signature "
+            f"({', '.join(unsigned[:3])}{'…' if len(unsigned) > 3 else ''}); Cisco RPMs are "
+            "signed, and gisobuild's signature check is expected to reject these"
+        )
+    key_ids = {
+        item["signature"]["key_id"] for item in selected if item.get("signature")
+    }
     if len(key_ids) > 1:
-        warnings.append("Selected RPMs are signed with different keys (" + ", ".join(sorted(key_ids))
-                        + "); confirm every package comes from Cisco")
-    evidence = selection_evidence(iso["relative_path"] if iso else None,
-                                  [item["basename"] for item in selected])
+        warnings.append(
+            "Selected RPMs are signed with different keys ("
+            + ", ".join(sorted(key_ids))
+            + "); confirm every package comes from Cisco"
+        )
+    evidence = selection_evidence(
+        iso["relative_path"] if iso else None, [item["basename"] for item in selected]
+    )
     warnings = reword_dependency_warning(warnings, evidence)
     confidence = confidence_report(
         evidence=evidence,
@@ -2110,14 +2589,19 @@ def create_build_plan(payload: dict) -> dict:
         release=release,
         iso_architectures=iso_architectures,
         package_groups=recommendation["package_groups"],
-        has_rpm_selection=any(item.get("basename", "").lower().endswith(".rpm")
-                              for item in selected),
+        has_rpm_selection=any(
+            item.get("basename", "").lower().endswith(".rpm") for item in selected
+        ),
         matched_pid=infer_platform_pid(iso_name) if iso_name else None,
         identity_from_metadata=identity_from_metadata,
     )
 
-    option_keys = sorted(set(BOOL_OPTIONS) | set(PATH_OPTIONS) | set(LIST_OPTIONS) |
-                         {"label", "platform", "auto_repo", "automatic_smu_selection"})
+    option_keys = sorted(
+        set(BOOL_OPTIONS)
+        | set(PATH_OPTIONS)
+        | set(LIST_OPTIONS)
+        | {"label", "platform", "auto_repo", "automatic_smu_selection"}
+    )
     options = {key: payload[key] for key in option_keys if key in payload}
     # Content, not just the path: an xrconfig edited in place (or one whose
     # suffix keeps it out of the inventory, and so out of the revision) must
@@ -2129,13 +2613,17 @@ def create_build_plan(payload: dict) -> dict:
             continue
         try:
             config_path = safe_data_path(value)
-            config_files[key] = file_checksums(config_path)["sha256"] if config_path.is_file() else None
+            config_files[key] = (
+                file_checksums(config_path)["sha256"] if config_path.is_file() else None
+            )
         except (OSError, ValueError):
             config_files[key] = None
     tool_commit = gisobuild_commit()
     fingerprint_input = {
         "application_version": APP_VERSION,
-        "builder_image": IMAGE if GISO_RUNNER == "docker" else f"local:{GISOBUILD_PYTHON}",
+        "builder_image": IMAGE
+        if GISO_RUNNER == "docker"
+        else f"local:{GISOBUILD_PYTHON}",
         "gisobuild_commit": tool_commit,
         "config_files": config_files,
         "inventory_revision": revision,
@@ -2170,9 +2658,14 @@ def create_build_plan(payload: dict) -> dict:
         "warnings": sorted(set(warnings)),
         "expected_outputs": {
             "iso": True,
-            "usb": bool(profile and profile["capabilities"].get("usb_image")
-                        and not (profile["capabilities"].get("skip_usb_image")
-                                 and payload.get("skip_usb_image"))),
+            "usb": bool(
+                profile
+                and profile["capabilities"].get("usb_image")
+                and not (
+                    profile["capabilities"].get("skip_usb_image")
+                    and payload.get("skip_usb_image")
+                )
+            ),
         },
         "estimated_output_bytes": estimated_output_bytes,
         "volume_free_bytes": build_volume_free_bytes(),
@@ -2184,10 +2677,13 @@ def giso_artifact_candidates(job_dir: Path) -> list[Path]:
     """Return output images eligible for verified archival."""
     top_level = list(job_dir.glob("*.iso"))
     images = top_level or [
-        path for path in job_dir.rglob("*.iso")
+        path
+        for path in job_dir.rglob("*.iso")
         if any(tag in path.name.lower() for tag in ("golden", "giso"))
     ]
-    return images + [path for path in job_dir.rglob("*.zip") if "usb" in path.name.lower()]
+    return images + [
+        path for path in job_dir.rglob("*.zip") if "usb" in path.name.lower()
+    ]
 
 
 def build_volume_free_bytes() -> dict[str, int]:
@@ -2243,9 +2739,14 @@ def archive_size(path: Path) -> int:
 
 
 def archive_timestamp(path: Path) -> float:
-    artifacts = [item for item in path.iterdir()
-                 if item.is_file() and item.suffix.lower() in {".iso", ".zip"}]
-    return max((item.stat().st_mtime for item in artifacts), default=path.stat().st_mtime)
+    artifacts = [
+        item
+        for item in path.iterdir()
+        if item.is_file() and item.suffix.lower() in {".iso", ".zip"}
+    ]
+    return max(
+        (item.stat().st_mtime for item in artifacts), default=path.stat().st_mtime
+    )
 
 
 @contextlib.contextmanager
@@ -2308,7 +2809,9 @@ def enforce_archive_policy(*, protected_job_id: str | None = None) -> list[str]:
         )
         total = sum(archive_size(path) for path in remaining)
         while total > MAX_ARCHIVE_BYTES and remaining:
-            oldest = next((path for path in remaining if path.name != protected_job_id), None)
+            oldest = next(
+                (path for path in remaining if path.name != protected_job_id), None
+            )
             if oldest is None:
                 break
             remaining.remove(oldest)
@@ -2350,7 +2853,9 @@ def remove_consumed_inputs(cleanup_paths: list[Path] | None) -> list[str]:
                 "permissions, then use Clear workspace files"
             )
     for extraction_dir in touched_extraction_dirs:
-        if not extraction_dir.is_dir() or any(item.is_file() for item in extraction_dir.rglob("*")):
+        if not extraction_dir.is_dir() or any(
+            item.is_file() for item in extraction_dir.rglob("*")
+        ):
             continue
         source = archive_source_for_extraction(extraction_dir)
         shutil.rmtree(extraction_dir, ignore_errors=True)
@@ -2376,7 +2881,9 @@ def archive_giso_artifacts_and_cleanup(
             raise RuntimeError(f"Unsafe build artifact: {source.name}")
     candidate_size = sum(path.stat().st_size for path in candidates)
     if candidate_size > MAX_ARCHIVE_BYTES:
-        raise RuntimeError("The completed GISO artifacts exceed the archive's total size limit; source files were kept")
+        raise RuntimeError(
+            "The completed GISO artifacts exceed the archive's total size limit; source files were kept"
+        )
     archive_dir = ARCHIVE / job_id
     archived = []
     with cross_process_archive_lock():
@@ -2385,15 +2892,26 @@ def archive_giso_artifacts_and_cleanup(
             for source in candidates:
                 destination = archive_dir / source.name
                 if destination.exists():
-                    raise RuntimeError(f"Build artifacts share the filename {source.name}")
+                    raise RuntimeError(
+                        f"Build artifacts share the filename {source.name}"
+                    )
                 # The archive retention clock starts when the verified build is archived,
                 # not when an old source file happened to be created.
                 shutil.copyfile(source, destination)
                 digest = file_sha256(destination)
-                if source.stat().st_size != destination.stat().st_size or file_sha256(source) != digest:
+                if (
+                    source.stat().st_size != destination.stat().st_size
+                    or file_sha256(source) != digest
+                ):
                     raise RuntimeError(f"Archive verification failed for {source.name}")
-                archived.append({"path": source.name, "size": destination.stat().st_size,
-                                 "sha256": digest, "url": f"/archive/{job_id}/{source.name}"})
+                archived.append(
+                    {
+                        "path": source.name,
+                        "size": destination.stat().st_size,
+                        "sha256": digest,
+                        "url": f"/archive/{job_id}/{source.name}",
+                    }
+                )
             enforce_archive_policy(protected_job_id=job_id)
             if not archive_dir.is_dir():
                 raise RuntimeError("The completed GISO archive could not be retained")
@@ -2445,7 +2963,9 @@ def build_report(job: dict, artifacts: list[dict]) -> dict:
 def write_build_report(job_id: str, job: dict, artifacts: list[dict]) -> None:
     try:
         report_path = ARCHIVE / job_id / "build-report.json"
-        report_path.write_text(json.dumps(build_report(job, artifacts), indent=2, sort_keys=True))
+        report_path.write_text(
+            json.dumps(build_report(job, artifacts), indent=2, sort_keys=True)
+        )
     except OSError:
         pass  # The report is a convenience artifact; a write failure must not fail the build.
 
@@ -2463,7 +2983,10 @@ def docker_build_state() -> bool | None:
     try:
         result = subprocess.run(
             [DOCKER_BIN, "ps", "-q", "--filter", "label=app=giso-webui"],
-            check=True, capture_output=True, text=True, timeout=5,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return bool(result.stdout.strip())
     except (OSError, subprocess.SubprocessError):
@@ -2479,14 +3002,16 @@ def docker_build_running() -> bool:
 def docker_busy_message(action: str) -> str:
     """Why `action` is refused, telling "a build runs" apart from "Docker is unreachable"."""
     if docker_build_state() is None:
-        return (f"{action} is not possible while Docker cannot be reached to confirm that no "
-                "build container is running; check the Docker socket and try again")
+        return (
+            f"{action} is not possible while Docker cannot be reached to confirm that no "
+            "build container is running; check the Docker socket and try again"
+        )
     return f"{action} must wait for the running Docker build container to finish"
 
 
 def extraction_path(path: Path) -> Path | None:
     suffix = archive_suffix(path.name)
-    return DATA / path.name[:-len(suffix)] if suffix else None
+    return DATA / path.name[: -len(suffix)] if suffix else None
 
 
 def archive_source_for_extraction(directory: Path) -> Path | None:
@@ -2523,7 +3048,9 @@ def upload_name(value: object) -> str:
     if not isinstance(value, str) or not value or len(value) > 255:
         raise ValueError("Upload filename must be between 1 and 255 characters")
     if value != Path(value).name or any(ord(char) < 32 for char in value):
-        raise ValueError("Upload filename must not contain a path or control characters")
+        raise ValueError(
+            "Upload filename must not contain a path or control characters"
+        )
     return value
 
 
@@ -2532,20 +3059,27 @@ def expire_upload_sessions() -> None:
     expired: list[dict] = []
     with upload_lock:
         for upload_id, item in list(uploads.items()):
-            if (not item.get("completing")
-                    and item.get("updated", time.time()) < cutoff
-                    and item.get("temp")):
+            if (
+                not item.get("completing")
+                and item.get("updated", time.time()) < cutoff
+                and item.get("temp")
+            ):
                 expired.append(uploads.pop(upload_id))
     for item in expired:
         Path(item["temp"]).unlink(missing_ok=True)
         if item.get("id"):
             forget_upload_session(item["id"])
     parts = DATA / ".parts"
-    tracked = {Path(item["temp"]).resolve() for item in uploads.values() if item.get("temp")}
+    tracked = {
+        Path(item["temp"]).resolve() for item in uploads.values() if item.get("temp")
+    }
     if parts.is_dir():
         for partial in parts.glob("*.part"):
             try:
-                if partial.resolve() not in tracked and partial.stat().st_mtime < cutoff:
+                if (
+                    partial.resolve() not in tracked
+                    and partial.stat().st_mtime < cutoff
+                ):
                     partial.unlink()
             except OSError:
                 pass
@@ -2566,11 +3100,16 @@ def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dic
     explained: dict[str, str] = {}
     for rpm in DATA.rglob("*.rpm"):
         if rpm_is_superseded(rpm, superseded):
-            explained.setdefault(rpm.name, "Superseded by a newer fix per Cisco supersedence notes")
+            explained.setdefault(
+                rpm.name, "Superseded by a newer fix per Cisco supersedence notes"
+            )
             continue
         if not service_can_read(rpm):
-            explained.setdefault(rpm.name, "The service cannot read this file; fix its ownership "
-                                           "or permissions and check files again")
+            explained.setdefault(
+                rpm.name,
+                "The service cannot read this file; fix its ownership "
+                "or permissions and check files again",
+            )
             continue
         canonical = rpm_filename_mismatch(rpm)
         if canonical:
@@ -2585,8 +3124,10 @@ def add_superseded_exclusions(recommendation: dict, superseded: set[str]) -> dic
         explained.setdefault(name, reason)
     if explained:
         recommendation["excluded"] = sorted(
-            recommendation.get("excluded", []) + [
-                {"name": name, "reason": reason} for name, reason in sorted(explained.items())
+            recommendation.get("excluded", [])
+            + [
+                {"name": name, "reason": reason}
+                for name, reason in sorted(explained.items())
             ],
             key=lambda item: item["name"],
         )
@@ -2627,7 +3168,9 @@ def resolve_component_conflicts(recommendation: dict) -> dict:
     conflicts = recommendation.get("component_conflicts") or []
     if not conflicts:
         return recommendation
-    groups_by_csc = {group["csc"]: group for group in recommendation.get("package_groups", [])}
+    groups_by_csc = {
+        group["csc"]: group for group in recommendation.get("package_groups", [])
+    }
     selected = list(recommendation.get("selected", []))
     selected_set = set(selected)
     excluded = list(recommendation.get("excluded", []))
@@ -2644,7 +3187,8 @@ def resolve_component_conflicts(recommendation: dict) -> dict:
                 eligible = False
                 break
             component_files = [
-                name for name in group["files"]
+                name
+                for name in group["files"]
                 if name in selected_set
                 and (match := RPM_COMPONENT.search(Path(name).name))
                 and match.group("component").lower() == component
@@ -2663,10 +3207,19 @@ def resolve_component_conflicts(recommendation: dict) -> dict:
         if not eligible or len(candidates) < 2:
             remaining_conflicts.append(conflict)
             continue
-        keys = {(identity["name"], identity.get("package_type"), identity["arch"], identity.get("vm_type"))
-                for _, _, identity in candidates}
-        if len(keys) != 1 or any(not identity.get("package_type") or not identity.get("vm_type")
-                                  for _, _, identity in candidates):
+        keys = {
+            (
+                identity["name"],
+                identity.get("package_type"),
+                identity["arch"],
+                identity.get("vm_type"),
+            )
+            for _, _, identity in candidates
+        }
+        if len(keys) != 1 or any(
+            not identity.get("package_type") or not identity.get("vm_type")
+            for _, _, identity in candidates
+        ):
             remaining_conflicts.append(conflict)
             continue
         best_csc, best_name, best_identity = candidates[0]
@@ -2688,16 +3241,18 @@ def resolve_component_conflicts(recommendation: dict) -> dict:
             if name == best_name:
                 continue
             dropped.add(name)
-            excluded.append({
-                "name": name,
-                "reason": (
-                    f"Superseded by {best_name} on {component} ({best_csc} carries "
-                    f"{best_identity['version']}-{best_identity['release']}, a newer version per "
-                    f"gisobuild's own eXR supersedence rule than {csc}'s "
-                    f"{identity['version']}-{identity['release']}); Cisco supersedence decides "
-                    "which remains"
-                ),
-            })
+            excluded.append(
+                {
+                    "name": name,
+                    "reason": (
+                        f"Superseded by {best_name} on {component} ({best_csc} carries "
+                        f"{best_identity['version']}-{best_identity['release']}, a newer version per "
+                        f"gisobuild's own eXR supersedence rule than {csc}'s "
+                        f"{identity['version']}-{identity['release']}); Cisco supersedence decides "
+                        "which remains"
+                    ),
+                }
+            )
     if dropped:
         recommendation["selected"] = [name for name in selected if name not in dropped]
         recommendation["excluded"] = sorted(excluded, key=lambda item: item["name"])
@@ -2705,10 +3260,13 @@ def resolve_component_conflicts(recommendation: dict) -> dict:
     return recommendation
 
 
-SUPERSEDENCE_FULL = re.compile(r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE)
+SUPERSEDENCE_FULL = re.compile(
+    r"([A-Za-z0-9_-]+-[0-9][0-9.]*\.CSC\w+)\s+Full", re.IGNORECASE
+)
 SMU_README_NAME = re.compile(r"^Name:[ \t]+(?P<name>\S+)[ \t]*$", re.MULTILINE)
 SMU_README_RPMS = re.compile(
-    r"^RPMS:[ \t]*\n(?P<body>(?:[ \t]+\S+\.rpm[ \t]+[0-9A-Fa-f]{32}[ \t]*\n)+)", re.MULTILINE
+    r"^RPMS:[ \t]*\n(?P<body>(?:[ \t]+\S+\.rpm[ \t]+[0-9A-Fa-f]{32}[ \t]*\n)+)",
+    re.MULTILINE,
 )
 SMU_README_RPM_LINE = re.compile(r"(?P<rpm>\S+\.rpm)[ \t]+(?P<md5>[0-9A-Fa-f]{32})")
 
@@ -2720,7 +3278,10 @@ def smu_readme_texts() -> list[str]:
     for readme in DATA.rglob("*.txt"):
         try:
             size = readme.stat().st_size
-            if size > MAX_SUPERSEDENCE_FILE_BYTES or inspected_bytes + size > MAX_SUPERSEDENCE_TOTAL_BYTES:
+            if (
+                size > MAX_SUPERSEDENCE_FILE_BYTES
+                or inspected_bytes + size > MAX_SUPERSEDENCE_TOTAL_BYTES
+            ):
                 continue
             inspected_bytes += size
             texts.append(readme.read_text(errors="ignore"))
@@ -2744,8 +3305,10 @@ def smu_readme_manifests(texts: list[str]) -> dict[str, dict[str, str]]:
         block = SMU_README_RPMS.search(text)
         if not name or not block:
             continue
-        rpms = {match.group("rpm"): match.group("md5").lower()
-                for match in SMU_README_RPM_LINE.finditer(block.group("body"))}
+        rpms = {
+            match.group("rpm"): match.group("md5").lower()
+            for match in SMU_README_RPM_LINE.finditer(block.group("body"))
+        }
         if rpms:
             manifests.setdefault(name.group("name"), {}).update(rpms)
     return manifests
@@ -2754,7 +3317,9 @@ def smu_readme_manifests(texts: list[str]) -> dict[str, dict[str, str]]:
 SMU_README_PREREQ_BLOCK = re.compile(
     r"^Pre-requisites:[ \t]*\n(?P<body>(?:[ \t]+\S.*\n)+)", re.MULTILINE
 )
-SMU_README_PREREQ_SMU = re.compile(r"^[ \t]+(?P<smu>\S+\.(?P<csc>CSC[A-Za-z0-9]+))[ \t]*$")
+SMU_README_PREREQ_SMU = re.compile(
+    r"^[ \t]+(?P<smu>\S+\.(?P<csc>CSC[A-Za-z0-9]+))[ \t]*$"
+)
 SMU_README_PREREQ_PACKAGE = re.compile(
     r"^[ \t]+(?P<csc>CSC[A-Za-z0-9]+)[ \t]+(?P<package>\S+)[ \t]+pkg[ \t]*$"
 )
@@ -2784,7 +3349,11 @@ def smu_readme_prerequisites(texts: list[str]) -> dict[str, dict[str, str]]:
                 package = SMU_README_PREREQ_PACKAGE.match(line)
                 if package:
                     packages[package.group("package")] = package.group("csc")
-        resolved = {package: smu_by_csc[csc] for package, csc in packages.items() if csc in smu_by_csc}
+        resolved = {
+            package: smu_by_csc[csc]
+            for package, csc in packages.items()
+            if csc in smu_by_csc
+        }
         if resolved:
             prerequisites.setdefault(name.group("name"), {}).update(resolved)
     return prerequisites
@@ -2816,7 +3385,9 @@ def explain_with_prerequisites(entries: list[dict]) -> list[dict]:
     return entries
 
 
-def smu_manifest_problems(available: list[str], texts: list[str] | None = None) -> dict[str, str]:
+def smu_manifest_problems(
+    available: list[str], texts: list[str] | None = None
+) -> dict[str, str]:
     """RPMs that must not be built because their own Cisco README says so.
 
     For every SMU with at least one RPM in `available`: if a README-listed
@@ -2848,14 +3419,23 @@ def smu_manifest_problems(available: list[str], texts: list[str] | None = None) 
                     break
         for name in here:
             if name in corrupt:
-                problems.setdefault(name, f"MD5 does not match the Cisco README for {smu}; "
-                                          "the file is damaged or not the Cisco original")
+                problems.setdefault(
+                    name,
+                    f"MD5 does not match the Cisco README for {smu}; "
+                    "the file is damaged or not the Cisco original",
+                )
             elif corrupt:
-                problems.setdefault(name, f"Part of {smu}, but {', '.join(corrupt)} from the same "
-                                          "fix failed its README checksum")
+                problems.setdefault(
+                    name,
+                    f"Part of {smu}, but {', '.join(corrupt)} from the same "
+                    "fix failed its README checksum",
+                )
             elif missing:
-                problems.setdefault(name, f"Incomplete fix: the Cisco README for {smu} lists "
-                                          f"{len(members)} RPMs; missing {', '.join(missing)}")
+                problems.setdefault(
+                    name,
+                    f"Incomplete fix: the Cisco README for {smu} lists "
+                    f"{len(members)} RPMs; missing {', '.join(missing)}",
+                )
     return problems
 
 
@@ -2880,8 +3460,10 @@ def _screened_rpms() -> tuple[list[str], set[str], dict[str, str]]:
     for text in texts:
         superseded.update(SUPERSEDENCE_FULL.findall(text))
     readable = [
-        rpm.name for rpm in DATA.rglob("*.rpm")
-        if not rpm_is_superseded(rpm, superseded) and service_can_read(rpm)
+        rpm.name
+        for rpm in DATA.rglob("*.rpm")
+        if not rpm_is_superseded(rpm, superseded)
+        and service_can_read(rpm)
         and rpm_filename_mismatch(rpm) is None
     ]
     return readable, superseded, smu_manifest_problems(readable, texts)
@@ -2903,9 +3485,13 @@ def selection_integrity_blockers(selected_names: list[str]) -> list[str]:
         if rpm.name in wanted:
             canonical = rpm_filename_mismatch(rpm)
             if canonical:
-                blockers.append(f"{rpm.name}: its own RPM header says it is {canonical}")
+                blockers.append(
+                    f"{rpm.name}: its own RPM header says it is {canonical}"
+                )
     problems = _screened_rpms()[2]
-    blockers.extend(f"{name}: {problems[name]}" for name in sorted(wanted) if name in problems)
+    blockers.extend(
+        f"{name}: {problems[name]}" for name in sorted(wanted) if name in problems
+    )
     return blockers
 
 
@@ -2918,7 +3504,11 @@ def discover() -> dict:
     files, dirs = inventory_files(), []
     ignored = {".parts"}
     for root, names, filenames in os.walk(DATA):
-        names[:] = [n for n in names if n not in ignored and not n.startswith("output_gisobuild")]
+        names[:] = [
+            n
+            for n in names
+            if n not in ignored and not n.startswith("output_gisobuild")
+        ]
         root_path = Path(root)
         if root_path != DATA:
             dirs.append(rel_data(root_path))
@@ -2933,29 +3523,46 @@ def discover() -> dict:
             identity_name, identity_from_metadata = iso_identity(iso_path)
         except (OSError, ValueError):
             iso_architectures = frozenset()
-        recommendation = recommend_smu_selection(identity_name, candidates, iso_architectures=iso_architectures)
+        recommendation = recommend_smu_selection(
+            identity_name, candidates, iso_architectures=iso_architectures
+        )
         # Platform/release may come from the image's embedded identity, but the
         # operator-facing "iso" is always the real file they uploaded.
         recommendation["iso"] = Path(isos[0]).name
     elif len(isos) > 1:
-        recommendation = {"ready": False, "selected": [], "excluded": [],
-                          "message": "More than one base ISO was found; keep one ISO or select it in Expert settings"}
+        recommendation = {
+            "ready": False,
+            "selected": [],
+            "excluded": [],
+            "message": "More than one base ISO was found; keep one ISO or select it in Expert settings",
+        }
     else:
-        recommendation = {"ready": False, "selected": [], "excluded": [],
-                          "message": "Upload one base ISO before SMUs can be selected"}
+        recommendation = {
+            "ready": False,
+            "selected": [],
+            "excluded": [],
+            "message": "Upload one base ISO before SMUs can be selected",
+        }
     recommendation = add_superseded_exclusions(recommendation, superseded)
     if len(isos) == 1:
         recommendation = exclude_unsatisfiable_packages(
-            recommendation, isos[0], identity_name, iso_architectures)
+            recommendation, isos[0], identity_name, iso_architectures
+        )
         recommendation = resolve_component_conflicts(recommendation)
     recommendation["unsatisfied_dependencies"] = (
-        unsatisfied_dependencies_for_recommendation(isos[0], recommendation.get("selected", []))
-        if len(isos) == 1 else []
+        unsatisfied_dependencies_for_recommendation(
+            isos[0], recommendation.get("selected", [])
+        )
+        if len(isos) == 1
+        else []
     )
-    evidence = selection_evidence(isos[0] if len(isos) == 1 else None,
-                                  recommendation.get("selected", []))
+    evidence = selection_evidence(
+        isos[0] if len(isos) == 1 else None, recommendation.get("selected", [])
+    )
     finalize_recommendation(recommendation)
-    recommendation["warnings"] = reword_dependency_warning(recommendation.get("warnings", []), evidence)
+    recommendation["warnings"] = reword_dependency_warning(
+        recommendation.get("warnings", []), evidence
+    )
     recommendation["confidence"] = confidence_report(
         evidence=evidence,
         resolved_platform=recommendation.get("platform"),
@@ -2967,12 +3574,21 @@ def discover() -> dict:
         matched_pid=infer_platform_pid(isos[0]) if len(isos) == 1 else None,
         identity_from_metadata=identity_from_metadata,
     )
-    matrices = [item["path"] for item in files
-                if item["type"] == ".json" and Path(item["path"]).name.startswith("compatibility_matrix_")]
-    return {"files": sorted(files, key=lambda x: x["path"]), "dirs": sorted(dirs),
-            "inventory_revision": current_inventory_revision(files),
-            "recommended": recommendation["selected"], "recommendation": recommendation,
-            "superseded": sorted(superseded), "matrices": matrices}
+    matrices = [
+        item["path"]
+        for item in files
+        if item["type"] == ".json"
+        and Path(item["path"]).name.startswith("compatibility_matrix_")
+    ]
+    return {
+        "files": sorted(files, key=lambda x: x["path"]),
+        "dirs": sorted(dirs),
+        "inventory_revision": current_inventory_revision(files),
+        "recommended": recommendation["selected"],
+        "recommendation": recommendation,
+        "superseded": sorted(superseded),
+        "matrices": matrices,
+    }
 
 
 def append_log(job_id: str, text: str) -> None:
@@ -3001,8 +3617,12 @@ def append_log(job_id: str, text: str) -> None:
                 jobs[job_id].update(progress=progress, phase=phase)
                 phase_change = (progress, phase)
     if phase_change:
-        log_event("build_progress", job_id=job_id, progress=phase_change[0],
-                  phase=json.dumps(phase_change[1]))
+        log_event(
+            "build_progress",
+            job_id=job_id,
+            progress=phase_change[0],
+            phase=json.dumps(phase_change[1]),
+        )
     for line in text.splitlines():
         if line.strip():
             app.logger.info("event=build_output job_id=%s message=%s", job_id, line)
@@ -3015,7 +3635,10 @@ def child_mount_args() -> list[str]:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", container):
         raise RuntimeError("Container hostname is invalid")
     result = subprocess.run(
-        [DOCKER_BIN, "inspect", container], check=True, capture_output=True, text=True,
+        [DOCKER_BIN, "inspect", container],
+        check=True,
+        capture_output=True,
+        text=True,
         timeout=5,
     )
     info = json.loads(result.stdout)[0]
@@ -3026,7 +3649,9 @@ def child_mount_args() -> list[str]:
         destination = mount.get("Destination")
         if destination not in wanted:
             continue
-        source = mount.get("Name") if mount.get("Type") == "volume" else mount.get("Source")
+        source = (
+            mount.get("Name") if mount.get("Type") == "volume" else mount.get("Source")
+        )
         if not source:
             raise RuntimeError(f"Cannot resolve container mount {destination}")
         args += ["-v", f"{source}:{destination}:{wanted[destination]}"]
@@ -3051,9 +3676,17 @@ def build_command(payload: dict, job_id: str, *, stage: bool = True) -> list[str
         command = [GISOBUILD_PYTHON, str(TOOL / "src/gisobuild.py")]
     else:
         command = [
-            DOCKER_BIN, "run", "--platform", "linux/amd64", "--rm",
-            "--name", f"giso-build-{job_id}", "--label", "app=giso-webui",
-            *child_mount_args(), IMAGE,
+            DOCKER_BIN,
+            "run",
+            "--platform",
+            "linux/amd64",
+            "--rm",
+            "--name",
+            f"giso-build-{job_id}",
+            "--label",
+            "app=giso-webui",
+            *child_mount_args(),
+            IMAGE,
             "/tool/src/gisobuild.py",
         ]
     if payload.get("yamlfile"):
@@ -3081,7 +3714,9 @@ def build_command(payload: dict, job_id: str, *, stage: bool = True) -> list[str
         selected_names = [item["basename"] for item in selected_rpms]
         payload["pkglist"] = selected_names
         smu_check = validate_smu_selection(
-            identity_name, selected_names, iso_architectures=iso_architectures,
+            identity_name,
+            selected_names,
+            iso_architectures=iso_architectures,
             full_candidate_packages=candidates,
         )
         issues = smu_check["issues"] + selection_integrity_blockers(selected_names)
@@ -3113,16 +3748,22 @@ def build_command(payload: dict, job_id: str, *, stage: bool = True) -> list[str
                     command += values
         if payload.get("label") and not payload.get("no_label"):
             if not re.fullmatch(r"[A-Za-z0-9_]+", payload["label"]):
-                raise ValueError("Label may contain only letters, numbers and underscore")
+                raise ValueError(
+                    "Label may contain only letters, numbers and underscore"
+                )
             command += ["--label", payload["label"]]
         for key, option in BOOL_OPTIONS.items():
             # eXR ignores --skip-usb-image; passing it would only suggest otherwise.
-            if key == "skip_usb_image" and not profile["capabilities"].get("skip_usb_image"):
+            if key == "skip_usb_image" and not profile["capabilities"].get(
+                "skip_usb_image"
+            ):
                 continue
             if payload.get(key):
                 command.append(option)
     # The child container sees OUTPUT at /output; a local process sees it as is.
-    out_directory = str(OUTPUT / job_id) if GISO_RUNNER == "local" else f"/output/{job_id}"
+    out_directory = (
+        str(OUTPUT / job_id) if GISO_RUNNER == "local" else f"/output/{job_id}"
+    )
     command += ["--out-directory", out_directory, "--clean"]
     return command
 
@@ -3145,10 +3786,12 @@ def command_preview(command: list[str]) -> str:
     arguments, not a reconstruction.
     """
     try:
-        script_index = next(i for i, arg in enumerate(command) if arg.endswith("gisobuild.py"))
+        script_index = next(
+            i for i, arg in enumerate(command) if arg.endswith("gisobuild.py")
+        )
     except StopIteration:
         return ""
-    tail = ["gisobuild.py", *command[script_index + 1:]]
+    tail = ["gisobuild.py", *command[script_index + 1 :]]
     cleaned = [Path(arg).name if arg.startswith("/") else arg for arg in tail]
     return shlex.join(cleaned)
 
@@ -3194,7 +3837,9 @@ def prepare_destructive_finalization(job_id: str) -> None:
         jobs[job_id]["status"] = "committing"
 
 
-def builder_process_environment(job_id: str) -> tuple[dict[str, str] | None, str | None]:
+def builder_process_environment(
+    job_id: str,
+) -> tuple[dict[str, str] | None, str | None]:
     """Environment and working directory for the build process.
 
     Docker mode keeps the inherited environment: it only reaches the docker
@@ -3225,16 +3870,29 @@ def local_builder_image_id() -> str | None:
     try:
         result = subprocess.run(
             [DOCKER_BIN, "image", "inspect", "--format", "{{.Id}}", IMAGE],
-            capture_output=True, text=True, timeout=15, check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
     image_id = result.stdout.strip()
-    return image_id if result.returncode == 0 and image_id.startswith("sha256:") else None
+    return (
+        image_id if result.returncode == 0 and image_id.startswith("sha256:") else None
+    )
 
 
-JOB_STAGES = ("preflight", "preparing_builder", "building", "verifying", "archiving",
-              "complete", "failed", "cancelled")
+JOB_STAGES = (
+    "preflight",
+    "preparing_builder",
+    "building",
+    "verifying",
+    "archiving",
+    "complete",
+    "failed",
+    "cancelled",
+)
 TERMINAL_STAGES = {"complete", "failed", "cancelled"}
 
 
@@ -3253,7 +3911,11 @@ def enter_stage(job_id: str, stage: str, at: float | None = None) -> None:
     now = time.time() if at is None else at
     with job_lock:
         job = jobs.get(job_id)
-        if job is None or job.get("stage") == stage or job.get("stage") in TERMINAL_STAGES:
+        if (
+            job is None
+            or job.get("stage") == stage
+            or job.get("stage") in TERMINAL_STAGES
+        ):
             return
         history = job.setdefault("stages", [])
         if history and "ended" not in history[-1]:
@@ -3297,8 +3959,10 @@ def discard_job_work_directory(job_id: str) -> None:
 def run_job(job_id: str, command: list[str]) -> None:
     with job_lock:
         job_started = jobs[job_id]["created"]
-        build_log_context = {"inventory_revision": jobs[job_id].get("inventory_revision"),
-                             "plan_fingerprint": jobs[job_id].get("plan_fingerprint")}
+        build_log_context = {
+            "inventory_revision": jobs[job_id].get("inventory_revision"),
+            "plan_fingerprint": jobs[job_id].get("plan_fingerprint"),
+        }
     try:
         append_log(job_id, "$ " + shlex.join(command) + "\n\n")
         log_event("build_started", job_id=job_id, **build_log_context)
@@ -3321,7 +3985,10 @@ def run_job(job_id: str, command: list[str]) -> None:
             except subprocess.TimeoutExpired:
                 pull.terminate()
                 pull.wait(timeout=20)
-                pull_output, pull_failure = "", f"timed out after {GISO_PULL_TIMEOUT_SECONDS} seconds"
+                pull_output, pull_failure = (
+                    "",
+                    f"timed out after {GISO_PULL_TIMEOUT_SECONDS} seconds",
+                )
             finally:
                 with job_lock:
                     job_processes.pop(job_id, None)
@@ -3344,31 +4011,46 @@ def run_job(job_id: str, command: list[str]) -> None:
                         f"on this host: {IMAGE}"
                     )
                 pinned = "@sha256:" in IMAGE
-                append_log(job_id, (
-                    f"\nWARNING: pulling the builder image {pull_failure}; using the copy already "
-                    f"on this host ({image_id[:19]}). "
-                    + ("The reference is digest-pinned, so it is identical.\n" if pinned else
-                       "The reference is a tag, so this copy may be older than the registry's.\n")
-                ))
+                append_log(
+                    job_id,
+                    (
+                        f"\nWARNING: pulling the builder image {pull_failure}; using the copy already "
+                        f"on this host ({image_id[:19]}). "
+                        + (
+                            "The reference is digest-pinned, so it is identical.\n"
+                            if pinned
+                            else "The reference is a tag, so this copy may be older than the registry's.\n"
+                        )
+                    ),
+                )
                 log_event("image_pull_fallback_to_cache", job_id=job_id, pinned=pinned)
             else:
                 log_event("image_pull_completed", job_id=job_id)
             with job_lock:
                 jobs[job_id]["builder_image"] = {
-                    "reference": IMAGE, "id": image_id,
+                    "reference": IMAGE,
+                    "id": image_id,
                     "source": "cache" if pull_failure else "registry",
                 }
         else:
             with job_lock:
                 jobs[job_id]["builder_image"] = {
                     "reference": f"gisobuild {gisobuild_commit() or 'unknown commit'} (bundled)",
-                    "id": None, "source": "bundled",
+                    "id": None,
+                    "source": "bundled",
                 }
         process_env, process_cwd = builder_process_environment(job_id)
         enter_stage(job_id, "building")
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, bufsize=1, start_new_session=True,
-                                env=process_env, cwd=process_cwd)
+        proc = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            start_new_session=True,
+            env=process_env,
+            cwd=process_cwd,
+        )
         with job_lock:
             job_processes[job_id] = proc
             jobs[job_id]["process_phase"] = "building"
@@ -3390,8 +4072,16 @@ def run_job(job_id: str, command: list[str]) -> None:
         job_dir = OUTPUT / job_id
         if job_dir.exists():
             for path in sorted(job_dir.rglob("*")):
-                if path.is_file() and (path.suffix in {".iso", ".zip", ".json", ".txt"} or "log" in path.name):
-                    artifacts.append({"path": str(path.relative_to(job_dir)), "size": path.stat().st_size})
+                if path.is_file() and (
+                    path.suffix in {".iso", ".zip", ".json", ".txt"}
+                    or "log" in path.name
+                ):
+                    artifacts.append(
+                        {
+                            "path": str(path.relative_to(job_dir)),
+                            "size": path.stat().st_size,
+                        }
+                    )
         success = code == 0 and any(
             path.suffix.lower() == ".iso" for path in giso_artifact_candidates(job_dir)
         )
@@ -3399,17 +4089,26 @@ def run_job(job_id: str, command: list[str]) -> None:
             enter_stage(job_id, "archiving")
             with job_lock:
                 jobs[job_id]["status"] = "finalizing"
-                cleanup_paths = [Path(path) for path in jobs[job_id].get("cleanup_paths", [])]
+                cleanup_paths = [
+                    Path(path) for path in jobs[job_id].get("cleanup_paths", [])
+                ]
             artifacts = archive_giso_artifacts_and_cleanup(
-                job_id, job_dir, cleanup_paths, lambda: prepare_destructive_finalization(job_id)
+                job_id,
+                job_dir,
+                cleanup_paths,
+                lambda: prepare_destructive_finalization(job_id),
             )
         with job_lock:
             if jobs[job_id]["status"] not in {"cancelled", "cancelling"}:
-                jobs[job_id].update(status="success" if success else "failed",
-                                    exit_code=code, artifacts=artifacts, finished=time.time(),
-                                    updated=time.time(),
-                                    progress=100 if success else jobs[job_id].get("progress", 0),
-                                    phase="Complete" if success else "Build failed")
+                jobs[job_id].update(
+                    status="success" if success else "failed",
+                    exit_code=code,
+                    artifacts=artifacts,
+                    finished=time.time(),
+                    updated=time.time(),
+                    progress=100 if success else jobs[job_id].get("progress", 0),
+                    phase="Complete" if success else "Build failed",
+                )
             job_snapshot = dict(jobs[job_id])
         enter_stage(job_id, "complete" if success else "failed")
         if not success:
@@ -3417,19 +4116,32 @@ def run_job(job_id: str, command: list[str]) -> None:
         persist_job(job_id)
         if success:
             write_build_report(job_id, job_snapshot, artifacts)
-        log_event("build_finished", exit_code=code, job_id=job_id,
-                  status="success" if success else "failed",
-                  duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
+        log_event(
+            "build_finished",
+            exit_code=code,
+            job_id=job_id,
+            status="success" if success else "failed",
+            duration_ms=round((time.time() - job_started) * 1000),
+            **build_log_context,
+        )
     except BuildCancelled:
         enter_stage(job_id, "cancelled")
         discard_job_work_directory(job_id)
         with job_lock:
             job_processes.pop(job_id, None)
-            jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
-                                updated=time.time())
+            jobs[job_id].update(
+                status="cancelled",
+                phase="Cancelled",
+                finished=time.time(),
+                updated=time.time(),
+            )
         persist_job(job_id)
-        log_event("build_cancelled", job_id=job_id,
-                  duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
+        log_event(
+            "build_cancelled",
+            job_id=job_id,
+            duration_ms=round((time.time() - job_started) * 1000),
+            **build_log_context,
+        )
     except Exception as exc:  # noqa: BLE001 - background failures must update job state
         append_log(job_id, f"\nERROR: {exc}\n")
         with job_lock:
@@ -3439,8 +4151,12 @@ def run_job(job_id: str, command: list[str]) -> None:
         with job_lock:
             job_processes.pop(job_id, None)
             if jobs[job_id]["status"] in {"cancelling", "cancelled"}:
-                jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
-                                    updated=time.time())
+                jobs[job_id].update(
+                    status="cancelled",
+                    phase="Cancelled",
+                    finished=time.time(),
+                    updated=time.time(),
+                )
             else:
                 jobs[job_id].update(
                     status="failed",
@@ -3450,8 +4166,13 @@ def run_job(job_id: str, command: list[str]) -> None:
                     updated=time.time(),
                 )
         persist_job(job_id)
-        log_event("build_failed", error_type=type(exc).__name__, job_id=job_id,
-                  duration_ms=round((time.time() - job_started) * 1000), **build_log_context)
+        log_event(
+            "build_failed",
+            error_type=type(exc).__name__,
+            job_id=job_id,
+            duration_ms=round((time.time() - job_started) * 1000),
+            **build_log_context,
+        )
 
 
 @app.get("/")
@@ -3486,17 +4207,45 @@ def security_headers(response):
         response.headers["Cache-Control"] = "no-store"
     request_id = getattr(g, "request_id", uuid.uuid4().hex[:12])
     response.headers["X-Request-ID"] = request_id
-    if response.status_code >= 400 and response.is_json and request.path.startswith("/api/"):
+    if (
+        response.status_code >= 400
+        and response.is_json
+        and request.path.startswith("/api/")
+    ):
         body = response.get_json(silent=True)
-        if isinstance(body, dict) and isinstance(body.get("error"), str) and "code" not in body:
+        if (
+            isinstance(body, dict)
+            and isinstance(body.get("error"), str)
+            and "code" not in body
+        ):
             detail = classify_api_error(request.endpoint or "", body["error"])
-            body.update({key: detail[key] for key in
-                         ("code", "human_message", "recoverable", "suggested_action")})
+            body.update(
+                {
+                    key: detail[key]
+                    for key in (
+                        "code",
+                        "human_message",
+                        "recoverable",
+                        "suggested_action",
+                    )
+                }
+            )
             response.set_data(json.dumps(body))
-    if request.endpoint not in {"health", "upload_chunk"} or response.status_code >= 400:
-        elapsed_ms = round((time.monotonic() - getattr(g, "request_started", time.monotonic())) * 1000)
-        log_event("http_request", elapsed_ms=elapsed_ms, endpoint=request.endpoint or "unknown",
-                  method=request.method, request_id=request_id, status=response.status_code)
+    if (
+        request.endpoint not in {"health", "upload_chunk"}
+        or response.status_code >= 400
+    ):
+        elapsed_ms = round(
+            (time.monotonic() - getattr(g, "request_started", time.monotonic())) * 1000
+        )
+        log_event(
+            "http_request",
+            elapsed_ms=elapsed_ms,
+            endpoint=request.endpoint or "unknown",
+            method=request.method,
+            request_id=request_id,
+            status=response.status_code,
+        )
     return response
 
 
@@ -3522,8 +4271,11 @@ def request_too_large(_error):
 def validate_host():
     global archive_policy_checked
     supplied_request_id = request.headers.get("X-Request-ID", "")
-    g.request_id = (supplied_request_id if re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", supplied_request_id)
-                    else uuid.uuid4().hex[:12])
+    g.request_id = (
+        supplied_request_id
+        if re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", supplied_request_id)
+        else uuid.uuid4().hex[:12]
+    )
     g.request_started = time.monotonic()
     initialize_job_store()
     log_startup_self_test_once()
@@ -3556,8 +4308,11 @@ def asset_version() -> str:
     if revision and revision != "unknown":
         return revision[:12]
     try:
-        newest = max(path.stat().st_mtime_ns for path in Path(app.static_folder).rglob("*")
-                     if path.is_file())
+        newest = max(
+            path.stat().st_mtime_ns
+            for path in Path(app.static_folder).rglob("*")
+            if path.is_file()
+        )
     except (OSError, ValueError):
         return APP_VERSION
     return f"{APP_VERSION}-{newest:x}"
@@ -3604,7 +4359,9 @@ def gisobuild_source_integrity() -> tuple[bool, str] | None:
     expected = os.environ.get("GISOBUILD_SOURCE_SHA256", "").strip().lower()
     if not expected:
         return None
-    manifest = Path(os.environ.get("GISOBUILD_SOURCE_MANIFEST", "/opt/gisobuild.sha256sums"))
+    manifest = Path(
+        os.environ.get("GISOBUILD_SOURCE_MANIFEST", "/opt/gisobuild.sha256sums")
+    )
     key = (str(TOOL), str(manifest), expected)
     if key not in gisobuild_source_results:
         gisobuild_source_results[key] = _check_gisobuild_source(manifest, expected)
@@ -3631,18 +4388,25 @@ def _check_gisobuild_source(manifest: Path, expected: str) -> tuple[bool, str]:
         if actual != digest:
             changed.append(name)
     try:
-        present = {path.relative_to(TOOL).as_posix() for path in TOOL.rglob("*")
-                   if not path.is_dir() and "__pycache__" not in path.parts}
+        present = {
+            path.relative_to(TOOL).as_posix()
+            for path in TOOL.rglob("*")
+            if not path.is_dir() and "__pycache__" not in path.parts
+        }
     except OSError:
         present = set(listed)
     added = sorted(present - set(listed))
     if changed or added:
         parts = []
         if changed:
-            parts.append(f"{len(changed)} changed or missing ({', '.join(sorted(changed)[:3])})")
+            parts.append(
+                f"{len(changed)} changed or missing ({', '.join(sorted(changed)[:3])})"
+            )
         if added:
             parts.append(f"{len(added)} unexpected ({', '.join(added[:3])})")
-        return False, "gisobuild files differ from the pinned source: " + "; ".join(parts)
+        return False, "gisobuild files differ from the pinned source: " + "; ".join(
+            parts
+        )
     return True, f"{len(listed)} files match the pinned SHA-256 manifest"
 
 
@@ -3671,8 +4435,11 @@ def startup_self_test() -> dict[str, dict]:
         record("gisobuild_source", *integrity)
     runner_binary = GISOBUILD_PYTHON if GISO_RUNNER == "local" else DOCKER_BIN
     found = os.access(runner_binary, os.X_OK)
-    record("runner_binary", found,
-           f"{'gisobuild Python' if GISO_RUNNER == 'local' else 'Docker CLI'} {presence(found)}")
+    record(
+        "runner_binary",
+        found,
+        f"{'gisobuild Python' if GISO_RUNNER == 'local' else 'Docker CLI'} {presence(found)}",
+    )
     for label, binary in (("isoinfo", ISOINFO_BIN), ("rpm", RPM_BIN)):
         found = os.access(binary, os.X_OK)
         record(label, found, f"{label} {presence(found)}", required=False)
@@ -3681,43 +4448,68 @@ def startup_self_test() -> dict[str, dict]:
         with sqlite3.connect(JOB_DB, timeout=5) as database:
             problems = []
             for table, columns in EXPECTED_TABLE_COLUMNS.items():
-                found = {row[1] for row in database.execute(f"PRAGMA table_info({table})")}
+                found = {
+                    row[1] for row in database.execute(f"PRAGMA table_info({table})")
+                }
                 if not columns <= found:
-                    problems.append(f"{table} lacks {', '.join(sorted(columns - found))}")
+                    problems.append(
+                        f"{table} lacks {', '.join(sorted(columns - found))}"
+                    )
             version = database.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION:
                 problems.append(f"schema version {version}, expected {SCHEMA_VERSION}")
-        record("database_schema", not problems,
-               "; ".join(problems) or f"jobs, activity (schema version {SCHEMA_VERSION})")
+        record(
+            "database_schema",
+            not problems,
+            "; ".join(problems) or f"jobs, activity (schema version {SCHEMA_VERSION})",
+        )
     except sqlite3.Error as exc:
         record("database_schema", False, type(exc).__name__)
 
     unwritable = []
-    for label, directory in (("uploads", DATA), ("output", OUTPUT), ("work", WORK),
-                             ("archive", ARCHIVE), ("state", STATE)):
+    for label, directory in (
+        ("uploads", DATA),
+        ("output", OUTPUT),
+        ("work", WORK),
+        ("archive", ARCHIVE),
+        ("state", STATE),
+    ):
         probe = directory / f".self-test-{uuid.uuid4().hex[:8]}"
         try:
             probe.write_bytes(b"")
             probe.unlink()
         except OSError:
             unwritable.append(label)
-    record("writable_directories", not unwritable,
-           "not writable: " + ", ".join(unwritable) if unwritable else "all writable")
+    record(
+        "writable_directories",
+        not unwritable,
+        "not writable: " + ", ".join(unwritable) if unwritable else "all writable",
+    )
 
-    config_problems = [f"alias {alias!r} -> unknown platform {target!r}"
-                       for alias, target in ALIASES.items() if target not in PLATFORMS]
-    config_problems += [f"{name}: architecture {profile.get('architecture')!r}"
-                        for name, profile in PLATFORMS.items()
-                        if profile.get("architecture") not in {"exr", "lnt"}]
+    config_problems = [
+        f"alias {alias!r} -> unknown platform {target!r}"
+        for alias, target in ALIASES.items()
+        if target not in PLATFORMS
+    ]
+    config_problems += [
+        f"{name}: architecture {profile.get('architecture')!r}"
+        for name, profile in PLATFORMS.items()
+        if profile.get("architecture") not in {"exr", "lnt"}
+    ]
     codes = [entry[0] for entry in ERROR_TAXONOMY]
     if len(codes) != len(set(codes)):
         config_problems.append("duplicate error taxonomy codes")
-    record("configuration", not config_problems, "; ".join(config_problems) or "consistent")
+    record(
+        "configuration", not config_problems, "; ".join(config_problems) or "consistent"
+    )
 
     try:
         free = shutil.disk_usage(DATA).free
-        record("free_storage", free >= MIN_FREE_BYTES,
-               f"{free // 1024**2} MiB free, {MIN_FREE_BYTES // 1024**2} MiB minimum")
+        record(
+            "free_storage",
+            free >= MIN_FREE_BYTES,
+            f"{free // 1024**2} MiB free, {MIN_FREE_BYTES // 1024**2} MiB minimum",
+        )
     except OSError as exc:
         record("free_storage", False, type(exc).__name__)
 
@@ -3725,8 +4517,11 @@ def startup_self_test() -> dict[str, dict]:
     # this process's own architecture; in Docker mode the builder container
     # is started with --platform linux/amd64, so any host architecture works.
     machine = host_platform.machine().lower()
-    record("architecture", GISO_RUNNER != "local" or machine in {"x86_64", "amd64"},
-           f"{machine} ({GISO_RUNNER} runner)")
+    record(
+        "architecture",
+        GISO_RUNNER != "local" or machine in {"x86_64", "amd64"},
+        f"{machine} ({GISO_RUNNER} runner)",
+    )
     return results
 
 
@@ -3737,8 +4532,12 @@ def log_startup_self_test_once() -> None:
     startup_self_test_logged = True
     for name, result in startup_self_test().items():
         if not result["ok"]:
-            log_event("startup_self_test_failed", check=name, required=result["required"],
-                      detail=result["detail"])
+            log_event(
+                "startup_self_test_failed",
+                check=name,
+                required=result["required"],
+                detail=result["detail"],
+            )
 
 
 @app.get("/api/ready")
@@ -3749,8 +4548,13 @@ def ready():
         docker_ok = os.access(GISOBUILD_PYTHON, os.X_OK)
     else:
         try:
-            subprocess.run([DOCKER_BIN, "info"], timeout=5, check=True,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                [DOCKER_BIN, "info"],
+                timeout=5,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             docker_ok = True
         except (OSError, subprocess.SubprocessError):
             pass
@@ -3775,7 +4579,8 @@ def ready():
     }
     self_test = startup_self_test()
     is_ready = all(checks.values()) and all(
-        result["ok"] for result in self_test.values() if result["required"])
+        result["ok"] for result in self_test.values() if result["required"]
+    )
     return jsonify(ok=is_ready, self_test=self_test, **checks), 200 if is_ready else 503
 
 
@@ -3810,7 +4615,10 @@ def gisobuild_commit() -> str | None:
     try:
         result = subprocess.run(
             ["git", "-C", str(TOOL), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=5, check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return recorded
@@ -3876,7 +4684,9 @@ def file_preview():
         raise BadRequest("Path is not a file")
     size = path.stat().st_size
     if size > MAX_FILE_PREVIEW_BYTES:
-        return jsonify(previewable=False, reason="File is too large to preview here", size=size)
+        return jsonify(
+            previewable=False, reason="File is too large to preview here", size=size
+        )
     try:
         text = path.read_bytes().decode("utf-8")
     except UnicodeDecodeError:
@@ -3895,18 +4705,25 @@ def smu_recommendation():
         packages, superseded = active_rpm_names()
         iso_architectures = inspect_iso_architecture(iso_path)
         identity_name, identity_from_metadata = iso_identity(iso_path)
-        recommendation = recommend_smu_selection(identity_name, packages, iso_architectures=iso_architectures)
+        recommendation = recommend_smu_selection(
+            identity_name, packages, iso_architectures=iso_architectures
+        )
         recommendation["iso"] = iso_path.name
         recommendation = add_superseded_exclusions(recommendation, superseded)
         recommendation = exclude_unsatisfiable_packages(
-            recommendation, iso, identity_name, iso_architectures)
+            recommendation, iso, identity_name, iso_architectures
+        )
         recommendation = resolve_component_conflicts(recommendation)
         recommendation["unsatisfied_dependencies"] = (
-            unsatisfied_dependencies_for_recommendation(iso, recommendation.get("selected", []))
+            unsatisfied_dependencies_for_recommendation(
+                iso, recommendation.get("selected", [])
+            )
         )
         evidence = selection_evidence(iso, recommendation.get("selected", []))
         finalize_recommendation(recommendation)
-        recommendation["warnings"] = reword_dependency_warning(recommendation.get("warnings", []), evidence)
+        recommendation["warnings"] = reword_dependency_warning(
+            recommendation.get("warnings", []), evidence
+        )
         recommendation["confidence"] = confidence_report(
             evidence=evidence,
             resolved_platform=recommendation.get("platform"),
@@ -3929,8 +4746,11 @@ def compatibility():
     try:
         iso = cisco_text(body.get("iso"), "base ISO", maximum=4096)
         packages = body.get("packages", [])
-        if (not isinstance(packages, list) or len(packages) > 10000 or
-                not all(isinstance(item, str) and len(item) <= 4096 for item in packages)):
+        if (
+            not isinstance(packages, list)
+            or len(packages) > 10000
+            or not all(isinstance(item, str) and len(item) <= 4096 for item in packages)
+        ):
             raise ValueError("Packages must be a list")
         package_names = package_names_for_validation(packages)
         iso_architectures = frozenset()
@@ -3943,33 +4763,53 @@ def compatibility():
         except ValueError:
             iso_architectures = frozenset()
         smu = validate_smu_selection(
-            identity_name, package_names, iso_architectures=iso_architectures,
+            identity_name,
+            package_names,
+            iso_architectures=iso_architectures,
             full_candidate_packages=active_rpm_names()[0],
         )
         # The same package-level proofs create_build_plan() blocks on, so this
         # manual check can never call a selection compatible that Start would
         # then refuse.
         extra_issues = selection_integrity_blockers(package_names)
-        smu["unsatisfied_dependencies"] = unsatisfied_dependencies_for_recommendation(iso, package_names)
-        extra_issues += [dependency_blocker_text(entry) for entry in smu["unsatisfied_dependencies"]]
+        smu["unsatisfied_dependencies"] = unsatisfied_dependencies_for_recommendation(
+            iso, package_names
+        )
+        extra_issues += [
+            dependency_blocker_text(entry) for entry in smu["unsatisfied_dependencies"]
+        ]
         if extra_issues:
             smu["issues"] = sorted(set(smu["issues"]) | set(extra_issues))
             smu["compatible"] = False
         result = {"smu": smu, "upgrade": None}
         matrix_name = body.get("matrix", "")
         if matrix_name:
-            matrix_path = safe_data_path(cisco_text(matrix_name, "compatibility matrix", maximum=4096))
-            if matrix_path.suffix.lower() != ".json" or matrix_path.stat().st_size > 1024 * 1024:
-                raise ValueError("Compatibility matrix must be a JSON file smaller than 1 MiB")
+            matrix_path = safe_data_path(
+                cisco_text(matrix_name, "compatibility matrix", maximum=4096)
+            )
+            if (
+                matrix_path.suffix.lower() != ".json"
+                or matrix_path.stat().st_size > 1024 * 1024
+            ):
+                raise ValueError(
+                    "Compatibility matrix must be a JSON file smaller than 1 MiB"
+                )
             matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
             result["upgrade"] = check_upgrade_matrix(
-                matrix, cisco_text(body.get("source_release"), "source release"),
+                matrix,
+                cisco_text(body.get("source_release"), "source release"),
                 cisco_text(body.get("target_release"), "target release"),
                 cisco_text(body.get("platform"), "platform"),
                 package_names,
             )
         return jsonify(result)
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
+    except (
+        OSError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        TypeError,
+        ValueError,
+    ) as exc:
         return jsonify(error=str(exc)), 400
 
 
@@ -3985,8 +4825,9 @@ def build_plan():
 @app.get("/api/cisco/config")
 def cisco_config():
     try:
-        enabled = bool(secret_value("CISCO_CLIENT_ID") and
-                       secret_value("CISCO_CLIENT_SECRET"))
+        enabled = bool(
+            secret_value("CISCO_CLIENT_ID") and secret_value("CISCO_CLIENT_SECRET")
+        )
     except CiscoDownloadError:
         enabled = False
     return jsonify(enabled=enabled)
@@ -4001,60 +4842,95 @@ def cisco_search():
         target = cisco_text(body.get("target_release"), "target release")
         response = cisco_client().search(pid, current, target)
         images = find_cisco_images(response)
-        transaction_id = cisco_text(response.get("metadataTransId"), "transaction ID", maximum=40)
+        transaction_id = cisco_text(
+            response.get("metadataTransId"), "transaction ID", maximum=40
+        )
     except (ValueError, CiscoDownloadError) as exc:
         log_event("cisco_search_failed", error_type=type(exc).__name__)
         return cisco_failure(exc)
     search_id = uuid.uuid4().hex
     with cisco_lock:
         cisco_searches.clear()
-        cisco_searches[search_id] = {"created": time.time(), "pid": pid,
-                                     "transaction_id": transaction_id,
-                                     "images": {item["guid"]: item for item in images}}
+        cisco_searches[search_id] = {
+            "created": time.time(),
+            "pid": pid,
+            "transaction_id": transaction_id,
+            "images": {item["guid"]: item for item in images},
+        }
     log_event("cisco_search_completed", images=len(images), search_id=search_id)
     append_activity(f"Cisco search completed: {len(images)} software files available.")
     return jsonify(id=search_id, images=images)
 
 
-def run_cisco_download(job_id: str, search: dict, selected: list[dict], downloads: list[dict]) -> None:
+def run_cisco_download(
+    job_id: str, search: dict, selected: list[dict], downloads: list[dict]
+) -> None:
     with cisco_lock:
         job = cisco_download_jobs[job_id]
     created_files: list[Path] = []
     try:
         for number, item in enumerate(selected, 1):
-            remote = next((entry for entry in downloads if entry.get("imageGuid") == item["guid"]), None)
+            remote = next(
+                (
+                    entry
+                    for entry in downloads
+                    if entry.get("imageGuid") == item["guid"]
+                ),
+                None,
+            )
             if not remote or not remote.get("url"):
                 raise CiscoDownloadError("Cisco did not return a download URL")
             name = upload_name(item["name"])
             target = DATA / name
-            while target.exists() or (extraction_path(target) and extraction_path(target).exists()):
+            while target.exists() or (
+                extraction_path(target) and extraction_path(target).exists()
+            ):
                 stem, suffix = split_upload_name(name)
                 target = DATA / f"{stem}-{uuid.uuid4().hex[:8]}{suffix}"
-            def update_progress(written: int, total: int, file_number: int = number) -> None:
+
+            def update_progress(
+                written: int, total: int, file_number: int = number
+            ) -> None:
                 file_fraction = written / total if total else 0
-                progress = int(((file_number - 1 + file_fraction) / len(selected)) * 100)
+                progress = int(
+                    ((file_number - 1 + file_fraction) / len(selected)) * 100
+                )
                 with cisco_lock:
                     job.update(status="downloading", progress=min(progress, 99))
 
             with cisco_lock:
-                job.update(status="downloading", progress=(number - 1) * 100 // len(selected))
+                job.update(
+                    status="downloading", progress=(number - 1) * 100 // len(selected)
+                )
             append_activity(f"Cisco download {number} of {len(selected)} started.")
             result = cisco_client().download(
-                str(remote["url"]), target, expected_size=item["size"],
-                max_bytes=MAX_UPLOAD_BYTES, cloud_token=str(remote.get("token", "")),
-                expected_md5=item["md5"], expected_sha512=item["sha512"],
+                str(remote["url"]),
+                target,
+                expected_size=item["size"],
+                max_bytes=MAX_UPLOAD_BYTES,
+                cloud_token=str(remote.get("token", "")),
+                expected_md5=item["md5"],
+                expected_sha512=item["sha512"],
                 progress=update_progress,
             )
             created_files.append(result.path)
             record_provenance(result.path, result.sha256, "cisco-download")
             extracted = extract_cisco_archive(result.path)
             with cisco_lock:
-                job["files"].append({"name": result.path.name, "size": result.size,
-                                     "sha256": result.sha256, "extracted": extracted})
+                job["files"].append(
+                    {
+                        "name": result.path.name,
+                        "size": result.size,
+                        "sha256": result.sha256,
+                        "extracted": extracted,
+                    }
+                )
                 job.update(status="verifying", progress=number * 100 // len(selected))
         with cisco_lock:
             job.update(status="ready", progress=100)
-        append_activity(f"Cisco download completed: {len(selected)} files verified and ready.")
+        append_activity(
+            f"Cisco download completed: {len(selected)} files verified and ready."
+        )
         log_event("cisco_download_completed", files=len(selected), job_id=job_id)
     except (CiscoDownloadError, OSError, ValueError) as exc:
         for path in created_files:
@@ -4065,7 +4941,9 @@ def run_cisco_download(job_id: str, search: dict, selected: list[dict], download
         with cisco_lock:
             job.update(status="failed", error=str(exc), files=[])
         log_event("cisco_download_failed", error_type=type(exc).__name__, job_id=job_id)
-        append_activity("Cisco download failed. Check the Cisco access status and technical details.")
+        append_activity(
+            "Cisco download failed. Check the Cisco access status and technical details."
+        )
 
 
 @app.post("/api/cisco/downloads")
@@ -4076,8 +4954,12 @@ def cisco_download_start():
     guids = body.get("image_guids")
     if not search or time.time() - search["created"] > 3300:
         return jsonify(error="Cisco search has expired; search again"), 410
-    if (not isinstance(guids, list) or not 1 <= len(guids) <= 5 or
-            any(not isinstance(x, str) for x in guids) or len(set(guids)) != len(guids)):
+    if (
+        not isinstance(guids, list)
+        or not 1 <= len(guids) <= 5
+        or any(not isinstance(x, str) for x in guids)
+        or len(set(guids)) != len(guids)
+    ):
         return jsonify(error="Select between one and five unique Cisco files"), 400
     job_id = uuid.uuid4().hex
     with operation_lock:
@@ -4091,23 +4973,39 @@ def cisco_download_start():
             return jsonify(error=docker_busy_message("Starting a Cisco download")), 409
         with cisco_lock:
             if cisco_download_running():
-                return jsonify(error="Wait for the current Cisco download to finish"), 409
+                return jsonify(
+                    error="Wait for the current Cisco download to finish"
+                ), 409
             cisco_download_jobs.clear()
             cisco_download_jobs[job_id] = {
-                "id": job_id, "status": "authenticating", "progress": 0,
-                "files": [], "error": "", "created": time.time(),
+                "id": job_id,
+                "status": "authenticating",
+                "progress": 0,
+                "files": [],
+                "error": "",
+                "created": time.time(),
             }
     try:
         selected = [search["images"][guid] for guid in guids]
-        if any(item["size"] <= 0 or item["size"] > MAX_UPLOAD_BYTES for item in selected):
+        if any(
+            item["size"] <= 0 or item["size"] > MAX_UPLOAD_BYTES for item in selected
+        ):
             raise CiscoDownloadError("A selected Cisco file has an invalid size")
-        if shutil.disk_usage(DATA).free < sum(item["size"] for item in selected) + MIN_FREE_BYTES:
-            raise CiscoDownloadError("Not enough free disk space for the Cisco download")
+        if (
+            shutil.disk_usage(DATA).free
+            < sum(item["size"] for item in selected) + MIN_FREE_BYTES
+        ):
+            raise CiscoDownloadError(
+                "Not enough free disk space for the Cisco download"
+            )
         mdf_ids = {item["mdf_id"] for item in selected}
         if len(mdf_ids) != 1 or not next(iter(mdf_ids)):
-            raise CiscoDownloadError("Selected Cisco files do not share valid product metadata")
-        response = cisco_client().request_download(search["pid"], next(iter(mdf_ids)),
-                                                   search["transaction_id"], guids)
+            raise CiscoDownloadError(
+                "Selected Cisco files do not share valid product metadata"
+            )
+        response = cisco_client().request_download(
+            search["pid"], next(iter(mdf_ids)), search["transaction_id"], guids
+        )
     except (KeyError, CiscoDownloadError) as exc:
         with cisco_lock:
             cisco_download_jobs.pop(job_id, None)
@@ -4116,17 +5014,33 @@ def cisco_download_start():
     k9_required = cisco_response_requires(response, "k9Content")
     acceptance_required = eula_required or k9_required
     downloads = response.get("downloads") or []
-    job = {"id": job_id, "status": "eula-required" if acceptance_required else "downloading",
-           "progress": 0, "files": [], "error": "", "created": time.time()}
+    job = {
+        "id": job_id,
+        "status": "eula-required" if acceptance_required else "downloading",
+        "progress": 0,
+        "files": [],
+        "error": "",
+        "created": time.time(),
+    }
     with cisco_lock:
         cisco_download_jobs[job_id] = job
     if acceptance_required:
-        job["pending"] = {"search": search, "selected": selected, "downloads": downloads,
-                          "eula_required": eula_required, "k9_required": k9_required}
-        return jsonify({key: value for key, value in job.items() if key != "pending"} |
-                       {"agreement": {"eula": eula_required, "k9": k9_required}}), 202
-    threading.Thread(target=run_cisco_download, args=(job_id, search, selected, downloads),
-                     daemon=True).start()
+        job["pending"] = {
+            "search": search,
+            "selected": selected,
+            "downloads": downloads,
+            "eula_required": eula_required,
+            "k9_required": k9_required,
+        }
+        return jsonify(
+            {key: value for key, value in job.items() if key != "pending"}
+            | {"agreement": {"eula": eula_required, "k9": k9_required}}
+        ), 202
+    threading.Thread(
+        target=run_cisco_download,
+        args=(job_id, search, selected, downloads),
+        daemon=True,
+    ).start()
     return jsonify(job), 202
 
 
@@ -4146,21 +5060,32 @@ def cisco_accept(job_id: str):
             client.accept_eula(names)
         if pending["k9_required"]:
             for name in names:
-                client.accept_k9(name, commercial_or_civil=body.get("commercial_or_civil") is True,
-                                  not_government_or_military=body.get("not_government_or_military") is True)
-        response = client.request_download(pending["search"]["pid"], pending["selected"][0]["mdf_id"],
-                                           pending["search"]["transaction_id"],
-                                           [item["guid"] for item in pending["selected"]])
+                client.accept_k9(
+                    name,
+                    commercial_or_civil=body.get("commercial_or_civil") is True,
+                    not_government_or_military=body.get("not_government_or_military")
+                    is True,
+                )
+        response = client.request_download(
+            pending["search"]["pid"],
+            pending["selected"][0]["mdf_id"],
+            pending["search"]["transaction_id"],
+            [item["guid"] for item in pending["selected"]],
+        )
     except CiscoDownloadError as exc:
         return cisco_failure(exc)
-    if cisco_response_requires(response, "eulaContent") or cisco_response_requires(response, "k9Content"):
+    if cisco_response_requires(response, "eulaContent") or cisco_response_requires(
+        response, "k9Content"
+    ):
         return jsonify(error="Cisco still requires agreement confirmation"), 409
     downloads = response.get("downloads") or []
     job.pop("pending", None)
     job["status"] = "downloading"
-    threading.Thread(target=run_cisco_download,
-                     args=(job_id, pending["search"], pending["selected"], downloads),
-                     daemon=True).start()
+    threading.Thread(
+        target=run_cisco_download,
+        args=(job_id, pending["search"], pending["selected"], downloads),
+        daemon=True,
+    ).start()
     return jsonify(job), 202
 
 
@@ -4181,14 +5106,25 @@ def archive_list():
     items = []
     with cross_process_archive_lock():
         if ARCHIVE.exists():
-            paths = [path for path in ARCHIVE.glob("*/*")
-                     if path.is_file() and path.suffix.lower() in {".iso", ".zip"}]
-            for path in sorted(paths, key=lambda item: item.stat().st_mtime, reverse=True):
+            paths = [
+                path
+                for path in ARCHIVE.glob("*/*")
+                if path.is_file() and path.suffix.lower() in {".iso", ".zip"}
+            ]
+            for path in sorted(
+                paths, key=lambda item: item.stat().st_mtime, reverse=True
+            ):
                 stat = path.stat()
-                items.append({"job_id": path.parent.name, "name": path.name,
-                              "size": stat.st_size, "created": stat.st_mtime,
-                              "url": f"/archive/{path.parent.name}/{path.name}",
-                              "has_report": (path.parent / "build-report.json").is_file()})
+                items.append(
+                    {
+                        "job_id": path.parent.name,
+                        "name": path.name,
+                        "size": stat.st_size,
+                        "created": stat.st_mtime,
+                        "url": f"/archive/{path.parent.name}/{path.name}",
+                        "has_report": (path.parent / "build-report.json").is_file(),
+                    }
+                )
     return jsonify(items)
 
 
@@ -4208,13 +5144,19 @@ def archive_checksums(job_id: str, name: str):
 def cleanup():
     with operation_lock:
         if cisco_download_running():
-            return jsonify(error="Temporary files cannot be cleaned during a Cisco download"), 409
+            return jsonify(
+                error="Temporary files cannot be cleaned during a Cisco download"
+            ), 409
         with job_lock:
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
-                return jsonify(error="Temporary files cannot be cleaned while a build is running"), 409
+                return jsonify(
+                    error="Temporary files cannot be cleaned while a build is running"
+                ), 409
         with upload_lock:
             if uploads_in_progress():
-                return jsonify(error="Temporary files cannot be cleaned while an upload is active"), 409
+                return jsonify(
+                    error="Temporary files cannot be cleaned while an upload is active"
+                ), 409
             # Idle, resumable sessions lose their partial files below; drop them too.
             idle_sessions = list(uploads)
             uploads.clear()
@@ -4255,7 +5197,8 @@ def cleanup():
             for job_id, job in jobs.items():
                 artifacts = job.get("artifacts", [])
                 retained = [
-                    artifact for artifact in artifacts
+                    artifact
+                    for artifact in artifacts
                     if str(artifact.get("url", "")).startswith("/archive/")
                 ]
                 if len(retained) != len(artifacts):
@@ -4265,16 +5208,25 @@ def cleanup():
                     changed_jobs.append(job_id)
         for job_id in changed_jobs:
             persist_job(job_id)
-        log_event("workspace_cleanup", cleared_artifacts=cleared_artifacts,
-                  removed_bytes=removed_bytes, removed_items=removed_items, **removed_by_area)
+        log_event(
+            "workspace_cleanup",
+            cleared_artifacts=cleared_artifacts,
+            removed_bytes=removed_bytes,
+            removed_items=removed_items,
+            **removed_by_area,
+        )
         append_activity(
             f"Workspace cleanup completed: {removed_items} top-level items and "
             f"{removed_bytes} bytes removed; completed archives were kept."
         )
-    return jsonify(ok=True, removed_bytes=removed_bytes, removed_items=removed_items,
-                   cleared_artifacts=cleared_artifacts,
-                   removed=removed_by_area,
-                   message="Uploads, partial files, build work, and raw output were removed. Archived images were kept.")
+    return jsonify(
+        ok=True,
+        removed_bytes=removed_bytes,
+        removed_items=removed_items,
+        cleared_artifacts=cleared_artifacts,
+        removed=removed_by_area,
+        message="Uploads, partial files, build work, and raw output were removed. Archived images were kept.",
+    )
 
 
 @app.post("/api/uploads/init")
@@ -4287,15 +5239,36 @@ def upload_init():
     size = body.get("size")
     if isinstance(size, bool) or not isinstance(size, int):
         return jsonify(error="Upload size must be an integer"), 400
-    allowed = (".iso", ".rpm", *ARCHIVE_SUFFIXES, ".yaml", ".yml", ".cfg", ".ini", ".sh", ".cms", ".txt", ".json")
-    if not name or size <= 0 or size > MAX_UPLOAD_BYTES or not name.lower().endswith(allowed):
+    allowed = (
+        ".iso",
+        ".rpm",
+        *ARCHIVE_SUFFIXES,
+        ".yaml",
+        ".yml",
+        ".cfg",
+        ".ini",
+        ".sh",
+        ".cms",
+        ".txt",
+        ".json",
+    )
+    if (
+        not name
+        or size <= 0
+        or size > MAX_UPLOAD_BYTES
+        or not name.lower().endswith(allowed)
+    ):
         return jsonify(error="Unsupported file or invalid size"), 400
     with operation_lock:
         if cisco_download_running():
-            return jsonify(error="Wait for the Cisco download to finish before uploading"), 409
+            return jsonify(
+                error="Wait for the Cisco download to finish before uploading"
+            ), 409
         with job_lock:
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
-                return jsonify(error="Wait for the current build to finish before uploading more files"), 409
+                return jsonify(
+                    error="Wait for the current build to finish before uploading more files"
+                ), 409
         if docker_build_running():
             return jsonify(error=docker_busy_message("Uploading")), 409
         with upload_lock:
@@ -4310,8 +5283,14 @@ def upload_init():
             parts.mkdir(parents=True, exist_ok=True)
             temp = parts / f"{upload_id}.part"
             temp.touch()
-            uploads[upload_id] = {"id": upload_id, "name": name, "size": size, "received": 0,
-                                  "temp": str(temp), "updated": time.time()}
+            uploads[upload_id] = {
+                "id": upload_id,
+                "name": name,
+                "size": size,
+                "received": 0,
+                "temp": str(temp),
+                "updated": time.time(),
+            }
             save_upload_session(upload_id, uploads[upload_id])
     log_event("upload_started", bytes=size, upload_id=upload_id)
     append_activity(f"Upload started: {size} bytes expected.")
@@ -4332,7 +5311,9 @@ def upload_chunk(upload_id: str):
         except ValueError:
             return jsonify(error="Invalid chunk offset"), 400
         if offset != item["received"]:
-            return jsonify(error="Unexpected chunk offset", expected=item["received"]), 409
+            return jsonify(
+                error="Unexpected chunk offset", expected=item["received"]
+            ), 409
         if item["received"] + len(chunk) > item["size"]:
             return jsonify(error="Upload exceeds declared size"), 400
         with open(item["temp"], "ab") as handle:
@@ -4346,8 +5327,13 @@ def upload_chunk(upload_id: str):
         previous = item.get("reported_percent", -10)
         if percent >= previous + 10 or item["received"] == item["size"]:
             item["reported_percent"] = percent
-            log_event("upload_progress", percent=percent, received_bytes=item["received"],
-                      total_bytes=item["size"], upload_id=upload_id)
+            log_event(
+                "upload_progress",
+                percent=percent,
+                received_bytes=item["received"],
+                total_bytes=item["size"],
+                upload_id=upload_id,
+            )
             append_activity(
                 f"Upload progress: {percent}% ({item['received']} of {item['size']} bytes)."
             )
@@ -4393,7 +5379,9 @@ def upload_complete(upload_id: str):
         item["completing"] = True
     with upload_lock:
         target = DATA / item["name"]
-        while target.exists() or (extraction_path(target) and extraction_path(target).exists()):
+        while target.exists() or (
+            extraction_path(target) and extraction_path(target).exists()
+        ):
             stem, suffix = split_upload_name(item["name"])
             target = DATA / f"{stem}-{uuid.uuid4().hex[:8]}{suffix}"
         Path(item["temp"]).replace(target)
@@ -4408,17 +5396,26 @@ def upload_complete(upload_id: str):
                 members = archive.getmembers()
                 if len(members) > MAX_TAR_MEMBERS:
                     raise ValueError("Tar archive contains too many files")
-                expanded_size = sum(member.size for member in members if member.isfile())
+                expanded_size = sum(
+                    member.size for member in members if member.isfile()
+                )
                 if expanded_size > MAX_EXTRACTED_BYTES:
                     raise ValueError("Expanded tar archive is too large")
                 if shutil.disk_usage(DATA).free < expanded_size + MIN_FREE_BYTES:
-                    raise ValueError("Not enough free disk space to extract tar archive")
+                    raise ValueError(
+                        "Not enough free disk space to extract tar archive"
+                    )
                 for member in members:
                     member_target = (destination / member.name).resolve()
-                    if destination.resolve() not in member_target.parents and member_target != destination.resolve():
+                    if (
+                        destination.resolve() not in member_target.parents
+                        and member_target != destination.resolve()
+                    ):
                         raise ValueError("Unsafe path in tar archive")
                     if member.issym() or member.islnk():
-                        raise ValueError("Links are not accepted in uploaded tar archives")
+                        raise ValueError(
+                            "Links are not accepted in uploaded tar archives"
+                        )
                 archive.extractall(destination, members=members, filter="data")
                 extracted = sum(1 for member in members if member.isfile())
     except ValueError as exc:
@@ -4430,16 +5427,24 @@ def upload_complete(upload_id: str):
         if archive_suffix(target.name):
             shutil.rmtree(destination, ignore_errors=True)
         target.unlink(missing_ok=True)
-        log_event("upload_archive_failed", error_type=type(exc).__name__, upload_id=upload_id)
+        log_event(
+            "upload_archive_failed", error_type=type(exc).__name__, upload_id=upload_id
+        )
         return jsonify(error="Tar archive could not be read safely"), 400
     finally:
         with upload_lock:
             uploads.pop(upload_id, None)
         forget_upload_session(upload_id)
-    log_event("upload_completed", bytes=target.stat().st_size, extracted_files=extracted,
-              upload_id=upload_id)
+    log_event(
+        "upload_completed",
+        bytes=target.stat().st_size,
+        extracted_files=extracted,
+        upload_id=upload_id,
+    )
     if extracted:
-        append_activity(f"Upload completed and archive extracted: {extracted} files ready.")
+        append_activity(
+            f"Upload completed and archive extracted: {extracted} files ready."
+        )
     else:
         append_activity("Upload completed and file is ready.")
     return jsonify(path=target.name, size=target.stat().st_size, extracted=extracted)
@@ -4456,7 +5461,9 @@ def delete_upload(name: str):
             abort(404)
         with job_lock:
             if any(job["status"] in ACTIVE_JOB_STATUSES for job in jobs.values()):
-                return jsonify(error="Inputs cannot be deleted while a build is running"), 409
+                return jsonify(
+                    error="Inputs cannot be deleted while a build is running"
+                ), 409
         if docker_build_running():
             return jsonify(error=docker_busy_message("Deleting inputs")), 409
         destination = extraction_path(path)
@@ -4482,10 +5489,14 @@ def create_job():
     preflight_started = time.time()
     with operation_lock:
         if cisco_download_running():
-            return jsonify(error="Wait for the Cisco download to finish before starting a build"), 409
+            return jsonify(
+                error="Wait for the Cisco download to finish before starting a build"
+            ), 409
         with upload_lock:
             if uploads_in_progress():
-                return jsonify(error="Wait for all uploads to finish before starting the build"), 409
+                return jsonify(
+                    error="Wait for all uploads to finish before starting the build"
+                ), 409
         if docker_build_running():
             return jsonify(error=docker_busy_message("Starting a build")), 409
         with job_lock:
@@ -4493,26 +5504,39 @@ def create_job():
                 return jsonify(error="A build is already running"), 409
         plan = create_build_plan(payload)
         if not plan["ready"]:
-            return jsonify(error="BuildPlan is blocked: " + "; ".join(plan["blockers"]),
-                           plan=plan), 400
+            return jsonify(
+                error="BuildPlan is blocked: " + "; ".join(plan["blockers"]), plan=plan
+            ), 400
         confirmed_fingerprint = payload.get("confirmed_plan_fingerprint")
         if confirmed_fingerprint and confirmed_fingerprint != plan["fingerprint"]:
-            return jsonify(error="Inventory changed since this BuildPlan was reviewed; "
-                                 "refresh and confirm the new plan before building",
-                           plan=plan), 409
+            return jsonify(
+                error="Inventory changed since this BuildPlan was reviewed; "
+                "refresh and confirm the new plan before building",
+                plan=plan,
+            ), 409
         payload["pkglist"] = [item["id"] for item in plan["selected_packages"]]
         payload["automatic_smu_selection"] = False
         job_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         with job_lock:
             if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
                 return jsonify(error="A build is already running"), 409
-            jobs[job_id] = {"id": job_id, "status": "queued", "created": time.time(),
-                            "updated": time.time(), "progress": 1, "phase": "Validating inputs",
-                            "log": "", "artifacts": [], "payload": payload, "command": [],
-                            "inventory_revision": plan["inventory_revision"],
-                            "plan_fingerprint": plan["fingerprint"], "build_plan": plan,
-                            "stage": "preflight",
-                            "stages": [{"stage": "preflight", "started": preflight_started}]}
+            jobs[job_id] = {
+                "id": job_id,
+                "status": "queued",
+                "created": time.time(),
+                "updated": time.time(),
+                "progress": 1,
+                "phase": "Validating inputs",
+                "log": "",
+                "artifacts": [],
+                "payload": payload,
+                "command": [],
+                "inventory_revision": plan["inventory_revision"],
+                "plan_fingerprint": plan["fingerprint"],
+                "build_plan": plan,
+                "stage": "preflight",
+                "stages": [{"stage": "preflight", "started": preflight_started}],
+            }
         try:
             command = build_command(payload, job_id)
             cleanup_paths = build_cleanup_paths(payload, plan["selected_packages"])
@@ -4523,20 +5547,34 @@ def create_job():
         except Exception as exc:  # noqa: BLE001 - setup failures become a stable API error
             with job_lock:
                 jobs.pop(job_id, None)
-            log_event("build_setup_failed", error_type=type(exc).__name__, job_id=job_id,
-                      inventory_revision=plan["inventory_revision"], plan_fingerprint=plan["fingerprint"])
-            return jsonify(error="Build setup failed; inspect the service log using the request ID"), 503
+            log_event(
+                "build_setup_failed",
+                error_type=type(exc).__name__,
+                job_id=job_id,
+                inventory_revision=plan["inventory_revision"],
+                plan_fingerprint=plan["fingerprint"],
+            )
+            return jsonify(
+                error="Build setup failed; inspect the service log using the request ID"
+            ), 503
         with job_lock:
-            jobs[job_id].update(status="running", progress=3, phase="Preparing build",
-                                command=command, command_preview=command_preview(command),
-                                cleanup_paths=[str(path) for path in cleanup_paths])
+            jobs[job_id].update(
+                status="running",
+                progress=3,
+                phase="Preparing build",
+                command=command,
+                command_preview=command_preview(command),
+                cleanup_paths=[str(path) for path in cleanup_paths],
+            )
         with store_lock, sqlite3.connect(JOB_DB) as database:
             rows = database.execute(
                 "SELECT text FROM activity ORDER BY id DESC LIMIT 50"
             ).fetchall()
         recent_activity = "\n".join(row[0] for row in reversed(rows))
         if recent_activity:
-            append_log(job_id, "Upload and workspace activity:\n" + recent_activity + "\n\n")
+            append_log(
+                job_id, "Upload and workspace activity:\n" + recent_activity + "\n\n"
+            )
         persist_job(job_id)
     threading.Thread(target=run_job, args=(job_id, command), daemon=True).start()
     return jsonify(id=job_id), 202
@@ -4551,7 +5589,9 @@ def get_job(job_id: str):
         return jsonify(public_job(job))
 
 
-def terminate_process_group(process: subprocess.Popen, grace_seconds: float = 20) -> None:
+def terminate_process_group(
+    process: subprocess.Popen, grace_seconds: float = 20
+) -> None:
     """Stop a local build and everything it started, leaving no orphans.
 
     Builds run with start_new_session=True, so the process ID is also the
@@ -4608,22 +5648,33 @@ def cancel_job(job_id: str):
         return jsonify(ok=True)
     if process_phase == "pulling" or not process_was_running or GISO_RUNNER == "local":
         with job_lock:
-            jobs[job_id].update(status="cancelled", phase="Cancelled", finished=time.time(),
-                                updated=time.time())
+            jobs[job_id].update(
+                status="cancelled",
+                phase="Cancelled",
+                finished=time.time(),
+                updated=time.time(),
+            )
         enter_stage(job_id, "cancelled")
         append_log(job_id, "\nBuild cancelled by user.\n")
         persist_job(job_id)
         return jsonify(ok=True)
     try:
-        subprocess.run([DOCKER_BIN, "stop", "--time", "10", f"giso-build-{job_id}"],
-                       timeout=20, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            [DOCKER_BIN, "stop", "--time", "10", f"giso-build-{job_id}"],
+            timeout=20,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         with job_lock:
             jobs[job_id]["status"] = "running"
         append_log(job_id, f"\nUnable to stop the build container: {exc}\n")
         return jsonify(error="The build container could not be stopped"), 503
     with job_lock:
-        jobs[job_id].update(status="cancelled", finished=time.time(), updated=time.time())
+        jobs[job_id].update(
+            status="cancelled", finished=time.time(), updated=time.time()
+        )
     enter_stage(job_id, "cancelled")
     append_log(job_id, "\nBuild cancelled by user.\n")
     persist_job(job_id)

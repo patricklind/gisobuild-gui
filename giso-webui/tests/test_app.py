@@ -16,7 +16,9 @@ from unittest.mock import MagicMock, patch
 
 import app as module
 
-ISOINFO_AVAILABLE = shutil.which("genisoimage") is not None and Path(module.ISOINFO_BIN).exists()
+ISOINFO_AVAILABLE = (
+    shutil.which("genisoimage") is not None and Path(module.ISOINFO_BIN).exists()
+)
 
 
 class GisoWebTests(unittest.TestCase):
@@ -54,7 +56,9 @@ class GisoWebTests(unittest.TestCase):
         # Never ask a real Docker daemon about images from a unit test.
         self.cached_image = patch("app.local_builder_image_id", return_value=None)
         self.cached_image.start()
-        self.disk_usage = patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=100 * 1024**3))
+        self.disk_usage = patch(
+            "app.shutil.disk_usage", return_value=SimpleNamespace(free=100 * 1024**3)
+        )
         self.disk_usage.start()
         self.client = module.app.test_client()
 
@@ -68,7 +72,9 @@ class GisoWebTests(unittest.TestCase):
         self.temp.cleanup()
 
     def upload(self, name, content):
-        response = self.client.post("/api/uploads/init", json={"name": name, "size": len(content)})
+        response = self.client.post(
+            "/api/uploads/init", json={"name": name, "size": len(content)}
+        )
         self.assertEqual(response.status_code, 200)
         upload_id = response.get_json()["id"]
         response = self.client.put(f"/api/uploads/{upload_id}?offset=0", data=content)
@@ -84,7 +90,13 @@ class GisoWebTests(unittest.TestCase):
         self.assertIsNone(body["gisobuild_commit"])
 
     def test_version_reports_the_image_source_revision_and_build_date(self):
-        with patch.dict(os.environ, {"SOURCE_REVISION": "0123456789abcdef", "BUILD_DATE": "2026-09-17T08:00:00Z"}):
+        with patch.dict(
+            os.environ,
+            {
+                "SOURCE_REVISION": "0123456789abcdef",
+                "BUILD_DATE": "2026-09-17T08:00:00Z",
+            },
+        ):
             body = self.client.get("/api/version").get_json()
         self.assertEqual(body["source_revision"], "0123456789abcdef")
         self.assertEqual(body["build_date"], "2026-09-17T08:00:00Z")
@@ -111,8 +123,13 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.get_json(), {"enabled": True})
         self.assertNotIn("secret", response.get_data(as_text=True))
 
-    @patch.dict(os.environ, {"CISCO_CLIENT_ID_FILE": "/missing/client-id",
-                             "CISCO_CLIENT_SECRET_FILE": "/missing/client-secret"})
+    @patch.dict(
+        os.environ,
+        {
+            "CISCO_CLIENT_ID_FILE": "/missing/client-id",
+            "CISCO_CLIENT_SECRET_FILE": "/missing/client-secret",
+        },
+    )
     def test_cisco_config_is_disabled_when_secret_files_are_absent(self):
         response = self.client.get("/api/cisco/config")
         self.assertEqual(response.get_json(), {"enabled": False})
@@ -121,17 +138,39 @@ class GisoWebTests(unittest.TestCase):
     def test_cisco_search_returns_safe_normalized_metadata(self, client):
         client.return_value.search.return_value = {
             "metadataTransId": "transaction",
-            "metadata": [{"products": [{"mdfId": 42, "releases": [{
-                "version": "26.1.2", "images": [{
-                "imageGuid": "A" * 40, "name": "ncs5500-mini-x-26.1.2.iso",
-                "size": "100", "md5": "b" * 32, "sha512": "c" * 128,
-            }]}],
-            }]}],
+            "metadata": [
+                {
+                    "products": [
+                        {
+                            "mdfId": 42,
+                            "releases": [
+                                {
+                                    "version": "26.1.2",
+                                    "images": [
+                                        {
+                                            "imageGuid": "A" * 40,
+                                            "name": "ncs5500-mini-x-26.1.2.iso",
+                                            "size": "100",
+                                            "md5": "b" * 32,
+                                            "sha512": "c" * 128,
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ],
             "access_token": "must-not-leak",
         }
-        response = self.client.post("/api/cisco/search", json={
-            "pid": "NCS-5501-SE", "current_release": "25.1.2", "target_release": "26.1.2",
-        })
+        response = self.client.post(
+            "/api/cisco/search",
+            json={
+                "pid": "NCS-5501-SE",
+                "current_release": "25.1.2",
+                "target_release": "26.1.2",
+            },
+        )
         self.assertEqual(response.status_code, 200)
         body = response.get_json()
         self.assertEqual(body["images"][0]["mdf_id"], "42")
@@ -144,16 +183,36 @@ class GisoWebTests(unittest.TestCase):
     def test_cisco_download_link_stays_server_side(self, client, thread):
         guid = "A" * 40
         module.cisco_searches["search"] = {
-            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
-            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
-                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+            "created": time.time(),
+            "pid": "NCS-5501-SE",
+            "transaction_id": "transaction",
+            "images": {
+                guid: {
+                    "guid": guid,
+                    "name": "image.iso",
+                    "size": 100,
+                    "release": "26.1.2",
+                    "mdf_id": "42",
+                    "md5": "",
+                    "sha512": "",
+                }
+            },
         }
         client.return_value.request_download.return_value = {
-            "downloads": [{"imageGuid": guid, "url": "https://download.cisco.com/private?token=secret"}]
+            "downloads": [
+                {
+                    "imageGuid": guid,
+                    "url": "https://download.cisco.com/private?token=secret",
+                }
+            ]
         }
-        response = self.client.post("/api/cisco/downloads", json={
-            "search_id": "search", "image_guids": [guid],
-        })
+        response = self.client.post(
+            "/api/cisco/downloads",
+            json={
+                "search_id": "search",
+                "image_guids": [guid],
+            },
+        )
         self.assertEqual(response.status_code, 202)
         self.assertNotIn("download.cisco.com", response.get_data(as_text=True))
         self.assertEqual(response.get_json()["status"], "downloading")
@@ -163,16 +222,33 @@ class GisoWebTests(unittest.TestCase):
     def test_cisco_download_reports_nested_eula_and_k9_requirements(self, client):
         guid = "A" * 40
         module.cisco_searches["search"] = {
-            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
-            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
-                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+            "created": time.time(),
+            "pid": "NCS-5501-SE",
+            "transaction_id": "transaction",
+            "images": {
+                guid: {
+                    "guid": guid,
+                    "name": "image.iso",
+                    "size": 100,
+                    "release": "26.1.2",
+                    "mdf_id": "42",
+                    "md5": "",
+                    "sha512": "",
+                }
+            },
         }
         client.return_value.request_download.return_value = {
-            "response": {"acceptanceForm": {"eulaContent": "terms", "k9Content": "notice"}}
+            "response": {
+                "acceptanceForm": {"eulaContent": "terms", "k9Content": "notice"}
+            }
         }
-        response = self.client.post("/api/cisco/downloads", json={
-            "search_id": "search", "image_guids": [guid],
-        })
+        response = self.client.post(
+            "/api/cisco/downloads",
+            json={
+                "search_id": "search",
+                "image_guids": [guid],
+            },
+        )
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.get_json()["agreement"], {"eula": True, "k9": True})
         self.assertNotIn("terms", response.get_data(as_text=True))
@@ -182,46 +258,86 @@ class GisoWebTests(unittest.TestCase):
         disk_usage.return_value = shutil._ntuple_diskusage(1000, 999, 1)
         guid = "A" * 40
         module.cisco_searches["search"] = {
-            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
-            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
-                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+            "created": time.time(),
+            "pid": "NCS-5501-SE",
+            "transaction_id": "transaction",
+            "images": {
+                guid: {
+                    "guid": guid,
+                    "name": "image.iso",
+                    "size": 100,
+                    "release": "26.1.2",
+                    "mdf_id": "42",
+                    "md5": "",
+                    "sha512": "",
+                }
+            },
         }
-        response = self.client.post("/api/cisco/downloads", json={
-            "search_id": "search", "image_guids": [guid],
-        })
+        response = self.client.post(
+            "/api/cisco/downloads",
+            json={
+                "search_id": "search",
+                "image_guids": [guid],
+            },
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn("free disk space", response.get_json()["error"])
 
     def test_cisco_download_is_blocked_during_upload_or_build(self):
         guid = "A" * 40
         module.cisco_searches["search"] = {
-            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
-            "images": {guid: {"guid": guid, "name": "image.iso", "size": 100,
-                              "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}},
+            "created": time.time(),
+            "pid": "NCS-5501-SE",
+            "transaction_id": "transaction",
+            "images": {
+                guid: {
+                    "guid": guid,
+                    "name": "image.iso",
+                    "size": 100,
+                    "release": "26.1.2",
+                    "mdf_id": "42",
+                    "md5": "",
+                    "sha512": "",
+                }
+            },
         }
         module.uploads["active"] = {"updated": time.time(), "temp": ""}
-        response = self.client.post("/api/cisco/downloads", json={
-            "search_id": "search", "image_guids": [guid],
-        })
+        response = self.client.post(
+            "/api/cisco/downloads",
+            json={
+                "search_id": "search",
+                "image_guids": [guid],
+            },
+        )
         self.assertEqual(response.status_code, 409)
         self.assertIn("upload", response.get_json()["error"])
         module.uploads.clear()
         module.jobs["active"] = {"status": "running"}
-        response = self.client.post("/api/cisco/downloads", json={
-            "search_id": "search", "image_guids": [guid],
-        })
+        response = self.client.post(
+            "/api/cisco/downloads",
+            json={
+                "search_id": "search",
+                "image_guids": [guid],
+            },
+        )
         self.assertEqual(response.status_code, 409)
         self.assertIn("build", response.get_json()["error"])
 
     def test_cisco_download_rejects_duplicate_file_selection(self):
         guid = "A" * 40
         module.cisco_searches["search"] = {
-            "created": time.time(), "pid": "NCS-5501-SE", "transaction_id": "transaction",
+            "created": time.time(),
+            "pid": "NCS-5501-SE",
+            "transaction_id": "transaction",
             "images": {guid: {"guid": guid, "name": "image.iso", "size": 100}},
         }
-        response = self.client.post("/api/cisco/downloads", json={
-            "search_id": "search", "image_guids": [guid, guid],
-        })
+        response = self.client.post(
+            "/api/cisco/downloads",
+            json={
+                "search_id": "search",
+                "image_guids": [guid, guid],
+            },
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn("unique", response.get_json()["error"])
 
@@ -245,8 +361,12 @@ class GisoWebTests(unittest.TestCase):
             {"imageGuid": "B", "url": "https://download.cisco.com/second.iso"},
         ]
         module.cisco_download_jobs["job"] = {
-            "id": "job", "status": "downloading", "created": time.time(),
-            "progress": 0, "files": [], "error": "",
+            "id": "job",
+            "status": "downloading",
+            "created": time.time(),
+            "progress": 0,
+            "files": [],
+            "error": "",
         }
         module.run_cisco_download("job", {}, selected, downloads)
         self.assertEqual(module.cisco_download_jobs["job"]["status"], "failed")
@@ -265,28 +385,62 @@ class GisoWebTests(unittest.TestCase):
             archive.addfile(info, io.BytesIO(b"rpm"))
 
         def download(_url, target, **_kwargs):
-            content = bundle.getvalue() if target.name.endswith(".tar.gz") else b"cisco iso"
+            content = (
+                bundle.getvalue() if target.name.endswith(".tar.gz") else b"cisco iso"
+            )
             target.write_bytes(content)
-            return SimpleNamespace(path=target, size=len(content),
-                                   sha256=hashlib.sha256(content).hexdigest())
+            return SimpleNamespace(
+                path=target,
+                size=len(content),
+                sha256=hashlib.sha256(content).hexdigest(),
+            )
 
         client.return_value.download.side_effect = download
         selected = [
-            {"guid": "A", "name": "8000-x64-24.3.1-CSCab12345.tar.gz", "size": 1, "md5": "", "sha512": ""},
-            {"guid": "B", "name": "8000-x64-24.3.1.iso", "size": 1, "md5": "", "sha512": ""},
+            {
+                "guid": "A",
+                "name": "8000-x64-24.3.1-CSCab12345.tar.gz",
+                "size": 1,
+                "md5": "",
+                "sha512": "",
+            },
+            {
+                "guid": "B",
+                "name": "8000-x64-24.3.1.iso",
+                "size": 1,
+                "md5": "",
+                "sha512": "",
+            },
         ]
-        downloads = [{"imageGuid": "A", "url": "https://download.cisco.com/a"},
-                     {"imageGuid": "B", "url": "https://download.cisco.com/b"}]
-        module.cisco_download_jobs["job"] = {"id": "job", "status": "downloading", "created": time.time(),
-                                             "progress": 0, "files": [], "error": ""}
+        downloads = [
+            {"imageGuid": "A", "url": "https://download.cisco.com/a"},
+            {"imageGuid": "B", "url": "https://download.cisco.com/b"},
+        ]
+        module.cisco_download_jobs["job"] = {
+            "id": "job",
+            "status": "downloading",
+            "created": time.time(),
+            "progress": 0,
+            "files": [],
+            "error": "",
+        }
         module.run_cisco_download("job", {}, selected, downloads)
-        self.assertEqual(module.cisco_download_jobs["job"]["status"], "ready",
-                         module.cisco_download_jobs["job"]["error"])
+        self.assertEqual(
+            module.cisco_download_jobs["job"]["status"],
+            "ready",
+            module.cisco_download_jobs["job"]["error"],
+        )
 
         items = {item["relative_path"]: item for item in module.inventory_files()}
-        renamed = next(p for p in items if p.startswith("8000-x64-24.3.1-CSCab12345-") and p.endswith(".tar.gz"))
+        renamed = next(
+            p
+            for p in items
+            if p.startswith("8000-x64-24.3.1-CSCab12345-") and p.endswith(".tar.gz")
+        )
         self.assertEqual(items[renamed]["source"], "cisco-download")
-        extracted = next(p for p in items if p.endswith("xr-cdp-24.3.1v1.0.1-1.x86_64.rpm"))
+        extracted = next(
+            p for p in items if p.endswith("xr-cdp-24.3.1v1.0.1-1.x86_64.rpm")
+        )
         self.assertEqual(items[extracted]["source"], "cisco-download")
         self.assertEqual(items["8000-x64-24.3.1.iso"]["source"], "cisco-download")
         self.assertEqual(items["manual.iso"]["source"], "upload")
@@ -302,22 +456,44 @@ class GisoWebTests(unittest.TestCase):
     @patch("app.cisco_client")
     def test_cisco_k9_only_flow_does_not_require_eula(self, client, thread):
         guid = "A" * 40
-        selected = [{"guid": guid, "name": "image.iso", "size": 100,
-                     "release": "26.1.2", "mdf_id": "42", "md5": "", "sha512": ""}]
+        selected = [
+            {
+                "guid": guid,
+                "name": "image.iso",
+                "size": 100,
+                "release": "26.1.2",
+                "mdf_id": "42",
+                "md5": "",
+                "sha512": "",
+            }
+        ]
         module.cisco_download_jobs["job"] = {
-            "id": "job", "status": "eula-required", "progress": 0, "files": [],
-            "error": "", "created": time.time(), "pending": {
+            "id": "job",
+            "status": "eula-required",
+            "progress": 0,
+            "files": [],
+            "error": "",
+            "created": time.time(),
+            "pending": {
                 "search": {"pid": "NCS-5501-SE", "transaction_id": "transaction"},
-                "selected": selected, "downloads": [], "eula_required": False,
+                "selected": selected,
+                "downloads": [],
+                "eula_required": False,
                 "k9_required": True,
             },
         }
         client.return_value.request_download.return_value = {
-            "downloads": [{"imageGuid": guid, "url": "https://download.cisco.com/file.iso"}]
+            "downloads": [
+                {"imageGuid": guid, "url": "https://download.cisco.com/file.iso"}
+            ]
         }
-        response = self.client.post("/api/cisco/downloads/job/accept", json={
-            "commercial_or_civil": True, "not_government_or_military": True,
-        })
+        response = self.client.post(
+            "/api/cisco/downloads/job/accept",
+            json={
+                "commercial_or_civil": True,
+                "not_government_or_military": True,
+            },
+        )
         self.assertEqual(response.status_code, 202)
         client.return_value.accept_eula.assert_not_called()
         client.return_value.accept_k9.assert_called_once()
@@ -347,12 +523,16 @@ class GisoWebTests(unittest.TestCase):
         first = self.upload(name, stream.getvalue())
         self.assertEqual(first.status_code, 200, first.get_json())
         self.assertEqual(first.get_json()["extracted"], 1)
-        extracted = self.data / "8000-x64-24.3.1-CSCab12345/xr-cdp-24.3.1v1.0.1-1.x86_64.rpm"
+        extracted = (
+            self.data / "8000-x64-24.3.1-CSCab12345/xr-cdp-24.3.1v1.0.1-1.x86_64.rpm"
+        )
         self.assertTrue(extracted.is_file())
 
         # A second copy keeps the whole ".tar.gz" suffix when renamed apart.
         second = self.upload(name, stream.getvalue()).get_json()
-        self.assertRegex(second["path"], r"^8000-x64-24\.3\.1-CSCab12345-[0-9a-f]{8}\.tar\.gz$")
+        self.assertRegex(
+            second["path"], r"^8000-x64-24\.3\.1-CSCab12345-[0-9a-f]{8}\.tar\.gz$"
+        )
         self.assertTrue((self.data / second["path"].removesuffix(".tar.gz")).is_dir())
 
         items = {item["relative_path"]: item for item in module.inventory_files()}
@@ -361,11 +541,15 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(rpm["extracted_from"], name)
 
     def test_plain_gzip_upload_is_still_rejected(self):
-        response = self.client.post("/api/uploads/init", json={"name": "notes.gz", "size": 10})
+        response = self.client.post(
+            "/api/uploads/init", json={"name": "notes.gz", "size": 10}
+        )
         self.assertEqual(response.status_code, 400)
 
     def test_tar_gz_paths_are_redacted_whole(self):
-        redacted = module.safe_log_text("extracting /uploads/8000-x64-24.3.1-CSCab12345.tar.gz now")
+        redacted = module.safe_log_text(
+            "extracting /uploads/8000-x64-24.3.1-CSCab12345.tar.gz now"
+        )
         self.assertEqual(redacted, "extracting [artifact] now")
 
     def test_upload_progress_is_available_in_activity_log(self):
@@ -379,13 +563,21 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn("private.iso", activity)
 
     def test_build_output_is_redacted_and_written_to_service_log(self):
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "progress": 0, "phase": "Starting",
-                              "log": "", "artifacts": []}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "progress": 0,
+            "phase": "Starting",
+            "log": "",
+            "artifacts": [],
+        }
         with self.assertLogs(module.app.logger.name, level="INFO") as captured:
             module.append_log(
-                "job", "Scanning /uploads/private/base.iso, update.rpm and "
-                "'/output/private matrix.json'\n"
+                "job",
+                "Scanning /uploads/private/base.iso, update.rpm and "
+                "'/output/private matrix.json'\n",
             )
         self.assertIn("[artifact]", module.jobs["job"]["log"])
         self.assertNotIn("base.iso", module.jobs["job"]["log"])
@@ -466,8 +658,10 @@ class GisoWebTests(unittest.TestCase):
                 info = tarfile.TarInfo(f"package{index}.rpm")
                 info.size = 0
                 archive.addfile(info, io.BytesIO(b""))
-        with patch.object(module, "MAX_TAR_MEMBERS", 2), \
-                self.assertRaisesRegex(module.CiscoDownloadError, "too many files"):
+        with (
+            patch.object(module, "MAX_TAR_MEMBERS", 2),
+            self.assertRaisesRegex(module.CiscoDownloadError, "too many files"),
+        ):
             module.extract_cisco_archive(archive_path)
         self.assertFalse((self.data / "cisco-many-members").exists())
 
@@ -480,7 +674,9 @@ class GisoWebTests(unittest.TestCase):
             archive.addfile(info, io.BytesIO(payload))
         extracted = module.extract_cisco_archive(archive_path)
         self.assertEqual(extracted, 1)
-        self.assertEqual((self.data / "cisco-safe/package.rpm").read_bytes(), b"rpm contents")
+        self.assertEqual(
+            (self.data / "cisco-safe/package.rpm").read_bytes(), b"rpm contents"
+        )
 
     def test_tar_absolute_path_member_is_rejected(self):
         stream = io.BytesIO()
@@ -532,8 +728,10 @@ class GisoWebTests(unittest.TestCase):
             info = tarfile.TarInfo("package.rpm")
             info.size = len(payload)
             archive.addfile(info, io.BytesIO(payload))
-        free_space = [SimpleNamespace(free=100 * 1024**3),
-                      SimpleNamespace(free=module.MIN_FREE_BYTES)]
+        free_space = [
+            SimpleNamespace(free=100 * 1024**3),
+            SimpleNamespace(free=module.MIN_FREE_BYTES),
+        ]
         with patch("app.shutil.disk_usage", side_effect=free_space):
             response = self.upload("no-space.tar", stream.getvalue())
         self.assertEqual(response.status_code, 400)
@@ -548,14 +746,17 @@ class GisoWebTests(unittest.TestCase):
             info.size = len(payload)
             archive.addfile(info, io.BytesIO(payload))
         upload_id = self.client.post(
-            "/api/uploads/init", json={"name": "package.tar", "size": len(stream.getvalue())}
+            "/api/uploads/init",
+            json={"name": "package.tar", "size": len(stream.getvalue())},
         ).get_json()["id"]
         self.client.put(f"/api/uploads/{upload_id}?offset=0", data=stream.getvalue())
         build_responses = []
 
         def attempt_build(*_args, **_kwargs):
             with module.app.test_client() as client:
-                build_responses.append(client.post("/api/jobs", json={"iso": "base.iso", "pkglist": []}))
+                build_responses.append(
+                    client.post("/api/jobs", json={"iso": "base.iso", "pkglist": []})
+                )
 
         with patch("app.tarfile.TarFile.extractall", side_effect=attempt_build):
             response = self.client.post(f"/api/uploads/{upload_id}/complete")
@@ -622,41 +823,53 @@ class GisoWebTests(unittest.TestCase):
 
         extracted = next(item for item in files if item["basename"] == "package.rpm")
         self.assertEqual(extracted["extracted_from"], "vendor-bundle.tar")
-        archive_entry = next(item for item in files if item["basename"] == "vendor-bundle.tar")
+        archive_entry = next(
+            item for item in files if item["basename"] == "vendor-bundle.tar"
+        )
         self.assertIsNone(archive_entry["extracted_from"])
 
     def test_upload_offset_must_be_sequential(self):
-        upload_id = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3}).get_json()["id"]
+        upload_id = self.client.post(
+            "/api/uploads/init", json={"name": "x.rpm", "size": 3}
+        ).get_json()["id"]
         response = self.client.put(f"/api/uploads/{upload_id}?offset=2", data=b"abc")
         self.assertEqual(response.status_code, 409)
 
     def test_empty_upload_chunk_is_rejected(self):
-        upload_id = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3}).get_json()["id"]
+        upload_id = self.client.post(
+            "/api/uploads/init", json={"name": "x.rpm", "size": 3}
+        ).get_json()["id"]
         response = self.client.put(f"/api/uploads/{upload_id}?offset=0", data=b"")
         self.assertEqual(response.status_code, 400)
         self.assertIn("empty", response.get_json()["error"].lower())
 
     def test_invalid_upload_size_returns_json_error(self):
-        response = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": "many"})
+        response = self.client.post(
+            "/api/uploads/init", json={"name": "x.rpm", "size": "many"}
+        )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.content_type, "application/json")
 
     def test_upload_size_rejects_boolean_and_fraction(self):
         for size in (True, 1.5):
             with self.subTest(size=size):
-                response = self.client.post("/api/uploads/init",
-                                            json={"name": "x.rpm", "size": size})
+                response = self.client.post(
+                    "/api/uploads/init", json={"name": "x.rpm", "size": size}
+                )
                 self.assertEqual(response.status_code, 400)
 
     def test_upload_filename_rejects_paths_and_control_characters(self):
         for name in ("../x.rpm", "folder/x.rpm", "bad\nx.rpm"):
             with self.subTest(name=name):
-                response = self.client.post("/api/uploads/init",
-                                            json={"name": name, "size": 3})
+                response = self.client.post(
+                    "/api/uploads/init", json={"name": name, "size": 3}
+                )
                 self.assertEqual(response.status_code, 400)
 
     def test_upload_session_can_be_cancelled_and_part_is_removed(self):
-        response = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3})
+        response = self.client.post(
+            "/api/uploads/init", json={"name": "x.rpm", "size": 3}
+        )
         upload_id = response.get_json()["id"]
         part = Path(module.uploads[upload_id]["temp"])
         self.assertTrue(part.exists())
@@ -670,8 +883,13 @@ class GisoWebTests(unittest.TestCase):
         parts.mkdir()
         part = parts / "expired.part"
         part.write_bytes(b"partial")
-        module.uploads["expired"] = {"name": "x.rpm", "size": 3, "received": 1,
-                                     "temp": str(part), "updated": 0}
+        module.uploads["expired"] = {
+            "name": "x.rpm",
+            "size": 3,
+            "received": 1,
+            "temp": str(part),
+            "updated": 0,
+        }
         response = self.client.get("/api/inputs")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("expired", module.uploads)
@@ -688,7 +906,9 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.content_type, "application/json")
 
     def test_cross_site_mutation_is_rejected(self):
-        response = self.client.post("/api/cleanup", headers={"Sec-Fetch-Site": "cross-site"})
+        response = self.client.post(
+            "/api/cleanup", headers={"Sec-Fetch-Site": "cross-site"}
+        )
         self.assertEqual(response.status_code, 403)
 
     def test_browser_security_headers_are_complete(self):
@@ -705,11 +925,19 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "base.iso").write_bytes(b"iso")
         rpm = self.data / "package.rpm"
         rpm.write_bytes(b"rpm")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
-        response = self.client.post("/api/jobs", json={
-            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
+        response = self.client.post(
+            "/api/jobs",
+            json={
+                "iso": "base.iso",
+                "platform": "asr9k",
+                "pkglist": [item["id"]],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("/secret", response.get_json()["error"])
 
@@ -722,18 +950,28 @@ class GisoWebTests(unittest.TestCase):
         with patch("app.tarfile.open", side_effect=OSError("/secret/internal/path")):
             response = self.client.post(f"/api/uploads/{upload_id}/complete")
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json()["error"], "Tar archive could not be read safely")
+        self.assertEqual(
+            response.get_json()["error"], "Tar archive could not be read safely"
+        )
 
     def test_build_payload_types_are_validated(self):
-        response = self.client.post("/api/jobs", json={"iso": ["base.iso"], "pkglist": []})
+        response = self.client.post(
+            "/api/jobs", json={"iso": ["base.iso"], "pkglist": []}
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn("iso must be a string", response.get_json()["error"])
 
     def test_job_api_hides_internal_command_and_payload(self):
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "log": "safe", "command": ["secret"],
-                              "payload": {"key_request": "sensitive-name"},
-                              "container_pid": 123, "artifacts": []}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "log": "safe",
+            "command": ["secret"],
+            "payload": {"key_request": "sensitive-name"},
+            "container_pid": 123,
+            "artifacts": [],
+        }
         detail = self.client.get("/api/jobs/job").get_json()
         summary = self.client.get("/api/jobs").get_json()[0]
         self.assertNotIn("command", detail)
@@ -742,11 +980,17 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn("payload", summary)
 
     def test_job_history_survives_store_reload(self):
-        module.jobs["saved"] = {"id": "saved", "status": "success", "created": 1,
-                                "updated": 2, "finished": 2,
-                                "log": "completed /uploads/private.iso",
-                                "artifacts": [{"path": "golden.iso", "size": 3}],
-                                "command": ["private"], "payload": {"iso": "private.iso"}}
+        module.jobs["saved"] = {
+            "id": "saved",
+            "status": "success",
+            "created": 1,
+            "updated": 2,
+            "finished": 2,
+            "log": "completed /uploads/private.iso",
+            "artifacts": [{"path": "golden.iso", "size": 3}],
+            "command": ["private"],
+            "payload": {"iso": "private.iso"},
+        }
         module.persist_job("saved")
         module.jobs.clear()
         module.store_initialized = False
@@ -757,8 +1001,14 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotIn("payload", module.jobs["saved"])
 
     def test_active_job_is_marked_interrupted_after_restart(self):
-        module.jobs["active"] = {"id": "active", "status": "running", "created": 1,
-                                 "updated": 2, "log": "building", "artifacts": []}
+        module.jobs["active"] = {
+            "id": "active",
+            "status": "running",
+            "created": 1,
+            "updated": 2,
+            "log": "building",
+            "artifacts": [],
+        }
         module.persist_job("active")
         module.jobs.clear()
         module.store_initialized = False
@@ -770,8 +1020,14 @@ class GisoWebTests(unittest.TestCase):
         with patch.object(module, "MAX_JOB_HISTORY", 2):
             for index in range(3):
                 job_id = f"job-{index}"
-                module.jobs[job_id] = {"id": job_id, "status": "success", "created": index,
-                                       "updated": index, "log": "", "artifacts": []}
+                module.jobs[job_id] = {
+                    "id": job_id,
+                    "status": "success",
+                    "created": index,
+                    "updated": index,
+                    "log": "",
+                    "artifacts": [],
+                }
                 module.persist_job(job_id)
             module.jobs.clear()
             module.store_initialized = False
@@ -780,19 +1036,30 @@ class GisoWebTests(unittest.TestCase):
 
     def test_only_one_build_can_run_at_a_time(self):
         module.jobs["active"] = {"id": "active", "status": "running", "created": 1}
-        response = self.client.post("/api/jobs", json={"iso": "base.iso", "pkglist": []})
+        response = self.client.post(
+            "/api/jobs", json={"iso": "base.iso", "pkglist": []}
+        )
         self.assertEqual(response.status_code, 409)
         self.assertIn("already running", response.get_json()["error"])
 
     def test_cancelling_job_blocks_new_uploads(self):
         module.jobs["active"] = {"id": "active", "status": "cancelling", "created": 1}
-        response = self.client.post("/api/uploads/init", json={"name": "x.rpm", "size": 3})
+        response = self.client.post(
+            "/api/uploads/init", json={"name": "x.rpm", "size": 3}
+        )
         self.assertEqual(response.status_code, 409)
 
     def test_cancel_during_pull_terminates_tracked_process(self):
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 3,
-                              "phase": "Preparing", "process_phase": "pulling"}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 3,
+            "phase": "Preparing",
+            "process_phase": "pulling",
+        }
         process = MagicMock()
         process.poll.return_value = None
         module.job_processes["job"] = process
@@ -804,9 +1071,16 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.subprocess.run")
     def test_cancel_running_build_stops_container_after_client_process(self, run):
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 50,
-                              "phase": "Building", "process_phase": "building"}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 50,
+            "phase": "Building",
+            "process_phase": "building",
+        }
         process = MagicMock()
         process.poll.return_value = None
         module.job_processes["job"] = process
@@ -820,50 +1094,85 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(module.jobs["job"]["status"], "cancelled")
 
     def test_cleanup_rejects_active_upload(self):
-        module.uploads["active"] = {"name": "x.rpm", "size": 3, "received": 0, "updated": time.time()}
+        module.uploads["active"] = {
+            "name": "x.rpm",
+            "size": 3,
+            "received": 0,
+            "updated": time.time(),
+        }
         response = self.client.post("/api/cleanup")
         self.assertEqual(response.status_code, 409)
         self.assertIn("upload", response.get_json()["error"])
 
     def test_upload_session_survives_a_restart_and_resumes_at_the_bytes_on_disk(self):
-        response = self.client.post("/api/uploads/init", json={"name": "base.iso", "size": 10})
+        response = self.client.post(
+            "/api/uploads/init", json={"name": "base.iso", "size": 10}
+        )
         upload_id = response.get_json()["id"]
-        self.assertEqual(self.client.put(f"/api/uploads/{upload_id}?offset=0", data=b"12345").status_code, 200)
+        self.assertEqual(
+            self.client.put(
+                f"/api/uploads/{upload_id}?offset=0", data=b"12345"
+            ).status_code,
+            200,
+        )
         partial = self.data / ".parts" / f"{upload_id}.part"
         partial.write_bytes(b"123456")  # the process died after writing one more byte
 
-        module.uploads.clear()           # restart: memory is gone
+        module.uploads.clear()  # restart: memory is gone
         module.store_initialized = False
         status = self.client.get(f"/api/uploads/{upload_id}").get_json()
         self.assertEqual((status["received"], status["size"]), (6, 10))
-        self.assertIn("can be resumed", self.client.get("/api/activity").get_json()["log"])
-        self.assertEqual(self.client.put(f"/api/uploads/{upload_id}?offset=6", data=b"7890").status_code, 200)
+        self.assertIn(
+            "can be resumed", self.client.get("/api/activity").get_json()["log"]
+        )
+        self.assertEqual(
+            self.client.put(
+                f"/api/uploads/{upload_id}?offset=6", data=b"7890"
+            ).status_code,
+            200,
+        )
         done = self.client.post(f"/api/uploads/{upload_id}/complete")
         self.assertEqual(done.status_code, 200, done.get_json())
         self.assertEqual((self.data / "base.iso").read_bytes(), b"1234567890")
         with sqlite3.connect(module.JOB_DB) as database:
-            self.assertEqual(database.execute("SELECT count(*) FROM upload_sessions").fetchone()[0], 0)
+            self.assertEqual(
+                database.execute("SELECT count(*) FROM upload_sessions").fetchone()[0],
+                0,
+            )
         self.assertEqual(self.client.get(f"/api/uploads/{upload_id}").status_code, 404)
 
     def test_idle_upload_session_does_not_block_and_is_dropped_by_cleanup(self):
-        upload_id = self.client.post("/api/uploads/init", json={"name": "base.iso", "size": 10}).get_json()["id"]
-        module.uploads[upload_id]["updated"] = time.time() - module.UPLOAD_ACTIVE_SECONDS - 1
+        upload_id = self.client.post(
+            "/api/uploads/init", json={"name": "base.iso", "size": 10}
+        ).get_json()["id"]
+        module.uploads[upload_id]["updated"] = (
+            time.time() - module.UPLOAD_ACTIVE_SECONDS - 1
+        )
         with module.upload_lock:
             self.assertFalse(module.uploads_in_progress())
         self.assertEqual(self.client.post("/api/cleanup").status_code, 200)
         self.assertNotIn(upload_id, module.uploads)
         with sqlite3.connect(module.JOB_DB) as database:
-            self.assertEqual(database.execute("SELECT count(*) FROM upload_sessions").fetchone()[0], 0)
+            self.assertEqual(
+                database.execute("SELECT count(*) FROM upload_sessions").fetchone()[0],
+                0,
+            )
 
     def test_refusals_distinguish_a_running_build_from_unreachable_docker(self):
         self.docker_running.stop()
         try:
             with patch("app.docker_build_state", return_value=None):
-                unreachable = self.client.post("/api/uploads/init", json={"name": "a.iso", "size": 3}).get_json()
+                unreachable = self.client.post(
+                    "/api/uploads/init", json={"name": "a.iso", "size": 3}
+                ).get_json()
             with patch("app.docker_build_state", return_value=True):
-                busy = self.client.post("/api/uploads/init", json={"name": "a.iso", "size": 3}).get_json()
+                busy = self.client.post(
+                    "/api/uploads/init", json={"name": "a.iso", "size": 3}
+                ).get_json()
             with patch("app.docker_build_state", return_value=False):
-                allowed = self.client.post("/api/uploads/init", json={"name": "a.iso", "size": 3})
+                allowed = self.client.post(
+                    "/api/uploads/init", json={"name": "a.iso", "size": 3}
+                )
         finally:
             self.docker_running.start()
         self.assertIn("Docker cannot be reached", unreachable["error"])
@@ -894,26 +1203,42 @@ class GisoWebTests(unittest.TestCase):
                 module.store_initialized = False
                 module.initialize_job_store()
                 with sqlite3.connect(module.JOB_DB) as database:
-                    database.execute("INSERT OR REPLACE INTO jobs VALUES (?, ?, ?)",
-                                     (job_id, json.dumps({"status": "running", "log": ""}), time.time()))
+                    database.execute(
+                        "INSERT OR REPLACE INTO jobs VALUES (?, ?, ?)",
+                        (
+                            job_id,
+                            json.dumps({"status": "running", "log": ""}),
+                            time.time(),
+                        ),
+                    )
                 module.jobs.clear()
                 module.store_initialized = False
                 with patch.object(module, "GISO_RUNNER", runner):
                     module.initialize_job_store()
                 self.assertEqual(module.jobs[job_id]["status"], "interrupted")
                 self.assertEqual((module.WORK / job_id).exists(), not expect_removed)
-                self.assertEqual((module.OUTPUT / job_id / "tmpabc").exists(), not expect_removed)
+                self.assertEqual(
+                    (module.OUTPUT / job_id / "tmpabc").exists(), not expect_removed
+                )
                 self.assertTrue((module.OUTPUT / job_id / "logs").exists())
 
     def test_cleanup_rejects_running_build(self):
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1, "updated": 1}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+        }
         response = self.client.post("/api/cleanup")
         self.assertEqual(response.status_code, 409)
         self.assertIn("build is running", response.get_json()["error"])
 
     def test_cleanup_rejects_active_cisco_download(self):
         module.cisco_download_jobs["job"] = {
-            "id": "job", "status": "downloading", "progress": 10, "created": time.time(),
+            "id": "job",
+            "status": "downloading",
+            "progress": 10,
+            "created": time.time(),
         }
         response = self.client.post("/api/cleanup")
         self.assertEqual(response.status_code, 409)
@@ -931,8 +1256,10 @@ class GisoWebTests(unittest.TestCase):
         # same builder). This proves the deployment-level opt-in works: a
         # repo@sha256:... reference validates and reaches the real docker
         # run command unchanged.
-        digest = ("ciscogisobuild/cisco-xr-gisobuild@sha256:"
-                  "be282c7a76b03820d7bdd6c8b8cc0d4a54a5b6207143f089123b32e245018bf3")
+        digest = (
+            "ciscogisobuild/cisco-xr-gisobuild@sha256:"
+            "be282c7a76b03820d7bdd6c8b8cc0d4a54a5b6207143f089123b32e245018bf3"
+        )
         self.assertEqual(module.validate_image_reference(digest), digest)
         (self.data / "base.iso").write_bytes(b"iso")
         with patch("app.IMAGE", digest):
@@ -946,7 +1273,9 @@ class GisoWebTests(unittest.TestCase):
         # future, which would delete every archive - including one just
         # created - on the very next policy check. A misconfiguration typo
         # must fail fast at startup, not silently destroy every artifact.
-        with self.assertRaisesRegex(RuntimeError, "ARCHIVE_RETENTION_DAYS must not be negative"):
+        with self.assertRaisesRegex(
+            RuntimeError, "ARCHIVE_RETENTION_DAYS must not be negative"
+        ):
             module.validate_archive_retention_days(-1)
 
     def test_zero_archive_retention_days_is_accepted(self):
@@ -954,7 +1283,9 @@ class GisoWebTests(unittest.TestCase):
 
     def test_non_positive_max_archive_bytes_is_rejected(self):
         for value in (0, -1):
-            with self.assertRaisesRegex(RuntimeError, "MAX_ARCHIVE_BYTES must be a positive number"):
+            with self.assertRaisesRegex(
+                RuntimeError, "MAX_ARCHIVE_BYTES must be a positive number"
+            ):
                 module.validate_max_archive_bytes(value)
 
     def test_parse_missing_dependencies_extracts_real_gisobuild_failure_format(self):
@@ -974,18 +1305,24 @@ class GisoWebTests(unittest.TestCase):
         found = module.parse_missing_dependencies(log)
         self.assertEqual(len(found), 4)
         self.assertIn(
-            {"requirement": "ncs5500-dpa = 1.0.0.5",
-             "required_by": "ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64"},
+            {
+                "requirement": "ncs5500-dpa = 1.0.0.5",
+                "required_by": "ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64",
+            },
             found,
         )
         self.assertIn(
-            {"requirement": "ncs5500-os = 1.0.0.1",
-             "required_by": "ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64"},
+            {
+                "requirement": "ncs5500-os = 1.0.0.1",
+                "required_by": "ncs5500-routing-1.0.0.3-r2512.CSCwv38342.x86_64",
+            },
             found,
         )
         self.assertIn(
-            {"requirement": "ncs5500-dpa = 1.0.0.5",
-             "required_by": "ncs5500-infra-1.0.0.8-r2512.CSCwu13268.x86_64"},
+            {
+                "requirement": "ncs5500-dpa = 1.0.0.5",
+                "required_by": "ncs5500-infra-1.0.0.8-r2512.CSCwu13268.x86_64",
+            },
             found,
         )
         # None of the timestamp prefix leaked into a captured requirement.
@@ -1001,16 +1338,24 @@ class GisoWebTests(unittest.TestCase):
 
     def test_failed_job_exposes_missing_dependencies_via_the_api(self):
         module.jobs["job"] = {
-            "id": "job", "status": "failed", "created": time.time(), "artifacts": [],
+            "id": "job",
+            "status": "failed",
+            "created": time.time(),
+            "artifacts": [],
             "log": "pkg-a = 1.0 is needed by pkg-b-1.0-r1.x86_64\n",
         }
         response = self.client.get("/api/jobs/job")
-        self.assertEqual(response.get_json()["missing_dependencies"],
-                         [{"requirement": "pkg-a = 1.0", "required_by": "pkg-b-1.0-r1.x86_64"}])
+        self.assertEqual(
+            response.get_json()["missing_dependencies"],
+            [{"requirement": "pkg-a = 1.0", "required_by": "pkg-b-1.0-r1.x86_64"}],
+        )
 
     def test_running_job_does_not_compute_missing_dependencies(self):
         module.jobs["job"] = {
-            "id": "job", "status": "running", "created": time.time(), "artifacts": [],
+            "id": "job",
+            "status": "running",
+            "created": time.time(),
+            "artifacts": [],
             "log": "pkg-a = 1.0 is needed by pkg-b-1.0-r1.x86_64\n",
         }
         response = self.client.get("/api/jobs/job")
@@ -1024,7 +1369,9 @@ class GisoWebTests(unittest.TestCase):
         self.assertLess(len(module.jobs["job"]["log"]), 100)
 
     def test_quoted_artifact_path_with_spaces_is_fully_redacted(self):
-        redacted = module.safe_log_text("$ docker run --iso '/uploads/customer router.iso'")
+        redacted = module.safe_log_text(
+            "$ docker run --iso '/uploads/customer router.iso'"
+        )
         self.assertEqual(redacted, "$ docker run --iso [artifact]")
         self.assertNotIn("customer", redacted)
 
@@ -1041,24 +1388,55 @@ class GisoWebTests(unittest.TestCase):
     def test_build_mounts_exclude_docker_socket(self, run):
         iso = self.data / "base.iso"
         iso.write_bytes(b"iso")
-        run.return_value.stdout = json.dumps([{"Mounts": [
-            {"Type": "bind", "Source": "/host/uploads", "Destination": "/uploads"},
-            {"Type": "bind", "Source": "/host/output", "Destination": "/output"},
-            {"Type": "bind", "Source": "/host/tool", "Destination": "/tool"},
-            {"Type": "volume", "Name": "work", "Destination": "/work"},
-            {"Type": "bind", "Source": "/var/run/docker.sock", "Destination": "/var/run/docker.sock"},
-        ]}])
-        command = module.build_command({"iso": "base.iso", "platform": "asr9k",
-                                        "pkglist": []}, "job")
+        run.return_value.stdout = json.dumps(
+            [
+                {
+                    "Mounts": [
+                        {
+                            "Type": "bind",
+                            "Source": "/host/uploads",
+                            "Destination": "/uploads",
+                        },
+                        {
+                            "Type": "bind",
+                            "Source": "/host/output",
+                            "Destination": "/output",
+                        },
+                        {
+                            "Type": "bind",
+                            "Source": "/host/tool",
+                            "Destination": "/tool",
+                        },
+                        {"Type": "volume", "Name": "work", "Destination": "/work"},
+                        {
+                            "Type": "bind",
+                            "Source": "/var/run/docker.sock",
+                            "Destination": "/var/run/docker.sock",
+                        },
+                    ]
+                }
+            ]
+        )
+        command = module.build_command(
+            {"iso": "base.iso", "platform": "asr9k", "pkglist": []}, "job"
+        )
         self.assertNotIn("/var/run/docker.sock:/var/run/docker.sock", command)
         self.assertIn("/host/uploads:/uploads:ro", command)
 
     @patch("app.child_mount_args", return_value=[])
     def test_exr_xrv9k_options_are_forwarded(self, _mounts):
         (self.data / "base.iso").write_bytes(b"iso")
-        command = module.build_command({"iso": "base.iso", "platform": "xrv9k", "pkglist": [],
-                                        "optimize": True, "full_iso": True,
-                                        "skip_usb_image": True}, "xrv")
+        command = module.build_command(
+            {
+                "iso": "base.iso",
+                "platform": "xrv9k",
+                "pkglist": [],
+                "optimize": True,
+                "full_iso": True,
+                "skip_usb_image": True,
+            },
+            "xrv",
+        )
         self.assertIn("--optimize", command)
         self.assertIn("--full-iso", command)
         # eXR ignores --skip-usb-image upstream, so it is not forwarded.
@@ -1067,8 +1445,15 @@ class GisoWebTests(unittest.TestCase):
     @patch("app.child_mount_args", return_value=[])
     def test_lnt_skip_usb_image_is_forwarded(self, _mounts):
         (self.data / "base.iso").write_bytes(b"iso")
-        command = module.build_command({"iso": "base.iso", "platform": "8000", "pkglist": [],
-                                        "skip_usb_image": True}, "lnt")
+        command = module.build_command(
+            {
+                "iso": "base.iso",
+                "platform": "8000",
+                "pkglist": [],
+                "skip_usb_image": True,
+            },
+            "lnt",
+        )
         self.assertIn("--skip-usb-image", command)
 
     def test_platform_matrix_is_exposed(self):
@@ -1082,21 +1467,42 @@ class GisoWebTests(unittest.TestCase):
 
     def test_compatibility_api_checks_smu_and_uploaded_upgrade_matrix(self):
         matrix = self.data / "compatibility_matrix_test.json"
-        matrix.write_text(json.dumps({"permitted": {"25.1.2": {"26.1.2": [{
-            "platform": "ncs5500", "bridge_smus": ["bridge-placeholder.rpm"],
-            "caveats": [],
-        }]}}}), encoding="utf-8")
-        response = self.client.post("/api/compatibility", json={
-            "iso": "ncs5500-mini-x-26.1.2.iso",
-            "packages": ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"],
-            "matrix": matrix.name, "source_release": "25.1.2",
-            "target_release": "26.1.2", "platform": "ncs5500",
-        })
+        matrix.write_text(
+            json.dumps(
+                {
+                    "permitted": {
+                        "25.1.2": {
+                            "26.1.2": [
+                                {
+                                    "platform": "ncs5500",
+                                    "bridge_smus": ["bridge-placeholder.rpm"],
+                                    "caveats": [],
+                                }
+                            ]
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        response = self.client.post(
+            "/api/compatibility",
+            json={
+                "iso": "ncs5500-mini-x-26.1.2.iso",
+                "packages": ["ncs5500-routing-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"],
+                "matrix": matrix.name,
+                "source_release": "25.1.2",
+                "target_release": "26.1.2",
+                "platform": "ncs5500",
+            },
+        )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()["smu"]["compatible"])
         self.assertTrue(response.get_json()["upgrade"]["permitted"])
-        self.assertEqual(response.get_json()["upgrade"]["missing_bridge_smus"],
-                         ["bridge-placeholder.rpm"])
+        self.assertEqual(
+            response.get_json()["upgrade"]["missing_bridge_smus"],
+            ["bridge-placeholder.rpm"],
+        )
 
     def test_smu_recommendation_api_selects_matching_packages_automatically(self):
         (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
@@ -1105,9 +1511,12 @@ class GisoWebTests(unittest.TestCase):
         (self.data / matching).write_bytes(b"rpm")
         (self.data / wrong_release).write_bytes(b"rpm")
 
-        response = self.client.post("/api/smu/recommendation", json={
-            "iso": "ncs5500-mini-x-26.1.2.iso",
-        })
+        response = self.client.post(
+            "/api/smu/recommendation",
+            json={
+                "iso": "ncs5500-mini-x-26.1.2.iso",
+            },
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["selected"], [matching])
@@ -1135,7 +1544,9 @@ class GisoWebTests(unittest.TestCase):
 
         recommendation = response.get_json()["recommendation"]
         self.assertIn(current, recommendation["selected"])
-        excluded_by_name = {item["name"]: item["reason"] for item in recommendation["excluded"]}
+        excluded_by_name = {
+            item["name"]: item["reason"] for item in recommendation["excluded"]
+        }
         self.assertIn(old_rpm.name, excluded_by_name)
         self.assertIn("Superseded", excluded_by_name[old_rpm.name])
 
@@ -1145,7 +1556,9 @@ class GisoWebTests(unittest.TestCase):
         metadata = self.data / "oversized.txt"
         with metadata.open("wb") as handle:
             handle.truncate(module.MAX_SUPERSEDENCE_FILE_BYTES + 1)
-        with patch("pathlib.Path.read_text", side_effect=AssertionError("must not be read")):
+        with patch(
+            "pathlib.Path.read_text", side_effect=AssertionError("must not be read")
+        ):
             packages, superseded = module.active_rpm_names()
         self.assertEqual(packages, [rpm])
         self.assertEqual(superseded, set())
@@ -1153,7 +1566,9 @@ class GisoWebTests(unittest.TestCase):
     def test_discover_pauses_automatic_selection_when_multiple_isos_exist(self):
         (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
         (self.data / "ncs5500-mini-x-26.1.3.iso").write_bytes(b"iso")
-        (self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm").write_bytes(b"rpm")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm").write_bytes(
+            b"rpm"
+        )
 
         response = self.client.get("/api/inputs")
 
@@ -1173,7 +1588,9 @@ class GisoWebTests(unittest.TestCase):
         with patch.object(Path, "stat", new=concurrent_stat):
             response = self.client.get("/api/inputs")
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("disappearing.rpm", {item["path"] for item in response.get_json()["files"]})
+        self.assertNotIn(
+            "disappearing.rpm", {item["path"] for item in response.get_json()["files"]}
+        )
         self.assertEqual(response.get_json()["recommended"], [])
 
     def test_inventory_exposes_stable_identity_without_absolute_path(self):
@@ -1211,9 +1628,13 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(items["notes.yaml"]["lifecycle"], "READY")
 
         # A running build marks exactly the files its plan uses.
-        module.jobs["active"] = {"status": "running", "build_plan": {
-            "iso": {"id": items["base.iso"]["id"]},
-            "selected_packages": [{"id": items["good.rpm"]["id"]}]}}
+        module.jobs["active"] = {
+            "status": "running",
+            "build_plan": {
+                "iso": {"id": items["base.iso"]["id"]},
+                "selected_packages": [{"id": items["good.rpm"]["id"]}],
+            },
+        }
         before = module.current_inventory_revision()
         try:
             items = {i["relative_path"]: i for i in module.inventory_files()}
@@ -1249,8 +1670,10 @@ class GisoWebTests(unittest.TestCase):
     def test_platform_is_inferred_and_invalid_option_rejected(self, _mounts):
         (self.data / "ncs5500-mini-x.iso").write_bytes(b"iso")
         with self.assertRaisesRegex(ValueError, "Full ISO"):
-            module.build_command({"iso": "ncs5500-mini-x.iso", "pkglist": [],
-                                  "full_iso": True}, "invalid")
+            module.build_command(
+                {"iso": "ncs5500-mini-x.iso", "pkglist": [], "full_iso": True},
+                "invalid",
+            )
 
     @patch("app.child_mount_args", return_value=[])
     def test_build_recalculates_automatic_smu_selection_server_side(self, _mounts):
@@ -1260,17 +1683,24 @@ class GisoWebTests(unittest.TestCase):
         for name in (iso, matching, wrong_release):
             (self.data / name).write_bytes(b"input")
 
-        command = module.build_command({
-            "iso": iso, "pkglist": [wrong_release], "automatic_smu_selection": True,
-            "auto_repo": True,
-        }, "automatic")
+        command = module.build_command(
+            {
+                "iso": iso,
+                "pkglist": [wrong_release],
+                "automatic_smu_selection": True,
+                "auto_repo": True,
+            },
+            "automatic",
+        )
 
         pkglist_index = command.index("--pkglist")
-        self.assertIn(matching, command[pkglist_index + 1:])
-        self.assertNotIn(wrong_release, command[pkglist_index + 1:])
+        self.assertIn(matching, command[pkglist_index + 1 :])
+        self.assertNotIn(wrong_release, command[pkglist_index + 1 :])
 
     @patch("app.child_mount_args", return_value=[])
-    def test_build_recalculates_automatic_smu_selection_server_side_for_lnt_platforms(self, _mounts):
+    def test_build_recalculates_automatic_smu_selection_server_side_for_lnt_platforms(
+        self, _mounts
+    ):
         # 01-PLATFORM-UPSTREAM-TODO.md's "Tests" section asked for a
         # "generic LNT workflow" test alongside the eXR one directly above -
         # the full discover-through-build_command pipeline had only ever
@@ -1284,17 +1714,24 @@ class GisoWebTests(unittest.TestCase):
         for name in (iso, matching, wrong_release):
             (self.data / name).write_bytes(b"input")
 
-        command = module.build_command({
-            "iso": iso, "pkglist": [wrong_release], "automatic_smu_selection": True,
-            "auto_repo": True,
-        }, "automatic-lnt")
+        command = module.build_command(
+            {
+                "iso": iso,
+                "pkglist": [wrong_release],
+                "automatic_smu_selection": True,
+                "auto_repo": True,
+            },
+            "automatic-lnt",
+        )
 
         pkglist_index = command.index("--pkglist")
-        self.assertIn(matching, command[pkglist_index + 1:])
-        self.assertNotIn(wrong_release, command[pkglist_index + 1:])
+        self.assertIn(matching, command[pkglist_index + 1 :])
+        self.assertNotIn(wrong_release, command[pkglist_index + 1 :])
 
     @patch("app.child_mount_args", return_value=[])
-    def test_manual_selection_of_a_partial_multi_component_bundle_is_rejected(self, _mounts):
+    def test_manual_selection_of_a_partial_multi_component_bundle_is_rejected(
+        self, _mounts
+    ):
         # CSCtest00001 is a multi-component fix requiring all 3 RPMs
         # together (see recommend_smu_selection()'s own "keep these RPMs
         # together" relationship text). Manually selecting only 2 of the 3
@@ -1311,10 +1748,15 @@ class GisoWebTests(unittest.TestCase):
             (self.data / name).write_bytes(b"input")
 
         with self.assertRaisesRegex(ValueError, "CSCTEST00001"):
-            module.build_command({
-                "iso": iso, "pkglist": bundle[:2], "automatic_smu_selection": False,
-                "auto_repo": True,
-            }, "partial-bundle")
+            module.build_command(
+                {
+                    "iso": iso,
+                    "pkglist": bundle[:2],
+                    "automatic_smu_selection": False,
+                    "auto_repo": True,
+                },
+                "partial-bundle",
+            )
 
     def test_build_plan_flags_a_partial_multi_component_bundle_as_a_blocker(self):
         iso = "ncs5500-mini-x-26.1.2.iso"
@@ -1326,14 +1768,22 @@ class GisoWebTests(unittest.TestCase):
         for name in (iso, *bundle):
             (self.data / name).write_bytes(b"input")
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": iso, "pkglist": bundle[:2], "automatic_smu_selection": False,
-            "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": iso,
+                "pkglist": bundle[:2],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         plan = response.get_json()
         self.assertFalse(plan["ready"], plan)
-        self.assertTrue(any("CSCTEST00001" in blocker for blocker in plan["blockers"]), plan["blockers"])
+        self.assertTrue(
+            any("CSCTEST00001" in blocker for blocker in plan["blockers"]),
+            plan["blockers"],
+        )
 
     def test_build_is_blocked_when_the_output_volume_is_nearly_full(self):
         # Every disk guard before this measured the uploads volume only, so a
@@ -1350,10 +1800,16 @@ class GisoWebTests(unittest.TestCase):
             return real_disk_usage(path)
 
         with patch("app.shutil.disk_usage", side_effect=fake_disk_usage):
-            response = self.client.post("/api/build-plan", json={
-                "iso": "base.iso", "platform": "ncs5500", "pkglist": [],
-                "automatic_smu_selection": False, "auto_repo": True,
-            })
+            response = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "base.iso",
+                    "platform": "ncs5500",
+                    "pkglist": [],
+                    "automatic_smu_selection": False,
+                    "auto_repo": True,
+                },
+            )
 
         plan = response.get_json()
         self.assertFalse(plan["ready"], plan)
@@ -1372,10 +1828,16 @@ class GisoWebTests(unittest.TestCase):
             return real_disk_usage(path)
 
         with patch("app.shutil.disk_usage", side_effect=fake_disk_usage):
-            response = self.client.post("/api/build-plan", json={
-                "iso": "base.iso", "platform": "ncs5500", "pkglist": [],
-                "automatic_smu_selection": False, "auto_repo": True,
-            })
+            response = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "base.iso",
+                    "platform": "ncs5500",
+                    "pkglist": [],
+                    "automatic_smu_selection": False,
+                    "auto_repo": True,
+                },
+            )
 
         plan = response.get_json()
         self.assertFalse(plan["ready"], plan)
@@ -1413,7 +1875,9 @@ class GisoWebTests(unittest.TestCase):
             "  name: host-25.1.2\n"
         )
         self.assertEqual(module.iso_identity_from_mdata(mdata), "ncs5500-mini-x-25.1.2")
-        self.assertIsNone(module.iso_identity_from_mdata("iso_rpms:\n- name: host-25.1.2\n"))
+        self.assertIsNone(
+            module.iso_identity_from_mdata("iso_rpms:\n- name: host-25.1.2\n")
+        )
         self.assertIsNone(module.iso_identity_from_mdata(""))
 
     def test_renamed_iso_platform_and_release_come_from_its_own_metadata(self):
@@ -1422,19 +1886,28 @@ class GisoWebTests(unittest.TestCase):
         # selection ("platform could not be detected"); the image's embedded
         # identity now resolves it and reports it as VERIFIED, not guessed.
         (self.data / "customer-golden-base.iso").write_bytes(b"iso")
-        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm").write_bytes(b"rpm")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm").write_bytes(
+            b"rpm"
+        )
         mdata = "iso_mdata:\n  iso_type: bundle\n  name: ncs5500-mini-x-25.1.2\n"
         with patch("app.read_iso_mdata", return_value=mdata):
-            plan = self.client.post("/api/build-plan", json={
-                "iso": "customer-golden-base.iso", "pkglist": [],
-                "automatic_smu_selection": True, "auto_repo": True,
-            }).get_json()
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "customer-golden-base.iso",
+                    "pkglist": [],
+                    "automatic_smu_selection": True,
+                    "auto_repo": True,
+                },
+            ).get_json()
             recommendation = self.client.get("/api/inputs").get_json()["recommendation"]
 
         self.assertEqual(plan["platform"], "ncs5500")
         self.assertEqual(plan["release"], "25.1.2")
-        self.assertEqual([p["basename"] for p in plan["selected_packages"]],
-                         ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"])
+        self.assertEqual(
+            [p["basename"] for p in plan["selected_packages"]],
+            ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"],
+        )
         self.assertEqual(plan["confidence"]["platform"]["value"], "VERIFIED")
         self.assertEqual(plan["confidence"]["platform"]["source"], "iso-metadata")
         self.assertEqual(plan["confidence"]["release"]["value"], "VERIFIED")
@@ -1447,27 +1920,45 @@ class GisoWebTests(unittest.TestCase):
         # matching RPMs against a release the image does not actually contain
         # is exactly the kind of known-bad build this app must refuse.
         (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
-        (self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm").write_bytes(b"new")
-        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm").write_bytes(b"old")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm").write_bytes(
+            b"new"
+        )
+        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm").write_bytes(
+            b"old"
+        )
         mdata = "iso_mdata:\n  name: ncs5500-mini-x-25.1.2\n"
         with patch("app.read_iso_mdata", return_value=mdata):
-            plan = self.client.post("/api/build-plan", json={
-                "iso": "ncs5500-mini-x-26.1.2.iso", "pkglist": [],
-                "automatic_smu_selection": True, "auto_repo": True,
-            }).get_json()
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "ncs5500-mini-x-26.1.2.iso",
+                    "pkglist": [],
+                    "automatic_smu_selection": True,
+                    "auto_repo": True,
+                },
+            ).get_json()
         self.assertEqual(plan["release"], "25.1.2")
-        self.assertEqual([p["basename"] for p in plan["selected_packages"]],
-                         ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"])
+        self.assertEqual(
+            [p["basename"] for p in plan["selected_packages"]],
+            ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"],
+        )
 
     def test_unusable_metadata_identity_falls_back_to_the_filename(self):
         # An identity that names no known platform must never replace a
         # working filename match with a worse one.
         (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
-        with patch("app.read_iso_mdata", return_value="iso_mdata:\n  name: something-odd\n"):
-            plan = self.client.post("/api/build-plan", json={
-                "iso": "ncs5500-mini-x-26.1.2.iso", "pkglist": [],
-                "automatic_smu_selection": False, "auto_repo": True,
-            }).get_json()
+        with patch(
+            "app.read_iso_mdata", return_value="iso_mdata:\n  name: something-odd\n"
+        ):
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "ncs5500-mini-x-26.1.2.iso",
+                    "pkglist": [],
+                    "automatic_smu_selection": False,
+                    "auto_repo": True,
+                },
+            ).get_json()
         self.assertEqual(plan["platform"], "ncs5500")
         self.assertEqual(plan["release"], "26.1.2")
         self.assertEqual(plan["confidence"]["platform"]["value"], "INFERRED")
@@ -1503,10 +1994,15 @@ class GisoWebTests(unittest.TestCase):
             "requires": [("ncs5500-dpa", "1.0.0.5"), ("ncs5500-bgp", "1.0.0.0")],
             "provides": [("ncs5500-routing", "1.0.0.3-r2512.CSCtest00001")],
         }
-        shipped = {"ncs5500-dpa": "1.0.0.0", "ncs5500-bgp": "1.0.0.0",
-                   "ncs5500-routing": "1.0.0.0"}
-        with patch("app.rpm_dependency_metadata", return_value=metadata), \
-                patch("app.safe_data_path", side_effect=lambda value: Path(value)):
+        shipped = {
+            "ncs5500-dpa": "1.0.0.0",
+            "ncs5500-bgp": "1.0.0.0",
+            "ncs5500-routing": "1.0.0.0",
+        }
+        with (
+            patch("app.rpm_dependency_metadata", return_value=metadata),
+            patch("app.safe_data_path", side_effect=lambda value: Path(value)),
+        ):
             missing = module.missing_package_dependencies(selected, shipped)
 
         # ncs5500-bgp = 1.0.0.0 is satisfied by the base image and must not
@@ -1528,11 +2024,17 @@ class GisoWebTests(unittest.TestCase):
             "a.rpm": {"requires": [("ncs5500-dpa", "1.0.0.5")], "provides": []},
             # Release suffix on the provide, bare version on the require -
             # exactly how real Cisco SMUs express this.
-            "b.rpm": {"requires": [],
-                      "provides": [("ncs5500-dpa", "1.0.0.5-r2512.CSCtest00002")]},
+            "b.rpm": {
+                "requires": [],
+                "provides": [("ncs5500-dpa", "1.0.0.5-r2512.CSCtest00002")],
+            },
         }
-        with patch("app.rpm_dependency_metadata", side_effect=lambda p: metadata[p.name]), \
-                patch("app.safe_data_path", side_effect=lambda value: Path(value)):
+        with (
+            patch(
+                "app.rpm_dependency_metadata", side_effect=lambda p: metadata[p.name]
+            ),
+            patch("app.safe_data_path", side_effect=lambda value: Path(value)),
+        ):
             missing = module.missing_package_dependencies(
                 selected, {"ncs5500-dpa": "1.0.0.0"}
             )
@@ -1547,8 +2049,10 @@ class GisoWebTests(unittest.TestCase):
             "requires": [("libc.so.6", "2.0"), ("some-third-party-pkg", "9.9.9")],
             "provides": [],
         }
-        with patch("app.rpm_dependency_metadata", return_value=metadata), \
-                patch("app.safe_data_path", side_effect=lambda value: Path(value)):
+        with (
+            patch("app.rpm_dependency_metadata", return_value=metadata),
+            patch("app.safe_data_path", side_effect=lambda value: Path(value)),
+        ):
             missing = module.missing_package_dependencies(
                 selected, {"ncs5500-dpa": "1.0.0.0"}
             )
@@ -1583,15 +2087,26 @@ class GisoWebTests(unittest.TestCase):
             # Cached by path, size and mtime: a second read costs no process.
             module.rpm_dependency_metadata(rpm)
         run.assert_called_once()
-        self.assertEqual(metadata["identity"], {
-            "name": "ncs5500-bgp", "version": "1.0.0.1",
-            "release": "r2512.CSCtest00001", "arch": "x86_64",
-            "package_type": "smu", "vm_type": "host",
-        })
+        self.assertEqual(
+            metadata["identity"],
+            {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.1",
+                "release": "r2512.CSCtest00001",
+                "arch": "x86_64",
+                "package_type": "smu",
+                "vm_type": "host",
+            },
+        )
         # Only exact, epoch-free constraints are kept.
-        self.assertEqual(metadata["signature"], {"algorithm": "RSA/SHA256", "key_id": "7476b0605746bd08"})
+        self.assertEqual(
+            metadata["signature"],
+            {"algorithm": "RSA/SHA256", "key_id": "7476b0605746bd08"},
+        )
         self.assertEqual(metadata["requires"], [("ncs5500-dpa", "1.0.0.5")])
-        self.assertEqual(metadata["provides"], [("ncs5500-bgp", "1.0.0.1-r2512.CSCtest00001")])
+        self.assertEqual(
+            metadata["provides"], [("ncs5500-bgp", "1.0.0.1-r2512.CSCtest00001")]
+        )
 
     def test_rpm_header_group_without_cisco_metadata_yields_no_package_or_vm_type(self):
         # A non-eXR/non-Cisco RPM's %{GROUP} is just free text (often the RPM
@@ -1610,17 +2125,31 @@ class GisoWebTests(unittest.TestCase):
         for name in (winner, loser):
             (self.data / name).write_bytes(b"x")
         return {
-            "selected": [winner, loser], "excluded": [],
+            "selected": [winner, loser],
+            "excluded": [],
             "package_groups": [
-                {"csc": "CSCwv36143", "components": ["ncs5500-bgp"], "files": [winner],
-                 "count": 1, "relationship": "Single-component fix"},
-                {"csc": "CSCwu13268", "components": ["ncs5500-bgp"], "files": [loser],
-                 "count": 1, "relationship": "Single-component fix"},
+                {
+                    "csc": "CSCwv36143",
+                    "components": ["ncs5500-bgp"],
+                    "files": [winner],
+                    "count": 1,
+                    "relationship": "Single-component fix",
+                },
+                {
+                    "csc": "CSCwu13268",
+                    "components": ["ncs5500-bgp"],
+                    "files": [loser],
+                    "count": 1,
+                    "relationship": "Single-component fix",
+                },
             ],
             "component_conflicts": [
-                {"component": "ncs5500-bgp", "cscs": ["CSCwu13268", "CSCwv36143"],
-                 "reason": "More than one fix changes this component; Cisco supersedence "
-                           "decides which remains"},
+                {
+                    "component": "ncs5500-bgp",
+                    "cscs": ["CSCwu13268", "CSCwv36143"],
+                    "reason": "More than one fix changes this component; Cisco supersedence "
+                    "decides which remains",
+                },
             ],
         }
 
@@ -1629,19 +2158,35 @@ class GisoWebTests(unittest.TestCase):
         loser = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
         recommendation = self._conflict_recommendation(winner, loser)
         identities = {
-            winner: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
-                     "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
-            loser: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
-                    "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
+            winner: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.2",
+                "release": "r2512.CSCwv36143",
+                "arch": "x86_64",
+                "package_type": "smu",
+                "vm_type": "host",
+            },
+            loser: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.1",
+                "release": "r2512.CSCwu13268",
+                "arch": "x86_64",
+                "package_type": "smu",
+                "vm_type": "host",
+            },
         }
-        with patch("app.rpm_dependency_metadata",
-                   side_effect=lambda p: {"identity": identities[p.name]}):
+        with patch(
+            "app.rpm_dependency_metadata",
+            side_effect=lambda p: {"identity": identities[p.name]},
+        ):
             result = module.resolve_component_conflicts(recommendation)
         self.assertEqual(result["selected"], [winner])
         self.assertEqual(result["component_conflicts"], [])
         self.assertEqual(len(result["excluded"]), 1)
         self.assertEqual(result["excluded"][0]["name"], loser)
-        self.assertEqual(module.classify_exclusion(result["excluded"][0]["reason"]), "SUPERSEDED")
+        self.assertEqual(
+            module.classify_exclusion(result["excluded"][0]["reason"]), "SUPERSEDED"
+        )
         self.assertIn(winner, result["excluded"][0]["reason"])
 
     def test_component_conflict_is_not_resolved_across_different_vm_types(self):
@@ -1651,13 +2196,27 @@ class GisoWebTests(unittest.TestCase):
         admin = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
         recommendation = self._conflict_recommendation(host, admin)
         identities = {
-            host: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
-                   "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
-            admin: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
-                    "arch": "x86_64", "package_type": "smu", "vm_type": "calvados"},
+            host: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.2",
+                "release": "r2512.CSCwv36143",
+                "arch": "x86_64",
+                "package_type": "smu",
+                "vm_type": "host",
+            },
+            admin: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.1",
+                "release": "r2512.CSCwu13268",
+                "arch": "x86_64",
+                "package_type": "smu",
+                "vm_type": "calvados",
+            },
         }
-        with patch("app.rpm_dependency_metadata",
-                   side_effect=lambda p: {"identity": identities[p.name]}):
+        with patch(
+            "app.rpm_dependency_metadata",
+            side_effect=lambda p: {"identity": identities[p.name]},
+        ):
             result = module.resolve_component_conflicts(recommendation)
         self.assertEqual(sorted(result["selected"]), sorted([host, admin]))
         self.assertEqual(result["excluded"], [])
@@ -1671,13 +2230,27 @@ class GisoWebTests(unittest.TestCase):
         loser = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
         recommendation = self._conflict_recommendation(winner, loser)
         identities = {
-            winner: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
-                     "arch": "x86_64", "package_type": None, "vm_type": None},
-            loser: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
-                    "arch": "x86_64", "package_type": None, "vm_type": None},
+            winner: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.2",
+                "release": "r2512.CSCwv36143",
+                "arch": "x86_64",
+                "package_type": None,
+                "vm_type": None,
+            },
+            loser: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.1",
+                "release": "r2512.CSCwu13268",
+                "arch": "x86_64",
+                "package_type": None,
+                "vm_type": None,
+            },
         }
-        with patch("app.rpm_dependency_metadata",
-                   side_effect=lambda p: {"identity": identities[p.name]}):
+        with patch(
+            "app.rpm_dependency_metadata",
+            side_effect=lambda p: {"identity": identities[p.name]},
+        ):
             result = module.resolve_component_conflicts(recommendation)
         self.assertEqual(sorted(result["selected"]), sorted([winner, loser]))
         self.assertEqual(result["excluded"], [])
@@ -1687,8 +2260,14 @@ class GisoWebTests(unittest.TestCase):
         a = "ncs5500-bgp-1.0.0.1-r2512.CSCwv36143.x86_64.rpm"
         b = "ncs5500-bgp-1.0.0.1-r2512.CSCwu13268.x86_64.rpm"
         recommendation = self._conflict_recommendation(a, b)
-        identity = {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "1",
-                    "arch": "x86_64", "package_type": "smu", "vm_type": "host"}
+        identity = {
+            "name": "ncs5500-bgp",
+            "version": "1.0.0.1",
+            "release": "1",
+            "arch": "x86_64",
+            "package_type": "smu",
+            "vm_type": "host",
+        }
         with patch("app.rpm_dependency_metadata", return_value={"identity": identity}):
             result = module.resolve_component_conflicts(recommendation)
         self.assertEqual(sorted(result["selected"]), sorted([a, b]))
@@ -1704,17 +2283,35 @@ class GisoWebTests(unittest.TestCase):
         sibling = "ncs5500-dpa-1.0.0.5-r2512.CSCwu13268.x86_64.rpm"
         recommendation = self._conflict_recommendation(winner, loser)
         recommendation["selected"].append(sibling)
-        recommendation["package_groups"][1]["components"] = ["ncs5500-bgp", "ncs5500-dpa"]
+        recommendation["package_groups"][1]["components"] = [
+            "ncs5500-bgp",
+            "ncs5500-dpa",
+        ]
         recommendation["package_groups"][1]["files"] = [loser, sibling]
         recommendation["package_groups"][1]["count"] = 2
         (self.data / sibling).write_bytes(b"x")
         identities = {
-            winner: {"name": "ncs5500-bgp", "version": "1.0.0.2", "release": "r2512.CSCwv36143",
-                     "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
-            loser: {"name": "ncs5500-bgp", "version": "1.0.0.1", "release": "r2512.CSCwu13268",
-                    "arch": "x86_64", "package_type": "smu", "vm_type": "host"},
+            winner: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.2",
+                "release": "r2512.CSCwv36143",
+                "arch": "x86_64",
+                "package_type": "smu",
+                "vm_type": "host",
+            },
+            loser: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.1",
+                "release": "r2512.CSCwu13268",
+                "arch": "x86_64",
+                "package_type": "smu",
+                "vm_type": "host",
+            },
         }
-        with patch("app.rpm_dependency_metadata", side_effect=lambda p: {"identity": identities[p.name]}):
+        with patch(
+            "app.rpm_dependency_metadata",
+            side_effect=lambda p: {"identity": identities[p.name]},
+        ):
             result = module.resolve_component_conflicts(recommendation)
         self.assertEqual(sorted(result["selected"]), sorted([winner, sibling]))
         self.assertEqual(result["component_conflicts"], [])
@@ -1730,20 +2327,35 @@ class GisoWebTests(unittest.TestCase):
         renamed.write_bytes(b"x")
         honest.write_bytes(b"x")
         identities = {
-            renamed.name: {"name": "ncs5500-bgp", "version": "1.0.0.1",
-                           "release": "r2512.CSCtest00001", "arch": "x86_64"},
-            honest.name: {"name": "ncs5500-dpa", "version": "1.0.0.5",
-                          "release": "r2512.CSCtest00002", "arch": "x86_64"},
+            renamed.name: {
+                "name": "ncs5500-bgp",
+                "version": "1.0.0.1",
+                "release": "r2512.CSCtest00001",
+                "arch": "x86_64",
+            },
+            honest.name: {
+                "name": "ncs5500-dpa",
+                "version": "1.0.0.5",
+                "release": "r2512.CSCtest00002",
+                "arch": "x86_64",
+            },
         }
-        with patch("app.rpm_dependency_metadata",
-                   side_effect=lambda p: {"identity": identities[p.name],
-                                          "requires": [], "provides": []}):
+        with patch(
+            "app.rpm_dependency_metadata",
+            side_effect=lambda p: {
+                "identity": identities[p.name],
+                "requires": [],
+                "provides": [],
+            },
+        ):
             candidates, _ = module.active_rpm_names()
             recommendation = module.add_superseded_exclusions({"excluded": []}, set())
         self.assertEqual(candidates, [honest.name])
         excluded = {item["name"]: item["reason"] for item in recommendation["excluded"]}
         self.assertIn(renamed.name, excluded)
-        self.assertIn("ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm", excluded[renamed.name])
+        self.assertIn(
+            "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm", excluded[renamed.name]
+        )
         self.assertNotIn(honest.name, excluded)
 
     def test_inventory_reports_where_each_rpm_identity_comes_from(self):
@@ -1752,8 +2364,12 @@ class GisoWebTests(unittest.TestCase):
         unreadable = self.data / "ncs5500-dpa-1.0.0.5-r2512.CSCtest00002.x86_64.rpm"
         for path in (confirmed, renamed, unreadable):
             path.write_bytes(path.name.encode())
-        header = {"name": "ncs5500-bgp", "version": "1.0.0.1",
-                  "release": "r2512.CSCtest00001", "arch": "x86_64"}
+        header = {
+            "name": "ncs5500-bgp",
+            "version": "1.0.0.1",
+            "release": "r2512.CSCtest00001",
+            "arch": "x86_64",
+        }
 
         def metadata(path):
             identity = None if path.name == unreadable.name else header
@@ -1761,13 +2377,25 @@ class GisoWebTests(unittest.TestCase):
 
         with patch("app.rpm_dependency_metadata", side_effect=metadata):
             items = {item["basename"]: item for item in module.inventory_files()}
-            blockers = module.selection_integrity_blockers([renamed.name, confirmed.name])
-        self.assertEqual((items[confirmed.name]["metadata_source"],
-                          items[confirmed.name]["metadata_confidence"]), ("rpm-header", "high"))
+            blockers = module.selection_integrity_blockers(
+                [renamed.name, confirmed.name]
+            )
+        self.assertEqual(
+            (
+                items[confirmed.name]["metadata_source"],
+                items[confirmed.name]["metadata_confidence"],
+            ),
+            ("rpm-header", "high"),
+        )
         self.assertEqual(items[renamed.name]["metadata_confidence"], "mismatch")
         self.assertEqual(items[renamed.name]["metadata_name"], confirmed.name)
-        self.assertEqual((items[unreadable.name]["metadata_source"],
-                          items[unreadable.name]["metadata_confidence"]), ("filename", "low"))
+        self.assertEqual(
+            (
+                items[unreadable.name]["metadata_source"],
+                items[unreadable.name]["metadata_confidence"],
+            ),
+            ("filename", "low"),
+        )
         # Manual mode may not build a file its own header contradicts.
         self.assertEqual(len(blockers), 1, blockers)
         self.assertIn(renamed.name, blockers[0])
@@ -1775,70 +2403,128 @@ class GisoWebTests(unittest.TestCase):
 
     def test_unsigned_or_mixed_key_rpms_are_warned_about(self):
         (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
-        names = ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm",
-                 "ncs5500-ospf-1.0.0.1-r2512.CSCtest00002.x86_64.rpm",
-                 "ncs5500-isis-1.0.0.1-r2512.CSCtest00003.x86_64.rpm"]
+        names = [
+            "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm",
+            "ncs5500-ospf-1.0.0.1-r2512.CSCtest00002.x86_64.rpm",
+            "ncs5500-isis-1.0.0.1-r2512.CSCtest00003.x86_64.rpm",
+        ]
         for name in names:
             (self.data / name).write_bytes(name.encode())
-        signatures = {names[0]: {"algorithm": "RSA/SHA256", "key_id": "7476b0605746bd08"},
-                      names[1]: {"algorithm": "RSA/SHA256", "key_id": "0000000000000001"},
-                      names[2]: None}
+        signatures = {
+            names[0]: {"algorithm": "RSA/SHA256", "key_id": "7476b0605746bd08"},
+            names[1]: {"algorithm": "RSA/SHA256", "key_id": "0000000000000001"},
+            names[2]: None,
+        }
 
         def metadata(path):
-            component, version, release = path.name.split("-")[1], "1.0.0.1", path.name.split("-", 3)[3][:-11]
-            return {"identity": {"name": f"ncs5500-{component}", "version": version,
-                                 "release": release, "arch": "x86_64"},
-                    "signature": signatures[path.name], "requires": [], "provides": []}
+            component, version, release = (
+                path.name.split("-")[1],
+                "1.0.0.1",
+                path.name.split("-", 3)[3][:-11],
+            )
+            return {
+                "identity": {
+                    "name": f"ncs5500-{component}",
+                    "version": version,
+                    "release": release,
+                    "arch": "x86_64",
+                },
+                "signature": signatures[path.name],
+                "requires": [],
+                "provides": [],
+            }
 
         with patch("app.rpm_dependency_metadata", side_effect=metadata):
             items = {i["basename"]: i for i in module.inventory_files()}
-            plan = module.create_build_plan({"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500",
-                                             "pkglist": names, "automatic_smu_selection": False})
+            plan = module.create_build_plan(
+                {
+                    "iso": "ncs5500-x64-25.1.2.iso",
+                    "platform": "ncs5500",
+                    "pkglist": names,
+                    "automatic_smu_selection": False,
+                }
+            )
         self.assertEqual(items[names[0]]["signature"]["key_id"], "7476b0605746bd08")
         self.assertIsNone(items[names[2]]["signature"])
         text = " | ".join(plan["warnings"])
         self.assertIn("1 selected RPM(s) carry no RSA header signature", text)
-        self.assertIn("signed with different keys (0000000000000001, 7476b0605746bd08)", text)
+        self.assertIn(
+            "signed with different keys (0000000000000001, 7476b0605746bd08)", text
+        )
 
     def test_manual_package_list_blocks_and_labels_header_mismatches(self):
-        source = (Path(module.__file__).parent / "static/manual-packages.js").read_text()
+        source = (
+            Path(module.__file__).parent / "static/manual-packages.js"
+        ).read_text()
         self.assertIn("file.metadata_confidence === 'mismatch'", source)
         self.assertIn("identity confirmed by RPM header", source)
 
     def test_inventory_revision_moves_only_when_files_change(self):
-        first = self.client.get("/api/inventory/revision").get_json()["inventory_revision"]
-        self.assertEqual(first, self.client.get("/api/inputs").get_json()["inventory_revision"])
-        self.assertEqual(first, self.client.get("/api/inventory/revision").get_json()["inventory_revision"])
+        first = self.client.get("/api/inventory/revision").get_json()[
+            "inventory_revision"
+        ]
+        self.assertEqual(
+            first, self.client.get("/api/inputs").get_json()["inventory_revision"]
+        )
+        self.assertEqual(
+            first,
+            self.client.get("/api/inventory/revision").get_json()["inventory_revision"],
+        )
         (self.data / "added-out-of-band.iso").write_bytes(b"iso")
-        second = self.client.get("/api/inventory/revision").get_json()["inventory_revision"]
+        second = self.client.get("/api/inventory/revision").get_json()[
+            "inventory_revision"
+        ]
         self.assertNotEqual(first, second)
         (self.data / "added-out-of-band.iso").unlink()
-        self.assertEqual(first, self.client.get("/api/inventory/revision").get_json()["inventory_revision"])
+        self.assertEqual(
+            first,
+            self.client.get("/api/inventory/revision").get_json()["inventory_revision"],
+        )
 
     def test_ui_refreshes_automatically_without_discarding_a_manual_selection(self):
         source = (Path(module.__file__).parent / "static/app.js").read_text()
         template = (Path(module.__file__).parent / "templates/index.html").read_text()
         self.assertIn("api('/api/inventory/revision')", source)
         self.assertIn("setTimeout(watchInventory, INVENTORY_WATCH_MS)", source)
-        self.assertIn("document.addEventListener('visibilitychange', checkInventoryChanged)", source)
+        self.assertIn(
+            "document.addEventListener('visibilitychange', checkInventoryChanged)",
+            source,
+        )
         # A manual selection in progress is never re-rendered away.
-        self.assertIn("if (packageListEdited) $('#inventory-changed').hidden = false;", source)
+        self.assertIn(
+            "if (packageListEdited) $('#inventory-changed').hidden = false;", source
+        )
         self.assertIn('id="inventory-changed"', template)
 
-    def test_unreadable_rpm_is_excluded_with_a_reason_instead_of_breaking_the_plan(self):
+    def test_unreadable_rpm_is_excluded_with_a_reason_instead_of_breaking_the_plan(
+        self,
+    ):
         (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
         good = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
         locked = "ncs5500-dpa-1.0.0.5-r2512.CSCtest00002.x86_64.rpm"
         (self.data / good).write_bytes(b"good")
         (self.data / locked).write_bytes(b"locked")
         real_can_read = module.service_can_read
-        with patch("app.service_can_read", side_effect=lambda p: p.name != locked and real_can_read(p)):
+        with patch(
+            "app.service_can_read",
+            side_effect=lambda p: p.name != locked and real_can_read(p),
+        ):
             candidates, superseded = module.active_rpm_names()
-            excluded = module.add_superseded_exclusions({"excluded": []}, superseded)["excluded"]
-            plan = self.client.post("/api/build-plan", json={
-                "iso": "ncs5500-x64-25.1.2.iso", "automatic_smu_selection": True, "pkglist": []}).get_json()
+            excluded = module.add_superseded_exclusions({"excluded": []}, superseded)[
+                "excluded"
+            ]
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "ncs5500-x64-25.1.2.iso",
+                    "automatic_smu_selection": True,
+                    "pkglist": [],
+                },
+            ).get_json()
         self.assertEqual(candidates, [good])
-        self.assertIn("cannot read this file", {e["name"]: e["reason"] for e in excluded}[locked])
+        self.assertIn(
+            "cannot read this file", {e["name"]: e["reason"] for e in excluded}[locked]
+        )
         self.assertTrue(plan["ready"], plan["blockers"])
         self.assertEqual([p["basename"] for p in plan["selected_packages"]], [good])
 
@@ -1846,14 +2532,19 @@ class GisoWebTests(unittest.TestCase):
         # Same layout as a real Cisco SMU README: tab-indented "<rpm> <md5>"
         # lines under "RPMS:", terminated by a line with only a tab.
         lines = "".join(f"\t{name} {md5}\n" for name, md5 in rpms.items())
-        return (f"# Readme for SMU {smu}\n\nName:                    {smu}\n\n"
-                f"DDTS:                    {smu.rsplit('.', 1)[-1]}\n\nRPMS: \n{lines}\t\n"
-                "Pre-requisites:          \n")
+        return (
+            f"# Readme for SMU {smu}\n\nName:                    {smu}\n\n"
+            f"DDTS:                    {smu.rsplit('.', 1)[-1]}\n\nRPMS: \n{lines}\t\n"
+            "Pre-requisites:          \n"
+        )
 
     def _smu_fix(self, smu, contents, uploaded):
         directory = self.data / smu
         directory.mkdir()
-        rpms = {name: hashlib.md5(body, usedforsecurity=False).hexdigest() for name, body in contents.items()}
+        rpms = {
+            name: hashlib.md5(body, usedforsecurity=False).hexdigest()
+            for name, body in contents.items()
+        }
         (directory / f"{smu}.txt").write_text(self._smu_readme(smu, rpms))
         for name in uploaded:
             (directory / name).write_bytes(contents[name])
@@ -1863,13 +2554,19 @@ class GisoWebTests(unittest.TestCase):
         # The case filename CSC grouping can never see: a 3-RPM fix uploaded
         # without its third RPM looks like a complete 2-RPM group.
         smu = "ncs5500-25.1.2.CSCtest00001"
-        names = [f"ncs5500-{component}-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"
-                 for component in ("infra", "routing", "iosxr-fwding")]
+        names = [
+            f"ncs5500-{component}-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"
+            for component in ("infra", "routing", "iosxr-fwding")
+        ]
         self._smu_fix(smu, {name: name.encode() for name in names}, uploaded=names[:2])
         candidates, superseded = module.active_rpm_names()
         self.assertEqual(candidates, [])
-        excluded = {item["name"]: item["reason"] for item in
-                    module.add_superseded_exclusions({"excluded": []}, superseded)["excluded"]}
+        excluded = {
+            item["name"]: item["reason"]
+            for item in module.add_superseded_exclusions({"excluded": []}, superseded)[
+                "excluded"
+            ]
+        }
         for name in names[:2]:
             self.assertIn("lists 3 RPMs", excluded[name])
             self.assertIn(names[2], excluded[name])
@@ -1878,7 +2575,9 @@ class GisoWebTests(unittest.TestCase):
         smu = "ncs5500-25.1.2.CSCtest00002"
         good = "ncs5500-infra-1.0.0.3-r2512.CSCtest00002.x86_64.rpm"
         bad = "ncs5500-routing-1.0.0.3-r2512.CSCtest00002.x86_64.rpm"
-        directory = self._smu_fix(smu, {good: b"good", bad: b"original"}, uploaded=[good, bad])
+        directory = self._smu_fix(
+            smu, {good: b"good", bad: b"original"}, uploaded=[good, bad]
+        )
         (directory / bad).write_bytes(b"truncated")
         problems = module.smu_manifest_problems([good, bad])
         self.assertIn("MD5 does not match", problems[bad])
@@ -1894,7 +2593,9 @@ class GisoWebTests(unittest.TestCase):
         # Layout of a real Cisco README: SMU-level prerequisites, then per
         # package under CONSTITUENT SMU DETAILS.
         (directory / f"{smu}.txt").write_text(
-            self._smu_readme(smu, {rpm: hashlib.md5(b"rpm", usedforsecurity=False).hexdigest()})
+            self._smu_readme(
+                smu, {rpm: hashlib.md5(b"rpm", usedforsecurity=False).hexdigest()}
+            )
             + "          ncs5500-25.1.2.CSCtest00099\n\n"
             "Supercedes:              \n          ncs5500-25.1.2.CSCtest00099   Partial\n\n"
             "CONSTITUENT SMU DETAILS:\n\nSource Packages:         ncs5500-infra\n"
@@ -1902,85 +2603,148 @@ class GisoWebTests(unittest.TestCase):
             "SMU Tar Contents:    \n"
         )
         selected = [{"relative_path": f"{smu}/{rpm}", "basename": rpm}]
-        metadata = {"requires": [("ncs5500-dpa", "1.0.0.5"), ("ncs5500-os", "1.0.0.1")],
-                    "provides": []}
+        metadata = {
+            "requires": [("ncs5500-dpa", "1.0.0.5"), ("ncs5500-os", "1.0.0.1")],
+            "provides": [],
+        }
         with patch("app.rpm_dependency_metadata", return_value=metadata):
             missing = module.missing_package_dependencies(
-                selected, {"ncs5500-dpa": "1.0.0.0", "ncs5500-os": "1.0.0.0"})
+                selected, {"ncs5500-dpa": "1.0.0.0", "ncs5500-os": "1.0.0.0"}
+            )
         by_requirement = {entry["requirement"]: entry for entry in missing}
         dpa = by_requirement["ncs5500-dpa = 1.0.0.5"]
         self.assertEqual(dpa["prerequisite_smu"], "ncs5500-25.1.2.CSCtest00099")
         self.assertEqual(dpa["listed_by"], smu)
-        self.assertIn("download Cisco SMU ncs5500-25.1.2.CSCtest00099", module.dependency_blocker_text(dpa))
+        self.assertIn(
+            "download Cisco SMU ncs5500-25.1.2.CSCtest00099",
+            module.dependency_blocker_text(dpa),
+        )
         # No README claim for ncs5500-os: keep the generic advice, never guess.
         self.assertNotIn("prerequisite_smu", by_requirement["ncs5500-os = 1.0.0.1"])
 
     def test_automatic_selection_leaves_out_fixes_that_cannot_install(self):
-        a = "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"   # needs dpa 1.0.0.5
-        a2 = "ncs5500-infra-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"    # same fix as a
-        b = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"       # needs routing 1.0.0.2 (from a)
-        c = "ncs5500-ospf-1.0.0.1-r2512.CSCtest00003.x86_64.rpm"      # needs nothing missing
-        requires = {a: [("ncs5500-dpa", "1.0.0.5")], b: [("ncs5500-routing", "1.0.0.2")]}
+        a = "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"  # needs dpa 1.0.0.5
+        a2 = "ncs5500-infra-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"  # same fix as a
+        b = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00002.x86_64.rpm"  # needs routing 1.0.0.2 (from a)
+        c = "ncs5500-ospf-1.0.0.1-r2512.CSCtest00003.x86_64.rpm"  # needs nothing missing
+        requires = {
+            a: [("ncs5500-dpa", "1.0.0.5")],
+            b: [("ncs5500-routing", "1.0.0.2")],
+        }
         provides = {a: [("ncs5500-routing", "1.0.0.2-r2512.CSCtest00001")]}
 
         def metadata(path):
-            return {"identity": None, "requires": requires.get(path.name, []),
-                    "provides": provides.get(path.name, [])}
+            return {
+                "identity": None,
+                "requires": requires.get(path.name, []),
+                "provides": provides.get(path.name, []),
+            }
 
         (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
         for name in (a, a2, b, c):
             (self.data / name).write_bytes(name.encode())
-        recommendation = {"ready": True, "selected": [a, a2, b, c], "excluded": [],
-                          "package_groups": [], "component_conflicts": [], "warnings": []}
-        with patch("app.rpm_dependency_metadata", side_effect=metadata), \
-                patch("app.inspect_iso_shipped_packages",
-                      return_value={"ncs5500-dpa": "1.0.0.0", "ncs5500-routing": "1.0.0.0"}):
+        recommendation = {
+            "ready": True,
+            "selected": [a, a2, b, c],
+            "excluded": [],
+            "package_groups": [],
+            "component_conflicts": [],
+            "warnings": [],
+        }
+        with (
+            patch("app.rpm_dependency_metadata", side_effect=metadata),
+            patch(
+                "app.inspect_iso_shipped_packages",
+                return_value={"ncs5500-dpa": "1.0.0.0", "ncs5500-routing": "1.0.0.0"},
+            ),
+        ):
             result = module.exclude_unsatisfiable_packages(
-                recommendation, "ncs5500-x64-25.1.2.iso", "ncs5500-x64-25.1.2.iso", frozenset())
-            manual = module.create_build_plan({"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500",
-                                               "pkglist": [a], "automatic_smu_selection": False})
+                recommendation,
+                "ncs5500-x64-25.1.2.iso",
+                "ncs5500-x64-25.1.2.iso",
+                frozenset(),
+            )
+            manual = module.create_build_plan(
+                {
+                    "iso": "ncs5500-x64-25.1.2.iso",
+                    "platform": "ncs5500",
+                    "pkglist": [a],
+                    "automatic_smu_selection": False,
+                }
+            )
         reasons = {item["name"]: item["reason"] for item in result["excluded"]}
         self.assertEqual(result["selected"], [c])
         self.assertIn("Needs ncs5500-dpa = 1.0.0.5", reasons[a])
         self.assertIn("Part of CSCTEST00001", reasons[a2])
         # b only became unsatisfiable once a was gone: the check repeats.
         self.assertIn("Needs ncs5500-routing = 1.0.0.2", reasons[b])
-        self.assertIn("3 left out because their dependencies cannot be satisfied", result["message"])
+        self.assertIn(
+            "3 left out because their dependencies cannot be satisfied",
+            result["message"],
+        )
         # An operator's explicit choice is blocked, never silently edited.
         self.assertFalse(manual["ready"])
         self.assertEqual([p["basename"] for p in manual["selected_packages"]], [a])
 
     def test_complete_fix_matching_its_readme_stays_selectable(self):
         smu = "ncs5500-25.1.2.CSCtest00003"
-        names = [f"ncs5500-{component}-1.0.0.4-r2512.CSCtest00003.x86_64.rpm"
-                 for component in ("infra", "routing")]
+        names = [
+            f"ncs5500-{component}-1.0.0.4-r2512.CSCtest00003.x86_64.rpm"
+            for component in ("infra", "routing")
+        ]
         self._smu_fix(smu, {name: name.encode() for name in names}, uploaded=names)
         # A README with no RPMS block (the base bundle's) makes no claim.
-        (self.data / "README-base.txt").write_text("Name: base\nPackage(s): everything\n")
+        (self.data / "README-base.txt").write_text(
+            "Name: base\nPackage(s): everything\n"
+        )
         self.assertEqual(sorted(module.active_rpm_names()[0]), sorted(names))
         self.assertEqual(module.smu_manifest_problems(names), {})
 
     def test_manual_selection_of_an_incomplete_fix_is_a_plan_blocker(self):
         (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
         smu = "ncs5500-25.1.2.CSCtest00004"
-        names = [f"ncs5500-{component}-1.0.0.5-r2512.CSCtest00004.x86_64.rpm"
-                 for component in ("infra", "routing")]
+        names = [
+            f"ncs5500-{component}-1.0.0.5-r2512.CSCtest00004.x86_64.rpm"
+            for component in ("infra", "routing")
+        ]
         self._smu_fix(smu, {name: name.encode() for name in names}, uploaded=names[:1])
-        plan = self.client.post("/api/build-plan", json={
-            "iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500", "pkglist": [names[0]],
-            "automatic_smu_selection": False,
-        }).get_json()
+        plan = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "ncs5500-x64-25.1.2.iso",
+                "platform": "ncs5500",
+                "pkglist": [names[0]],
+                "automatic_smu_selection": False,
+            },
+        ).get_json()
         self.assertFalse(plan["ready"])
-        self.assertTrue(any("Incomplete fix" in blocker and names[1] in blocker
-                            for blocker in plan["blockers"]), plan["blockers"])
-        compatibility = self.client.post("/api/compatibility", json={
-            "iso": "ncs5500-x64-25.1.2.iso", "packages": [names[0]],
-        }).get_json()
+        self.assertTrue(
+            any(
+                "Incomplete fix" in blocker and names[1] in blocker
+                for blocker in plan["blockers"]
+            ),
+            plan["blockers"],
+        )
+        compatibility = self.client.post(
+            "/api/compatibility",
+            json={
+                "iso": "ncs5500-x64-25.1.2.iso",
+                "packages": [names[0]],
+            },
+        ).get_json()
         self.assertFalse(compatibility["smu"]["compatible"])
-        with patch("app.child_mount_args", return_value=[]), \
-                self.assertRaisesRegex(ValueError, "Incomplete fix"):
-            module.build_command({"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500",
-                                  "pkglist": [names[0]]}, "manifest")
+        with (
+            patch("app.child_mount_args", return_value=[]),
+            self.assertRaisesRegex(ValueError, "Incomplete fix"),
+        ):
+            module.build_command(
+                {
+                    "iso": "ncs5500-x64-25.1.2.iso",
+                    "platform": "ncs5500",
+                    "pkglist": [names[0]],
+                },
+                "manifest",
+            )
 
     def test_unreadable_rpm_header_and_source_rpms_are_never_excluded_by_name(self):
         # No ground truth means no claim: a header rpm cannot read is left to
@@ -1989,8 +2753,10 @@ class GisoWebTests(unittest.TestCase):
         source = self.data / "ncs5500-bgp-1.0.0.1-r2512.src.rpm"
         unreadable.write_bytes(b"x")
         source.write_bytes(b"x")
-        with patch("app.rpm_dependency_metadata",
-                   return_value={"identity": None, "requires": [], "provides": []}) as query:
+        with patch(
+            "app.rpm_dependency_metadata",
+            return_value={"identity": None, "requires": [], "provides": []},
+        ) as query:
             self.assertIsNone(module.rpm_filename_mismatch(unreadable))
             self.assertIsNone(module.rpm_filename_mismatch(source))
         query.assert_called_once_with(unreadable)
@@ -1999,7 +2765,9 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.get("/api/storage")
         volumes = response.get_json()["volume_free_bytes"]
         self.assertEqual(set(volumes), {"uploads", "work", "output"})
-        self.assertTrue(all(isinstance(value, int) for value in volumes.values()), volumes)
+        self.assertTrue(
+            all(isinstance(value, int) for value in volumes.values()), volumes
+        )
 
     def test_manual_mode_with_zero_packages_is_a_valid_ready_plan(self):
         # 05-TESTING-CI-TODO.md flagged this as an untested, unclear case
@@ -2015,10 +2783,16 @@ class GisoWebTests(unittest.TestCase):
         # this test pins the backend half of that split responsibility.
         (self.data / "base.iso").write_bytes(b"iso")
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": "base.iso", "platform": "ncs5500", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "base.iso",
+                "platform": "ncs5500",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         plan = response.get_json()
         self.assertTrue(plan["ready"], plan)
@@ -2032,7 +2806,12 @@ class GisoWebTests(unittest.TestCase):
             module.build_command({"iso": "base.iso", "pkglist": []}, "unknown")
 
     def test_build_progress_follows_real_log_milestones(self):
-        module.jobs["job"] = {"log": "", "updated": 0, "progress": 3, "phase": "Preparing"}
+        module.jobs["job"] = {
+            "log": "",
+            "updated": 0,
+            "progress": 3,
+            "phase": "Preparing",
+        }
         module.append_log("job", "Scanning repository [/work/repo]...\n")
         self.assertEqual(module.jobs["job"]["progress"], 28)
         self.assertEqual(module.jobs["job"]["phase"], "Scanning update packages")
@@ -2046,8 +2825,10 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "two").mkdir()
         (self.data / "one/package.rpm").write_bytes(b"same rpm")
         (self.data / "two/package.rpm").write_bytes(b"same rpm")
-        command = module.build_command({"iso": "base.iso", "platform": "asr9k",
-                                        "pkglist": ["package.rpm"]}, "duplicate")
+        command = module.build_command(
+            {"iso": "base.iso", "platform": "asr9k", "pkglist": ["package.rpm"]},
+            "duplicate",
+        )
         self.assertIn("package.rpm", command)
 
     @patch("app.child_mount_args", return_value=[])
@@ -2056,15 +2837,23 @@ class GisoWebTests(unittest.TestCase):
         # this confirms the backend actually includes --verbose-dep-check
         # in the real build command when the payload requests it.
         (self.data / "base.iso").write_bytes(b"iso")
-        command = module.build_command({"iso": "base.iso", "platform": "ncs57",
-                                        "pkglist": [], "verbose_dep_check": True}, "job")
+        command = module.build_command(
+            {
+                "iso": "base.iso",
+                "platform": "ncs57",
+                "pkglist": [],
+                "verbose_dep_check": True,
+            },
+            "job",
+        )
         self.assertIn("--verbose-dep-check", command)
 
     @patch("app.child_mount_args", return_value=[])
     def test_verbose_dep_check_is_omitted_when_not_requested(self, _mounts):
         (self.data / "base.iso").write_bytes(b"iso")
-        command = module.build_command({"iso": "base.iso", "platform": "ncs57",
-                                        "pkglist": []}, "job")
+        command = module.build_command(
+            {"iso": "base.iso", "platform": "ncs57", "pkglist": []}, "job"
+        )
         self.assertNotIn("--verbose-dep-check", command)
 
     @patch("app.child_mount_args", return_value=[])
@@ -2075,8 +2864,10 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "one/package.rpm").write_bytes(b"first")
         (self.data / "two/package.rpm").write_bytes(b"second")
         with self.assertRaises(ValueError):
-            module.build_command({"iso": "base.iso", "platform": "asr9k",
-                                  "pkglist": ["package.rpm"]}, "conflict")
+            module.build_command(
+                {"iso": "base.iso", "platform": "asr9k", "pkglist": ["package.rpm"]},
+                "conflict",
+            )
 
     @patch("app.child_mount_args", return_value=[])
     def test_inventory_id_selects_exact_rpm(self, _mounts):
@@ -2087,26 +2878,41 @@ class GisoWebTests(unittest.TestCase):
         second = self.data / "two/package.rpm"
         first.write_bytes(b"first")
         second.write_bytes(b"second")
-        selected = next(item for item in module.inventory_files()
-                        if item["relative_path"] == "two/package.rpm")
+        selected = next(
+            item
+            for item in module.inventory_files()
+            if item["relative_path"] == "two/package.rpm"
+        )
 
-        module.build_command({"iso": "base.iso", "platform": "asr9k",
-                              "pkglist": [selected["id"]]}, "identity")
+        module.build_command(
+            {"iso": "base.iso", "platform": "asr9k", "pkglist": [selected["id"]]},
+            "identity",
+        )
 
-        self.assertEqual((module.WORK / "identity/repo/package.rpm").read_bytes(), b"second")
+        self.assertEqual(
+            (module.WORK / "identity/repo/package.rpm").read_bytes(), b"second"
+        )
 
     def test_build_plan_is_backend_owned_and_checksum_fingerprinted(self):
         (self.data / "base.iso").write_bytes(b"iso")
         rpm = self.data / "package.rpm"
         rpm.write_bytes(b"first")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
-        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
-                   "automatic_smu_selection": False, "auto_repo": True}
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
+        payload = {
+            "iso": "base.iso",
+            "platform": "asr9k",
+            "pkglist": [item["id"]],
+            "automatic_smu_selection": False,
+            "auto_repo": True,
+        }
 
         first = self.client.post("/api/build-plan", json=payload).get_json()
         rpm.write_bytes(b"second")
-        second_item = next(entry for entry in module.inventory_files()
-                           if entry["type"] == ".rpm")
+        second_item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
         payload["pkglist"] = [second_item["id"]]
         second = self.client.post("/api/build-plan", json=payload).get_json()
 
@@ -2115,14 +2921,20 @@ class GisoWebTests(unittest.TestCase):
         self.assertNotEqual(first["inventory_revision"], second["inventory_revision"])
         self.assertNotEqual(first["fingerprint"], second["fingerprint"])
 
-    def test_build_plan_fingerprint_changes_when_config_content_or_gisobuild_changes(self):
+    def test_build_plan_fingerprint_changes_when_config_content_or_gisobuild_changes(
+        self,
+    ):
         (self.data / "base.iso").write_bytes(b"iso")
         # .txt is not an inventory type, so only the explicit content hash
         # can notice this edit - the inventory revision stays the same.
         config = self.data / "router-config.txt"
         config.write_text("hostname one\n")
-        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [],
-                   "xrconfig": "router-config.txt"}
+        payload = {
+            "iso": "base.iso",
+            "platform": "asr9k",
+            "pkglist": [],
+            "xrconfig": "router-config.txt",
+        }
         with patch("app.gisobuild_commit", return_value="abc1234"):
             first = self.client.post("/api/build-plan", json=payload).get_json()
             config.write_text("hostname two\n")
@@ -2131,8 +2943,10 @@ class GisoWebTests(unittest.TestCase):
             third = self.client.post("/api/build-plan", json=payload).get_json()
         self.assertEqual(first["inventory_revision"], second["inventory_revision"])
         self.assertNotEqual(first["fingerprint"], second["fingerprint"])
-        self.assertEqual(second["config_files"]["xrconfig"],
-                         hashlib.sha256(b"hostname two\n").hexdigest())
+        self.assertEqual(
+            second["config_files"]["xrconfig"],
+            hashlib.sha256(b"hostname two\n").hexdigest(),
+        )
         self.assertNotEqual(second["fingerprint"], third["fingerprint"])
         self.assertEqual(third["gisobuild_commit"], "def5678")
 
@@ -2140,34 +2954,70 @@ class GisoWebTests(unittest.TestCase):
         # One backend model: choosing by hand exactly what automatic selection
         # chose must give the same packages, blockers and warnings.
         (self.data / "asr9k-x64-7.3.2.iso").write_bytes(b"iso")
-        for name in ("asr9k-x64-routing-1.0.0.1-r732.CSCtest00001.x86_64.rpm",
-                     "asr9k-x64-bgp-1.0.0.1-r732.CSCtest00002.x86_64.rpm"):
+        for name in (
+            "asr9k-x64-routing-1.0.0.1-r732.CSCtest00001.x86_64.rpm",
+            "asr9k-x64-bgp-1.0.0.1-r732.CSCtest00002.x86_64.rpm",
+        ):
             (self.data / name).write_bytes(name.encode())
-        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00003.x86_64.rpm").write_bytes(b"other")
+        (self.data / "ncs5500-bgp-1.0.0.1-r2512.CSCtest00003.x86_64.rpm").write_bytes(
+            b"other"
+        )
         base = {"iso": "asr9k-x64-7.3.2.iso", "platform": "asr9k", "auto_repo": True}
-        automatic = self.client.post("/api/build-plan", json={
-            **base, "pkglist": [], "automatic_smu_selection": True}).get_json()
-        manual = self.client.post("/api/build-plan", json={
-            **base, "automatic_smu_selection": False,
-            "pkglist": [item["id"] for item in automatic["selected_packages"]]}).get_json()
+        automatic = self.client.post(
+            "/api/build-plan",
+            json={**base, "pkglist": [], "automatic_smu_selection": True},
+        ).get_json()
+        manual = self.client.post(
+            "/api/build-plan",
+            json={
+                **base,
+                "automatic_smu_selection": False,
+                "pkglist": [item["id"] for item in automatic["selected_packages"]],
+            },
+        ).get_json()
         self.assertTrue(automatic["ready"], automatic["blockers"])
         self.assertEqual(len(automatic["selected_packages"]), 2)
-        for key in ("selected_packages", "blockers", "warnings", "platform", "engine", "release"):
+        for key in (
+            "selected_packages",
+            "blockers",
+            "warnings",
+            "platform",
+            "engine",
+            "release",
+        ):
             self.assertEqual(automatic[key], manual[key], key)
 
     def test_compatibility_check_reports_the_dependency_blocker_the_plan_would(self):
         (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
         rpm = "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"
         (self.data / rpm).write_bytes(b"rpm")
-        missing = [{"requirement": "ncs5500-dpa = 1.0.0.5", "required_by": [rpm],
-                    "base_image_has": "1.0.0.0"}]
-        with patch("app.missing_package_dependencies", return_value=missing), \
-                patch("app.inspect_iso_shipped_packages", return_value={"ncs5500-dpa": "1.0.0.0"}):
-            check = self.client.post("/api/compatibility", json={
-                "iso": "ncs5500-x64-25.1.2.iso", "packages": [rpm]}).get_json()
-            plan = self.client.post("/api/build-plan", json={
-                "iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500", "pkglist": [rpm],
-                "automatic_smu_selection": False}).get_json()
+        missing = [
+            {
+                "requirement": "ncs5500-dpa = 1.0.0.5",
+                "required_by": [rpm],
+                "base_image_has": "1.0.0.0",
+            }
+        ]
+        with (
+            patch("app.missing_package_dependencies", return_value=missing),
+            patch(
+                "app.inspect_iso_shipped_packages",
+                return_value={"ncs5500-dpa": "1.0.0.0"},
+            ),
+        ):
+            check = self.client.post(
+                "/api/compatibility",
+                json={"iso": "ncs5500-x64-25.1.2.iso", "packages": [rpm]},
+            ).get_json()
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "ncs5500-x64-25.1.2.iso",
+                    "platform": "ncs5500",
+                    "pkglist": [rpm],
+                    "automatic_smu_selection": False,
+                },
+            ).get_json()
         self.assertFalse(check["smu"]["compatible"])
         self.assertEqual(check["smu"]["unsatisfied_dependencies"], missing)
         dependency_line = module.dependency_blocker_text(missing[0])
@@ -2176,32 +3026,56 @@ class GisoWebTests(unittest.TestCase):
 
     def test_real_blocker_messages_map_to_error_codes(self):
         from platform_validation import validate_smu_selection
+
         iso = "ncs5500-mini-x-25.1.2.iso"
         produced = {
-            "DEPENDENCY_ERROR": module.dependency_blocker_text({
-                "requirement": "ncs5500-dpa = 1.0.0.5", "required_by": ["a.rpm"],
-                "base_image_has": "1.0.0.0"}),
+            "DEPENDENCY_ERROR": module.dependency_blocker_text(
+                {
+                    "requirement": "ncs5500-dpa = 1.0.0.5",
+                    "required_by": ["a.rpm"],
+                    "base_image_has": "1.0.0.0",
+                }
+            ),
             "RELEASE_MISMATCH": validate_smu_selection(
-                iso, ["ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"])["issues"][0],
-            "PLATFORM_MISMATCH": next(i for i in validate_smu_selection(
-                iso, ["asr9k-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"])["issues"] if "platform" in i),
-            "DUPLICATE_CONFLICT": validate_smu_selection(iso, [
-                "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm",
-                "ncs5500-bgp-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"])["issues"][0],
+                iso, ["ncs5500-bgp-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"]
+            )["issues"][0],
+            "PLATFORM_MISMATCH": next(
+                i
+                for i in validate_smu_selection(
+                    iso, ["asr9k-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"]
+                )["issues"]
+                if "platform" in i
+            ),
+            "DUPLICATE_CONFLICT": validate_smu_selection(
+                iso,
+                [
+                    "ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm",
+                    "ncs5500-bgp-1.0.0.2-r2512.CSCtest00001.x86_64.rpm",
+                ],
+            )["issues"][0],
             "RPM_ARCH_MISMATCH": validate_smu_selection(
-                iso, ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"],
-                iso_architectures=frozenset({"aarch64"}))["issues"][0],
+                iso,
+                ["ncs5500-bgp-1.0.0.1-r2512.CSCtest00001.x86_64.rpm"],
+                iso_architectures=frozenset({"aarch64"}),
+            )["issues"][0],
         }
         with patch("app.shutil.disk_usage", return_value=SimpleNamespace(free=1)):
             produced["STORAGE_ERROR"] = module.build_space_blockers(10)[0]
         (self.data / "base.iso").write_bytes(b"iso")
         self.iso_signature.stop()
         try:
-            plan = module.create_build_plan({"iso": "base.iso", "platform": "asr9k", "pkglist": [],
-                                             "full_iso": True})
+            plan = module.create_build_plan(
+                {
+                    "iso": "base.iso",
+                    "platform": "asr9k",
+                    "pkglist": [],
+                    "full_iso": True,
+                }
+            )
             missing = module.create_build_plan({"iso": "gone.iso", "pkglist": []})
-            unknown = module.create_build_plan({"iso": "base.iso", "pkglist": [],
-                                                "automatic_smu_selection": True})
+            unknown = module.create_build_plan(
+                {"iso": "base.iso", "pkglist": [], "automatic_smu_selection": True}
+            )
         finally:
             self.iso_signature.start()
         by_code = {issue["code"]: issue for issue in plan["issues"]}
@@ -2218,29 +3092,57 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(len(plan["issues"]), len(plan["blockers"]))
 
     def test_api_errors_carry_a_code_by_where_they_happened(self):
-        upload = self.client.post("/api/uploads/init", json={"name": "notes.gz", "size": 10}).get_json()
+        upload = self.client.post(
+            "/api/uploads/init", json={"name": "notes.gz", "size": 10}
+        ).get_json()
         self.assertEqual(upload["code"], "UPLOAD_ERROR")
         self.assertTrue(upload["suggested_action"])
-        self.assertEqual(upload["error"], "Unsupported file or invalid size")  # unchanged
+        self.assertEqual(
+            upload["error"], "Unsupported file or invalid size"
+        )  # unchanged
         archive = self.client.delete("/api/archive/no-such-job/golden.iso")
         self.assertEqual(archive.status_code, 404)
         self.assertEqual(archive.get_json()["code"], "ARCHIVE_ERROR")
-        self.assertEqual(self.client.get("/api/jobs/no-such-job").get_json()["error"],
-                         "The requested item was not found")
-        self.assertNotIn("application/json", self.client.get("/no-such-page").content_type)
-        self.assertEqual(module.classify_api_error("cisco_search", "Cisco authorization failed: 401")["code"],
-                         "CISCO_AUTH_ERROR")
-        self.assertEqual(module.classify_api_error("cisco_search", "Cisco API credentials are not configured")["code"],
-                         "CISCO_AUTH_ERROR")
-        self.assertEqual(module.classify_api_error("cisco_search", "No matching images")["code"],
-                         "CISCO_DOWNLOAD_ERROR")
-        self.assertEqual(module.classify_api_error("archive_delete", "Archive item not found")["code"],
-                         "ARCHIVE_ERROR")
-        self.assertEqual(module.classify_api_error("upload_complete",
-                                                   "Not enough free disk space to extract tar archive")["code"],
-                         "STORAGE_ERROR")
-        module.cisco_download_jobs["dl"] = {"status": "failed", "error": "Cisco authorization failed: 403",
-                                            "created": time.time()}
+        self.assertEqual(
+            self.client.get("/api/jobs/no-such-job").get_json()["error"],
+            "The requested item was not found",
+        )
+        self.assertNotIn(
+            "application/json", self.client.get("/no-such-page").content_type
+        )
+        self.assertEqual(
+            module.classify_api_error(
+                "cisco_search", "Cisco authorization failed: 401"
+            )["code"],
+            "CISCO_AUTH_ERROR",
+        )
+        self.assertEqual(
+            module.classify_api_error(
+                "cisco_search", "Cisco API credentials are not configured"
+            )["code"],
+            "CISCO_AUTH_ERROR",
+        )
+        self.assertEqual(
+            module.classify_api_error("cisco_search", "No matching images")["code"],
+            "CISCO_DOWNLOAD_ERROR",
+        )
+        self.assertEqual(
+            module.classify_api_error("archive_delete", "Archive item not found")[
+                "code"
+            ],
+            "ARCHIVE_ERROR",
+        )
+        self.assertEqual(
+            module.classify_api_error(
+                "upload_complete", "Not enough free disk space to extract tar archive"
+            )["code"],
+            "STORAGE_ERROR",
+        )
+        module.cisco_download_jobs["dl"] = {
+            "status": "failed",
+            "error": "Cisco authorization failed: 403",
+            "created": time.time(),
+        }
         try:
             status = self.client.get("/api/cisco/downloads/dl").get_json()
         finally:
@@ -2248,23 +3150,44 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(status["failure"]["code"], "CISCO_AUTH_ERROR")
 
     def test_job_failures_are_classified(self):
-        dependency = {"status": "failed", "exit_code": 1,
-                      "log": "\tncs5500-dpa = 1.0.0.5 is needed by ncs5500-routing-1.0.0.2-r2512.x86_64\n"}
+        dependency = {
+            "status": "failed",
+            "exit_code": 1,
+            "log": "\tncs5500-dpa = 1.0.0.5 is needed by ncs5500-routing-1.0.0.2-r2512.x86_64\n",
+        }
         nothing = {"status": "failed", "exit_code": 0, "log": "Info: Nothing to do\n"}
         crashed = {"status": "failed", "exit_code": 2, "log": "Traceback ...\n"}
-        no_builder = {"status": "failed", "log": "\nERROR: The builder image could not be pulled "
-                                                  "(exited with status 1) and is not cached on this host: x\n"}
-        self.assertEqual(module.classify_job_failure(dependency)["code"], "DEPENDENCY_ERROR")
-        self.assertEqual(module.classify_job_failure(nothing)["code"], "OUTPUT_VALIDATION_ERROR")
-        self.assertEqual(module.classify_job_failure(crashed)["code"], "GISOBUILD_ERROR")
-        self.assertIn("status 2", module.classify_job_failure(crashed)["technical_message"])
-        self.assertEqual(module.classify_job_failure(no_builder)["code"], "ENVIRONMENT_ERROR")
+        no_builder = {
+            "status": "failed",
+            "log": "\nERROR: The builder image could not be pulled "
+            "(exited with status 1) and is not cached on this host: x\n",
+        }
+        self.assertEqual(
+            module.classify_job_failure(dependency)["code"], "DEPENDENCY_ERROR"
+        )
+        self.assertEqual(
+            module.classify_job_failure(nothing)["code"], "OUTPUT_VALIDATION_ERROR"
+        )
+        self.assertEqual(
+            module.classify_job_failure(crashed)["code"], "GISOBUILD_ERROR"
+        )
+        self.assertIn(
+            "status 2", module.classify_job_failure(crashed)["technical_message"]
+        )
+        self.assertEqual(
+            module.classify_job_failure(no_builder)["code"], "ENVIRONMENT_ERROR"
+        )
         self.assertIsNone(module.classify_job_failure({"status": "success"}))
 
     def test_build_plan_returns_blockers_instead_of_enabling_invalid_build(self):
-        response = self.client.post("/api/build-plan", json={
-            "iso": "missing.iso", "platform": "asr9k", "pkglist": [],
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "missing.iso",
+                "platform": "asr9k",
+                "pkglist": [],
+            },
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.get_json()["ready"])
@@ -2276,7 +3199,9 @@ class GisoWebTests(unittest.TestCase):
         # preflight, so it must name those conditions itself.
         (self.data / "base.iso").write_bytes(b"iso")
         payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": []}
-        self.assertTrue(self.client.post("/api/build-plan", json=payload).get_json()["ready"])
+        self.assertTrue(
+            self.client.post("/api/build-plan", json=payload).get_json()["ready"]
+        )
 
         module.uploads["pending"] = {"name": "x.rpm", "updated": time.time()}
         module.jobs["other"] = {"status": "running"}
@@ -2294,20 +3219,35 @@ class GisoWebTests(unittest.TestCase):
 
     def test_local_exr_plan_requires_sys_chroot_before_starting(self):
         (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
-        payload = {"iso": "ncs5500-x64-25.1.2.iso", "platform": "ncs5500", "pkglist": [],
-                   "xrconfig": "", "automatic_smu_selection": True}
+        payload = {
+            "iso": "ncs5500-x64-25.1.2.iso",
+            "platform": "ncs5500",
+            "pkglist": [],
+            "xrconfig": "",
+            "automatic_smu_selection": True,
+        }
         message = "needs the SYS_CHROOT capability"
-        with patch.object(module, "GISO_RUNNER", "local"), \
-                patch("app.build_environment_blockers", side_effect=lambda: ([], [])):
+        with (
+            patch.object(module, "GISO_RUNNER", "local"),
+            patch("app.build_environment_blockers", side_effect=lambda: ([], [])),
+        ):
             with patch("app.process_has_capability", return_value=False):
                 blocked = self.client.post("/api/build-plan", json=payload).get_json()
-                lnt = self.client.post("/api/build-plan", json={
-                    **payload, "iso": "ncs5500-x64-25.1.2.iso", "platform": "8000"}).get_json()
+                lnt = self.client.post(
+                    "/api/build-plan",
+                    json={
+                        **payload,
+                        "iso": "ncs5500-x64-25.1.2.iso",
+                        "platform": "8000",
+                    },
+                ).get_json()
             with patch("app.process_has_capability", return_value=True):
                 allowed = self.client.post("/api/build-plan", json=payload).get_json()
         with patch("app.process_has_capability", return_value=False):
             docker_mode = self.client.post("/api/build-plan", json=payload).get_json()
-        self.assertTrue(any(message in b for b in blocked["blockers"]), blocked["blockers"])
+        self.assertTrue(
+            any(message in b for b in blocked["blockers"]), blocked["blockers"]
+        )
         self.assertFalse(any(message in b for b in allowed["blockers"]))
         self.assertFalse(any(message in b for b in lnt["blockers"]))
         self.assertFalse(any(message in b for b in docker_mode["blockers"]))
@@ -2318,7 +3258,9 @@ class GisoWebTests(unittest.TestCase):
             self.assertTrue(module.process_has_capability(module.CAP_SYS_CHROOT))
             self.assertFalse(module.process_has_capability(0))
 
-    def test_static_assets_are_versioned_so_a_proxy_cannot_serve_the_previous_page(self):
+    def test_static_assets_are_versioned_so_a_proxy_cannot_serve_the_previous_page(
+        self,
+    ):
         # A deployment behind Cloudflare kept serving the previous app.js after
         # an upgrade; /static/*.js is cached by extension there.
         with patch.dict(os.environ, {"SOURCE_REVISION": "abc123def4567890"}):
@@ -2333,44 +3275,82 @@ class GisoWebTests(unittest.TestCase):
 
     def test_build_plan_carries_the_command_it_would_run_and_its_package_counts(self):
         (self.data / "ncs5500-mini-x-25.1.2.iso").write_bytes(b"CD001 image")
-        (self.data / "ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm").write_bytes(b"rpm")
-        (self.data / "ncs5500-mpls-1.0.0.0-r2601.CSCwu99999.x86_64.rpm").write_bytes(b"rpm")
-        with patch.object(module, "is_iso9660_image", return_value=True), \
-                patch.object(module, "inspect_iso_architecture", return_value=frozenset({"x86_64"})), \
-                patch.object(module, "build_environment_blockers", side_effect=lambda: ([], [])), \
-                patch.object(module, "GISO_RUNNER", "local"), \
-                patch.object(module, "GISOBUILD_PYTHON", sys.executable):
-            plan = self.client.post("/api/build-plan", json={
-                "iso": "ncs5500-mini-x-25.1.2.iso", "label": "PREVIEW",
-                "automatic_smu_selection": True,
-            }).get_json()
+        (self.data / "ncs5500-mpls-1.0.0.0-r2512.CSCwu14807.x86_64.rpm").write_bytes(
+            b"rpm"
+        )
+        (self.data / "ncs5500-mpls-1.0.0.0-r2601.CSCwu99999.x86_64.rpm").write_bytes(
+            b"rpm"
+        )
+        with (
+            patch.object(module, "is_iso9660_image", return_value=True),
+            patch.object(
+                module, "inspect_iso_architecture", return_value=frozenset({"x86_64"})
+            ),
+            patch.object(
+                module, "build_environment_blockers", side_effect=lambda: ([], [])
+            ),
+            patch.object(module, "GISO_RUNNER", "local"),
+            patch.object(module, "GISOBUILD_PYTHON", sys.executable),
+        ):
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "ncs5500-mini-x-25.1.2.iso",
+                    "label": "PREVIEW",
+                    "automatic_smu_selection": True,
+                },
+            ).get_json()
 
         self.assertTrue(plan["ready"], plan["blockers"])
         # The exact invocation, redacted the same way the finished build report
         # redacts it, so an operator can check it before starting.
-        self.assertTrue(plan["generated_command"].startswith("gisobuild.py --iso ncs5500-mini-x-25.1.2.iso"),
-                        plan["generated_command"])
+        self.assertTrue(
+            plan["generated_command"].startswith(
+                "gisobuild.py --iso ncs5500-mini-x-25.1.2.iso"
+            ),
+            plan["generated_command"],
+        )
         self.assertIn("--label PREVIEW", plan["generated_command"])
-        self.assertEqual(plan["package_summary"],
-                         {"discovered": 2, "included": 1, "excluded": 1,
-                          "by_status": {"WRONG_RELEASE": 1}})
+        self.assertEqual(
+            plan["package_summary"],
+            {
+                "discovered": 2,
+                "included": 1,
+                "excluded": 1,
+                "by_status": {"WRONG_RELEASE": 1},
+            },
+        )
         excluded = plan["excluded_packages"][0]
-        self.assertEqual([excluded["status"], excluded["platform"], excluded["release"],
-                          excluded["architecture"], excluded["csc"], excluded["included"]],
-                         ["WRONG_RELEASE", "ncs5500", "r2601", "x86_64", "CSCwu99999", False])
+        self.assertEqual(
+            [
+                excluded["status"],
+                excluded["platform"],
+                excluded["release"],
+                excluded["architecture"],
+                excluded["csc"],
+                excluded["included"],
+            ],
+            ["WRONG_RELEASE", "ncs5500", "r2601", "x86_64", "CSCwu99999", False],
+        )
         self.assertEqual(excluded["source"], "iso-metadata+rpm-filename")
 
     def test_build_plan_without_a_runnable_command_still_reports_its_blockers(self):
-        with patch.object(module, "build_command", side_effect=RuntimeError("Docker is unreachable")):
-            plan = self.client.post("/api/build-plan", json={"iso": "missing.iso"}).get_json()
+        with patch.object(
+            module, "build_command", side_effect=RuntimeError("Docker is unreachable")
+        ):
+            plan = self.client.post(
+                "/api/build-plan", json={"iso": "missing.iso"}
+            ).get_json()
         self.assertEqual(plan["generated_command"], "")
         self.assertTrue(plan["blockers"])
 
     def test_build_plan_is_blocked_when_gisobuild_or_docker_is_unavailable(self):
         (self.data / "base.iso").write_bytes(b"iso")
         payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": []}
-        with patch("app.gisobuild_tool_available", return_value=False), \
-                patch.object(module, "DOCKER_BIN", str(Path(self.temp.name) / "no-docker")):
+        with (
+            patch("app.gisobuild_tool_available", return_value=False),
+            patch.object(module, "DOCKER_BIN", str(Path(self.temp.name) / "no-docker")),
+        ):
             plan = self.client.post("/api/build-plan", json=payload).get_json()
         self.assertFalse(plan["ready"])
         text = " | ".join(plan["blockers"])
@@ -2385,14 +3365,21 @@ class GisoWebTests(unittest.TestCase):
         with patch.object(module, "RPM_BIN", str(Path(self.temp.name) / "no-rpm")):
             plan = self.client.post("/api/build-plan", json=payload).get_json()
         self.assertTrue(plan["ready"], plan["blockers"])
-        self.assertTrue(any("rpm is not available" in warning for warning in plan["warnings"]))
+        self.assertTrue(
+            any("rpm is not available" in warning for warning in plan["warnings"])
+        )
 
     def test_build_plan_confidence_is_unknown_when_no_iso_is_selected(self):
         # Nothing has been detected yet, so every confidence entry must say so
         # rather than defaulting to a value that looks like a real answer.
-        response = self.client.post("/api/build-plan", json={
-            "iso": "missing.iso", "platform": "", "pkglist": [],
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "missing.iso",
+                "platform": "",
+                "pkglist": [],
+            },
+        )
 
         confidence = response.get_json()["confidence"]
         self.assertEqual(confidence["platform"]["value"], "UNKNOWN")
@@ -2401,24 +3388,52 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(confidence["dependency_closure"]["value"], "UNKNOWN")
 
     def test_confidence_is_verified_only_by_evidence_from_the_files(self):
-        base = {"resolved_platform": "ncs5500", "platform_manual": False, "release": "25.1.2",
-                "iso_architectures": frozenset({"x86_64"}), "package_groups": [{"csc": "CSCX"}],
-                "has_rpm_selection": True}
+        base = {
+            "resolved_platform": "ncs5500",
+            "platform_manual": False,
+            "release": "25.1.2",
+            "iso_architectures": frozenset({"x86_64"}),
+            "package_groups": [{"csc": "CSCX"}],
+            "has_rpm_selection": True,
+        }
         plain = module.confidence_report(**base)
-        proven = module.confidence_report(**base, evidence={
-            "rpm_headers_verified": True, "csc_groups_verified": True, "dependency_pre_checked": True})
-        self.assertEqual([plain[k]["value"] for k in ("package_architecture", "csc_groups", "dependency_closure")],
-                         ["INFERRED", "INFERRED", "UNKNOWN"])
-        self.assertEqual([proven[k]["value"] for k in ("package_architecture", "csc_groups", "dependency_closure")],
-                         ["VERIFIED", "VERIFIED", "PARTIAL"])
+        proven = module.confidence_report(
+            **base,
+            evidence={
+                "rpm_headers_verified": True,
+                "csc_groups_verified": True,
+                "dependency_pre_checked": True,
+            },
+        )
+        self.assertEqual(
+            [
+                plain[k]["value"]
+                for k in ("package_architecture", "csc_groups", "dependency_closure")
+            ],
+            ["INFERRED", "INFERRED", "UNKNOWN"],
+        )
+        self.assertEqual(
+            [
+                proven[k]["value"]
+                for k in ("package_architecture", "csc_groups", "dependency_closure")
+            ],
+            ["VERIFIED", "VERIFIED", "PARTIAL"],
+        )
         self.assertEqual(proven["csc_groups"]["source"], "smu-readme")
         # No RPMs selected: nothing to verify, whatever the evidence says.
-        empty = module.confidence_report(**{**base, "has_rpm_selection": False, "package_groups": []},
-                                         evidence={"rpm_headers_verified": True, "csc_groups_verified": True,
-                                                   "dependency_pre_checked": True})
+        empty = module.confidence_report(
+            **{**base, "has_rpm_selection": False, "package_groups": []},
+            evidence={
+                "rpm_headers_verified": True,
+                "csc_groups_verified": True,
+                "dependency_pre_checked": True,
+            },
+        )
         self.assertEqual(empty["dependency_closure"]["value"], "UNKNOWN")
-        reworded = module.reword_dependency_warning([module.FILENAME_DEPENDENCY_WARNING, "other"],
-                                                    {"dependency_pre_checked": True})
+        reworded = module.reword_dependency_warning(
+            [module.FILENAME_DEPENDENCY_WARNING, "other"],
+            {"dependency_pre_checked": True},
+        )
         self.assertIn("pre-checked from the packages' own headers", reworded[0])
         self.assertEqual(reworded[1], "other")
 
@@ -2429,12 +3444,20 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "asr9k-x64-7.3.2.iso").write_bytes(b"iso")
         rpm = self.data / "asr9k-x64-routing-1.0.0.1-r732.CSCtest00001.x86_64.rpm"
         rpm.write_bytes(b"rpm")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": "asr9k-x64-7.3.2.iso", "platform": "", "pkglist": [item["id"]],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "asr9k-x64-7.3.2.iso",
+                "platform": "",
+                "pkglist": [item["id"]],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         confidence = response.get_json()["confidence"]
         self.assertEqual(confidence["platform"]["value"], "INFERRED")
@@ -2452,10 +3475,16 @@ class GisoWebTests(unittest.TestCase):
     def test_build_plan_confidence_marks_manual_platform_as_operator_selected(self):
         (self.data / "base.iso").write_bytes(b"iso")
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": "base.iso", "platform": "asr9k", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "base.iso",
+                "platform": "asr9k",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         confidence = response.get_json()["confidence"]
         self.assertEqual(confidence["platform"]["value"], "INFERRED")
@@ -2472,11 +3501,17 @@ class GisoWebTests(unittest.TestCase):
         # the uncertainty this field exists to surface honestly.
         (self.data / "unknown-platform.iso").write_bytes(b"iso")
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": "unknown-platform.iso", "platform": "exr-generic", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-            "skip_usb_image": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "unknown-platform.iso",
+                "platform": "exr-generic",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+                "skip_usb_image": True,
+            },
+        )
 
         body = response.get_json()
         self.assertTrue(body["ready"], body)
@@ -2490,37 +3525,73 @@ class GisoWebTests(unittest.TestCase):
         # certificate without the other. A warning, not a blocker, since the
         # base ISO might already carry the missing one from an earlier build.
         (self.data / "base.iso").write_bytes(b"iso")
-        response = self.client.post("/api/build-plan", json={
-            "iso": "base.iso", "platform": "8000", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-            "ownership_vouchers": "vouchers.tar",
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "base.iso",
+                "platform": "8000",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+                "ownership_vouchers": "vouchers.tar",
+            },
+        )
         warnings = response.get_json()["warnings"]
-        self.assertTrue(any("ownership" in warning.lower() for warning in warnings), warnings)
+        self.assertTrue(
+            any("ownership" in warning.lower() for warning in warnings), warnings
+        )
 
     def test_build_plan_warns_when_only_ownership_certificate_is_set(self):
         (self.data / "base.iso").write_bytes(b"iso")
-        response = self.client.post("/api/build-plan", json={
-            "iso": "base.iso", "platform": "8000", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-            "ownership_certificate": "certificate.pem",
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "base.iso",
+                "platform": "8000",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+                "ownership_certificate": "certificate.pem",
+            },
+        )
         warnings = response.get_json()["warnings"]
-        self.assertTrue(any("ownership" in warning.lower() for warning in warnings), warnings)
+        self.assertTrue(
+            any("ownership" in warning.lower() for warning in warnings), warnings
+        )
 
-    def test_build_plan_does_not_warn_when_both_or_neither_ownership_fields_are_set(self):
+    def test_build_plan_does_not_warn_when_both_or_neither_ownership_fields_are_set(
+        self,
+    ):
         (self.data / "base.iso").write_bytes(b"iso")
-        neither = self.client.post("/api/build-plan", json={
-            "iso": "base.iso", "platform": "8000", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-        }).get_json()
-        both = self.client.post("/api/build-plan", json={
-            "iso": "base.iso", "platform": "8000", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-            "ownership_vouchers": "vouchers.tar", "ownership_certificate": "certificate.pem",
-        }).get_json()
-        self.assertFalse(any("ownership" in w.lower() for w in neither["warnings"]), neither["warnings"])
-        self.assertFalse(any("ownership" in w.lower() for w in both["warnings"]), both["warnings"])
+        neither = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "base.iso",
+                "platform": "8000",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        ).get_json()
+        both = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "base.iso",
+                "platform": "8000",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+                "ownership_vouchers": "vouchers.tar",
+                "ownership_certificate": "certificate.pem",
+            },
+        ).get_json()
+        self.assertFalse(
+            any("ownership" in w.lower() for w in neither["warnings"]),
+            neither["warnings"],
+        )
+        self.assertFalse(
+            any("ownership" in w.lower() for w in both["warnings"]), both["warnings"]
+        )
 
     def test_build_plan_automatic_selection_explains_superseded_exclusions(self):
         # create_build_plan()'s automatic_smu_selection path pulls candidates
@@ -2538,14 +3609,21 @@ class GisoWebTests(unittest.TestCase):
             "ncs5500-bgp-1.0.0.1.CSCold00001 Full\n"
         )
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": "ncs5500-mini-x-26.1.2.iso", "pkglist": [],
-            "automatic_smu_selection": True, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "ncs5500-mini-x-26.1.2.iso",
+                "pkglist": [],
+                "automatic_smu_selection": True,
+                "auto_repo": True,
+            },
+        )
 
         plan = response.get_json()
         self.assertTrue(plan["ready"], plan)
-        excluded_by_name = {item["name"]: item["reason"] for item in plan["excluded_packages"]}
+        excluded_by_name = {
+            item["name"]: item["reason"] for item in plan["excluded_packages"]
+        }
         self.assertIn(old_rpm.name, excluded_by_name)
         self.assertIn("Superseded", excluded_by_name[old_rpm.name])
 
@@ -2553,13 +3631,21 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "renamed.iso").write_bytes(b"\x1f\x8b" + b"\0" * 40000)
         self.iso_signature.stop()
         try:
-            plan = self.client.post("/api/build-plan", json={
-                "iso": "renamed.iso", "platform": "asr9k", "pkglist": [],
-            }).get_json()
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "renamed.iso",
+                    "platform": "asr9k",
+                    "pkglist": [],
+                },
+            ).get_json()
         finally:
             self.iso_signature.start()
         self.assertFalse(plan["ready"])
-        self.assertTrue(any("not an ISO 9660 image" in b for b in plan["blockers"]), plan["blockers"])
+        self.assertTrue(
+            any("not an ISO 9660 image" in b for b in plan["blockers"]),
+            plan["blockers"],
+        )
 
     @unittest.skipUnless(
         ISOINFO_AVAILABLE,
@@ -2570,8 +3656,11 @@ class GisoWebTests(unittest.TestCase):
         source.mkdir()
         (source / "README").write_text("synthetic")
         iso_path = self.data / "real.iso"
-        subprocess.run(["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
-                       check=True, capture_output=True)
+        subprocess.run(
+            ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
+            check=True,
+            capture_output=True,
+        )
         self.iso_signature.stop()
         try:
             self.assertTrue(module.is_iso9660_image(iso_path))
@@ -2583,7 +3672,9 @@ class GisoWebTests(unittest.TestCase):
         ISOINFO_AVAILABLE,
         "genisoimage and isoinfo are only available inside the giso-webui container image",
     )
-    def test_build_plan_confidence_reports_verified_iso_architecture_from_real_iso(self):
+    def test_build_plan_confidence_reports_verified_iso_architecture_from_real_iso(
+        self,
+    ):
         # inspect_iso_architecture() reads the ISO's own contents, so this is
         # the one field this endpoint can honestly call VERIFIED.
         source = Path(self.temp.name) / "iso-src-confidence"
@@ -2594,13 +3685,20 @@ class GisoWebTests(unittest.TestCase):
         iso_path = self.data / "verified.iso"
         subprocess.run(
             ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": "verified.iso", "platform": "asr9k", "pkglist": [],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "verified.iso",
+                "platform": "asr9k",
+                "pkglist": [],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         confidence = response.get_json()["confidence"]
         self.assertEqual(confidence["iso_architecture"]["value"], "VERIFIED")
@@ -2624,21 +3722,32 @@ class GisoWebTests(unittest.TestCase):
         iso_path = self.data / "base.iso"
         subprocess.run(
             ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
         rpm = self.data / "ncs5500-routing-1.0.0.1-r2612.CSCtest00001.aarch64.rpm"
         rpm.write_bytes(b"rpm")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
 
-        response = self.client.post("/api/build-plan", json={
-            "iso": "base.iso", "platform": "ncs5500", "pkglist": [item["id"]],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/build-plan",
+            json={
+                "iso": "base.iso",
+                "platform": "ncs5500",
+                "pkglist": [item["id"]],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         plan = response.get_json()
         self.assertFalse(plan["ready"])
-        self.assertTrue(any("architecture" in blocker.lower() for blocker in plan["blockers"]),
-                        plan["blockers"])
+        self.assertTrue(
+            any("architecture" in blocker.lower() for blocker in plan["blockers"]),
+            plan["blockers"],
+        )
 
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
@@ -2646,25 +3755,48 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "base.iso").write_bytes(b"iso")
         rpm = self.data / "package.rpm"
         rpm.write_bytes(b"rpm")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
 
-        response = self.client.post("/api/jobs", json={
-            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/jobs",
+            json={
+                "iso": "base.iso",
+                "platform": "asr9k",
+                "pkglist": [item["id"]],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         self.assertEqual(response.status_code, 202)
         job = module.jobs[response.get_json()["id"]]
         self.assertEqual(job["plan_fingerprint"], job["build_plan"]["fingerprint"])
-        self.assertEqual(job["inventory_revision"], job["build_plan"]["inventory_revision"])
+        self.assertEqual(
+            job["inventory_revision"], job["build_plan"]["inventory_revision"]
+        )
 
     def test_command_preview_strips_docker_wrapper_and_shows_basenames(self):
         real_command = [
-            "/usr/bin/docker", "run", "--rm", "-v", "/home/alice/secret-project:/uploads:ro",
-            "-v", "giso-webui_giso-output:/output:rw", "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
-            "/tool/src/gisobuild.py", "--iso", "/uploads/base.iso",
-            "--pkglist", "/uploads/one/package.rpm", "--label", "MYLABEL",
-            "--out-directory", "/output/job-1", "--clean",
+            "/usr/bin/docker",
+            "run",
+            "--rm",
+            "-v",
+            "/home/alice/secret-project:/uploads:ro",
+            "-v",
+            "giso-webui_giso-output:/output:rw",
+            "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
+            "/tool/src/gisobuild.py",
+            "--iso",
+            "/uploads/base.iso",
+            "--pkglist",
+            "/uploads/one/package.rpm",
+            "--label",
+            "MYLABEL",
+            "--out-directory",
+            "/output/job-1",
+            "--clean",
         ]
         preview = module.command_preview(real_command)
         self.assertNotIn("docker", preview)
@@ -2682,22 +3814,34 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
-    def test_created_job_exposes_a_safe_command_preview_but_not_the_real_command(self, _mounts, _run_job):
+    def test_created_job_exposes_a_safe_command_preview_but_not_the_real_command(
+        self, _mounts, _run_job
+    ):
         (self.data / "base.iso").write_bytes(b"iso")
         rpm = self.data / "package.rpm"
         rpm.write_bytes(b"rpm")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
 
-        response = self.client.post("/api/jobs", json={
-            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/jobs",
+            json={
+                "iso": "base.iso",
+                "platform": "asr9k",
+                "pkglist": [item["id"]],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         self.assertEqual(response.status_code, 202)
         job_id = response.get_json()["id"]
         api_job = self.client.get(f"/api/jobs/{job_id}").get_json()
         self.assertIn("command_preview", api_job)
-        self.assertTrue(api_job["command_preview"].startswith("gisobuild.py --iso base.iso"))
+        self.assertTrue(
+            api_job["command_preview"].startswith("gisobuild.py --iso base.iso")
+        )
         self.assertNotIn("command", api_job)
         internal_job = module.jobs[job_id]
         self.assertIn("command", internal_job)
@@ -2705,7 +3849,9 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
-    def test_cleanup_paths_do_not_include_an_unselected_duplicate_basename(self, _mounts, _run_job):
+    def test_cleanup_paths_do_not_include_an_unselected_duplicate_basename(
+        self, _mounts, _run_job
+    ):
         # create_job() resolves pkglist by opaque inventory ID, so two RPMs
         # with the same basename but different content can coexist and be
         # selected precisely (resolve_rpm_identifiers()). build_command()
@@ -2720,28 +3866,48 @@ class GisoWebTests(unittest.TestCase):
         other_rpm = self.data / "two/package.rpm"
         selected_rpm.write_bytes(b"selected content")
         other_rpm.write_bytes(b"a different upload that happens to share this filename")
-        item = next(entry for entry in module.inventory_files()
-                    if entry["relative_path"] == "one/package.rpm")
+        item = next(
+            entry
+            for entry in module.inventory_files()
+            if entry["relative_path"] == "one/package.rpm"
+        )
 
-        response = self.client.post("/api/jobs", json={
-            "iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
-            "automatic_smu_selection": False, "auto_repo": True,
-        })
+        response = self.client.post(
+            "/api/jobs",
+            json={
+                "iso": "base.iso",
+                "platform": "asr9k",
+                "pkglist": [item["id"]],
+                "automatic_smu_selection": False,
+                "auto_repo": True,
+            },
+        )
 
         self.assertEqual(response.status_code, 202)
-        cleanup_paths = {Path(p) for p in module.jobs[response.get_json()["id"]]["cleanup_paths"]}
+        cleanup_paths = {
+            Path(p) for p in module.jobs[response.get_json()["id"]]["cleanup_paths"]
+        }
         self.assertIn(selected_rpm.resolve(), cleanup_paths)
         self.assertNotIn(other_rpm.resolve(), cleanup_paths)
 
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
-    def test_stale_confirmed_plan_is_rejected_when_inventory_changes(self, _mounts, _run_job):
+    def test_stale_confirmed_plan_is_rejected_when_inventory_changes(
+        self, _mounts, _run_job
+    ):
         (self.data / "base.iso").write_bytes(b"iso")
         rpm = self.data / "package.rpm"
         rpm.write_bytes(b"rpm")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
-        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
-                   "automatic_smu_selection": False, "auto_repo": True}
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
+        payload = {
+            "iso": "base.iso",
+            "platform": "asr9k",
+            "pkglist": [item["id"]],
+            "automatic_smu_selection": False,
+            "auto_repo": True,
+        }
         reviewed = self.client.post("/api/build-plan", json=payload).get_json()
 
         (self.data / "other.rpm").write_bytes(b"unrelated new upload")
@@ -2754,13 +3920,22 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.run_job")
     @patch("app.child_mount_args", return_value=[])
-    def test_confirmed_plan_matching_current_inventory_is_accepted(self, _mounts, _run_job):
+    def test_confirmed_plan_matching_current_inventory_is_accepted(
+        self, _mounts, _run_job
+    ):
         (self.data / "base.iso").write_bytes(b"iso")
         rpm = self.data / "package.rpm"
         rpm.write_bytes(b"rpm")
-        item = next(entry for entry in module.inventory_files() if entry["type"] == ".rpm")
-        payload = {"iso": "base.iso", "platform": "asr9k", "pkglist": [item["id"]],
-                   "automatic_smu_selection": False, "auto_repo": True}
+        item = next(
+            entry for entry in module.inventory_files() if entry["type"] == ".rpm"
+        )
+        payload = {
+            "iso": "base.iso",
+            "platform": "asr9k",
+            "pkglist": [item["id"]],
+            "automatic_smu_selection": False,
+            "auto_repo": True,
+        }
         reviewed = self.client.post("/api/build-plan", json=payload).get_json()
 
         payload["confirmed_plan_fingerprint"] = reviewed["fingerprint"]
@@ -2769,11 +3944,15 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
 
     def test_manual_package_ui_uses_ids_and_renders_duplicate_conflicts(self):
-        source = (Path(module.__file__).parent / "static/manual-packages.js").read_text()
+        source = (
+            Path(module.__file__).parent / "static/manual-packages.js"
+        ).read_text()
         self.assertIn("box.value = file.id", source)
         self.assertIn("same filename but different content", source)
         self.assertIn("identical copies deduplicated", source)
-        self.assertNotIn("new Map(rpms.map(file => [basename(file.path), file]))", source)
+        self.assertNotIn(
+            "new Map(rpms.map(file => [basename(file.path), file]))", source
+        )
 
     @patch("app.child_mount_args", return_value=[])
     def test_package_glob_characters_cannot_select_unintended_files(self, _mounts):
@@ -2781,8 +3960,10 @@ class GisoWebTests(unittest.TestCase):
         (self.data / "package-one.rpm").write_bytes(b"rpm")
 
         with self.assertRaisesRegex(ValueError, "exact filename"):
-            module.build_command({"iso": "base.iso", "platform": "asr9k",
-                                  "pkglist": ["package-*.rpm"]}, "glob")
+            module.build_command(
+                {"iso": "base.iso", "platform": "asr9k", "pkglist": ["package-*.rpm"]},
+                "glob",
+            )
 
     def test_cleanup_removes_workspace_but_keeps_archive(self):
         (self.data / "base.iso").write_bytes(b"remove")
@@ -2802,20 +3983,33 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse((self.output / "finished.iso").exists())
         self.assertFalse((module.WORK / "old-job").exists())
         self.assertTrue(archived.exists())
-        self.assertEqual(response.get_json()["removed"],
-                         {"output": 1, "uploads": 2, "work": 1})
-        self.assertTrue(any("event=workspace_cleanup" in line for line in captured.output))
+        self.assertEqual(
+            response.get_json()["removed"], {"output": 1, "uploads": 2, "work": 1}
+        )
+        self.assertTrue(
+            any("event=workspace_cleanup" in line for line in captured.output)
+        )
 
     def test_cleanup_clears_failed_output_links_but_keeps_archive_links(self):
         failed_id = "failed-job"
         module.jobs[failed_id] = {
-            "id": failed_id, "status": "failed", "created": 1, "updated": 1,
-            "log": "", "artifacts": [
+            "id": failed_id,
+            "status": "failed",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "artifacts": [
                 {"path": "logs/gisobuild.log", "size": 3},
-                {"path": "upgrade_matrix/matrix.json", "size": 4,
-                 "url": f"/download/{failed_id}/upgrade_matrix/matrix.json"},
-                {"path": "golden.iso", "size": 5,
-                 "url": f"/archive/{failed_id}/golden.iso"},
+                {
+                    "path": "upgrade_matrix/matrix.json",
+                    "size": 4,
+                    "url": f"/download/{failed_id}/upgrade_matrix/matrix.json",
+                },
+                {
+                    "path": "golden.iso",
+                    "size": 5,
+                    "url": f"/archive/{failed_id}/golden.iso",
+                },
             ],
         }
         module.persist_job(failed_id)
@@ -2826,20 +4020,31 @@ class GisoWebTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["cleared_artifacts"], 2)
-        self.assertEqual(module.jobs[failed_id]["artifacts"], [{
-            "path": "golden.iso", "size": 5,
-            "url": f"/archive/{failed_id}/golden.iso",
-        }])
+        self.assertEqual(
+            module.jobs[failed_id]["artifacts"],
+            [
+                {
+                    "path": "golden.iso",
+                    "size": 5,
+                    "url": f"/archive/{failed_id}/golden.iso",
+                }
+            ],
+        )
         with module.sqlite3.connect(module.JOB_DB) as database:
-            stored = json.loads(database.execute(
-                "SELECT data FROM jobs WHERE id = ?", (failed_id,),
-            ).fetchone()[0])
+            stored = json.loads(
+                database.execute(
+                    "SELECT data FROM jobs WHERE id = ?",
+                    (failed_id,),
+                ).fetchone()[0]
+            )
         self.assertEqual(len(stored["artifacts"]), 1)
         self.assertTrue(stored["artifacts"][0]["url"].startswith("/archive/"))
 
     def test_request_log_uses_endpoint_and_safe_correlation_id(self):
         with self.assertLogs(module.app.logger.name, level="INFO") as captured:
-            response = self.client.get("/api/inputs", headers={"X-Request-ID": "request-123"})
+            response = self.client.get(
+                "/api/inputs", headers={"X-Request-ID": "request-123"}
+            )
         self.assertEqual(response.headers["X-Request-ID"], "request-123")
         log = "\n".join(captured.output)
         self.assertIn("endpoint=inputs", log)
@@ -2861,15 +4066,21 @@ class GisoWebTests(unittest.TestCase):
             "print('locked', flush=True)\n"
             "time.sleep(1.5)\n"
         )
-        proc = subprocess.Popen([sys.executable, "-c", script, str(lock_path)],
-                                stdout=subprocess.PIPE, text=True)
+        proc = subprocess.Popen(
+            [sys.executable, "-c", script, str(lock_path)],
+            stdout=subprocess.PIPE,
+            text=True,
+        )
         try:
             self.assertEqual(proc.stdout.readline().strip(), "locked")
             start = time.monotonic()
             with module.cross_process_archive_lock():
                 elapsed = time.monotonic() - start
-            self.assertGreater(elapsed, 1.0,
-                              "cross_process_archive_lock() did not wait for the other process")
+            self.assertGreater(
+                elapsed,
+                1.0,
+                "cross_process_archive_lock() did not wait for the other process",
+            )
         finally:
             proc.wait(timeout=5)
             proc.stdout.close()
@@ -2894,11 +4105,15 @@ class GisoWebTests(unittest.TestCase):
         job_dir.mkdir()
         (job_dir / "router-goldenk9.iso").write_bytes(b"golden image")
         artifacts = module.archive_golden_iso_and_cleanup("job", job_dir, [])
-        self.assertEqual(artifacts[0]["sha256"], hashlib.sha256(b"golden image").hexdigest())
+        self.assertEqual(
+            artifacts[0]["sha256"], hashlib.sha256(b"golden image").hexdigest()
+        )
 
     def test_build_report_captures_version_plan_and_output_checksums(self):
         job = {
-            "id": "job-1", "created": 100.0, "finished": 200.0,
+            "id": "job-1",
+            "created": 100.0,
+            "finished": 200.0,
             "payload": {"label": "my-build"},
             "command_preview": "gisobuild.py --iso base.iso",
             "build_plan": {"fingerprint": "abc123", "platform": "ncs5500"},
@@ -2919,11 +4134,15 @@ class GisoWebTests(unittest.TestCase):
         (module.ARCHIVE / "job-2").mkdir(parents=True)
         job = {"id": "job-2", "payload": {}, "build_plan": {}}
         module.write_build_report("job-2", job, [{"path": "golden.iso"}])
-        report = json.loads((module.ARCHIVE / "job-2" / "build-report.json").read_text())
+        report = json.loads(
+            (module.ARCHIVE / "job-2" / "build-report.json").read_text()
+        )
         self.assertEqual(report["job_id"], "job-2")
 
     def test_write_build_report_does_not_raise_when_archive_dir_is_missing(self):
-        module.write_build_report("missing-job", {"id": "missing-job", "payload": {}}, [])
+        module.write_build_report(
+            "missing-job", {"id": "missing-job", "payload": {}}, []
+        )
 
     def test_archive_list_reports_has_report_only_when_the_file_exists(self):
         job_dir = self.output / "job"
@@ -2949,8 +4168,13 @@ class GisoWebTests(unittest.TestCase):
         job_dir = self.output / "cleanup-job"
         job_dir.mkdir()
         (job_dir / "router-golden.iso").write_bytes(b"golden image")
-        module.jobs["cleanup-job"] = {"log": "", "progress": 0, "phase": "",
-                                       "status": "running", "updated": time.time()}
+        module.jobs["cleanup-job"] = {
+            "log": "",
+            "progress": 0,
+            "phase": "",
+            "status": "running",
+            "updated": time.time(),
+        }
         self.addCleanup(module.jobs.pop, "cleanup-job", None)
         real_rmtree = module.shutil.rmtree
 
@@ -2961,9 +4185,12 @@ class GisoWebTests(unittest.TestCase):
 
         with patch.object(module.shutil, "rmtree", side_effect=rmtree):
             artifacts = module.archive_giso_artifacts_and_cleanup(
-                "cleanup-job", job_dir, [stubborn, deletable])
+                "cleanup-job", job_dir, [stubborn, deletable]
+            )
 
-        self.assertEqual([artifact["path"] for artifact in artifacts], ["router-golden.iso"])
+        self.assertEqual(
+            [artifact["path"] for artifact in artifacts], ["router-golden.iso"]
+        )
         self.assertTrue((module.ARCHIVE / "cleanup-job" / "router-golden.iso").exists())
         self.assertFalse(deletable.exists())
         self.assertTrue(stubborn.exists())
@@ -2985,7 +4212,9 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(owned.exists())
         self.assertTrue(unrelated.exists())
 
-    def test_successful_build_removes_emptied_extraction_directory_and_source_archive(self):
+    def test_successful_build_removes_emptied_extraction_directory_and_source_archive(
+        self,
+    ):
         archive = self.data / "vendor-bundle.tar"
         archive.write_bytes(b"tar contents")
         extraction_dir = self.data / "vendor-bundle"
@@ -3031,7 +4260,9 @@ class GisoWebTests(unittest.TestCase):
 
         with self.assertRaises(module.BuildCancelled):
             module.archive_giso_artifacts_and_cleanup(
-                "cancel-finalize", job_dir, [owned],
+                "cancel-finalize",
+                job_dir,
+                [owned],
                 lambda: (_ for _ in ()).throw(module.BuildCancelled("cancelled")),
             )
 
@@ -3065,10 +4296,16 @@ class GisoWebTests(unittest.TestCase):
         self.assertFalse(orphan.exists())
 
     def test_upload_init_reserves_space_for_concurrent_sessions(self):
-        with patch("app.shutil.disk_usage", return_value=SimpleNamespace(
-                free=module.MIN_FREE_BYTES + 15)):
-            first = self.client.post("/api/uploads/init", json={"name": "one.rpm", "size": 10})
-            second = self.client.post("/api/uploads/init", json={"name": "two.rpm", "size": 10})
+        with patch(
+            "app.shutil.disk_usage",
+            return_value=SimpleNamespace(free=module.MIN_FREE_BYTES + 15),
+        ):
+            first = self.client.post(
+                "/api/uploads/init", json={"name": "one.rpm", "size": 10}
+            )
+            second = self.client.post(
+                "/api/uploads/init", json={"name": "two.rpm", "size": 10}
+            )
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 507)
 
@@ -3078,8 +4315,10 @@ class GisoWebTests(unittest.TestCase):
         (job_dir / "router-goldenk9.iso").write_bytes(b"golden image")
         (job_dir / "router-usb_boot.zip").write_bytes(b"usb image")
         artifacts = module.archive_giso_artifacts_and_cleanup("usb-job", job_dir)
-        self.assertEqual({item["path"] for item in artifacts},
-                         {"router-goldenk9.iso", "router-usb_boot.zip"})
+        self.assertEqual(
+            {item["path"] for item in artifacts},
+            {"router-goldenk9.iso", "router-usb_boot.zip"},
+        )
         self.assertTrue((module.ARCHIVE / "usb-job/router-usb_boot.zip").exists())
 
     def test_symlink_build_artifact_is_rejected(self):
@@ -3102,7 +4341,9 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(items[0]["name"], "router-usb_boot.zip")
         response = self.client.get("/api/archive/usb-job/router-usb_boot.zip/checksums")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json()["sha256"], hashlib.sha256(content).hexdigest())
+        self.assertEqual(
+            response.get_json()["sha256"], hashlib.sha256(content).hexdigest()
+        )
 
     def test_archive_retention_removes_complete_expired_job(self):
         old_job = module.ARCHIVE / "old-job"
@@ -3116,8 +4357,10 @@ class GisoWebTests(unittest.TestCase):
         current_job = module.ARCHIVE / "current-job"
         current_job.mkdir()
         (current_job / "golden.iso").write_bytes(b"current")
-        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
-                patch.object(module, "MAX_ARCHIVE_BYTES", 1024):
+        with (
+            patch.object(module, "ARCHIVE_RETENTION_DAYS", 30),
+            patch.object(module, "MAX_ARCHIVE_BYTES", 1024),
+        ):
             removed = module.enforce_archive_policy()
         self.assertIn("old-job", removed)
         self.assertFalse(old_job.exists())
@@ -3134,8 +4377,10 @@ class GisoWebTests(unittest.TestCase):
         os.utime(iso, (old_time, old_time))
         os.utime(usb, (old_time, old_time))
         os.utime(old_job, None)
-        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
-                patch.object(module, "MAX_ARCHIVE_BYTES", 1024):
+        with (
+            patch.object(module, "ARCHIVE_RETENTION_DAYS", 30),
+            patch.object(module, "MAX_ARCHIVE_BYTES", 1024),
+        ):
             removed = module.enforce_archive_policy()
         self.assertEqual(removed, ["old-job"])
         self.assertFalse(old_job.exists())
@@ -3150,8 +4395,10 @@ class GisoWebTests(unittest.TestCase):
         new_job = module.ARCHIVE / "new-job"
         new_job.mkdir()
         (new_job / "golden.iso").write_bytes(b"abcdef")
-        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
-                patch.object(module, "MAX_ARCHIVE_BYTES", 10):
+        with (
+            patch.object(module, "ARCHIVE_RETENTION_DAYS", 30),
+            patch.object(module, "MAX_ARCHIVE_BYTES", 10),
+        ):
             removed = module.enforce_archive_policy()
         self.assertEqual(removed, ["old-job"])
         self.assertFalse(old_job.exists())
@@ -3168,8 +4415,10 @@ class GisoWebTests(unittest.TestCase):
         new_iso.write_bytes(b"abcdef")
         old_time = time.time() - 31 * 86400
         os.utime(new_iso, (old_time, old_time))
-        with patch.object(module, "ARCHIVE_RETENTION_DAYS", 30), \
-                patch.object(module, "MAX_ARCHIVE_BYTES", 10):
+        with (
+            patch.object(module, "ARCHIVE_RETENTION_DAYS", 30),
+            patch.object(module, "MAX_ARCHIVE_BYTES", 10),
+        ):
             artifacts = module.archive_giso_artifacts_and_cleanup("new-job", job_dir)
         self.assertEqual(artifacts[0]["path"], "new-golden.iso")
         self.assertTrue((module.ARCHIVE / "new-job/new-golden.iso").exists())
@@ -3177,7 +4426,9 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.subprocess.run")
     def test_health_returns_service_unavailable_when_dependency_is_down(self, run):
-        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "info"], 5)
+        run.side_effect = module.subprocess.TimeoutExpired(
+            [module.DOCKER_BIN, "info"], 5
+        )
         response = self.client.get("/api/ready")
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.get_json()["ok"])
@@ -3185,7 +4436,9 @@ class GisoWebTests(unittest.TestCase):
 
     @patch("app.subprocess.run")
     def test_health_is_pure_liveness_and_ignores_dependency_state(self, run):
-        run.side_effect = module.subprocess.TimeoutExpired([module.DOCKER_BIN, "info"], 5)
+        run.side_effect = module.subprocess.TimeoutExpired(
+            [module.DOCKER_BIN, "info"], 5
+        )
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()["ok"])
@@ -3198,36 +4451,55 @@ class GisoWebTests(unittest.TestCase):
 
     def test_ready_includes_a_startup_self_test_that_names_each_failure(self):
         module.initialize_job_store()
-        with patch.object(module, "GISO_RUNNER", "local"), \
-                patch.object(module, "GISOBUILD_PYTHON", sys.executable), \
-                patch.object(module, "TOOL", Path(self.temp.name)), \
-                patch.object(module.host_platform, "machine", return_value="x86_64"):
+        with (
+            patch.object(module, "GISO_RUNNER", "local"),
+            patch.object(module, "GISOBUILD_PYTHON", sys.executable),
+            patch.object(module, "TOOL", Path(self.temp.name)),
+            patch.object(module.host_platform, "machine", return_value="x86_64"),
+        ):
             (Path(self.temp.name) / "src").mkdir()
             (Path(self.temp.name) / "src" / "gisobuild.py").write_text("")
             healthy = self.client.get("/api/ready")
-            with patch.object(module.host_platform, "machine", return_value="aarch64"), \
-                    patch.dict(module.ALIASES, {"bogus": "no-such-platform"}):
+            with (
+                patch.object(module.host_platform, "machine", return_value="aarch64"),
+                patch.dict(module.ALIASES, {"bogus": "no-such-platform"}),
+            ):
                 broken = self.client.get("/api/ready").get_json()
         body = healthy.get_json()
         self.assertEqual(healthy.status_code, 200, body)
-        for name in ("gisobuild", "runner_binary", "database_schema", "writable_directories",
-                     "configuration", "free_storage", "architecture"):
-            self.assertTrue(body["self_test"][name]["ok"], (name, body["self_test"][name]))
+        for name in (
+            "gisobuild",
+            "runner_binary",
+            "database_schema",
+            "writable_directories",
+            "configuration",
+            "free_storage",
+            "architecture",
+        ):
+            self.assertTrue(
+                body["self_test"][name]["ok"], (name, body["self_test"][name])
+            )
         self.assertFalse(broken["ok"])
         self.assertFalse(broken["self_test"]["architecture"]["ok"])
-        self.assertIn("no-such-platform", broken["self_test"]["configuration"]["detail"])
+        self.assertIn(
+            "no-such-platform", broken["self_test"]["configuration"]["detail"]
+        )
 
     def pinned_gisobuild_tree(self):
         tool = Path(self.temp.name) / "gisobuild"
         (tool / "src").mkdir(parents=True)
         (tool / "src" / "gisobuild.py").write_text("print('gisobuild')\n")
         (tool / "README.md").write_text("upstream\n")
-        lines = "".join(f"{hashlib.sha256((tool / name).read_bytes()).hexdigest()}  ./{name}\n"
-                        for name in ("README.md", "src/gisobuild.py"))
+        lines = "".join(
+            f"{hashlib.sha256((tool / name).read_bytes()).hexdigest()}  ./{name}\n"
+            for name in ("README.md", "src/gisobuild.py")
+        )
         manifest = Path(self.temp.name) / "gisobuild.sha256sums"
         manifest.write_text(lines)
-        environment = {"GISOBUILD_SOURCE_SHA256": hashlib.sha256(lines.encode()).hexdigest(),
-                       "GISOBUILD_SOURCE_MANIFEST": str(manifest)}
+        environment = {
+            "GISOBUILD_SOURCE_SHA256": hashlib.sha256(lines.encode()).hexdigest(),
+            "GISOBUILD_SOURCE_MANIFEST": str(manifest),
+        }
         return tool, manifest, environment
 
     def test_self_contained_gisobuild_source_is_checked_against_its_pinned_sha256(self):
@@ -3235,13 +4507,26 @@ class GisoWebTests(unittest.TestCase):
 
         def check():
             module.gisobuild_source_results.clear()
-            with patch.object(module, "TOOL", tool), patch.dict(os.environ, environment):
-                return module.startup_self_test()["gisobuild_source"], module.build_environment_blockers()[0]
+            with (
+                patch.object(module, "TOOL", tool),
+                patch.dict(os.environ, environment),
+            ):
+                return module.startup_self_test()[
+                    "gisobuild_source"
+                ], module.build_environment_blockers()[0]
 
         result, blockers = check()
-        self.assertEqual(result, {"ok": True, "required": True,
-                                  "detail": "2 files match the pinned SHA-256 manifest"})
-        self.assertFalse(any("pinned source" in blocker for blocker in blockers), blockers)
+        self.assertEqual(
+            result,
+            {
+                "ok": True,
+                "required": True,
+                "detail": "2 files match the pinned SHA-256 manifest",
+            },
+        )
+        self.assertFalse(
+            any("pinned source" in blocker for blocker in blockers), blockers
+        )
         (tool / "__pycache__").mkdir()
         (tool / "__pycache__" / "x.pyc").write_bytes(b"cache")
         self.assertTrue(check()[0]["ok"])
@@ -3250,25 +4535,36 @@ class GisoWebTests(unittest.TestCase):
         (tool / "src" / "extra.py").write_text("")
         result, blockers = check()
         self.assertFalse(result["ok"])
-        self.assertEqual(result["detail"], "gisobuild files differ from the pinned source: "
-                         "1 changed or missing (src/gisobuild.py); 1 unexpected (src/extra.py)")
+        self.assertEqual(
+            result["detail"],
+            "gisobuild files differ from the pinned source: "
+            "1 changed or missing (src/gisobuild.py); 1 unexpected (src/extra.py)",
+        )
         blocker = next(blocker for blocker in blockers if "pinned source" in blocker)
         self.assertEqual(module.classify_error(blocker)["code"], "ENVIRONMENT_ERROR")
 
         manifest.write_text(manifest.read_text() + "0" * 64 + "  ./src/extra.py\n")
         result, _ = check()
-        self.assertEqual(result["detail"], "source manifest does not match the pinned SHA-256")
+        self.assertEqual(
+            result["detail"], "source manifest does not match the pinned SHA-256"
+        )
         manifest.unlink()
         self.assertEqual(check()[0]["detail"], "source manifest missing")
 
-    def test_unpinned_gisobuild_checkout_skips_the_source_check_and_version_reports_the_pin(self):
+    def test_unpinned_gisobuild_checkout_skips_the_source_check_and_version_reports_the_pin(
+        self,
+    ):
         module.gisobuild_source_results.clear()
         with patch.dict(os.environ, {"GISOBUILD_SOURCE_SHA256": ""}):
             self.assertNotIn("gisobuild_source", module.startup_self_test())
-            self.assertIsNone(self.client.get("/api/version").get_json()["gisobuild_source_sha256"])
+            self.assertIsNone(
+                self.client.get("/api/version").get_json()["gisobuild_source_sha256"]
+            )
         with patch.dict(os.environ, {"GISOBUILD_SOURCE_SHA256": "ab" * 32}):
-            self.assertEqual(self.client.get("/api/version").get_json()["gisobuild_source_sha256"],
-                             "ab" * 32)
+            self.assertEqual(
+                self.client.get("/api/version").get_json()["gisobuild_source_sha256"],
+                "ab" * 32,
+            )
 
     def test_self_test_reports_unwritable_directories_and_a_bad_schema(self):
         module.initialize_job_store()
@@ -3279,45 +4575,76 @@ class GisoWebTests(unittest.TestCase):
         with patch.object(module, "WORK", missing):
             result = module.startup_self_test()
         self.assertFalse(result["database_schema"]["ok"])
-        self.assertIn("activity lacks created, text", result["database_schema"]["detail"])
+        self.assertIn(
+            "activity lacks created, text", result["database_schema"]["detail"]
+        )
         self.assertFalse(result["writable_directories"]["ok"])
         self.assertEqual(result["writable_directories"]["detail"], "not writable: work")
         # No absolute paths in anything the browser can read.
-        self.assertFalse(any(self.temp.name in entry["detail"] or "/usr/" in entry["detail"]
-                             for entry in result.values()), result)
+        self.assertFalse(
+            any(
+                self.temp.name in entry["detail"] or "/usr/" in entry["detail"]
+                for entry in result.values()
+            ),
+            result,
+        )
         self.assertFalse(result["isoinfo"]["required"])
 
     def test_legacy_job_store_is_adopted_and_versioned_without_losing_jobs(self):
         module.STATE.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(module.JOB_DB) as database:  # the pre-versioning layout
-            database.execute("CREATE TABLE jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)")
-            database.execute("CREATE TABLE activity (id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                             "created REAL NOT NULL, text TEXT NOT NULL)")
-            database.execute("INSERT INTO jobs VALUES (?, ?, ?)",
-                             ("old", json.dumps({"status": "success", "log": ""}), 1.0))
+            database.execute(
+                "CREATE TABLE jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"
+            )
+            database.execute(
+                "CREATE TABLE activity (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "created REAL NOT NULL, text TEXT NOT NULL)"
+            )
+            database.execute(
+                "INSERT INTO jobs VALUES (?, ?, ?)",
+                ("old", json.dumps({"status": "success", "log": ""}), 1.0),
+            )
         module.initialize_job_store()
         with sqlite3.connect(module.JOB_DB) as database:
-            self.assertEqual(database.execute("PRAGMA user_version").fetchone()[0], module.SCHEMA_VERSION)
+            self.assertEqual(
+                database.execute("PRAGMA user_version").fetchone()[0],
+                module.SCHEMA_VERSION,
+            )
         self.assertEqual(module.jobs["old"]["status"], "success")
         self.assertIsNone(module.store_schema_problem)
-        self.assertEqual(self.client.get("/api/version").get_json()["schema_version"], module.SCHEMA_VERSION)
+        self.assertEqual(
+            self.client.get("/api/version").get_json()["schema_version"],
+            module.SCHEMA_VERSION,
+        )
 
     def test_newer_job_store_blocks_builds_instead_of_being_rewritten(self):
         module.STATE.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(module.JOB_DB) as database:
-            database.execute("CREATE TABLE jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)")
-            database.execute("INSERT INTO jobs VALUES (?, ?, ?)",
-                             ("future", json.dumps({"status": "running", "log": ""}), 1.0))
+            database.execute(
+                "CREATE TABLE jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated REAL NOT NULL)"
+            )
+            database.execute(
+                "INSERT INTO jobs VALUES (?, ?, ?)",
+                ("future", json.dumps({"status": "running", "log": ""}), 1.0),
+            )
             database.execute(f"PRAGMA user_version = {module.SCHEMA_VERSION + 1}")
         try:
             module.initialize_job_store()
-            self.assertNotIn("future", module.jobs)  # not restored, not marked interrupted
+            self.assertNotIn(
+                "future", module.jobs
+            )  # not restored, not marked interrupted
             with sqlite3.connect(module.JOB_DB) as database:
-                row = database.execute("SELECT data FROM jobs WHERE id='future'").fetchone()
+                row = database.execute(
+                    "SELECT data FROM jobs WHERE id='future'"
+                ).fetchone()
             self.assertEqual(json.loads(row[0])["status"], "running")
             blockers, _ = module.build_environment_blockers()
-            self.assertTrue(any("job store cannot be used" in b for b in blockers), blockers)
-            self.assertEqual(module.classify_error(blockers[0])["code"], "ENVIRONMENT_ERROR")
+            self.assertTrue(
+                any("job store cannot be used" in b for b in blockers), blockers
+            )
+            self.assertEqual(
+                module.classify_error(blockers[0])["code"], "ENVIRONMENT_ERROR"
+            )
         finally:
             module.store_schema_problem = None
 
@@ -3331,9 +4658,13 @@ class GisoWebTests(unittest.TestCase):
         self.assertIn("1 upload(s) were interrupted by a service restart", log)
         self.assertIn("1 Cisco download(s) were interrupted by a service restart", log)
         self.assertFalse(cisco_partial.exists())
-        self.assertTrue((self.data / ".parts" / "abc.part").exists())  # normal expiry still applies
+        self.assertTrue(
+            (self.data / ".parts" / "abc.part").exists()
+        )  # normal expiry still applies
         module.initialize_job_store()  # already initialized: not reported twice
-        self.assertEqual(self.client.get("/api/activity").get_json()["log"].count("interrupted"), 2)
+        self.assertEqual(
+            self.client.get("/api/activity").get_json()["log"].count("interrupted"), 2
+        )
 
     def test_storage_reports_real_disk_and_archive_usage(self):
         archive_dir = module.ARCHIVE / "job-1"
@@ -3344,7 +4675,9 @@ class GisoWebTests(unittest.TestCase):
 
         self.assertEqual(payload["archive_used_bytes"], 1000)
         self.assertEqual(payload["archive_quota_bytes"], module.MAX_ARCHIVE_BYTES)
-        self.assertEqual(payload["archive_retention_days"], module.ARCHIVE_RETENTION_DAYS)
+        self.assertEqual(
+            payload["archive_retention_days"], module.ARCHIVE_RETENTION_DAYS
+        )
         self.assertEqual(payload["disk_free_bytes"], 100 * 1024**3)
 
     def test_storage_reports_zero_archive_usage_before_any_archive_exists(self):
@@ -3379,7 +4712,9 @@ class GisoWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
     @patch("app.subprocess.Popen")
-    def test_build_events_are_logged_with_inventory_revision_and_plan_fingerprint(self, popen):
+    def test_build_events_are_logged_with_inventory_revision_and_plan_fingerprint(
+        self, popen
+    ):
         pull = MagicMock(returncode=0, args=[module.DOCKER_BIN, "pull"])
         pull.communicate.return_value = ("", None)
         job_dir = self.output / "job"
@@ -3387,12 +4722,22 @@ class GisoWebTests(unittest.TestCase):
         (job_dir / "router-golden.iso").write_bytes(b"golden image")
         build = SimpleNamespace(pid=123, stdout=io.StringIO(""), wait=lambda: 0)
         popen.side_effect = [pull, build]
-        module.jobs["job"] = {"id": "job", "status": "running", "created": time.time(),
-                              "updated": time.time(), "log": "", "progress": 3,
-                              "phase": "Preparing", "artifacts": [],
-                              "inventory_revision": "rev-1", "plan_fingerprint": "fp-1"}
-        with patch.object(module, "gisobuild_commit", return_value=None), \
-             self.assertLogs(module.app.logger.name, level="INFO") as captured:
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": time.time(),
+            "updated": time.time(),
+            "log": "",
+            "progress": 3,
+            "phase": "Preparing",
+            "artifacts": [],
+            "inventory_revision": "rev-1",
+            "plan_fingerprint": "fp-1",
+        }
+        with (
+            patch.object(module, "gisobuild_commit", return_value=None),
+            self.assertLogs(module.app.logger.name, level="INFO") as captured,
+        ):
             module.run_job("job", [module.DOCKER_BIN, "run"])
         log = "\n".join(captured.output)
         self.assertIn("event=build_started", log)
@@ -3408,14 +4753,23 @@ class GisoWebTests(unittest.TestCase):
             [module.DOCKER_BIN, "pull"], 10
         )
         popen.return_value = pull
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 3,
-                              "phase": "Preparing", "artifacts": []}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 3,
+            "phase": "Preparing",
+            "artifacts": [],
+        }
         with patch.object(module, "GISO_PULL_TIMEOUT_SECONDS", 10):
             module.run_job("job", [module.DOCKER_BIN, "run"])
         self.assertEqual(module.jobs["job"]["status"], "failed")
-        self.assertIn("could not be pulled (timed out after 10 seconds) and is not cached",
-                      module.jobs["job"]["log"])
+        self.assertIn(
+            "could not be pulled (timed out after 10 seconds) and is not cached",
+            module.jobs["job"]["log"],
+        )
         pull.terminate.assert_called_once_with()
         pull.wait.assert_called_once_with(timeout=20)
 
@@ -3427,18 +4781,33 @@ class GisoWebTests(unittest.TestCase):
         )
         build = SimpleNamespace(pid=123, stdout=io.StringIO("built\n"), wait=lambda: 0)
         popen.side_effect = [pull, build]
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 3,
-                              "phase": "Preparing", "artifacts": []}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 3,
+            "phase": "Preparing",
+            "artifacts": [],
+        }
         cached = "sha256:" + "ab" * 32
-        with patch.object(module, "GISO_PULL_TIMEOUT_SECONDS", 10), \
-                patch.object(module, "IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4"), \
-                patch("app.local_builder_image_id", return_value=cached):
+        with (
+            patch.object(module, "GISO_PULL_TIMEOUT_SECONDS", 10),
+            patch.object(module, "IMAGE", "ciscogisobuild/cisco-xr-gisobuild:2.3.4"),
+            patch("app.local_builder_image_id", return_value=cached),
+        ):
             module.run_job("job", [module.DOCKER_BIN, "run"])
         job = module.jobs["job"]
         self.assertIn("built", job["log"])  # the build itself ran
-        self.assertEqual(job["builder_image"], {"reference": "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
-                                                "id": cached, "source": "cache"})
+        self.assertEqual(
+            job["builder_image"],
+            {
+                "reference": "ciscogisobuild/cisco-xr-gisobuild:2.3.4",
+                "id": cached,
+                "source": "cache",
+            },
+        )
         self.assertIn("using the copy already on this host", job["log"])
         self.assertIn("may be older than the registry's", job["log"])
 
@@ -3454,9 +4823,16 @@ class GisoWebTests(unittest.TestCase):
 
         pull.communicate.side_effect = complete_pull
         popen.return_value = pull
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 3,
-                              "phase": "Preparing", "artifacts": []}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 3,
+            "phase": "Preparing",
+            "artifacts": [],
+        }
 
         module.run_job("job", [module.DOCKER_BIN, "run"])
 
@@ -3469,9 +4845,16 @@ class GisoWebTests(unittest.TestCase):
         pull.communicate.return_value = ("", None)
         build = SimpleNamespace(pid=123, stdout=io.StringIO(""), wait=lambda: 0)
         popen.side_effect = [pull, build]
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 3,
-                              "phase": "Preparing", "artifacts": []}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 3,
+            "phase": "Preparing",
+            "artifacts": [],
+        }
         module.run_job("job", [module.DOCKER_BIN, "run"])
         self.assertEqual(module.jobs["job"]["status"], "failed")
         self.assertEqual(module.jobs["job"]["phase"], "Build failed")
@@ -3480,9 +4863,16 @@ class GisoWebTests(unittest.TestCase):
     @patch("app.subprocess.Popen")
     def test_background_build_error_is_safe_for_job_api(self, popen):
         popen.side_effect = RuntimeError("/internal/customer-router.iso")
-        module.jobs["job"] = {"id": "job", "status": "running", "created": 1,
-                              "updated": 1, "log": "", "progress": 3,
-                              "phase": "Preparing", "artifacts": []}
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 3,
+            "phase": "Preparing",
+            "artifacts": [],
+        }
         module.run_job("job", [module.DOCKER_BIN, "run"])
         response = self.client.get("/api/jobs/job")
         self.assertEqual(response.status_code, 200)
@@ -3493,8 +4883,10 @@ class GisoWebTests(unittest.TestCase):
         job_dir = self.output / "large-job"
         job_dir.mkdir()
         (job_dir / "golden.iso").write_bytes(b"large")
-        with patch.object(module, "MAX_ARCHIVE_BYTES", 4), \
-                self.assertRaisesRegex(RuntimeError, "exceed"):
+        with (
+            patch.object(module, "MAX_ARCHIVE_BYTES", 4),
+            self.assertRaisesRegex(RuntimeError, "exceed"),
+        ):
             module.archive_giso_artifacts_and_cleanup("large-job", job_dir)
         self.assertTrue(job_dir.exists())
 
@@ -3511,8 +4903,10 @@ class GisoWebTests(unittest.TestCase):
         nested = job_dir / "results"
         nested.mkdir(parents=True)
         (nested / "router-golden.iso").write_bytes(b"nested giso")
-        self.assertEqual([path.name for path in module.giso_artifact_candidates(job_dir)],
-                         ["router-golden.iso"])
+        self.assertEqual(
+            [path.name for path in module.giso_artifact_candidates(job_dir)],
+            ["router-golden.iso"],
+        )
         artifacts = module.archive_giso_artifacts_and_cleanup("nested-job", job_dir)
         self.assertEqual(artifacts[0]["path"], "router-golden.iso")
 
@@ -3559,10 +4953,16 @@ class GisoWebTests(unittest.TestCase):
         archive_dir.mkdir()
         (archive_dir / "golden.iso").write_bytes(b"golden iso content")
 
-        with patch("app.hashlib.md5", wraps=hashlib.md5) as md5_spy, \
-                patch("app.hashlib.sha256", wraps=hashlib.sha256) as sha256_spy:
-            first = self.client.get("/api/archive/cache-job/golden.iso/checksums").get_json()
-            second = self.client.get("/api/archive/cache-job/golden.iso/checksums").get_json()
+        with (
+            patch("app.hashlib.md5", wraps=hashlib.md5) as md5_spy,
+            patch("app.hashlib.sha256", wraps=hashlib.sha256) as sha256_spy,
+        ):
+            first = self.client.get(
+                "/api/archive/cache-job/golden.iso/checksums"
+            ).get_json()
+            second = self.client.get(
+                "/api/archive/cache-job/golden.iso/checksums"
+            ).get_json()
 
         self.assertEqual(first, second)
         self.assertEqual(md5_spy.call_count, 1)
@@ -3598,25 +4998,36 @@ class IsoArchitectureInspectionTests(unittest.TestCase):
         iso_path = Path(self.temp.name) / "test.iso"
         subprocess.run(
             ["genisoimage", "-quiet", "-R", "-o", str(iso_path), str(source)],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
         return iso_path
 
     def test_detects_x86_64_only_exr_image_from_metadata(self):
-        iso_path = self._build_iso({
-            "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list:\n",
-        })
-        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64"}))
+        iso_path = self._build_iso(
+            {
+                "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list:\n",
+            }
+        )
+        self.assertEqual(
+            module.inspect_iso_architecture(iso_path), frozenset({"x86_64"})
+        )
 
     def test_detects_dual_arch_exr_image_from_metadata(self):
-        iso_path = self._build_iso({
-            "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list: armv7l\n",
-        })
-        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64", "aarch64"}))
+        iso_path = self._build_iso(
+            {
+                "iosxr_image_mdata.yml": "x86_64 supported arch list: corei7_64\narm supported arch list: armv7l\n",
+            }
+        )
+        self.assertEqual(
+            module.inspect_iso_architecture(iso_path), frozenset({"x86_64", "aarch64"})
+        )
 
     def test_falls_back_to_rpm_repository_listing_for_lnt_image(self):
         iso_path = self._build_iso({"repo/foo-1.0-r0.x86_64.rpm": ""})
-        self.assertEqual(module.inspect_iso_architecture(iso_path), frozenset({"x86_64"}))
+        self.assertEqual(
+            module.inspect_iso_architecture(iso_path), frozenset({"x86_64"})
+        )
 
     def test_unreadable_iso_reports_unknown_rather_than_raising(self):
         bogus = Path(self.temp.name) / "not-an-iso.iso"

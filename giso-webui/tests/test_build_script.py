@@ -33,13 +33,15 @@ class BuildScriptTests(unittest.TestCase):
         template = (web_root / "templates" / "index.html").read_text()
         theme = (web_root / "static" / "cisco-theme.css").read_text()
 
-        self.assertLess(template.index("compact.css"), template.index("cisco-theme.css"))
+        self.assertLess(
+            template.index("compact.css"), template.index("cisco-theme.css")
+        )
         self.assertIn("--navy: #0d2740", theme)
         self.assertIn("@media (prefers-reduced-motion: reduce)", theme)
 
     def test_cleanup_resets_failed_artifacts_in_the_ui(self):
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
-        cleanup_handler = script[script.index("$('#cleanup').onclick"):]
+        cleanup_handler = script[script.index("$('#cleanup').onclick") :]
         self.assertIn("$('#artifacts').replaceChildren()", cleanup_handler)
         self.assertIn("result.cleared_artifacts", cleanup_handler)
         self.assertIn("currentJob = null", cleanup_handler)
@@ -48,11 +50,11 @@ class BuildScriptTests(unittest.TestCase):
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
         template = (Path(__file__).parents[1] / "templates" / "index.html").read_text()
         self.assertIn('id="archive-filter"', template)
-        load_archive = script[script.index("async function loadArchive()"):]
+        load_archive = script[script.index("async function loadArchive()") :]
         self.assertIn("row.dataset.name=item.name.toLowerCase()", load_archive)
         self.assertIn("applyArchiveFilter()", load_archive)
-        filter_fn = script[script.index("function applyArchiveFilter()"):]
-        filter_fn = filter_fn[:filter_fn.index("\n}\n")]
+        filter_fn = script[script.index("function applyArchiveFilter()") :]
+        filter_fn = filter_fn[: filter_fn.index("\n}\n")]
         self.assertIn("row.dataset.name.includes(query)", filter_fn)
 
     def test_cisco_search_results_support_filtering_by_filename(self):
@@ -65,11 +67,13 @@ class BuildScriptTests(unittest.TestCase):
         form_start = template.index('id="cisco-results-form"')
         filter_start = template.index('id="cisco-results-filter"')
         self.assertLess(filter_start, form_start)
-        search_handler = script[script.index("$('#cisco-search-form').addEventListener"):]
+        search_handler = script[
+            script.index("$('#cisco-search-form').addEventListener") :
+        ]
         self.assertIn("label.dataset.name=image.name.toLowerCase()", search_handler)
         self.assertIn("applyCiscoResultsFilter()", search_handler)
-        filter_fn = script[script.index("function applyCiscoResultsFilter()"):]
-        filter_fn = filter_fn[:filter_fn.index("\n}\n")]
+        filter_fn = script[script.index("function applyCiscoResultsFilter()") :]
+        filter_fn = filter_fn[: filter_fn.index("\n}\n")]
         self.assertIn("label.dataset.name.includes(query)", filter_fn)
 
     def test_system_status_pill_uses_the_deep_readiness_check(self):
@@ -80,13 +84,15 @@ class BuildScriptTests(unittest.TestCase):
         # would be a false all-clear on a deployment that can never actually
         # complete a build.
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
-        health_fn = script[script.index("async function health()"):]
-        health_fn = health_fn[:health_fn.index("\n}\n")]
+        health_fn = script[script.index("async function health()") :]
+        health_fn = health_fn[: health_fn.index("\n}\n")]
         self.assertIn("fetch('/api/ready')", health_fn)
         self.assertNotIn("api('/api/health')", health_fn)
         self.assertNotIn("api('/api/ready')", health_fn)
         for check in ("docker", "tool", "storage", "database", "disk"):
-            self.assertIn(f"{check}:", script[:script.index("async function health()")])
+            self.assertIn(
+                f"{check}:", script[: script.index("async function health()")]
+            )
 
     def test_manual_package_mode_renders_uploaded_rpms_as_choices(self):
         # renderManualPackages()/selectedManualPackages()/syncManualPackageValue()
@@ -131,11 +137,13 @@ class BuildScriptTests(unittest.TestCase):
         template = (web_root / "templates" / "index.html").read_text()
 
         self.assertIn("No RPM packages uploaded.", template)
-        render_inputs = app_script[app_script.index("function renderInputs(data)"):]
-        render_inputs = render_inputs[:render_inputs.index("\n}\n")]
+        render_inputs = app_script[app_script.index("function renderInputs(data)") :]
+        render_inputs = render_inputs[: render_inputs.index("\n}\n")]
         self.assertIn("renderManualPackages(data, plan)", render_inputs)
-        render_manual = manual_script[manual_script.index("function renderManualPackages(data, plan)"):]
-        render_manual = render_manual[:render_manual.index("if (!rpms.length)")]
+        render_manual = manual_script[
+            manual_script.index("function renderManualPackages(data, plan)") :
+        ]
+        render_manual = render_manual[: render_manual.index("if (!rpms.length)")]
         self.assertIn("logicalRpms(data.files)", render_manual)
 
     def test_missing_dependencies_panel_is_rendered_on_poll(self):
@@ -143,19 +151,24 @@ class BuildScriptTests(unittest.TestCase):
         template = (Path(__file__).parents[1] / "templates" / "index.html").read_text()
         self.assertIn('id="missing-dependencies"', template)
         self.assertIn("function renderMissingDependencies(job)", script)
-        self.assertIn("renderMissingDependencies(job)", script[script.index("async function poll()"):])
-        panel_fn = script[script.index("function renderMissingDependencies(job)"):]
-        panel_fn = panel_fn[:panel_fn.index("\n}\n")]
+        self.assertIn(
+            "renderMissingDependencies(job)",
+            script[script.index("async function poll()") :],
+        )
+        panel_fn = script[script.index("function renderMissingDependencies(job)") :]
+        panel_fn = panel_fn[: panel_fn.index("\n}\n")]
         self.assertIn("job.missing_dependencies", panel_fn)
         # The same panel is reused one step earlier for dependencies known
         # before the build runs, so both paths share one rendering.
-        shared_fn = script[script.index("function dependencyPanel("):]
-        shared_fn = shared_fn[:shared_fn.index("\n}\n")]
+        shared_fn = script[script.index("function dependencyPanel(") :]
+        shared_fn = shared_fn[: shared_fn.index("\n}\n")]
         self.assertIn("required_by", shared_fn)
         self.assertIn("base_image_has", shared_fn)
         self.assertIn("renderUnsatisfiedDependencies(plan)", script)
 
-    def test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation(self):
+    def test_smu_plan_blockers_are_shown_during_review_not_only_at_final_confirmation(
+        self,
+    ):
         # recommend_smu_selection() (backing /api/smu/recommendation and
         # discover(), the default automatic-selection preview used in Step 2)
         # now returns a real "blockers" array (see
@@ -165,8 +178,8 @@ class BuildScriptTests(unittest.TestCase):
         # from clicking "Start build", which calls the separate
         # /api/build-plan endpoint - never during ongoing Step 2 review.
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
-        fn = script[script.index("function applySmuRecommendation(plan)"):]
-        fn = fn[:fn.index("\nfunction smuGroupCard")]
+        fn = script[script.index("function applySmuRecommendation(plan)") :]
+        fn = fn[: fn.index("\nfunction smuGroupCard")]
         self.assertIn("plan.blockers", fn)
         # Dependency blockers (proven from RPM headers + the base image's own
         # package list) lead the same list, ahead of the filename-derived ones.
@@ -177,7 +190,9 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("plan.unsatisfied_dependencies", fn)
         self.assertIn("'bad'", fn)
 
-    def test_expected_output_is_shown_during_review_not_only_at_final_confirmation(self):
+    def test_expected_output_is_shown_during_review_not_only_at_final_confirmation(
+        self,
+    ):
         # expected_outputs (ISO/USB) previously existed only in the
         # /api/build-plan response, shown only in the final "Start build?"
         # confirmation dialog text - never persistently during Step 2 review.
@@ -187,18 +202,21 @@ class BuildScriptTests(unittest.TestCase):
         # plan's platform and /api/platforms' per-platform capabilities.
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
         self.assertIn("function expectedOutputText(platformId)", script)
-        expected_fn = script[script.index("function expectedOutputText(platformId)"):]
-        expected_fn = expected_fn[:expected_fn.index("\n}\n")]
+        expected_fn = script[script.index("function expectedOutputText(platformId)") :]
+        expected_fn = expected_fn[: expected_fn.index("\n}\n")]
         self.assertIn("profile.capabilities?.usb_image", expected_fn)
         self.assertIn("skip_usb_image", expected_fn)
-        plan_fn = script[script.index("function applySmuRecommendation(plan)"):]
-        plan_fn = plan_fn[:plan_fn.index("\nfunction smuGroupCard")]
+        plan_fn = script[script.index("function applySmuRecommendation(plan)") :]
+        plan_fn = plan_fn[: plan_fn.index("\nfunction smuGroupCard")]
         self.assertIn("expectedOutputText(plan.platform)", plan_fn)
         self.assertIn("expected-output-value", plan_fn)
         # Toggling the checkbox or the manual platform override afterwards
         # must refresh the same field live, not just at plan-calculation time.
         self.assertIn("addEventListener('change', refreshExpectedOutput)", script)
-        self.assertIn("refreshExpectedOutput()", script[script.index("$('[name=platform]').addEventListener"):])
+        self.assertIn(
+            "refreshExpectedOutput()",
+            script[script.index("$('[name=platform]').addEventListener") :],
+        )
 
     def test_build_report_shows_the_confidence_grid(self):
         # create_build_plan() has always computed a full confidence report
@@ -208,8 +226,11 @@ class BuildScriptTests(unittest.TestCase):
         # though Step 2's live review (applySmuRecommendation()) already
         # does via the same confidenceGrid() helper.
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
-        report_fn = script[script.index("function renderBuildReport(job)"):
-                            script.index("function renderMissingDependencies(job)")]
+        report_fn = script[
+            script.index("function renderBuildReport(job)") : script.index(
+                "function renderMissingDependencies(job)"
+            )
+        ]
         self.assertIn("confidenceGrid(plan.confidence)", report_fn)
 
     def test_disk_estimate_is_shown_during_review_and_uses_already_loaded_data(self):
@@ -222,13 +243,13 @@ class BuildScriptTests(unittest.TestCase):
         # no new backend endpoint or duplicate size computation needed.
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
         self.assertIn("function estimatedOutputBytes(plan)", script)
-        estimate_fn = script[script.index("function estimatedOutputBytes(plan)"):]
-        estimate_fn = estimate_fn[:estimate_fn.index("\n}\n")]
+        estimate_fn = script[script.index("function estimatedOutputBytes(plan)") :]
+        estimate_fn = estimate_fn[: estimate_fn.index("\n}\n")]
         self.assertIn("inputs.files", estimate_fn)
         self.assertIn("plan.selected", estimate_fn)
         self.assertIn("function renderDiskEstimate()", script)
-        render_fn = script[script.index("function renderDiskEstimate()"):]
-        render_fn = render_fn[:render_fn.index("\n}\n")]
+        render_fn = script[script.index("function renderDiskEstimate()") :]
+        render_fn = render_fn[: render_fn.index("\n}\n")]
         # storageInfo.volume_free_bytes covers every volume a build touches
         # (uploads/work/output); disk_free_bytes stays as the fallback for a
         # backend that predates that field.
@@ -237,8 +258,18 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn("not enough space on the", render_fn)
         # Loaded once at plan-calculation time and once when storage usage
         # arrives, in whichever order those two independent requests finish.
-        self.assertIn("renderDiskEstimate()", script[script.index("function applySmuRecommendation(plan)"):script.index("\nfunction smuGroupCard")])
-        self.assertIn("renderDiskEstimate()", script[script.index("async function loadStorage()"):])
+        self.assertIn(
+            "renderDiskEstimate()",
+            script[
+                script.index("function applySmuRecommendation(plan)") : script.index(
+                    "\nfunction smuGroupCard"
+                )
+            ],
+        )
+        self.assertIn(
+            "renderDiskEstimate()",
+            script[script.index("async function loadStorage()") :],
+        )
 
     def test_automatic_selection_review_list_supports_filtering(self):
         # The manual package list, archive list and Cisco search results all
@@ -256,15 +287,15 @@ class BuildScriptTests(unittest.TestCase):
         details_start = template.index('id="smu-plan-details"')
         filter_start = template.index('id="smu-review-filter"')
         self.assertLess(filter_start, details_start)
-        group_card_fn = script[script.index("function smuGroupCard(group)"):]
-        group_card_fn = group_card_fn[:group_card_fn.index("\n}\n")]
+        group_card_fn = script[script.index("function smuGroupCard(group)") :]
+        group_card_fn = group_card_fn[: group_card_fn.index("\n}\n")]
         self.assertIn("card.dataset.search=", group_card_fn)
-        plan_fn = script[script.index("function applySmuRecommendation(plan)"):]
-        plan_fn = plan_fn[:plan_fn.index("\nfunction smuGroupCard")]
+        plan_fn = script[script.index("function applySmuRecommendation(plan)") :]
+        plan_fn = plan_fn[: plan_fn.index("\nfunction smuGroupCard")]
         self.assertIn("row.dataset.search=", plan_fn)
         self.assertIn("applySmuReviewFilter()", plan_fn)
-        filter_fn = script[script.index("function applySmuReviewFilter()"):]
-        filter_fn = filter_fn[:filter_fn.index("\n}\n")]
+        filter_fn = script[script.index("function applySmuReviewFilter()") :]
+        filter_fn = filter_fn[: filter_fn.index("\n}\n")]
         self.assertIn(".csc-card, #smu-plan-details .excluded-package", filter_fn)
         self.assertIn("el.dataset.search.includes(query)", filter_fn)
 
@@ -274,8 +305,8 @@ class BuildScriptTests(unittest.TestCase):
         # an operator who had already uploaded an ISO and just needed to add
         # a package was wrongly told the ISO was still missing too.
         script = (Path(__file__).parents[1] / "static" / "app.js").read_text()
-        fn = script[script.index("function updateBuildAvailability()"):]
-        fn = fn[:fn.index("\n}\n")]
+        fn = script[script.index("function updateBuildAvailability()") :]
+        fn = fn[: fn.index("\n}\n")]
         self.assertIn("Waiting for an ISO and a customization", fn)
         self.assertIn("Waiting for an ISO…", fn)
         self.assertIn("Waiting for a customization", fn)
@@ -287,13 +318,18 @@ class BuildScriptTests(unittest.TestCase):
 
         self.assertIn('id="manual-package-compatible-only"', template)
         self.assertIn('id="manual-package-selected-only"', template)
-        filter_fn = manual_script[manual_script.index("function applyManualPackageFilter()"):]
-        filter_fn = filter_fn[:filter_fn.index("\n  }\n")]
+        filter_fn = manual_script[
+            manual_script.index("function applyManualPackageFilter()") :
+        ]
+        filter_fn = filter_fn[: filter_fn.index("\n  }\n")]
         self.assertIn("compatibleOnly", filter_fn)
         self.assertIn("option.classList.contains('incompatible')", filter_fn)
         self.assertIn("selectedOnly", filter_fn)
         self.assertIn(".manual-rpm-checkbox').checked", filter_fn)
-        self.assertIn("applyManualPackageFilter()", manual_script[manual_script.index("window.syncManualPackageValue"):])
+        self.assertIn(
+            "applyManualPackageFilter()",
+            manual_script[manual_script.index("window.syncManualPackageValue") :],
+        )
 
     def test_lnt_only_defaults_do_not_block_exr_builds(self):
         # verbose_dep_check defaults to checked in the template (gisobuild's
@@ -311,7 +347,9 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn('id="lnt-controls"', template)
         self.assertIn('name="verbose_dep_check" checked', template)
         self.assertIn("profile.architecture !== 'lnt'", script)
-        reset_for_unsupported = script[script.index("Object.entries(capabilityNames)"):]
+        reset_for_unsupported = script[
+            script.index("Object.entries(capabilityNames)") :
+        ]
         self.assertIn("control.checked=false", reset_for_unsupported)
         self.assertIn("verbose_dep_check:'verbose_dependency_check'", script)
 
@@ -354,9 +392,19 @@ class BuildScriptTests(unittest.TestCase):
             environment["PATH"] = f"{bin_dir}:{environment['PATH']}"
             try:
                 result = subprocess.run(
-                    [bash, str(script), "--iso", str(iso), "--output",
-                     f"output_gisobuild_safe/../../{victim.name}", "--clean"],
-                    capture_output=True, text=True, env=environment, check=False,
+                    [
+                        bash,
+                        str(script),
+                        "--iso",
+                        str(iso),
+                        "--output",
+                        f"output_gisobuild_safe/../../{victim.name}",
+                        "--clean",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                    check=False,
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("Refusing to clean", result.stderr)
@@ -375,9 +423,17 @@ class BuildScriptTests(unittest.TestCase):
         script = (Path(__file__).parents[2] / "build-giso.sh").read_text()
         self.assertIn("mktemp -d", script)
         result = subprocess.run(
-            [bash, str(Path(__file__).parents[2] / "build-giso.sh"),
-             "--iso", "missing.iso", "--image", "--privileged"],
-            capture_output=True, text=True, check=False,
+            [
+                bash,
+                str(Path(__file__).parents[2] / "build-giso.sh"),
+                "--iso",
+                "missing.iso",
+                "--image",
+                "--privileged",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Docker image must not start with a dash", result.stderr)
@@ -387,7 +443,11 @@ class BuildScriptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_name:
             source = Path(temp_name) / "base image.iso"
             source.write_bytes(b"iso")
-            responses = [{"id": "abc"}, {"received": 3}, {"path": "base image-a1b2.iso"}]
+            responses = [
+                {"id": "abc"},
+                {"received": 3},
+                {"path": "base image-a1b2.iso"},
+            ]
             with patch.object(runner, "request", side_effect=responses) as call:
                 uploaded = runner.upload_path("http://127.0.0.1:8080", source)
         self.assertEqual(uploaded, "base image-a1b2.iso")
@@ -403,9 +463,18 @@ class BuildScriptTests(unittest.TestCase):
             iso.write_bytes(b"synthetic test marker")
             script = Path(__file__).parents[2] / "scripts/e2e_real_iso.py"
             result = subprocess.run(
-                [sys.executable, str(script), str(iso), "--platform", "ncs5500",
-                 "--url", "file:///tmp/fake-api"],
-                capture_output=True, text=True, check=False,
+                [
+                    sys.executable,
+                    str(script),
+                    str(iso),
+                    "--platform",
+                    "ncs5500",
+                    "--url",
+                    "file:///tmp/fake-api",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
             )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("HTTP(S) origin", result.stderr)
