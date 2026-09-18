@@ -571,9 +571,16 @@ read today.
       `test_build_plan_carries_the_command_it_would_run_and_its_package_counts`,
       `test_build_plan_without_a_runnable_command_still_reports_its_blockers`.
       Fixed 2026-09-18: the panel showed blockers but never `plan.warnings`
-      or an unresolved `component_conflicts` (a version tie
+      or an unresolved `component_conflicts` (which
       `resolve_component_conflicts()` deliberately leaves both fixes
-      selected for), so "READY TO BUILD" could hide a real ambiguity Step
-      2's own review already showed. Now renders both under "Review before
-      building". Test:
+      selected for - a version tie, mixed `vm_type`, or missing
+      `package_type`/`vm_type` metadata), so "READY TO BUILD" could hide a
+      real ambiguity Step 2's own review already showed. Now renders both
+      under "Review before building". Test:
       `test_build_preview_shows_an_unresolved_conflict_before_building`.
+      Step 2's own conflict panel ("Overlapping fixes detected") had
+      rendered `component_conflicts` since before this session with no
+      browser test of its own; added
+      `test_step_two_review_shows_an_unresolved_conflict` alongside, which
+      also needed scoping past `plan.warnings`' own, separately-rendered
+      "Review before building" panel in the same review.

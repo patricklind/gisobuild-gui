@@ -677,8 +677,20 @@ Never silently exclude without a reason.
       (confirmed to fail without the fix - the warning panel did not
       exist - and pass with it):
       `test_build_preview_shows_an_unresolved_conflict_before_building`.
-      Full suite green (340 unit/integration tests, 23 browser tests, ruff
-      clean, Graphify refreshed).
+      Its first fixture attempt (both files given an identical, hand-picked
+      `version`/`release`) reconstructed neither file's real name via
+      `rpm_filename_mismatch()`, so both were silently excluded as
+      `INVALID` before `resolve_component_conflicts()` ever ran - the test
+      still passed, for the wrong reason (masked by two files sharing a
+      class-level "Review before building" heading with the unrelated
+      warnings panel it also renders). Corrected to reconstruct each file's
+      real name and omit `package_type`/`vm_type`, the genuinely-unresolved
+      case above - which also surfaced that Step 2's own equivalent test
+      (added alongside, see `06-UI-OPERATOR-TODO.md`) needed the same fix,
+      and needed to scope its locator past the *other*,
+      also-"Review before building" `plan.warnings` panel Step 2 renders
+      separately. Full suite green (340 unit/integration tests, 24 browser
+      tests, ruff clean, Graphify refreshed).
 
       **Full gisobuild run: attempted, not completed, 2026-09-18.** Two
       attempts against the real, complete NCS5500 25.1.2 workspace (base ISO

@@ -147,25 +147,43 @@ class OperatorFlowTests(unittest.TestCase):
             [rows.nth(index).inner_text() for index in (3, 4, 5)], ["3", "2", "1"]
         )
 
+    def conflicting_isis_identity(self, path):
+        # Correctly reconstructs each file's own filename (or
+        # rpm_filename_mismatch() excludes it before resolve_component_conflicts()
+        # ever sees it), but with no package_type/vm_type - a plain RPM
+        # carrying no Cisco GROUP tag, unlike the SMU fixture elsewhere in
+        # this file. resolve_component_conflicts() cannot determine whether
+        # the two are the same real package without that metadata (never
+        # guesses), so the conflict stays genuinely unresolved: two
+        # *different* CSCs on the same component, each with its own real
+        # version/release in its own filename, is not a tie
+        # compare_exr_rpm_labels() would resolve - the metadata gap is what
+        # actually leaves this one ambiguous.
+        match = module.RPM_COMPONENT.search(path.name)
+        return {
+            "identity": {
+                "name": match.group("component"),
+                "version": match.group("version"),
+                "release": f"r732.CSC{match.group('bug')}",
+                "arch": "x86_64",
+                "package_type": None,
+                "vm_type": None,
+            }
+        }
+
     def test_build_preview_shows_an_unresolved_conflict_before_building(self):
-        # resolve_component_conflicts() deliberately leaves a version tie
-        # unresolved (never guesses) - the plan still says READY TO BUILD
-        # (both fixes stay selected for gisobuild's own supersedence to
-        # decide), but the operator must see that ambiguity here, not only
-        # in Step 2's live review.
+        # resolve_component_conflicts() never guesses without package_type/
+        # vm_type metadata - the plan still says READY TO BUILD (both fixes
+        # stay selected for gisobuild's own supersedence to decide), but the
+        # operator must see that ambiguity here, not only in Step 2's live
+        # review.
         tied_a = "asr9k-x64-isis-1.0.0.1-r732.CSCtest00010.x86_64.rpm"
-        tied_b = "asr9k-x64-isis-1.0.0.1-r732.CSCtest00011.x86_64.rpm"
+        tied_b = "asr9k-x64-isis-1.0.0.2-r732.CSCtest00011.x86_64.rpm"
         for name in (self.ISO, tied_a, tied_b):
             self.write(name)
-        identity = {
-            "name": "asr9k-x64-isis",
-            "version": "1.0.0.1",
-            "release": "1",
-            "arch": "x86_64",
-            "package_type": "smu",
-            "vm_type": "host",
-        }
-        with patch("app.rpm_dependency_metadata", return_value={"identity": identity}):
+        with patch(
+            "app.rpm_dependency_metadata", side_effect=self.conflicting_isis_identity
+        ):
             self.open()
             expect(self.page.locator("#smu-plan-state")).to_have_text("Calculated")
             self.page.locator("#preview-build").click()
@@ -181,6 +199,35 @@ class OperatorFlowTests(unittest.TestCase):
             "gisobuild.py --iso asr9k-x64-7.3.2.iso"
         )
         expect(self.page.locator("#job-status")).to_have_text("Not started")
+
+    def test_step_two_review_shows_an_unresolved_conflict(self):
+        # The backend side of this (validate_smu_selection()'s
+        # component_conflicts, and resolve_component_conflicts() leaving it
+        # unresolved without package_type/vm_type metadata) has unit coverage
+        # (test_multiple_fixes_for_same_component_require_supersedence_data,
+        # test_component_conflict_is_not_resolved_without_package_type_metadata);
+        # this covers the live Step 2 review panel that has rendered it since
+        # before this session, which had no browser test of its own.
+        tied_a = "asr9k-x64-isis-1.0.0.1-r732.CSCtest00010.x86_64.rpm"
+        tied_b = "asr9k-x64-isis-1.0.0.2-r732.CSCtest00011.x86_64.rpm"
+        for name in (self.ISO, tied_a, tied_b):
+            self.write(name)
+        with patch(
+            "app.rpm_dependency_metadata", side_effect=self.conflicting_isis_identity
+        ):
+            self.open()
+            expect(self.page.locator("#smu-plan-state")).to_have_text("Calculated")
+            # Step 2 also renders plan.warnings as its own, separate
+            # ".smu-relationship-warning" ("Review before building"); scope
+            # to the one this test is about.
+            warning = self.page.locator(
+                "#smu-plan-details .smu-relationship-warning",
+                has_text="Overlapping fixes detected",
+            )
+            expect(warning).to_contain_text("Overlapping fixes detected")
+            expect(warning).to_contain_text("asr9k-x64-isis")
+            expect(warning).to_contain_text("CSCTEST00010")
+            expect(warning).to_contain_text("CSCTEST00011")
 
     def test_automatic_selection(self):
         for name in (self.ISO, self.ROUTING, self.BGP, self.OTHER_RELEASE):
