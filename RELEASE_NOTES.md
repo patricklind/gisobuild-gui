@@ -40,6 +40,19 @@ The latest published version is
   fallback when the registry is unreachable.
 - Fixes manual CSC group checkboxes, lost manual selections on upload, and the
   upgrade check reading the Cisco search form's target release.
+- Automatic selection now resolves a same-package conflict between two SMUs
+  exactly the way gisobuild's own eXR engine would (the higher real RPM
+  version wins), instead of leaving both selected behind a warning the
+  operator had to act on by hand. The review step, the build preview and the
+  actual build now agree on the result in every case, including a fix losing
+  more than one of its components to different competing fixes.
+- Adds a build preview ("Show build preview") that renders the exact
+  gisobuild command, package counts by status, and readiness for the current
+  form state before starting a build.
+- Every excluded package now carries a status code (wrong platform/release/
+  architecture, superseded, missing dependency, duplicate, invalid, or
+  unidentified), the platform/release/architecture/CSC its filename states,
+  and which check decided it.
 - CI adds real-browser tests, synthetic build integration tests, platform
   fixtures, flake8-bandit rules, Trivy scans, an SBOM and a Docker-only guard.
 

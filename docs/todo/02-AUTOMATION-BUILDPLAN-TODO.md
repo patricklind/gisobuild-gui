@@ -643,6 +643,30 @@ Never silently exclude without a reason.
       LNT section above - LNT filenames carry no CSC ID, so
       `component_conflicts` cannot fire for an LNT selection).
 
+      **Full gisobuild run: attempted, not completed, 2026-09-18.** Two
+      attempts against the real, complete NCS5500 25.1.2 workspace (base ISO
+      + all 12 base `optional-rpms/*` + all 10 SMU tars, 25 selected RPMs)
+      each ran for well over an hour under this Mac's amd64/Rosetta
+      emulation without reaching a terminal state - the first attempt's
+      earlier, *incomplete* workspace (missing the 12 base packages; a test
+      setup mistake, not a code defect) did complete in ~31 minutes and
+      failed gisobuild's own compatibility check exactly as expected for a
+      workspace missing base dependencies, which is what surfaced the
+      missing-files mistake. Both full-workspace attempts were cancelled
+      cleanly through `DELETE /api/jobs/<id>` (`build_cancelled`, no orphan
+      processes) rather than left to run indefinitely; this is a real
+      limitation of today's verification, not a simulated result, and this
+      TODO item is deliberately left unchecked until a full run actually
+      completes. It does not weaken the fix itself: the defect and its fix
+      were in this application's own plan/preview/job-creation code path
+      (proven directly via `create_build_plan()`/`POST /api/jobs` against
+      the real RPMs, before and after), not in whether the separate,
+      third-party `gisobuild` binary itself can finish on this machine
+      today. Retry when time and environment performance allow; the
+      correctly-complete throwaway workspace recipe is above (extract the
+      base tar's `optional-rpms/` directory in addition to the SMU tars,
+      not just the SMU tars alone).
+
       <details><summary>Superseded same-day: the rpmvercmp/Lua-eval plan (kept as a record, not a task list)</summary>
 
       So the task is not "invent a rule for which fix wins" - it is **make our

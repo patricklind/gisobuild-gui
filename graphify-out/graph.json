@@ -10047,7 +10047,7 @@
       "node_kind": "heading",
       "norm_label": "release safety",
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L57"
+      "source_location": "L70"
     },
     {
       "id": "release_notes_unreleased",
@@ -10071,7 +10071,7 @@
       "node_kind": "heading",
       "norm_label": "validation status",
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L46"
+      "source_location": "L59"
     },
     {
       "id": "security_deployment_boundary",
@@ -11197,7 +11197,7 @@
       "node_kind": "heading",
       "norm_label": "automatic refresh",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L814"
+      "source_location": "L838"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_buildplan",
@@ -11209,7 +11209,7 @@
       "node_kind": "heading",
       "norm_label": "buildplan",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L731"
+      "source_location": "L755"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_buildplan_fingerprint",
@@ -11221,7 +11221,7 @@
       "node_kind": "heading",
       "norm_label": "buildplan fingerprint",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L761"
+      "source_location": "L785"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_canonical_inventory",
@@ -11281,7 +11281,7 @@
       "node_kind": "heading",
       "norm_label": "inventory revision",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L785"
+      "source_location": "L809"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_iso_inspection",
@@ -11305,7 +11305,7 @@
       "node_kind": "heading",
       "norm_label": "preflight",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L857"
+      "source_location": "L881"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_rpm_inspection",
@@ -11365,7 +11365,7 @@
       "node_kind": "heading",
       "norm_label": "unified selection engine",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L703"
+      "source_location": "L727"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo",
@@ -27612,7 +27612,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L703",
+      "source_location": "L727",
       "weight": 1.0
     },
     {
@@ -27623,7 +27623,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L731",
+      "source_location": "L755",
       "weight": 1.0
     },
     {
@@ -27634,7 +27634,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L761",
+      "source_location": "L785",
       "weight": 1.0
     },
     {
@@ -27645,7 +27645,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L785",
+      "source_location": "L809",
       "weight": 1.0
     },
     {
@@ -27656,7 +27656,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L814",
+      "source_location": "L838",
       "weight": 1.0
     },
     {
@@ -27667,7 +27667,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L857",
+      "source_location": "L881",
       "weight": 1.0
     },
     {
@@ -32804,7 +32804,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L46",
+      "source_location": "L59",
       "weight": 1.0
     },
     {
@@ -32815,7 +32815,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L57",
+      "source_location": "L70",
       "weight": 1.0
     },
     {
@@ -40024,5 +40024,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "0805df18ed0d30aee88a6651decdab1c71f65f3e"
+  "built_at_commit": "a10dea85f3ffa04895e40ef729c6ddba6ab93396"
 }
