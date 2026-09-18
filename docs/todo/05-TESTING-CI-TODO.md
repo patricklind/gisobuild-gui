@@ -403,6 +403,37 @@ Optional:
 - [x] Fail the CI merge gate when tracked `graphify-out/graph.json` is stale
 - [x] Verify `.graphifyignore` still excludes Cisco licensed/sensitive inputs and build outputs
 
+## Release automation
+
+- [ ] Automatic patch release on every green `main` push (raised by the
+      maintainer 2026-09-18, confirmed after clarifying: automatic tag and
+      release on every push, not only on request). Added
+      `.github/workflows/auto-release.yml`: triggers on the `CI` workflow's
+      own `completed` event, filtered to `branches: [main]` and
+      `conclusion == 'success'`, so a failed or skipped CI run creates no
+      tag. Computes the next patch version from the highest existing `v*`
+      tag (`git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1`,
+      `v0.0.1` when none exist) and pushes only that new tag - it builds and
+      publishes nothing itself. Pushing a `v*` tag is `release.yml`'s own,
+      pre-existing trigger (unchanged), which re-runs the complete CI suite
+      against that exact commit a second time and only builds/publishes if
+      that also passes - the same gate a manual `workflow_dispatch` release
+      already went through, so no publishing path is weakened. A `workflow_run`
+      completion for a `workflow_call`-reused `ci.yml` (e.g. `release.yml`'s
+      own `verify` job) does not independently fire this trigger, so there is
+      no risk of a release re-tagging itself.
+      Verified: `actionlint` clean on the new file; the version-increment
+      shell logic tested directly (`sort -V` correctly orders `v0.0.9` <
+      `v0.0.10` and `v0.1.0` above both; empty-tag-list case yields `v0.0.1`)
+      against a throwaway git history and against this repository's own real
+      tags (highest today: `v0.1.0` → computed next: `v0.1.1`). Not yet
+      observed firing on GitHub Actions (nothing is pushed from this
+      environment) - left unchecked until a real push confirms it tags and
+      releases as designed.
+      `docs/releasing.md` and `AGENTS.md`'s release rule updated; the manual
+      `workflow_dispatch` path is unchanged and remains how a deliberate
+      minor/major bump or pre-release is done.
+
 ## Merge policy
 
 Package-selection or build-runner changes must not merge unless:

@@ -1,0 +1,59 @@
+name: Auto-tag release
+
+# Every push to main that passes CI is automatically released: this workflow
+# only computes the next patch version and pushes that tag. It never builds
+# or publishes anything itself - pushing a "v*" tag is release.yml's own,
+# pre-existing trigger (docs/releasing.md), which re-runs the full CI suite
+# against that exact commit and only builds/publishes if that passes too, the
+# same gate a manual `workflow_dispatch` release already goes through. This
+# workflow adds no new publishing path, only removes the manual "Run
+# workflow" step for an ordinary patch release.
+#
+# A deliberate minor/major bump or a pre-release still uses the existing
+# manual `workflow_dispatch` trigger on release.yml; do that before the next
+# push to main advances the auto patch version past it, or afterwards.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Compute the next patch version
+        id: version
+        run: |
+          set -euo pipefail
+          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1)
+          if [[ -z "$latest" ]]; then
+            next="v0.0.1"
+          else
+            IFS='.' read -r major minor patch <<<"${latest#v}"
+            next="v${major}.${minor}.$((patch + 1))"
+          fi
+          echo "Latest release: ${latest:-none}; next: $next"
+          echo "tag=$next" >>"$GITHUB_OUTPUT"
+      - name: Create and push the release tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_TAG" -m "GISO Builder $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"

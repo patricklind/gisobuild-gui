@@ -172,8 +172,12 @@ rule in this file wins and the examples must be corrected.
   necessary.
 - One module has one owner at a time. Never edit the same file from two
   worktrees.
-- Do not create a version tag or GitHub Release until CI is green. Never publish
-  Cisco artifacts; the release contains this application's container image and
+- Do not manually create a version tag or GitHub Release until CI is green - a
+  patch release now happens automatically once CI passes on `main`
+  (`.github/workflows/auto-release.yml`; see `docs/releasing.md`), and a
+  deliberate minor/major bump or pre-release still goes through the manual
+  Release workflow. Never publish Cisco artifacts; the release contains this
+  application's container image and
   documentation only.
 
 ## Project overview
