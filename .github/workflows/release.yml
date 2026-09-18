@@ -100,7 +100,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       # Socket deployment web image (compose.socket.yaml).
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: giso-webui
           push: true
@@ -114,7 +114,7 @@ jobs:
           provenance: mode=max
           sbom: true
       # Default image (compose.yaml): web app plus pinned gisobuild.
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/selfcontained.Dockerfile
