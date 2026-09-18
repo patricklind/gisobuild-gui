@@ -2345,7 +2345,9 @@ def build_environment_blockers() -> tuple[list[str], list[str]]:
     return blockers, warnings
 
 
-def planned_command_preview(payload: dict) -> str:
+def planned_command_preview(
+    payload: dict, already_excluded: frozenset[str] = frozenset()
+) -> str:
     """The gisobuild command this plan would run, for review before starting.
 
     Exactly what `create_job()` would execute, put through the same redaction
@@ -2355,7 +2357,11 @@ def planned_command_preview(payload: dict) -> str:
     omitted rather than turning a preview into an error.
     """
     try:
-        return command_preview(build_command(payload, "preview", stage=False))
+        return command_preview(
+            build_command(
+                payload, "preview", stage=False, already_excluded=already_excluded
+            )
+        )
     except Exception:  # noqa: BLE001 - a preview must never fail the plan
         return ""
 
@@ -2457,6 +2463,7 @@ def create_build_plan(payload: dict) -> dict:
         "component_conflicts": [],
     }
     selected: list[dict] = []
+    identifiers: list[str] = []
     profile = None
     iso_architectures: frozenset[str] = frozenset()
     identity_name, identity_from_metadata = iso_name, False
@@ -2496,11 +2503,29 @@ def create_build_plan(payload: dict) -> dict:
         try:
             selected = resolve_rpm_identifiers(identifiers)
             profile = validate_platform_options({**payload, "iso": identity_name})
+            # A file this automatic pipeline already excluded (with a proven
+            # reason: superseded via README, an unmet dependency, or a
+            # same-package version conflict resolve_component_conflicts()
+            # just decided) is not "missing" from its CSC's bundle - it was
+            # deliberately judged unnecessary. Without this, the bundle-
+            # completeness check below sees the exact same file gap and
+            # raises its own, contradictory "N of M required RPMs" blocker
+            # for a plan this pipeline already resolved (found against real
+            # Cisco RPMs: an eXR component conflict correctly dropped one
+            # file of a multi-component fix, then this check immediately
+            # re-blocked the plan over the very gap that drop explains).
+            # Manual selection is unaffected: recommendation["excluded"] is
+            # only ever populated by the automatic pipeline above.
+            already_explained = {
+                entry["name"] for entry in recommendation.get("excluded", [])
+            }
             compatibility = validate_smu_selection(
                 identity_name,
                 [item["basename"] for item in selected],
                 iso_architectures=iso_architectures,
-                full_candidate_packages=candidates,
+                full_candidate_packages=[
+                    name for name in candidates if name not in already_explained
+                ],
             )
             blockers.extend(compatibility["issues"])
             warnings.extend(compatibility["warnings"])
@@ -2637,7 +2662,22 @@ def create_build_plan(payload: dict) -> dict:
     return {
         "fingerprint": fingerprint,
         "inventory_revision": revision,
-        "generated_command": planned_command_preview(payload),
+        # Preview exactly what create_job() would run: the plan's own resolved
+        # identifiers (post add_superseded_exclusions()/
+        # exclude_unsatisfiable_packages()/resolve_component_conflicts()), not
+        # a re-derivation. build_command()'s own automatic_smu_selection
+        # branch calls recommend_smu_selection() alone - without those three
+        # steps - so previewing the raw payload could show packages this plan
+        # already excluded (verified against real Cisco RPMs: an eXR
+        # component conflict left both the dropped and kept versions in the
+        # preview command). create_job() avoids this the same way: it always
+        # turns automatic selection off and passes the plan's own selection.
+        "generated_command": planned_command_preview(
+            {**payload, "pkglist": identifiers, "automatic_smu_selection": False},
+            already_excluded=frozenset(
+                entry["name"] for entry in recommendation.get("excluded", [])
+            ),
+        ),
         "ready": not blockers,
         "iso": iso,
         "engine": profile["engine"] if profile else None,
@@ -3662,13 +3702,30 @@ def child_mount_args() -> list[str]:
     return args
 
 
-def build_command(payload: dict, job_id: str, *, stage: bool = True) -> list[str]:
+def build_command(
+    payload: dict,
+    job_id: str,
+    *,
+    stage: bool = True,
+    already_excluded: frozenset[str] = frozenset(),
+) -> list[str]:
     """The command a build runs, and (with stage=True) the repository it needs.
 
     stage=False builds the same gisobuild arguments without touching the disk
     or the Docker daemon, for showing an operator what a plan would run before
     they start it: no staged repository copy and no runner prefix, which the
     preview strips anyway (see command_preview()).
+
+    already_excluded names files an earlier automatic-selection pass already
+    excluded with a proven reason (superseded via README, an unmet
+    dependency, or a same-package version conflict resolve_component_conflicts()
+    resolved) - see the matching note in create_build_plan(). Pass it whenever
+    the pkglist here is that pass's own resolved output (create_job() and the
+    build preview both are), or its own bundle-completeness check re-flags a
+    gap this app itself already explained and resolved, for a plan the
+    operator was just told is ready (confirmed against real Cisco RPMs: an
+    eXR component conflict correctly resolved by create_build_plan() then
+    made /api/jobs reject the very plan /api/build-plan called ready).
     """
     if not stage:
         command = [str(TOOL / "src/gisobuild.py")]
@@ -3717,7 +3774,9 @@ def build_command(payload: dict, job_id: str, *, stage: bool = True) -> list[str
             identity_name,
             selected_names,
             iso_architectures=iso_architectures,
-            full_candidate_packages=candidates,
+            full_candidate_packages=[
+                name for name in candidates if name not in already_excluded
+            ],
         )
         issues = smu_check["issues"] + selection_integrity_blockers(selected_names)
         if issues:
@@ -5516,6 +5575,9 @@ def create_job():
             ), 409
         payload["pkglist"] = [item["id"] for item in plan["selected_packages"]]
         payload["automatic_smu_selection"] = False
+        already_excluded = frozenset(
+            entry["name"] for entry in plan.get("excluded_packages", [])
+        )
         job_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         with job_lock:
             if any(j["status"] in ACTIVE_JOB_STATUSES for j in jobs.values()):
@@ -5538,7 +5600,7 @@ def create_job():
                 "stages": [{"stage": "preflight", "started": preflight_started}],
             }
         try:
-            command = build_command(payload, job_id)
+            command = build_command(payload, job_id, already_excluded=already_excluded)
             cleanup_paths = build_cleanup_paths(payload, plan["selected_packages"])
         except ValueError as exc:
             with job_lock:

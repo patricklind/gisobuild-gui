@@ -3334,6 +3334,136 @@ class GisoWebTests(unittest.TestCase):
         )
         self.assertEqual(excluded["source"], "iso-metadata+rpm-filename")
 
+    def test_component_conflict_resolution_does_not_desync_plan_from_job_or_preview(
+        self,
+    ):
+        # Found against real, signed Cisco RPMs (docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md
+        # "SMUs that are incompatible with the rest of the selection"): a CSC
+        # providing 5 components lost 2 of them to newer, unrelated fixes via
+        # resolve_component_conflicts() - correct, matching gisobuild's own
+        # eXR behavior - but three things then disagreed about it:
+        # (1) the bundle-completeness check re-flagged the very gap that drop
+        #     already explained, blocking a plan resolve_component_conflicts()
+        #     had just resolved;
+        # (2) the build preview command listed *both* the dropped and the
+        #     kept version of each contested component, because it re-derived
+        #     selection through build_command()'s own bare
+        #     recommend_smu_selection() instead of previewing the plan's own
+        #     resolved output;
+        # (3) POST /api/jobs then rejected the exact plan POST /api/build-plan
+        #     had just called ready, for the same reason as (1).
+        losing_csc = "CSCtest00010"
+        winning_alpha_csc = "CSCtest00011"
+        winning_beta_csc = "CSCtest00012"
+        (self.data / "ncs5500-mini-x-25.1.2.iso").write_bytes(b"CD001 image")
+        kept_untouched = [
+            f"ncs5500-gamma-1.0.0.1-r2512.{losing_csc}.x86_64.rpm",
+            f"ncs5500-delta-1.0.0.1-r2512.{losing_csc}.x86_64.rpm",
+            f"ncs5500-epsilon-1.0.0.1-r2512.{losing_csc}.x86_64.rpm",
+        ]
+        dropped = [
+            f"ncs5500-alpha-1.0.0.1-r2512.{losing_csc}.x86_64.rpm",
+            f"ncs5500-beta-1.0.0.1-r2512.{losing_csc}.x86_64.rpm",
+        ]
+        kept_replacements = [
+            f"ncs5500-alpha-1.0.0.2-r2512.{winning_alpha_csc}.x86_64.rpm",
+            f"ncs5500-beta-1.0.0.2-r2512.{winning_beta_csc}.x86_64.rpm",
+        ]
+        for name in kept_untouched + dropped + kept_replacements:
+            (self.data / name).write_bytes(b"rpm")
+
+        def identity_for(path):
+            # Must reproduce the exact filename - rpm_filename_mismatch()
+            # reconstructs it from these fields and excludes the file at the
+            # active_rpm_names() screening stage on any mismatch.
+            match = module.RPM_COMPONENT.search(path.name)
+            return {
+                "identity": {
+                    "name": match.group("component"),
+                    "version": match.group("version"),
+                    "release": f"r2512.CSC{match.group('bug')}",
+                    "arch": "x86_64",
+                    "package_type": "smu",
+                    "vm_type": "host",
+                }
+            }
+
+        with (
+            patch.object(module, "is_iso9660_image", return_value=True),
+            patch.object(
+                module, "inspect_iso_architecture", return_value=frozenset({"x86_64"})
+            ),
+            patch.object(
+                module, "build_environment_blockers", side_effect=lambda: ([], [])
+            ),
+            patch.object(module, "GISO_RUNNER", "local"),
+            patch.object(module, "GISOBUILD_PYTHON", sys.executable),
+            patch("app.rpm_dependency_metadata", side_effect=identity_for),
+        ):
+            plan = self.client.post(
+                "/api/build-plan",
+                json={
+                    "iso": "ncs5500-mini-x-25.1.2.iso",
+                    "label": "CONFLICTPLAN",
+                    "automatic_smu_selection": True,
+                },
+            ).get_json()
+
+            self.assertTrue(plan["ready"], plan["blockers"])
+            self.assertFalse(
+                any(
+                    "required RPMs are selected" in blocker
+                    for blocker in plan["blockers"]
+                ),
+                plan["blockers"],
+            )
+            selected_basenames = {
+                item["basename"] for item in plan["selected_packages"]
+            }
+            self.assertEqual(
+                selected_basenames, set(kept_untouched + kept_replacements)
+            )
+            excluded_names = {entry["name"] for entry in plan["excluded_packages"]}
+            self.assertEqual(excluded_names, set(dropped))
+            self.assertTrue(
+                all(
+                    entry["status"] == "SUPERSEDED"
+                    for entry in plan["excluded_packages"]
+                    if entry["name"] in dropped
+                )
+            )
+
+            # (2): the previewed command must select exactly the plan's own
+            # resolved packages - never the ones it just excluded.
+            command = plan["generated_command"]
+            for name in dropped:
+                self.assertNotIn(name, command, command)
+            for name in kept_untouched + kept_replacements:
+                self.assertIn(name, command, command)
+
+            # (3): Start must accept the same plan Review just called ready.
+            with (
+                patch("app.run_job"),
+                patch("app.child_mount_args", return_value=[]),
+            ):
+                response = self.client.post(
+                    "/api/jobs",
+                    json={
+                        "iso": "ncs5500-mini-x-25.1.2.iso",
+                        "label": "CONFLICTPLAN",
+                        "automatic_smu_selection": True,
+                        "confirmed_plan_fingerprint": plan["fingerprint"],
+                    },
+                )
+            self.assertEqual(response.status_code, 202, response.get_json())
+            job = module.jobs[response.get_json()["id"]]
+            job_pkglist_basenames = {
+                Path(p).name for p in job["command"] if p.endswith(".rpm")
+            }
+            self.assertEqual(
+                job_pkglist_basenames, set(kept_untouched + kept_replacements)
+            )
+
     def test_build_plan_without_a_runnable_command_still_reports_its_blockers(self):
         with patch.object(
             module, "build_command", side_effect=RuntimeError("Docker is unreachable")

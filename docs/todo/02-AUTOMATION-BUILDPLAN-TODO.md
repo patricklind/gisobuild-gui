@@ -562,11 +562,86 @@ Never silently exclude without a reason.
       refreshed (1270 nodes, 2170 edges, 82 communities); diff reviewed, no
       unexpected architecture changes.
 
-      Not yet exercised: a real Cisco eXR SMU tar end-to-end (the unit tests
-      above use constructed `%{GROUP}` strings modeled on upstream's own
-      parser, not a real signed Cisco RPM) - see "RPM metadata" above for
-      the precedent of validating against real Cisco SMU tars before this is
-      considered fully proven.
+      **Real-content verification, 2026-09-18** (throwaway container and
+      Docker volumes; all 10 real NCS5500 25.1.2 SMU tars extracted
+      unmodified, licensed content removed afterwards): loaded all 20 real,
+      signed RPMs and got a genuine, previously-untested conflict shape -
+      `CSCwt13701` (7 components: dpa, dpa-fwding, fwding, infra,
+      iosxr-fwding, os, os-support) has two of its components (`infra`,
+      `iosxr-fwding`) also touched by later, unrelated fixes
+      (`CSCwu13268`/`CSCwv36143`/`CSCwv38342`), and none of these three CSCs
+      supersede each other via README `Full` notation, so the conflict
+      reaches `resolve_component_conflicts()` genuinely unresolved by the
+      earlier README-based path. `resolve_component_conflicts()` itself
+      correctly picked the highest real version each time (`ncs5500-infra`
+      1.0.0.8 over 1.0.0.3, `ncs5500-iosxr-fwding` 1.0.0.5 over 1.0.0.4 and
+      1.0.0.1, `ncs5500-routing` 1.0.0.3 over 1.0.0.2) - the port of
+      `compare_exr_rpm_labels()` is proven correct against real Cisco
+      version/release strings, not just the unit tests' constructed ones.
+
+      That same real run then surfaced three further, real defects this
+      exact conflict shape exposes (a CSC losing *more than one* of its
+      components to *different* other CSCs - the unit tests above only
+      covered losing exactly one):
+
+      1. **The bundle-completeness check re-blocked a plan
+         `resolve_component_conflicts()` had already resolved.**
+         `create_build_plan()`'s own `validate_smu_selection(...,
+         full_candidate_packages=candidates)` call passed the *raw* uploaded
+         RPM list, still containing the two files `resolve_component_conflicts()`
+         had just (correctly) dropped, so it re-derived "CSCwt13701 is a
+         multi-component fix; 5 of 7 required RPMs are selected" as a
+         blocker - contradicting the resolution that had just explained the
+         very same gap. Fixed: `full_candidate_packages` now excludes
+         whatever `recommendation["excluded"]` already explains, in
+         `create_build_plan()` and in `build_command()` (via a new
+         `already_excluded` parameter, populated from
+         `plan["excluded_packages"]`) - so a file this automatic pipeline has
+         already proven unnecessary is not "silently missing" to either
+         check. Manual selection is unaffected: `recommendation["excluded"]`
+         is only ever populated by the automatic pipeline.
+      2. **The build preview (`generated_command`) showed both the dropped
+         and the kept version of every contested component.** It re-derived
+         selection through `build_command()`'s own bare
+         `recommend_smu_selection()` call (no `add_superseded_exclusions()`/
+         `exclude_unsatisfiable_packages()`/`resolve_component_conflicts()`),
+         instead of previewing the plan's own already-resolved selection -
+         so the "gisobuild command this plan will run" named 17 packages
+         where the plan itself said 14. Fixed: `create_build_plan()` now
+         previews `{**payload, "pkglist": identifiers, "automatic_smu_selection":
+         False}` (the plan's own resolved identifiers), matching exactly what
+         `create_job()` already does for the real build.
+      3. **`POST /api/jobs` rejected the exact plan `POST /api/build-plan`
+         had just called `ready: true`** - the same stale-`full_candidate_packages`
+         defect as (1), reached through `build_command()`'s own copy of the
+         same check when `create_job()` calls it with the plan's resolved
+         pkglist. This is the same "review says ready, Start rejects it"
+         class of bug `build_command()`'s own docstring already warns
+         against for a different case. Fixed by the same `already_excluded`
+         threading as (1).
+
+         All three verified against the real RPMs before and after the fix:
+         before, `/api/build-plan` returned `ready: false` with the stale
+         blocker and a 17-package preview; `/api/jobs` returned 400
+         `"SMU compatibility check failed: CSCWT13701 is a multi-component
+         fix; 5 of 7 required RPMs are selected..."`. After, `/api/build-plan`
+         returns `ready: true`, a 14-package preview matching
+         `selected_packages` exactly, and `/api/jobs` accepts the identical
+         plan (202, job created) with exactly those 14 RPMs; the real
+         gisobuild run itself was left to complete separately (see below) so
+         this fix's own verification did not block on its full duration.
+         Regression test (synthetic, reproducing the real shape - one
+         CSC losing two different components to two different other CSCs):
+         `test_component_conflict_resolution_does_not_desync_plan_from_job_or_preview`
+         in `giso-webui/tests/test_app.py`, asserting all three of the above
+         together (plan readiness, preview-vs-selection agreement, and job
+         acceptance) so they cannot silently drift apart again. Full suite
+         green after the fix (339 unit/integration tests, 22 browser tests,
+         `ruff check` and `ruff format --check` clean).
+
+      Not yet exercised: an LNT-side equivalent (out of scope today per the
+      LNT section above - LNT filenames carry no CSC ID, so
+      `component_conflicts` cannot fire for an LNT selection).
 
       <details><summary>Superseded same-day: the rpmvercmp/Lua-eval plan (kept as a record, not a task list)</summary>
 
