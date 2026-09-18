@@ -405,14 +405,14 @@ Optional:
 
 ## Release automation
 
-- [ ] Automatic patch release on every green `main` push (raised by the
-      maintainer 2026-09-18, confirmed after clarifying: automatic tag and
-      release on every push, not only on request). Added
+- [ ] Automatic release on every green `main` push (raised by the maintainer
+      2026-09-18, confirmed after clarifying: automatic tag and release on
+      every push, not only on request). Added
       `.github/workflows/auto-release.yml`: triggers on the `CI` workflow's
       own `completed` event, filtered to `branches: [main]` and
       `conclusion == 'success'`, so a failed or skipped CI run creates no
-      tag. Computes the next patch version from the highest existing `v*`
-      tag (`git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1`,
+      tag. Computes the next version from the highest existing `v*` tag
+      (`git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1`,
       `v0.0.1` when none exist) and pushes only that new tag - it builds and
       publishes nothing itself. Pushing a `v*` tag is `release.yml`'s own,
       pre-existing trigger (unchanged), which re-runs the complete CI suite
@@ -422,17 +422,33 @@ Optional:
       completion for a `workflow_call`-reused `ci.yml` (e.g. `release.yml`'s
       own `verify` job) does not independently fire this trigger, so there is
       no risk of a release re-tagging itself.
-      Verified: `actionlint` clean on the new file; the version-increment
-      shell logic tested directly (`sort -V` correctly orders `v0.0.9` <
-      `v0.0.10` and `v0.1.0` above both; empty-tag-list case yields `v0.0.1`)
-      against a throwaway git history and against this repository's own real
-      tags (highest today: `v0.1.0` → computed next: `v0.1.1`). Not yet
-      observed firing on GitHub Actions (nothing is pushed from this
-      environment) - left unchecked until a real push confirms it tags and
-      releases as designed.
+      Versioning corrected same day (maintainer clarification): patch and
+      minor each roll over at 9 into the next component like an odometer,
+      not an unbounded patch counter - `v1.2.3` → `v1.2.4`, `v0.0.9` →
+      `v0.1.0`, `v0.9.9` → `v1.0.0`.
+      Minimum release interval added same day (maintainer clarification:
+      at least 1 hour between releases): a new "Check the minimum interval
+      since the last release" step reads the last release tag's own
+      creation time (`git for-each-ref refs/tags/<tag>
+      --format='%(creatordate:unix)'` - the tag's own timestamp, not the
+      commit it points at, since a tag can be pushed for an older commit)
+      and skips computing/pushing a new tag when under
+      `MIN_SECONDS_BETWEEN_RELEASES` (3600) have passed; several commits
+      landing within that hour get one release on the next push after it
+      passes, not one release each.
+      Verified: `actionlint` clean on the file; the version-arithmetic shell
+      logic tested directly against every stated case (`v0.0.9`→`v0.1.0`,
+      `v0.9.9`→`v1.0.0`, `v1.9.9`→`v2.0.0`, an ordinary `v1.2.3`→`v1.2.4`, no
+      existing tags→`v0.0.1`) and against this repository's own real tags
+      (highest today: `v0.1.0` → computed next: `v0.1.1`); the interval gate
+      tested against a throwaway git history for both a just-created tag
+      (`elapsed=0` → skips) and one backdated 2 hours
+      (`elapsed=7200` → proceeds). Not yet observed firing on GitHub Actions
+      (nothing is pushed from this environment) - left unchecked until a
+      real push confirms it tags and releases as designed.
       `docs/releasing.md` and `AGENTS.md`'s release rule updated; the manual
-      `workflow_dispatch` path is unchanged and remains how a deliberate
-      minor/major bump or pre-release is done.
+      `workflow_dispatch` path is unchanged and remains how to jump ahead of
+      where the automatic rollover would land, or publish a pre-release.
 
 ## Merge policy
 

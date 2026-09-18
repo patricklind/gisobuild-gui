@@ -5,17 +5,23 @@ Published versions are listed on the
 The current documentation follows `main`; use the matching Git tag when
 operating an older release.
 
-## Automatic patch releases
+## Automatic releases
 
 Every push to `main` that passes the full **CI** workflow is released
-automatically: the **Auto-tag release** workflow
+automatically, at most once per hour: the **Auto-tag release** workflow
 (`.github/workflows/auto-release.yml`) waits for CI to complete on that exact
-commit, computes the next patch version from the highest existing `v*` tag
-(for example `v1.2.3` → `v1.2.4`), and pushes that tag. It never builds or
-publishes anything itself; pushing the tag is what triggers the **Release**
-workflow below, which re-runs the complete CI suite against that commit a
-second time and only builds/publishes if that also passes - the same gate a
-manual release always went through. A failed or skipped CI run creates no tag
+commit, skips releasing if less than an hour has passed since the last
+release tag was created (several commits landing close together get one
+release, not one each - the next push after the hour passes releases
+everything accumulated since then), otherwise computes the next version from
+the highest existing `v*` tag and pushes that tag. Patch and minor each roll
+over at 9 into the next component, like an odometer, rather than counting
+patches without bound: `v1.2.3` → `v1.2.4`, `v0.0.9` → `v0.1.0`, `v0.9.9` →
+`v1.0.0`. It never builds or publishes anything itself; pushing the tag is
+what triggers the **Release** workflow below, which re-runs the complete CI
+suite against that commit a second time and only builds/publishes if that
+also passes - the same gate a manual release always went through. A failed or
+skipped CI run creates no tag
 and no release.
 
 The **Release** workflow builds `linux/amd64` and `linux/arm64` images,
@@ -30,12 +36,13 @@ outside the application images and must never be attached to a release. The
 default image contains only the open-source `ios-xr/gisobuild` tool at a pinned
 commit and SHA-256 manifest, never Cisco software images or packages.
 
-## Deliberate minor/major bumps and pre-releases
+## Deliberate out-of-sequence bumps and pre-releases
 
-A patch bump needs no action - it happens on the next push to `main`. For a
-minor or major version, or a pre-release, run the **Release** workflow
-manually before that automatic patch tag would otherwise land on the version
-you want to bump from:
+A normal release needs no action - it happens on the next push to `main`,
+including the automatic rollover into a new minor or major version. To jump
+ahead of where that rollover would naturally land (for example, releasing
+`v1.0.0` for an announcement before the version has actually counted up to
+it), or to publish a pre-release, run the **Release** workflow manually:
 
 1. Merge through a pull request with required CI checks passing. Trusted
    same-repository `codex/*` pull requests are squash-merged automatically

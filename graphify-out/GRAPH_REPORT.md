@@ -1,7 +1,7 @@
 # Graph Report - project  (2026-09-18)
 
 ## Corpus Check
-- 55 files · ~121,123 words
+- 55 files · ~121,649 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 16 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 3)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `9753fc65`
+- Built from commit: `414a11d4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -44,7 +44,7 @@
 - AGENTS.md
 - Path
 - AI Master Prompt — Cisco IOS-XR GISO Build Web UI
-- upload_complete
+- infer_platform
 - TODO — Concrete Bug Audit
 - TODO — Self-contained Docker Image
 - TODO — Automation, Inventory & BuildPlan
@@ -62,7 +62,7 @@
 - GisoBuildCapabilities
 - initialize_job_store
 - SelfContainedPackagingTests
-- command_preview
+- upload_complete
 - check_graphify_freshness.py
 - SyntheticBuildIntegrationTests
 - describe_package
@@ -84,7 +84,7 @@
 - .test_automatic_selection_leaves_out_fixes_that_cannot_install
 - P2 — Tooling reliability
 - compare_exr_rpm_labels
-- infer_platform
+- command_preview
 - upstream_gisobuild_file
 - platform_validation.py
 - Release process
@@ -206,9 +206,9 @@ Nodes (5): fake_disk_usage(), fake_disk_usage(), rmtree(), Path, skipUnless
 Cohesion: 0.11
 Nodes (18): AI Master Prompt — Cisco IOS-XR GISO Build Web UI, Artifacts and reproducibility, Automatic package handling, Beginner and advanced modes, BuildPlan, Capability-driven UI, Compatibility matrix, Completion criteria (+10 more)
 
-### Community 29 - "upload_complete"
-Cohesion: 0.43
-Nodes (7): archive_suffix(), extract_cisco_archive(), extraction_path(), The archive suffix a filename ends with (case-insensitive), or None., (stem, suffix) that keeps a multi-part archive suffix like ".tar.gz" intact., split_upload_name(), upload_complete()
+### Community 29 - "infer_platform"
+Cohesion: 0.25
+Nodes (3): _bundle_files_by_csc(), infer_platform(), Map each CSC bug ID to every candidate filename belonging to it. Mirrors…
 
 ### Community 31 - "TODO — Concrete Bug Audit"
 Cohesion: 0.13
@@ -258,9 +258,9 @@ Nodes (63): after_request, context_processor, errorhandler, get, activity(), arc
 Cohesion: 0.10
 Nodes (19): before_request, _check_gisobuild_source(), expire_upload_sessions(), forget_upload_session(), gisobuild_source_integrity(), initialize_job_store(), log_startup_self_test_once(), Remember where a workspace file came from (see file_provenance). (+11 more)
 
-### Community 52 - "command_preview"
-Cohesion: 0.50
-Nodes (4): command_preview(), planned_command_preview(), The gisobuild command this plan would run, for review before starting. Exactly…, Redacted, script-only view of the real build command for operator display.…
+### Community 52 - "upload_complete"
+Cohesion: 0.43
+Nodes (7): archive_suffix(), extract_cisco_archive(), extraction_path(), The archive suffix a filename ends with (case-insensitive), or None., (stem, suffix) that keeps a multi-part archive suffix like ".tar.gz" intact., split_upload_name(), upload_complete()
 
 ### Community 53 - "check_graphify_freshness.py"
 Cohesion: 0.50
@@ -338,9 +338,9 @@ Nodes (3): `gisobuild_commit()` silently returned null due to git's ownership ch
 Cohesion: 0.27
 Nodes (5): compare_exr_rpm_labels(), Compare two eXR RPMs' (version, release), the way gisobuild's own…, ExrRpmLabelCompareTests, compare_exr_rpm_labels() vs. the real pinned upstream algorithm. See…, Execute the real upstream functions from the pinned source itself. Deliberately…
 
-### Community 74 - "infer_platform"
-Cohesion: 0.25
-Nodes (3): _bundle_files_by_csc(), infer_platform(), Map each CSC bug ID to every candidate filename belonging to it. Mirrors…
+### Community 74 - "command_preview"
+Cohesion: 0.50
+Nodes (4): command_preview(), planned_command_preview(), The gisobuild command this plan would run, for review before starting. Exactly…, Redacted, script-only view of the real build command for operator display.…
 
 ### Community 76 - "upstream_gisobuild_file"
 Cohesion: 0.33
@@ -352,7 +352,7 @@ Nodes (12): capabilities_for_platform(), check_upgrade_matrix(), matrix_platform
 
 ### Community 78 - "Release process"
 Cohesion: 0.67
-Nodes (3): Automatic patch releases, Deliberate minor/major bumps and pre-releases, Release process
+Nodes (3): Automatic releases, Deliberate out-of-sequence bumps and pre-releases, Release process
 
 ### Community 80 - "terminate_process_group"
 Cohesion: 0.67
@@ -366,7 +366,7 @@ Nodes (3): Stop a local build and everything it started, leaving no orphans. Bui
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `validate_smu_selection()` connect `PlatformCompatibilityTests` to `recommend_smu_selection`, `infer_platform`, `platform_validation.py`, `IsoArchitectureInspectionTests`, `app.py`, `describe_package`, `Path`?**
+- **Why does `validate_smu_selection()` connect `PlatformCompatibilityTests` to `recommend_smu_selection`, `platform_validation.py`, `IsoArchitectureInspectionTests`, `app.py`, `describe_package`, `Path`, `infer_platform`?**
   _High betweenness centrality (0.194) - this node is a cross-community bridge._
 - **Why does `GisoWebTests` connect `GisoWebTests` to `PlatformCompatibilityTests`, `patch`, `.test_automatic_selection_leaves_out_fixes_that_cannot_install`, `.test_build_waits_for_tar_extraction_to_finish`, `IsoArchitectureInspectionTests`, `.test_component_conflict_resolution_does_not_desync_plan_from_job_or_preview`, `.test_discover_tolerates_file_removed_during_scan`, `._smu_fix`, `.upload`, `dict`, `.test_cisco_downloads_are_recorded_as_such_in_the_inventory`, `Path`?**
   _High betweenness centrality (0.179) - this node is a cross-community bridge._
