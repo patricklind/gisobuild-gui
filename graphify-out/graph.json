@@ -12121,7 +12121,7 @@
       "node_kind": "heading",
       "norm_label": "acceptance criteria",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L144"
+      "source_location": "L149"
     },
     {
       "id": "docs_todo_00_master_todo_final_operator_workflow",
@@ -12157,7 +12157,7 @@
       "node_kind": "heading",
       "norm_label": "immediate bug-fix priority",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L109"
+      "source_location": "L112"
     },
     {
       "id": "docs_todo_00_master_todo_major_workstreams",
@@ -12169,7 +12169,7 @@
       "node_kind": "heading",
       "norm_label": "major workstreams",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L78"
+      "source_location": "L80"
     },
     {
       "id": "docs_todo_00_master_todo_suggested_implementation_order",
@@ -12181,7 +12181,7 @@
       "node_kind": "heading",
       "norm_label": "suggested implementation order",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L128"
+      "source_location": "L131"
     },
     {
       "id": "gisobuild_guide_1_determine_the_platform_and_install_architecture",
@@ -27298,17 +27298,6 @@
     },
     {
       "source": "docs_todo_00_master_todo_gisobuild_gui_master_todo",
-      "target": "docs_todo_00_master_todo_immediate_bug_fix_priority",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L109",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_00_master_todo_gisobuild_gui_master_todo",
       "target": "docs_todo_00_master_todo_final_operator_workflow",
       "relation": "contains",
       "_origin": "ast",
@@ -27320,13 +27309,24 @@
     },
     {
       "source": "docs_todo_00_master_todo_gisobuild_gui_master_todo",
+      "target": "docs_todo_00_master_todo_immediate_bug_fix_priority",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/00-MASTER-TODO.md",
+      "source_location": "L112",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_00_master_todo_gisobuild_gui_master_todo",
       "target": "docs_todo_00_master_todo_suggested_implementation_order",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L128",
+      "source_location": "L131",
       "weight": 1.0
     },
     {
@@ -27337,7 +27337,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L144",
+      "source_location": "L149",
       "weight": 1.0
     },
     {
@@ -27348,7 +27348,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L78",
+      "source_location": "L80",
       "weight": 1.0
     },
     {
@@ -40024,5 +40024,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "cc5bd0b9a9bd93352f3cd62a9904dd9c95bffd56"
+  "built_at_commit": "0805df18ed0d30aee88a6651decdab1c71f65f3e"
 }

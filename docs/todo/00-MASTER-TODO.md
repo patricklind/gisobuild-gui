@@ -68,10 +68,12 @@ Core principle:
       remaining process-local-only state (see `04-STATE-SECURITY-OBSERVABILITY-TODO.md`).
 - [x] Run without `/var/run/docker.sock` — 2026-09-17: the self-contained
       deployment (`docker/selfcontained.Dockerfile`,
-      `giso-webui/compose.selfcontained.yaml`, `GISO_RUNNER=local`) built a
-      real NCS5500 25.1.2 Golden ISO with no socket, read-only root and only
-      `SYS_CHROOT`. The original socket deployment is still the documented
-      default (see `03-DOCKER-SELF-CONTAINED-TODO.md`).
+      `giso-webui/compose.yaml`, `GISO_RUNNER=local`) built a real NCS5500
+      25.1.2 Golden ISO with no socket, read-only root and only
+      `SYS_CHROOT`. 2026-09-18: this is now the documented default —
+      `compose.yaml` builds it directly, and the original socket deployment
+      moved to `giso-webui/compose.socket.yaml` as the explicit alternative
+      (see `03-DOCKER-SELF-CONTAINED-TODO.md`).
 - [x] Run without an external `.gisobuild-tool` checkout — same deployment:
       gisobuild is baked into the image at a pinned, verified commit.
 
@@ -88,8 +90,9 @@ Core principle:
 - [x] Unified automatic/manual selection engine (`02-AUTOMATION-BUILDPLAN-TODO.md`)
 - [x] Immutable BuildPlan
 - [x] Inventory revision + stale-state prevention
-- [ ] Self-contained Docker image — built and proven with a real eXR build;
-      open: LNT unexercised, non-root, default switch (source SHA-256 manifest done)
+- [ ] Self-contained Docker image — built, proven with real eXR builds, and
+      made the default deployment (source SHA-256 manifest and default
+      switch both done); open: LNT unexercised, non-root impossible for eXR
 - [x] GisoBuildRunner abstraction — `GISO_RUNNER` docker/local in
       `build_command()`/`run_job()`/`cancel_job()`, integration-tested for
       both and proven live for local
@@ -134,9 +137,11 @@ See `07-BUG-AUDIT-TODO.md` for detailed scenarios and required regression tests.
 - [x] Phase 4 — unified automatic/manual CSC selection
 - [x] Phase 5 — GisoBuildRunner abstraction
 - [x] Phase 6 — self-contained Docker image (real build proven)
-- [ ] Phase 7 — remove Docker socket/nested builder — possible and proven; the socket deployment is still the default
-      (to do: make our own image the default instead of
-      `ciscogisobuild/cisco-xr-gisobuild:2.3.4` - see `03-DOCKER-SELF-CONTAINED-TODO.md`)
+- [x] Phase 7 — remove Docker socket/nested builder — 2026-09-18: the
+      self-contained deployment is now the default (`compose.yaml`); the
+      socket deployment remains available as an explicit opt-in
+      (`compose.socket.yaml`, its builder image now pinned by digest) - see
+      `03-DOCKER-SELF-CONTAINED-TODO.md`
 - [ ] Phase 8 — persistent state/inventory DB
 - [ ] Phase 9 — UI simplification
 - [ ] Phase 10 — security/observability hardening
