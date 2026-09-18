@@ -11089,7 +11089,7 @@
       "node_kind": "heading",
       "norm_label": "cancellation",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L322"
+      "source_location": "L340"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_compose",
@@ -11101,7 +11101,7 @@
       "node_kind": "heading",
       "norm_label": "compose",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L387"
+      "source_location": "L405"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_developer_experience_acceptance_criteria",
@@ -11113,7 +11113,7 @@
       "node_kind": "heading",
       "norm_label": "developer experience acceptance criteria",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L400"
+      "source_location": "L418"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_docker_only_enforcement",
@@ -11161,7 +11161,7 @@
       "node_kind": "heading",
       "norm_label": "optional publishing",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L431"
+      "source_location": "L449"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_optional_stage_service_tooling",
@@ -11173,7 +11173,7 @@
       "node_kind": "heading",
       "norm_label": "optional stage / service \u2014 tooling",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L217"
+      "source_location": "L235"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_replace_nested_docker",
@@ -11185,7 +11185,7 @@
       "node_kind": "heading",
       "norm_label": "replace nested docker",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L252"
+      "source_location": "L270"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_reproducibility",
@@ -11197,7 +11197,7 @@
       "node_kind": "heading",
       "norm_label": "reproducibility",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L361"
+      "source_location": "L379"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_runtime_layout",
@@ -11209,7 +11209,7 @@
       "node_kind": "heading",
       "norm_label": "runtime layout",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L230"
+      "source_location": "L248"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_security",
@@ -11221,7 +11221,7 @@
       "node_kind": "heading",
       "norm_label": "security",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L284"
+      "source_location": "L302"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_stage_1_source",
@@ -11257,7 +11257,7 @@
       "node_kind": "heading",
       "norm_label": "stage 3 \u2014 application",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L208"
+      "source_location": "L226"
     },
     {
       "id": "docs_todo_03_docker_self_contained_todo_todo_self_contained_docker_image",
@@ -11281,7 +11281,7 @@
       "node_kind": "heading",
       "norm_label": "version endpoint",
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L346"
+      "source_location": "L364"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo",
@@ -27817,7 +27817,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L208",
+      "source_location": "L226",
       "weight": 1.0
     },
     {
@@ -27828,7 +27828,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L217",
+      "source_location": "L235",
       "weight": 1.0
     },
     {
@@ -27872,7 +27872,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L230",
+      "source_location": "L248",
       "weight": 1.0
     },
     {
@@ -27883,18 +27883,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L252",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_03_docker_self_contained_todo_todo_self_contained_docker_image",
-      "target": "docs_todo_03_docker_self_contained_todo_security",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L284",
+      "source_location": "L270",
       "weight": 1.0
     },
     {
@@ -27910,13 +27899,24 @@
     },
     {
       "source": "docs_todo_03_docker_self_contained_todo_todo_self_contained_docker_image",
+      "target": "docs_todo_03_docker_self_contained_todo_security",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
+      "source_location": "L302",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_03_docker_self_contained_todo_todo_self_contained_docker_image",
       "target": "docs_todo_03_docker_self_contained_todo_cancellation",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L322",
+      "source_location": "L340",
       "weight": 1.0
     },
     {
@@ -27927,7 +27927,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L346",
+      "source_location": "L364",
       "weight": 1.0
     },
     {
@@ -27938,7 +27938,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L361",
+      "source_location": "L379",
       "weight": 1.0
     },
     {
@@ -27949,7 +27949,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L387",
+      "source_location": "L405",
       "weight": 1.0
     },
     {
@@ -27960,7 +27960,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L400",
+      "source_location": "L418",
       "weight": 1.0
     },
     {
@@ -27971,7 +27971,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md",
-      "source_location": "L431",
+      "source_location": "L449",
       "weight": 1.0
     },
     {
@@ -40254,5 +40254,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "95a0487775aa50a6770ad47b39557df339a50191"
+  "built_at_commit": "be3dd8b9c13890847476e03f3fff986f837a8485"
 }

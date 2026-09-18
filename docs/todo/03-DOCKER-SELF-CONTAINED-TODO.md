@@ -204,6 +204,24 @@ Suggested stages:
       pinned `requirements.txt` for the app)
 - [ ] include all test/runtime utilities needed so the host never needs them -
       tests still run in the separate `giso-webui` / browser-test images.
+      **Investigated 2026-09-18 — recommend closing, achieved by a different,
+      better design than the literal wording assumed.** The stated goal is
+      "the host never needs them"; the literal wording assumed the way to get
+      there was baking test/lint/audit tooling into this same production
+      image. Instead the "Docker-only enforcement" section above (all items
+      checked) and "Optional Stage/Service — tooling" right below this one
+      achieve the identical goal through separate, purpose-built images
+      (`giso-webui` test image, `docker/browser-tests.Dockerfile`,
+      `docker/tooling.Dockerfile`) - every test, lint, audit, staging
+      rehearsal and Graphify run this session used one of those, never the
+      host and never the production `selfcontained.Dockerfile` image.
+      Deliberately so: bloating the production runtime image with pytest,
+      ruff, Playwright/Chromium etc. would make it larger and give it a wider
+      dependency/CVE surface for capabilities it never uses at runtime -
+      worse, not better, for a read-only, capability-dropped container. There
+      is nothing left for the host to need either way. Close this as "done,
+      via separate images" rather than leaving it looking like unfinished
+      work on the production image.
 
 ### Stage 3 — application
 
