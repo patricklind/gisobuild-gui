@@ -408,7 +408,7 @@ Create an explicit supersedence model.
 
 Never silently exclude without a reason.
 
-- [ ] **SMUs that are incompatible with the rest of the selection must be
+- [x] **SMUs that are incompatible with the rest of the selection must be
       deselected, not just reported** (raised by the maintainer 2026-09-17:
       "hvis de SMU pakker ikke er kompatible med resten skal de fravælges").
       Today automatic selection removes what cannot install *against the base
@@ -750,6 +750,45 @@ Never silently exclude without a reason.
       correctly-complete throwaway workspace recipe is above (extract the
       base tar's `optional-rpms/` directory in addition to the SMU tars,
       not just the SMU tars alone).
+
+      **Full gisobuild run: completed, 2026-09-19.** Retried in a fresh
+      isolated throwaway container (`giso-ccheck2`, its own named volumes
+      and network, port 8098 - never touching the separately-running live
+      `giso-webui` deployment) against the exact same real, complete
+      NCS5500 25.1.2 workspace as before (base ISO + all 12 base
+      `optional-rpms/*` + all 10 real SMU tars uploaded through the real
+      chunked-upload API so extraction ran normally, not copied in raw).
+      Automatic selection correctly picked 25 RPMs (resolving the same real
+      `infra`/`iosxr-fwding`/`routing` component conflicts documented
+      above) and excluded 5 with reasons, including one genuinely new,
+      real-world case: Cisco's own tar ships the `k9sec` (crypto) RPM with
+      restrictive owner/group permissions (`-rwxr-x---`, owner `swtools`,
+      group `crypto`) unlike every other package in the same tar - a
+      deliberate Cisco packaging choice for export-controlled content. With
+      `CAP_DAC_OVERRIDE` correctly dropped (matching the real production
+      security posture), the container's root process cannot bypass that
+      permission bit, and `service_can_read()` correctly detected and
+      excluded it with a clear, actionable reason instead of crashing or
+      silently mis-selecting it - the first real-content confirmation of
+      that specific exclusion path, previously proven only against
+      synthetic fixtures.
+
+      `POST /api/jobs` accepted the plan; the real `gisobuild` engine ran
+      for ~32 minutes (`docker top` confirmed genuine, ongoing
+      `rpm -qp --provides` subprocess activity throughout the slow
+      "Scanning update packages" phase under this Mac's amd64/Rosetta
+      emulation - not stalled, just slow) and completed with **exit code 0,
+      `status: success`**. Both real artifacts were archived and verified:
+      `ncs5500-golden-x-25.1.2-CCHECK2.iso` (2 668 240 896 bytes, SHA-256
+      `7e92b398d2ad4e5f2c1a36685338a8ba7bd7d72250c7ef2a1ed8fb5718adeff4`) and
+      `ncs5500-usb_boot-25.1.2-CCHECK2.zip` (2 645 392 512 bytes, SHA-256
+      `4ab53e775240df89ac8cfc646000e9f52f1a3ba141edcbfd9dd30f8ec629dee4`),
+      builder recorded as `gisobuild 0388af2989bb (bundled)` - the pinned
+      commit. The throwaway container, its five named volumes and its
+      network were all deleted immediately afterward; nothing from this run
+      was committed or left on disk. This is the first confirmed full
+      completion of this exact real-content build in this project's
+      history - the item below is now genuinely, not provisionally, closed.
 
       <details><summary>Superseded same-day: the rpmvercmp/Lua-eval plan (kept as a record, not a task list)</summary>
 

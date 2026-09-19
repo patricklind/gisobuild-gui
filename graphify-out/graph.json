@@ -12150,7 +12150,7 @@
       "node_kind": "heading",
       "norm_label": "automatic refresh",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L922"
+      "source_location": "L961"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_buildplan",
@@ -12162,7 +12162,7 @@
       "node_kind": "heading",
       "norm_label": "buildplan",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L839"
+      "source_location": "L878"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_buildplan_fingerprint",
@@ -12174,7 +12174,7 @@
       "node_kind": "heading",
       "norm_label": "buildplan fingerprint",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L869"
+      "source_location": "L908"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_canonical_inventory",
@@ -12234,7 +12234,7 @@
       "node_kind": "heading",
       "norm_label": "inventory revision",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L893"
+      "source_location": "L932"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_iso_inspection",
@@ -12258,7 +12258,7 @@
       "node_kind": "heading",
       "norm_label": "preflight",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L965"
+      "source_location": "L1004"
     },
     {
       "id": "docs_todo_02_automation_buildplan_todo_rpm_inspection",
@@ -12318,7 +12318,7 @@
       "node_kind": "heading",
       "norm_label": "unified selection engine",
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L811"
+      "source_location": "L850"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo",
@@ -28904,6 +28904,17 @@
     },
     {
       "source": "docs_todo_02_automation_buildplan_todo_todo_automation_inventory_buildplan",
+      "target": "docs_todo_02_automation_buildplan_todo_preflight",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
+      "source_location": "L1004",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_todo_02_automation_buildplan_todo_todo_automation_inventory_buildplan",
       "target": "docs_todo_02_automation_buildplan_todo_rpm_inspection",
       "relation": "contains",
       "_origin": "ast",
@@ -28987,7 +28998,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L811",
+      "source_location": "L850",
       "weight": 1.0
     },
     {
@@ -28998,7 +29009,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L839",
+      "source_location": "L878",
       "weight": 1.0
     },
     {
@@ -29009,7 +29020,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L869",
+      "source_location": "L908",
       "weight": 1.0
     },
     {
@@ -29020,7 +29031,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L893",
+      "source_location": "L932",
       "weight": 1.0
     },
     {
@@ -29031,18 +29042,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L922",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_todo_02_automation_buildplan_todo_todo_automation_inventory_buildplan",
-      "target": "docs_todo_02_automation_buildplan_todo_preflight",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/todo/02-AUTOMATION-BUILDPLAN-TODO.md",
-      "source_location": "L965",
+      "source_location": "L961",
       "weight": 1.0
     },
     {
@@ -42153,5 +42153,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "f765ea20dfa14b0b66dd63983ef0730705933fbc"
+  "built_at_commit": "f8616b2f2c5a236b07b84955fdd97ef17102bf04"
 }
