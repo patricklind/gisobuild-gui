@@ -10653,7 +10653,7 @@
       "node_kind": "heading",
       "norm_label": "release safety",
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L70"
+      "source_location": "L79"
     },
     {
       "id": "release_notes_unreleased",
@@ -10677,7 +10677,7 @@
       "node_kind": "heading",
       "norm_label": "validation status",
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L59"
+      "source_location": "L68"
     },
     {
       "id": "security_deployment_boundary",
@@ -10797,7 +10797,7 @@
       "node_kind": "heading",
       "norm_label": "smu compatibility checks",
       "source_file": "docs/platform-support.md",
-      "source_location": "L45"
+      "source_location": "L58"
     },
     {
       "id": "docs_platform_support_source_of_truth",
@@ -10809,7 +10809,7 @@
       "node_kind": "heading",
       "norm_label": "source of truth",
       "source_file": "docs/platform-support.md",
-      "source_location": "L82"
+      "source_location": "L95"
     },
     {
       "id": "scripts_coord_sh__entry",
@@ -28420,7 +28420,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/platform-support.md",
-      "source_location": "L45",
+      "source_location": "L58",
       "weight": 1.0
     },
     {
@@ -28442,7 +28442,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/platform-support.md",
-      "source_location": "L82",
+      "source_location": "L95",
       "weight": 1.0
     },
     {
@@ -34184,7 +34184,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L59",
+      "source_location": "L68",
       "weight": 1.0
     },
     {
@@ -34195,7 +34195,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "RELEASE_NOTES.md",
-      "source_location": "L70",
+      "source_location": "L79",
       "weight": 1.0
     },
     {
@@ -42036,5 +42036,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "9ca87327c20a1666615c667accfbbfd6bf3c4da4"
+  "built_at_commit": "6842bd48c53f2c6901c6459f4ef4707efe969d08"
 }

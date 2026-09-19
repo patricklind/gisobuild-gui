@@ -36,8 +36,21 @@ result in the build log and the platform recovery guide.
 ## Option rules
 
 - `--migration` is accepted only for ASR 9000 eXR images.
-- `--full-iso` is accepted only for IOS XRv 9000.
-- `--x86-only`, `--optimize`, and boot scripts are eXR options.
+- `--full-iso` is accepted only for IOS XRv 9000, and only in a deployment
+  whose bundled gisobuild build registers it in the first place (see below).
+- `--x86-only` and boot scripts are eXR options.
+- `--optimize`/`--full-iso` are further gated by the deployment itself, not
+  only by platform: `gisobuild.py` only registers either flag when a
+  directory it calls `exr` exists two levels above wherever it runs from -
+  something upstream expects to come from Cisco's own separate builder
+  image. Confirmed directly against the real self-contained image (the
+  default deployment): that directory is never created there, so neither
+  flag exists at all - the UI never offers them, and selecting one anyway
+  fails with "needs gisobuild's optional eXR extension, which this
+  deployment's bundled gisobuild build does not include" rather than the
+  ordinary platform-mismatch message. The socket deployment's externally
+  supplied builder image has not been inspected for this directory, so it
+  still assumes both are available there, as before.
 - package removal, PID filtering, bridging-fix clearing, and verbose dependency
   controls are IOS XR7/LNT options.
 - An unrecognized filename requires an explicit platform selection.

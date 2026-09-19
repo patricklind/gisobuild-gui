@@ -3,7 +3,7 @@
 Published releases and generated change logs are available on the
 [GitHub Releases page](https://github.com/patricklind/gisobuild-gui/releases).
 The latest published version is
-[v0.0.6](https://github.com/patricklind/gisobuild-gui/releases/tag/v0.0.6).
+[v0.1.1](https://github.com/patricklind/gisobuild-gui/releases/tag/v0.1.1).
 
 ## Unreleased
 
@@ -55,6 +55,15 @@ The latest published version is
   and which check decided it.
 - CI adds real-browser tests, synthetic build integration tests, platform
   fixtures, flake8-bandit rules, Trivy scans, an SBOM and a Docker-only guard.
+- Every green push to `main` is now released automatically, at most once per
+  hour, with odometer-style versioning (`v0.0.9` → `v0.1.0`, `v0.9.9` →
+  `v1.0.0`). A weekly check detects when the bundled `ios-xr/gisobuild` commit
+  falls behind upstream. Fixed a bug found by inspecting the real release
+  history: the automatic tagger originally pushed its tag using the default
+  `GITHUB_TOKEN`, which GitHub does not allow to trigger further workflow
+  runs, so no release actually published anything until a maintainer noticed
+  and stepped in by hand; it now dispatches the release workflow directly
+  instead.
 
 ## Validation status
 
