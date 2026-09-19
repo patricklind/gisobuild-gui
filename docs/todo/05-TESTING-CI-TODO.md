@@ -580,10 +580,19 @@ Optional:
         `validate` job's existing "tag already exists" check remains the
         guard against double-tagging. Requires `permissions: actions: write`
         in addition to `contents: read` (added). `actionlint` clean.
-      - Not yet directly observed succeeding end-to-end on a real push
-        (this fix has not yet had a real CI-success-on-main cycle to prove
-        itself) - left unchecked until the next automatic release actually
-        produces a `release.yml` run, not just a tag.
+      - Pushed and watched live, 2026-09-19: the fix commit's own CI run
+        passed, and the resulting `auto-release.yml` run correctly found
+        `v0.1.3` (itself an orphaned tag from the *old*, still-broken code,
+        created minutes earlier for a prior commit's CI success) as the
+        latest tag, correctly read its real creation time
+        (`2026-09-19T08:28:49Z`), correctly computed only ~15 minutes had
+        elapsed, and correctly skipped both "Compute the next version" and
+        "Dispatch the Release workflow" rather than firing early - the
+        interval gate itself is proven correct against real tag data. The
+        dispatch step itself has not yet had a chance to run (nothing has
+        gone a full hour since `v0.1.3` yet) - left unchecked until a
+        dispatched `release.yml` run is observed for a version this fix
+        computed itself, not just the gate that decides whether to.
 
 ## Merge policy
 
