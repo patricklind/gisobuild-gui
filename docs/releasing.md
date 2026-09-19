@@ -14,15 +14,27 @@ commit, skips releasing if less than an hour has passed since the last
 release tag was created (several commits landing close together get one
 release, not one each - the next push after the hour passes releases
 everything accumulated since then), otherwise computes the next version from
-the highest existing `v*` tag and pushes that tag. Patch and minor each roll
-over at 9 into the next component, like an odometer, rather than counting
-patches without bound: `v1.2.3` → `v1.2.4`, `v0.0.9` → `v0.1.0`, `v0.9.9` →
-`v1.0.0`. It never builds or publishes anything itself; pushing the tag is
-what triggers the **Release** workflow below, which re-runs the complete CI
-suite against that commit a second time and only builds/publishes if that
-also passes - the same gate a manual release always went through. A failed or
-skipped CI run creates no tag
-and no release.
+the highest existing `v*` tag and asks the **Release** workflow below to run
+with it. Patch and minor each roll over at 9 into the next component, like an
+odometer, rather than counting patches without bound: `v1.2.3` → `v1.2.4`,
+`v0.0.9` → `v0.1.0`, `v0.9.9` → `v1.0.0`. It never builds or publishes
+anything itself and creates no tag directly - it dispatches the Release
+workflow's own `workflow_dispatch` trigger, which re-runs the complete CI
+suite against `main` and only creates the tag and builds/publishes if that
+also passes, exactly the same path a manual release already went through. A
+failed or skipped CI run creates no tag and no release.
+
+**Why a dispatch, not a direct tag push (fixed 2026-09-19):** the first
+version of this workflow pushed the tag itself using the default
+`GITHUB_TOKEN`. GitHub does not let events triggered by `GITHUB_TOKEN`
+trigger further workflow runs (this prevents infinite loops), so that tag
+push never actually started the Release workflow - the tag existed on
+GitHub, but nothing was ever built, published, or released for it. This
+went undetected for several releases because a human noticed the missing
+release and created it by hand from the GitHub UI, so a bare, asset-less
+release appeared to exist. Explicitly dispatching the Release workflow is a
+direct API call, not an automatically cascaded event, so it is not subject
+to the same restriction.
 
 The **Release** workflow builds `linux/amd64` and `linux/arm64` images,
 publishes the `linux/amd64` default image as the `<version>` and `latest`

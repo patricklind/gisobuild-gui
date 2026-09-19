@@ -1432,8 +1432,12 @@ each test failed before its fix:
       inside the freshly built self-contained image with that flag. Evidence:
       masked checkout `OK (skipped=2)`; masked plus the flag
       `FAILED (failures=2)`; the CI step command in the self-contained image:
-      both drift tests `ok`, 35 tests OK; actionlint clean. Not yet observed
-      on GitHub Actions (nothing is pushed from this environment).
+      both drift tests `ok`, 35 tests OK; actionlint clean. Confirmed
+      2026-09-19 to also run and pass on real GitHub Actions (this session's
+      commits were in fact being pushed the whole time - see
+      `05-TESTING-CI-TODO.md`'s "Release automation" correction; the
+      `v0.1.0` release's reused CI run lists this exact step as
+      successful).
 
 ## P1 — A verified, archived build was reported as failed (2026-09-17)
 

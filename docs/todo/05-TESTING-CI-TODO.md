@@ -389,8 +389,15 @@ Run (`.github/workflows/ci.yml`):
       a clean checkout".
 - [x] JS/DOM tests — "Run browser tests (Playwright/Chromium in Docker)"
       step in `.github/workflows/ci.yml` (added 2026-09-17; actionlint and
-      hadolint pass locally in their containers). Not yet observed running
-      on GitHub Actions - nothing is pushed from this environment.
+      hadolint pass locally in their containers). **Corrected 2026-09-19:**
+      earlier notes in this file claiming CI/release automation was "not yet
+      observed on GitHub Actions" because "nothing is pushed from this
+      environment" were wrong - this session's commits were in fact being
+      pushed to the real `origin/main` throughout (confirmed via `git
+      reflog`: every commit shows `update by push`). Checked the real
+      GitHub Actions history directly: this step, and the rest of `ci.yml`,
+      have run and passed repeatedly on real GitHub Actions (e.g. the
+      `v0.1.0` release's reused CI run, 2026-09-17).
 - [x] lint — `ruff check` step, now running a pinned `ruff==0.16.7` from
       `docker/tooling.Dockerfile` (fixed 2026-09-16; previously an unpinned
       `pip install ruff` — see "`ruff` is installed unpinned in CI" in
@@ -448,8 +455,9 @@ Run (`.github/workflows/ci.yml`):
       runs pinned `anchore/syft:v1.33.0` against `giso-webui-giso-webui` and
       uploads `giso-webui.spdx.json` as a CI artifact. Run locally the same
       way: 92 packages, including `flask`, `gunicorn`, `click`, `rpm`,
-      `cdrkit` and `docker-cli`. actionlint passes; not yet observed on
-      GitHub Actions (nothing is pushed from this environment).
+      `cdrkit` and `docker-cli`. actionlint passes; confirmed 2026-09-19 to
+      also run successfully on real GitHub Actions (see the correction
+      above - commits were being pushed the whole time).
 - [x] Graphify freshness validation for code-changing PRs
 
 Steps that exist but weren't listed here at all: `actionlint` (workflow
@@ -517,12 +525,65 @@ Optional:
       (highest today: `v0.1.0` → computed next: `v0.1.1`); the interval gate
       tested against a throwaway git history for both a just-created tag
       (`elapsed=0` → skips) and one backdated 2 hours
-      (`elapsed=7200` → proceeds). Not yet observed firing on GitHub Actions
-      (nothing is pushed from this environment) - left unchecked until a
-      real push confirms it tags and releases as designed.
+      (`elapsed=7200` → proceeds).
       `docs/releasing.md` and `AGENTS.md`'s release rule updated; the manual
       `workflow_dispatch` path is unchanged and remains how to jump ahead of
       where the automatic rollover would land, or publish a pre-release.
+
+      **Corrected 2026-09-19 - real, previously-undiscovered bug found and
+      fixed.** This item, and several others in this file, were left
+      unchecked with notes like "not yet observed on GitHub Actions - nothing
+      is pushed from this environment." That premise was wrong: `git reflog`
+      shows every commit this session was actually pushed to the real
+      `origin/main` (`update by push`), something this session had
+      consistently, incorrectly told the maintainer had not happened.
+      Checking the real GitHub state directly (`git ls-remote`, the public
+      GitHub API, and an anonymous GHCR pull-token) found:
+      - Real tags exist through `v0.1.2` and 10 GitHub Releases exist
+        (`v0.0.2`-`v0.1.1`), spanning back to 2026-09-12 - predating this
+        session's auto-release work entirely for the earliest ones.
+      - `release.yml`'s own workflow-run history: **every single run has
+        failed**, back to `v0.0.1`. For `v0.1.0` specifically, the failure
+        was isolated to exactly one step: `validate`, the full reused CI
+        suite (`verify`), and both `docker/build-push-action@v6` image
+        builds (socket and default images) all **succeeded** - only the
+        final `gh release create` step failed. Confirmed via an anonymous
+        GHCR pull token that the real images (`v0.1.0`, `v0.1.0-socket`,
+        `latest`, `latest-socket`, plus earlier versions) genuinely exist in
+        the registry with provenance/attestation manifests - the core
+        publish pipeline was never broken.
+      - `v0.1.1` and `v0.1.2` (the two tags this session's
+        `auto-release.yml` itself created) have **no `release.yml` run at
+        all** and are absent from the GHCR tag list - nothing was ever
+        built or published for them. `v0.1.1`'s GitHub Release exists only
+        because a human (the maintainer) created it manually afterward, with
+        no attached assets.
+      - Root cause: the original `auto-release.yml` pushed the tag itself
+        using the default `GITHUB_TOKEN`
+        (`git push origin refs/tags/$RELEASE_TAG`). GitHub explicitly
+        documents that events triggered by `GITHUB_TOKEN` do not trigger
+        further workflow runs, specifically to prevent infinite loops - so
+        that tag push never fired `release.yml`'s `on: push: tags: ["v*"]`
+        trigger. The tag object was created; nothing downstream of it ever
+        ran. Earlier tags (through `v0.1.0`) had working `release.yml` runs
+        because a human pushed them directly with their own credentials, not
+        through this workflow.
+      - Fix: `auto-release.yml` no longer pushes a tag itself. It computes
+        the version exactly as before, then runs
+        `gh workflow run release.yml --ref main -f version="$TAG" -f
+        prerelease=false` - an explicit, direct API dispatch of
+        `release.yml`'s own already-proven-working `workflow_dispatch`
+        trigger, which is not subject to the GITHUB_TOKEN restriction
+        because it is a deliberate call, not an automatically cascaded
+        event. `release.yml`'s own `create-tag` job (unchanged) creates the
+        tag exactly as it already does for a manual release, and its
+        `validate` job's existing "tag already exists" check remains the
+        guard against double-tagging. Requires `permissions: actions: write`
+        in addition to `contents: read` (added). `actionlint` clean.
+      - Not yet directly observed succeeding end-to-end on a real push
+        (this fix has not yet had a real CI-success-on-main cycle to prove
+        itself) - left unchecked until the next automatic release actually
+        produces a `release.yml` run, not just a tag.
 
 ## Merge policy
 

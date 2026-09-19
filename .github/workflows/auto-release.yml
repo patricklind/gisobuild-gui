@@ -1,19 +1,40 @@
 name: Auto-tag release
 
 # Every push to main that passes CI is automatically released, at most once
-# per hour: this workflow only computes the next version and pushes that tag.
-# Patch and minor each roll over at 9 into the next component (v0.0.9 ->
-# v0.1.0, v0.9.9 -> v1.0.0), not an unbounded patch counter. It never builds
-# or publishes anything itself - pushing a "v*" tag is release.yml's own,
-# pre-existing trigger (docs/releasing.md), which re-runs the full CI suite
-# against that exact commit and only builds/publishes if that passes too, the
-# same gate a manual `workflow_dispatch` release already goes through. This
-# workflow adds no new publishing path, only removes the manual "Run
-# workflow" step for an ordinary release.
+# per hour: this workflow only computes the next version and asks
+# release.yml to do the rest. Patch and minor each roll over at 9 into the
+# next component (v0.0.9 -> v0.1.0, v0.9.9 -> v1.0.0), not an unbounded patch
+# counter.
+#
+# Fixed 2026-09-19 (found by inspecting real GitHub Actions/GHCR state, not
+# assumed): this workflow originally pushed the tag itself with
+# `git push origin refs/tags/$RELEASE_TAG`, using the default GITHUB_TOKEN.
+# GitHub explicitly documents that events triggered by GITHUB_TOKEN do not
+# trigger other workflow runs (to avoid infinite loops) - so that tag push
+# never fired release.yml's `on: push: tags: ["v*"]` trigger. The tag object
+# was created on GitHub (confirmed: v0.1.1/v0.1.2 exist as real tags), but
+# nothing ever built or published anything for it, and no GitHub Release was
+# created automatically - v0.1.1's release existed only because a human
+# manually created it afterward. Earlier tags (through v0.1.0) worked because
+# they were pushed by a human, not by this workflow.
+#
+# Fix: explicitly dispatch release.yml's own, already-proven-working
+# `workflow_dispatch` trigger (confirmed working end-to-end for v0.1.0:
+# validate, the full reused CI suite, and both image builds all succeeded)
+# instead of pushing a tag ourselves. `gh workflow run` is a direct,
+# intentional API call, not an automatically-cascaded git event, so it is not
+# subject to the same GITHUB_TOKEN restriction. release.yml's own
+# `create-tag` job then creates the tag exactly as it already does for a
+# manual release, and its own `validate` job's "does this tag already exist"
+# check protects against ever double-tagging.
+#
+# This workflow still adds no new publishing path and duplicates no publish
+# logic - it only replaces the manual "Run workflow" click for an ordinary
+# release with an automatic decision of when and what version to run it with.
 #
 # A deliberate out-of-sequence bump or a pre-release still uses the existing
-# manual `workflow_dispatch` trigger on release.yml; do that before the next
-# push to main advances the auto version past it, or afterwards.
+# manual `workflow_dispatch` trigger on release.yml directly; do that before
+# the next push to main advances the auto version past it, or afterwards.
 
 on:
   workflow_run:
@@ -22,7 +43,8 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
+  actions: write
 
 concurrency:
   group: auto-tag-release
@@ -55,9 +77,9 @@ jobs:
             echo "ok=true" >>"$GITHUB_OUTPUT"
           else
             # The tag's own creation time, not the commit it points at - a
-            # tag can be pushed for an older commit (as this workflow does),
-            # so the commit's own timestamp would not reflect when the last
-            # release actually happened.
+            # tag can be pushed for an older commit (as release.yml's
+            # create-tag job does), so the commit's own timestamp would not
+            # reflect when the last release actually happened.
             last_epoch=$(git for-each-ref "refs/tags/$latest" --format='%(creatordate:unix)')
             elapsed=$(( $(date +%s) - last_epoch ))
             if ((elapsed < MIN_SECONDS_BETWEEN_RELEASES)); then
@@ -95,13 +117,11 @@ jobs:
           fi
           echo "Latest release: ${latest:-none}; next: $next"
           echo "tag=$next" >>"$GITHUB_OUTPUT"
-      - name: Create and push the release tag
+      - name: Dispatch the Release workflow for the computed version
         if: steps.interval.outputs.ok == 'true'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$RELEASE_TAG" -m "GISO Builder $RELEASE_TAG"
-          git push origin "refs/tags/$RELEASE_TAG"
+          gh workflow run release.yml --ref main -f version="$RELEASE_TAG" -f prerelease=false

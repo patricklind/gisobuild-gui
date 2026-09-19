@@ -11511,7 +11511,7 @@
       "node_kind": "heading",
       "norm_label": "p1 \u2014 a verified, archived build was reported as failed (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1438"
+      "source_location": "L1442"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_automatic_selection_kept_packages_it_had_proven_cannot_install_2026_09_17",
@@ -11595,7 +11595,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 ui defects seen in the live deployment (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1459"
+      "source_location": "L1463"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p3_cisco_download_hardening_residual_deferred",
@@ -11619,7 +11619,7 @@
       "node_kind": "heading",
       "norm_label": "required regression-test additions",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1480"
+      "source_location": "L1484"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_todo_concrete_bug_audit",
@@ -12471,7 +12471,7 @@
       "node_kind": "heading",
       "norm_label": "graphify ci guard",
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L474"
+      "source_location": "L482"
     },
     {
       "id": "docs_todo_05_testing_ci_todo_integration_test",
@@ -12495,7 +12495,7 @@
       "node_kind": "heading",
       "norm_label": "merge policy",
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L527"
+      "source_location": "L588"
     },
     {
       "id": "docs_todo_05_testing_ci_todo_regression_tests",
@@ -12519,7 +12519,7 @@
       "node_kind": "heading",
       "norm_label": "release automation",
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L480"
+      "source_location": "L488"
     },
     {
       "id": "docs_todo_05_testing_ci_todo_representative_platform_fixtures",
@@ -15656,7 +15656,7 @@
       "node_kind": "heading",
       "norm_label": "deliberate out-of-sequence bumps and pre-releases",
       "source_file": "docs/releasing.md",
-      "source_location": "L39"
+      "source_location": "L51"
     },
     {
       "id": "docs_releasing_release_process",
@@ -28475,7 +28475,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/releasing.md",
-      "source_location": "L39",
+      "source_location": "L51",
       "weight": 1.0
     },
     {
@@ -29388,7 +29388,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L474",
+      "source_location": "L482",
       "weight": 1.0
     },
     {
@@ -29399,7 +29399,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L480",
+      "source_location": "L488",
       "weight": 1.0
     },
     {
@@ -29410,7 +29410,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L527",
+      "source_location": "L588",
       "weight": 1.0
     },
     {
@@ -30026,7 +30026,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1438",
+      "source_location": "L1442",
       "weight": 1.0
     },
     {
@@ -30037,7 +30037,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1459",
+      "source_location": "L1463",
       "weight": 1.0
     },
     {
@@ -30048,7 +30048,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1480",
+      "source_location": "L1484",
       "weight": 1.0
     },
     {
@@ -42036,5 +42036,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "86cc487841e39d9ce9691821ee4a3d83ef6fe212"
+  "built_at_commit": "a4f53716211a2d5c9733a7890f2cbbdc8544a089"
 }
