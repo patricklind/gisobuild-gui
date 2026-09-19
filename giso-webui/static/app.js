@@ -1413,13 +1413,21 @@ $('#close-guide').onclick = () => $('#upgrade-guide').close();
 $('#close-rollback-guide').onclick = () => $('#rollback-guide').close();
 $('#guide-family').onchange = updateGuideWorkflow;
 $('#rollback-family').onchange = updateRollbackWorkflow;
+// `pre:not([hidden])` only inspects each <pre>'s own attribute; steps like
+// #rollback-abort-step hide their <pre> by setting `hidden` on the
+// containing <li>, which that selector cannot see. Checking for a hidden
+// ancestor is what actually matches what the guide shows on screen.
+function visibleGuideCommands(dialog) {
+  return [...dialog.querySelectorAll('pre')]
+    .filter(pre => !pre.closest('[hidden]'))
+    .map(pre => pre.textContent)
+    .join('\n\n');
+}
 $('#copy-guide').onclick = async () => {
-  const commands=[...$('#upgrade-guide').querySelectorAll('pre')].map(pre=>pre.textContent).join('\n\n');
-  await copyText(commands, $('#copy-guide'), 'Copy commands');
+  await copyText(visibleGuideCommands($('#upgrade-guide')), $('#copy-guide'), 'Copy commands');
 };
 $('#copy-rollback-guide').onclick = async () => {
-  const commands=[...$('#rollback-guide').querySelectorAll('pre:not([hidden])')].map(pre=>pre.textContent).join('\n\n');
-  await copyText(commands, $('#copy-rollback-guide'), 'Copy rollback commands');
+  await copyText(visibleGuideCommands($('#rollback-guide')), $('#copy-rollback-guide'), 'Copy rollback commands');
 };
 $('#cleanup').onclick = async () => {
   if (!await showConfirmation('Clear workspace files?', 'Remove all uploaded source files, partial uploads, build working files, and raw output?\n\nCompleted ISO and USB files in the GISO Archive will be kept.', 'Clear workspace', true)) return;

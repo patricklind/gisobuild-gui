@@ -837,6 +837,41 @@ own default value, then that a real build-preview command contains neither
 console error never fires). Full suite green (382 unit tests, 28 browser
 tests), ruff and `ruff format --check` clean.
 
+### "Copy rollback commands" copied a command from a rollback step the guide had just hidden (found 2026-09-19, live UI check)
+
+Found by opening the Rollback guide dialog in another fresh, isolated
+throwaway instance and switching through its "Rollback workflow" dropdown -
+an area no earlier session had exercised.
+
+`updateRollbackWorkflow()` in `static/app.js` hides the "Abort an
+un-applied package request when appropriate" step for the eXR and legacy
+rollback families by setting `hidden` on the step's `<li id="rollback-abort-step">`,
+not on the `<pre id="rollback-abort">` command inside it - and the on-screen
+guide correctly stops showing that step. But `#copy-rollback-guide`'s click
+handler collected commands with the CSS selector `pre:not([hidden])`, which
+only inspects each `<pre>`'s own `hidden` attribute and has no notion of a
+hidden ancestor. It kept matching `#rollback-abort`, so clicking "Copy
+rollback commands" while "IOS XR 64-bit / eXR rollback" was selected copied
+`install package abort latest` - a real, state-changing router command -
+into the middle of a command sequence the visible guide never showed for
+that workflow. (The sibling `#copy-guide` handler for the upgrade guide
+happened not to have this problem: its one conditionally-hidden `<pre
+id="guide-apply">` is hidden on the element itself, and its text is always
+cleared to `''` in the same code path that hides it, so no stale content
+could leak through - but it relied on that coincidence rather than on the
+selector being correct.)
+
+Fixed by replacing both handlers' collection logic with a shared
+`visibleGuideCommands()` helper that filters with
+`!pre.closest('[hidden]')` - matching a hidden ancestor, not just the
+`<pre>` itself - so copied text can never diverge from what the dialog
+currently shows. Verified with a new browser test,
+`test_rollback_guide_copy_excludes_a_step_hidden_for_the_selected_workflow`,
+confirmed to fail against the unfixed selector (clipboard text contained
+`install package abort latest` after selecting the eXR workflow) and pass
+against the fix. Full suite green (382 unit tests, 29 browser tests), ruff
+clean, ESLint clean.
+
 ### A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16)
 
 Current behavior (before this fix):

@@ -850,6 +850,26 @@ class OperatorFlowTests(unittest.TestCase):
         iso_override.dispatch_event("change")
         expect(target).to_have_value("7.3.9")
 
+    def test_rollback_guide_copy_excludes_a_step_hidden_for_the_selected_workflow(self):
+        # updateRollbackWorkflow() hides the "Abort an un-applied package
+        # request" step for the eXR and legacy rollback families by setting
+        # `hidden` on the step's <li>, not on the <pre> command inside it.
+        # The Copy button collected commands with `pre:not([hidden])`,
+        # which only looks at each <pre>'s own attribute and has no notion
+        # of a hidden ancestor - so it kept copying `install package abort
+        # latest` from the hidden step regardless of which workflow was
+        # selected, even though the on-screen guide correctly hid it. That
+        # command aborts a pending package operation on a real router; it
+        # has no place in a copied eXR rollback command sequence.
+        self.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        self.open()
+        self.page.locator("#rollback-guide-button").click()
+        self.page.locator("#rollback-family").select_option("exr")
+        expect(self.page.locator("#rollback-abort-step")).to_be_hidden()
+        self.page.locator("#copy-rollback-guide").click()
+        copied = self.page.evaluate("() => navigator.clipboard.readText()")
+        self.assertNotIn("install package abort latest", copied)
+
 
 if __name__ == "__main__":
     unittest.main()
