@@ -11499,7 +11499,7 @@
       "node_kind": "heading",
       "norm_label": "dns-rebinding toctou in the cisco download ssrf guard (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1292"
+      "source_location": "L1296"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_a_verified_archived_build_was_reported_as_failed_2026_09_17",
@@ -11511,7 +11511,7 @@
       "node_kind": "heading",
       "norm_label": "p1 \u2014 a verified, archived build was reported as failed (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1442"
+      "source_location": "L1446"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_automatic_selection_kept_packages_it_had_proven_cannot_install_2026_09_17",
@@ -11523,7 +11523,7 @@
       "node_kind": "heading",
       "norm_label": "p1 \u2014 automatic selection kept packages it had proven cannot install (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1390"
+      "source_location": "L1394"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_ci_would_fail_on_a_clean_checkout_2026_09_17",
@@ -11535,7 +11535,7 @@
       "node_kind": "heading",
       "norm_label": "p1 \u2014 ci would fail on a clean checkout (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1418"
+      "source_location": "L1422"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p1_misconfiguration_can_silently_destroy_archived_artifacts",
@@ -11559,7 +11559,7 @@
       "node_kind": "heading",
       "norm_label": "p1/p2 \u2014 found by the first real self-contained build (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1363"
+      "source_location": "L1367"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_graphify_repository_correctness",
@@ -11583,7 +11583,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 operator ui defects found by the first real-browser tests (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1336"
+      "source_location": "L1340"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p2_ui_defects_seen_in_the_live_deployment_2026_09_17",
@@ -11595,7 +11595,7 @@
       "node_kind": "heading",
       "norm_label": "p2 \u2014 ui defects seen in the live deployment (2026-09-17)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1463"
+      "source_location": "L1467"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_p3_cisco_download_hardening_residual_deferred",
@@ -11607,7 +11607,7 @@
       "node_kind": "heading",
       "norm_label": "p3 \u2014 cisco download hardening (residual, deferred)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1290"
+      "source_location": "L1294"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_required_regression_test_additions",
@@ -11619,7 +11619,7 @@
       "node_kind": "heading",
       "norm_label": "required regression-test additions",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1484"
+      "source_location": "L1488"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_todo_concrete_bug_audit",
@@ -15406,7 +15406,7 @@
       "node_kind": "heading",
       "norm_label": "a stale partial file from a crashed download made the next attempt fail too (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1253"
+      "source_location": "L1257"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_ci_ran_the_unit_test_suite_on_the_github_actions_host_python_instead_of_inside_the_built_container",
@@ -15442,7 +15442,7 @@
       "node_kind": "heading",
       "norm_label": "superseded rpms were silently dropped instead of being explained (2026-09-16)",
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1220"
+      "source_location": "L1224"
     },
     {
       "id": "docs_todo_07_bug_audit_todo_gisobuild_commit_silently_returned_null_due_to_git_s_ownership_check_2026_09_16",
@@ -29817,7 +29817,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1220",
+      "source_location": "L1224",
       "weight": 1.0
     },
     {
@@ -29828,7 +29828,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1253",
+      "source_location": "L1257",
       "weight": 1.0
     },
     {
@@ -29927,7 +29927,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1292",
+      "source_location": "L1296",
       "weight": 1.0
     },
     {
@@ -29971,7 +29971,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1290",
+      "source_location": "L1294",
       "weight": 1.0
     },
     {
@@ -29982,7 +29982,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1336",
+      "source_location": "L1340",
       "weight": 1.0
     },
     {
@@ -29993,7 +29993,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1363",
+      "source_location": "L1367",
       "weight": 1.0
     },
     {
@@ -30004,7 +30004,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1390",
+      "source_location": "L1394",
       "weight": 1.0
     },
     {
@@ -30015,7 +30015,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1418",
+      "source_location": "L1422",
       "weight": 1.0
     },
     {
@@ -30026,7 +30026,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1442",
+      "source_location": "L1446",
       "weight": 1.0
     },
     {
@@ -30037,7 +30037,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1463",
+      "source_location": "L1467",
       "weight": 1.0
     },
     {
@@ -30048,7 +30048,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/07-BUG-AUDIT-TODO.md",
-      "source_location": "L1484",
+      "source_location": "L1488",
       "weight": 1.0
     },
     {
@@ -42036,5 +42036,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "6842bd48c53f2c6901c6459f4ef4707efe969d08"
+  "built_at_commit": "215f886fe284ea03f54b876256a1bd6101670dd2"
 }

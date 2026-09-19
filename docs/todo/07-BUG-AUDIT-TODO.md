@@ -1214,8 +1214,12 @@ and `hadolint` against the edited workflow — all clean. `pip-audit` could not
 be exercised locally because this sandbox's host Python is 3.9 and
 `giso-webui/requirements.txt` pins packages requiring 3.10+; CI itself pins
 Python 3.12 via `actions/setup-python`, so this is a local sandbox limitation,
-not a defect in the workflow change. The actual GitHub Actions run of this
-workflow has not been observed — only the equivalent commands run locally.
+not a defect in the workflow change. **Confirmed 2026-09-19** (checking the
+real GitHub Actions history directly, after discovering this session's
+commits were in fact reaching `origin/main` all along — see
+`05-TESTING-CI-TODO.md`'s "Release automation" correction): every one of
+these steps, including `pip-audit`, has run and passed repeatedly on real
+GitHub Actions since - e.g. the `v0.1.0` release's reused CI run.
 
 ### Superseded RPMs were silently dropped instead of being explained (2026-09-16)
 
