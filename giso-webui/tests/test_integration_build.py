@@ -19,6 +19,7 @@ import stat
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -88,6 +89,15 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
     OTHER_RELEASE = "ncs5500-bgp-1.0.0.1-r2612.CSCtest00002.x86_64.rpm"
 
     def setUp(self):
+        # run_job() runs in a fire-and-forget daemon thread that keeps doing
+        # real work (verification, archiving, cleanup, the final status
+        # update) well after it drops out of module.job_processes - the only
+        # thing the old tearDown() waited for. A test's own assertions run
+        # fast enough to never notice, but tearDown() returning early let the
+        # *next* test's setUp() reset module.DATA/WORK/jobs while a build
+        # thread from the previous test was still reading and writing them,
+        # a cross-test race a slower/more loaded CI runner hit for real.
+        self._threads_before_test = {t.ident for t in threading.enumerate()}
         self.temp = tempfile.TemporaryDirectory()
         root = Path(self.temp.name)
         for name in ("uploads", "output", "work", "archive", "state", "bin"):
@@ -138,6 +148,16 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         deadline = time.monotonic() + 10
         while module.job_processes and time.monotonic() < deadline:
             time.sleep(0.05)
+        # The subprocess handle above is gone well before run_job()'s own
+        # thread finishes (verification, archiving, cleanup, the final
+        # status update all happen after it) - wait for the thread itself,
+        # not just the process, so the next test's setUp() never resets
+        # module.DATA/WORK/jobs out from under still-running work.
+        stray = [
+            t for t in threading.enumerate() if t.ident not in self._threads_before_test
+        ]
+        for thread in stray:
+            thread.join(timeout=max(0.0, deadline - time.monotonic()))
         for active in reversed(self.patches):
             active.stop()
         module.store_initialized = False
@@ -320,6 +340,39 @@ class SyntheticBuildIntegrationTests(unittest.TestCase):
         self.assertFalse((module.ARCHIVE / job_id).exists())
         self.assertTrue(iso.exists())
         self.assertTrue(rpm.exists())
+
+    def test_work_directory_is_gone_before_status_becomes_externally_visible_as_failed(
+        self,
+    ):
+        # A synthetic-integration run on a slower/more loaded CI runner
+        # failed exactly the assertion above (module.WORK / job_id gone)
+        # intermittently, while never failing locally: run_job() used to
+        # publish status="failed" to the jobs dict *before* calling
+        # discard_job_work_directory(), so a client polling GET /api/jobs
+        # (as wait_for_job() does) could observe "failed" and still find the
+        # scratch directory there for a moment. This pins the real ordering
+        # directly, rather than relying on winning a timing race to notice a
+        # regression.
+        seen_status_at_cleanup = []
+        real_discard = module.discard_job_work_directory
+
+        def spy(job_id):
+            with module.job_lock:
+                seen_status_at_cleanup.append(module.jobs[job_id]["status"])
+            real_discard(job_id)
+
+        self.write(self.ISO)
+        self.write(self.ROUTING)
+        with (
+            patch.dict(os.environ, {"FAKE_GISOBUILD_MODE": "dependency-failure"}),
+            patch.object(module, "discard_job_work_directory", side_effect=spy),
+        ):
+            job_id = self.start_build(
+                {"iso": self.ISO, "automatic_smu_selection": True, "pkglist": []}
+            )
+            job = self.wait_for_job(job_id)
+        self.assertEqual(job["status"], "failed")
+        self.assertEqual(seen_status_at_cleanup, ["running"])
 
     def test_lnt_build_passes_lnt_only_options_to_the_engine(self):
         self.write("8000-x86_64-24.2.11.iso")
@@ -629,6 +682,9 @@ class LocalRunnerIntegrationTests(SyntheticBuildIntegrationTests):
     test_registry_outage_without_a_cached_image_fails_clearly = None
     test_exr_build_runs_the_plan_archives_the_image_and_cleans_inputs = None
     test_exr_dependency_failure_is_reported_and_inputs_are_kept = None
+    test_work_directory_is_gone_before_status_becomes_externally_visible_as_failed = (
+        None
+    )
     test_lnt_build_passes_lnt_only_options_to_the_engine = None
     test_consecutive_builds_use_only_their_own_inventory = None
 

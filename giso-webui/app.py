@@ -4239,6 +4239,17 @@ def run_job(job_id: str, command: list[str]) -> None:
                 cleanup_paths,
                 lambda: prepare_destructive_finalization(job_id),
             )
+        # Cleanup happens before the status update it precedes (not after,
+        # as this branch once had it) so that a client observing "failed" via
+        # the API never finds the scratch directory still there - the same
+        # ordering the BuildCancelled/Exception handlers below already use.
+        # A synthetic-integration test running under a slower/more loaded
+        # CI runner caught this: it polls for the job leaving
+        # ACTIVE_JOB_STATUSES, then immediately asserts the work directory is
+        # gone, and lost that race often enough there to fail intermittently
+        # while never failing on a fast, idle local machine.
+        if not success:
+            discard_job_work_directory(job_id)
         with job_lock:
             if jobs[job_id]["status"] not in {"cancelled", "cancelling"}:
                 jobs[job_id].update(
@@ -4252,8 +4263,6 @@ def run_job(job_id: str, command: list[str]) -> None:
                 )
             job_snapshot = dict(jobs[job_id])
         enter_stage(job_id, "complete" if success else "failed")
-        if not success:
-            discard_job_work_directory(job_id)
         persist_job(job_id)
         if success:
             write_build_report(job_id, job_snapshot, artifacts)

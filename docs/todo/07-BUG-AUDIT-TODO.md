@@ -377,6 +377,72 @@ TODO:
       work, not before it.
 - [x] Add regression test for cancellation during finalization.
 
+### A failed build's work directory could still exist for a moment after the API reported "failed" (found 2026-09-19, real CI)
+
+Found via a real GitHub Actions run of the fixed auto-release pipeline (the
+first real end-to-end test since `05-TESTING-CI-TODO.md`'s "Release
+automation" fix) - not something this session's own local runs had ever hit,
+because CI's runner is slower/more loaded than a fast, idle local machine
+and this is exactly the kind of race that needs contention to show up.
+
+Current behavior (before the fix): in `run_job()`'s main (non-exception)
+finalization path, the job's `status` in the shared `jobs` dict was set to
+`"success"`/`"failed"` *before* `discard_job_work_directory(job_id)` ran for
+a failed build - the opposite order from the `BuildCancelled`/generic
+`Exception` handlers just below it, which both already clean up before
+updating status. A client polling `GET /api/jobs/<id>` (exactly what
+`giso-webui/tests/test_integration_build.py`'s `wait_for_job()` helper
+does) could observe `"failed"` and, in that same instant, still find
+`/work/<job_id>` on disk - which is what
+`test_exr_dependency_failure_is_reported_and_inputs_are_kept` caught
+failing in CI (`AssertionError: True is not false` on
+`(module.WORK / job["id"]).exists()`), while passing every time locally.
+
+TODO:
+
+- [x] Reorder the main finalization path to discard the work directory
+      before publishing the terminal status, matching the two exception
+      handlers' existing order.
+- [x] Add a regression test that pins the ordering directly
+      (`test_work_directory_is_gone_before_status_becomes_externally_visible_as_failed`,
+      by spying on `discard_job_work_directory` and recording the job's
+      `status` at the moment it runs) rather than relying on winning a
+      timing race to notice a future regression - confirmed to fail against
+      the old ordering (`seen_status_at_cleanup == ["failed"]`) and pass
+      against the fix (`["running"]`).
+- [x] A second, larger issue the same investigation surfaced:
+      `test_integration_build.py`'s `tearDown()` only waited for
+      `module.job_processes` to empty, but `run_job()`'s background thread
+      keeps doing real work (verification, archiving, cleanup, the status
+      update itself) well after it drops out of `job_processes` (that
+      happens right after `proc.wait()` returns, near the very start of
+      finalization). `tearDown()` could therefore return, and the *next*
+      test's `setUp()` reset `module.DATA`/`WORK`/`jobs`, while the
+      previous test's build thread was still reading and writing those same
+      globals - a real cross-test race, not merely a slow-assertion one,
+      and a plausible explanation for the other test that failed in the
+      same CI run (`test_lnt_build_passes_lnt_only_options_to_the_engine`,
+      `500 != 202` starting an unrelated build immediately after) even
+      though that one could not be reproduced locally to confirm the causal
+      link directly. Fixed by having `setUp()` snapshot live thread idents
+      and `tearDown()` join any new ones before tearing down patches/temp
+      dirs - a test-harness fix, not a production-code change (`run_job()`
+      is deliberately fire-and-forget in production; the API is
+      polling-based by design).
+- [ ] Whether the `test_lnt_build_passes_lnt_only_options_to_the_engine`
+      failure was actually caused by this cross-test race, or is an
+      unrelated, still-latent bug of its own, is not confirmed - 24 local
+      repro attempts (isolated, paired, and full-suite runs) never
+      reproduced it. Left open pending the next real CI run under this fix;
+      re-open with its own investigation if it recurs.
+
+Verified: full suite green (382 unit/integration tests - the ordering fix's
+own new test, plus one skip added to `LocalRunnerIntegrationTests`'
+existing Docker-only-behavior exclusion list, alongside its two
+already-excluded siblings), 24 browser tests, ruff and `ruff format --check`
+clean, three repeated full-suite runs showing no timing regression from the
+added thread-join.
+
 ### Successful build deletes unrelated files from the entire upload workspace
 
 Current behavior:
