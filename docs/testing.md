@@ -32,7 +32,8 @@ boundary" in `AGENTS.md`. `docker/tooling.Dockerfile` is a small, pinned
 container (Python 3.12 + git) that `rehearse.py`'s pure-stdlib logic runs in
 unmodified; build it once and reuse the image.
 
-CI additionally runs Ruff, `pip-audit`, the Docker-only guard, the Graphify
+CI additionally runs Ruff, ESLint (`giso-webui/static/app.js` and
+`manual-packages.js`), `pip-audit`, the Docker-only guard, the Graphify
 freshness check, Trivy, and the platform drift tests inside the default image
 (see the command reference below). Locally, run the pinned
 equivalents from the same `gisobuild-tooling` image built above — never
@@ -79,6 +80,8 @@ docker run --rm -v "$(pwd):/work:ro" -e PYTHONDONTWRITEBYTECODE=1 gisobuild-brow
 # lint (incl. flake8-bandit security rules) and dependency audit
 docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling ruff check giso-webui staging scripts --cache-dir=/tmp/ruff-cache
 docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling pip-audit -r giso-webui/requirements.txt
+# JavaScript lint (giso-webui/static/.eslintrc.js)
+docker run --rm -v "$(pwd)/giso-webui/static:/work:ro" -w /work node@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 sh -c "npx --yes eslint@8.57.0 app.js manual-packages.js"
 # no host-side tooling in docs/scripts
 docker run --rm -v "$(pwd):/project:ro" -w /project gisobuild-tooling python -B scripts/check_docker_only.py
 # code graph refresh (needs a writable mount)

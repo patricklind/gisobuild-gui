@@ -1,17 +1,17 @@
 # Graph Report - project  (2026-09-19)
 
 ## Corpus Check
-- 55 files · ~127,297 words
+- 56 files · ~127,861 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 16 file(s) not represented in the graph (top: (none) 7, .css 4, .Dockerfile 3)
 
 ## Summary
-- 1334 nodes · 2285 edges · 89 communities (59 shown, 18 thin omitted)
+- 1335 nodes · 2285 edges · 90 communities (59 shown, 18 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 43 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `215f886f`
+- Built from commit: `48e3326c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -121,7 +121,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (89 total, 18 thin omitted)
+## Communities (90 total, 18 thin omitted)
 
 ### Community 2 - "CiscoDownloadError"
 Cohesion: 0.22
@@ -361,7 +361,7 @@ Nodes (7): archive_size(), build_space_blockers(), build_volume_free_bytes(), Fr
 
 ## Knowledge Gaps
 - **250 isolated node(s):** `inputs`, `platformProfiles`, `VOLUME_LABELS`, `neededPrerequisiteSmus`, `CONFIDENCE_LABELS` (+245 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 635 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 636 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -370,7 +370,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `validate_smu_selection()` connect `PlatformCompatibilityTests` to `recommend_smu_selection`, `test_platform_compatibility.py`, `IsoArchitectureInspectionTests`, `app.py`, `infer_platform`, `platform_validation.py`, `create_build_plan`?**
   _High betweenness centrality (0.192) - this node is a cross-community bridge._
 - **Why does `GisoWebTests` connect `GisoWebTests` to `PlatformCompatibilityTests`, `patch`, `.test_automatic_selection_leaves_out_fixes_that_cannot_install`, `.test_build_waits_for_tar_extraction_to_finish`, `IsoArchitectureInspectionTests`, `.test_component_conflict_resolution_does_not_desync_plan_from_job_or_preview`, `.test_discover_tolerates_file_removed_during_scan`, `._smu_fix`, `.upload`, `.test_run_job_honors_cancellation_during_image_pull`, `dict`, `.test_cisco_downloads_are_recorded_as_such_in_the_inventory`, `Path`?**
-  _High betweenness centrality (0.180) - this node is a cross-community bridge._
+  _High betweenness centrality (0.184) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `patch` (e.g. with `.setUpClass()` and `.test_build_preview_shows_an_unresolved_conflict_before_building()`) actually correct?**
   _`patch` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `inputs`, `platformProfiles`, `VOLUME_LABELS` to the rest of the system?**

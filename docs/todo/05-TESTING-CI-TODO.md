@@ -398,6 +398,34 @@ Run (`.github/workflows/ci.yml`):
       GitHub Actions history directly: this step, and the rest of `ci.yml`,
       have run and passed repeatedly on real GitHub Actions (e.g. the
       `v0.1.0` release's reused CI run, 2026-09-17).
+- [x] JavaScript lint — found 2026-09-19: `giso-webui/static/app.js` (1475
+      lines) and `manual-packages.js` had never been linted by any tool in
+      this project's history - no JS linter existed anywhere in the repo or
+      CI. Ran ESLint 8.57.0 against both (in a throwaway `node:20-slim`
+      container, no lasting host/image change) with a ruleset targeting real
+      correctness bugs (`no-undef`, `no-unused-vars`, `no-unreachable`,
+      `no-fallthrough`, `no-cond-assign`, `no-constant-condition`,
+      `array-callback-return`, and more) - zero findings on the real files.
+      The one wrinkle: `app.js` and `manual-packages.js` are both loaded as
+      plain (non-module) `<script>` tags on one page and deliberately share
+      a handful of top-level bindings (`renderManualPackages`,
+      `packageListEdited`, `lines`, `updateBuildAvailability`, …) through the
+      lexical scope classic scripts share on one page - not `window`
+      properties, so a naive lint config flags them as undefined. Modeled
+      that precisely with per-file `overrides` in the new
+      `giso-webui/static/.eslintrc.js` (each file's own globals list has
+      exactly what it borrows from the other, never what it declares
+      itself, so `no-redeclare` cannot fire on the real declaration).
+      Verified the check actually catches bugs, not just passes trivially:
+      injected an unused variable, an unused function and an undefined
+      reference into a scratch copy - all three correctly flagged; reverted,
+      the real files pass clean. Added as a permanent "Lint JavaScript" step
+      in `.github/workflows/ci.yml` (pinned `node@sha256:2cf067c…`, pinned
+      `eslint@8.57.0`, no Dockerfile change needed - matches the existing
+      `actionlint`/`hadolint` pattern of a dedicated pinned image per tool
+      rather than adding Node to `gisobuild-tooling`). `actionlint` and the
+      docker-only check both clean; full suite unaffected (381 unit tests,
+      24 browser tests).
 - [x] lint — `ruff check` step, now running a pinned `ruff==0.16.7` from
       `docker/tooling.Dockerfile` (fixed 2026-09-16; previously an unpinned
       `pip install ruff` — see "`ruff` is installed unpinned in CI" in

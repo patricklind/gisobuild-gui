@@ -33,6 +33,11 @@ jobs:
             ruff format --check giso-webui/app.py giso-webui/cisco_download.py \
             giso-webui/maintenance.py giso-webui/platform_validation.py \
             giso-webui/tests giso-webui/browser_tests staging scripts --cache-dir=/tmp/ruff-cache
+      - name: Lint JavaScript
+        run: |
+          docker run --rm -v "$PWD/giso-webui/static:/work:ro" -w /work \
+            node@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 \
+            sh -c "npx --yes eslint@8.57.0 app.js manual-packages.js"
       - name: Check docs and scripts for host-side project tooling
         run: |
           docker run --rm -v "$PWD:/project:ro" -w /project gisobuild-tooling \

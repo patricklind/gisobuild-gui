@@ -10535,7 +10535,7 @@
       "node_kind": "heading",
       "norm_label": "2. container smoke test",
       "source_file": "docs/testing.md",
-      "source_location": "L101"
+      "source_location": "L104"
     },
     {
       "id": "docs_testing_3_licensed_iso_acceptance_test",
@@ -10547,7 +10547,7 @@
       "node_kind": "heading",
       "norm_label": "3. licensed-iso acceptance test",
       "source_file": "docs/testing.md",
-      "source_location": "L121"
+      "source_location": "L124"
     },
     {
       "id": "docs_testing_4_matching_hardware_validation",
@@ -10559,7 +10559,7 @@
       "node_kind": "heading",
       "norm_label": "4. matching-hardware validation",
       "source_file": "docs/testing.md",
-      "source_location": "L150"
+      "source_location": "L153"
     },
     {
       "id": "docs_testing_developer_command_reference",
@@ -10571,7 +10571,7 @@
       "node_kind": "heading",
       "norm_label": "developer command reference",
       "source_file": "docs/testing.md",
-      "source_location": "L60"
+      "source_location": "L61"
     },
     {
       "id": "docs_testing_reporting_results",
@@ -10583,7 +10583,7 @@
       "node_kind": "heading",
       "norm_label": "reporting results",
       "source_file": "docs/testing.md",
-      "source_location": "L158"
+      "source_location": "L161"
     },
     {
       "id": "docs_testing_testing_and_acceptance",
@@ -12471,7 +12471,7 @@
       "node_kind": "heading",
       "norm_label": "graphify ci guard",
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L482"
+      "source_location": "L510"
     },
     {
       "id": "docs_todo_05_testing_ci_todo_integration_test",
@@ -12495,7 +12495,7 @@
       "node_kind": "heading",
       "norm_label": "merge policy",
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L597"
+      "source_location": "L625"
     },
     {
       "id": "docs_todo_05_testing_ci_todo_regression_tests",
@@ -12519,7 +12519,7 @@
       "node_kind": "heading",
       "norm_label": "release automation",
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L488"
+      "source_location": "L516"
     },
     {
       "id": "docs_todo_05_testing_ci_todo_representative_platform_fixtures",
@@ -15735,6 +15735,17 @@
       "norm_label": "operator-facing storage visibility (ai-master-prompt.md section 37/45). a read,...",
       "source_file": "giso-webui/app.py",
       "source_location": "L4730"
+    },
+    {
+      "id": "giso_webui_static_eslintrc",
+      "label": ".eslintrc.js",
+      "_origin": "ast",
+      "community": 89,
+      "community_name": ".eslintrc.js",
+      "file_type": "code",
+      "norm_label": ".eslintrc.js",
+      "source_file": "giso-webui/static/.eslintrc.js",
+      "source_location": "L1"
     },
     {
       "id": "agents_agents_md",
@@ -28508,7 +28519,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L60",
+      "source_location": "L61",
       "weight": 1.0
     },
     {
@@ -28519,7 +28530,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L101",
+      "source_location": "L104",
       "weight": 1.0
     },
     {
@@ -28530,7 +28541,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L121",
+      "source_location": "L124",
       "weight": 1.0
     },
     {
@@ -28541,7 +28552,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L150",
+      "source_location": "L153",
       "weight": 1.0
     },
     {
@@ -28552,7 +28563,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L158",
+      "source_location": "L161",
       "weight": 1.0
     },
     {
@@ -29388,7 +29399,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L482",
+      "source_location": "L510",
       "weight": 1.0
     },
     {
@@ -29399,7 +29410,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L488",
+      "source_location": "L516",
       "weight": 1.0
     },
     {
@@ -29410,7 +29421,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/05-TESTING-CI-TODO.md",
-      "source_location": "L597",
+      "source_location": "L625",
       "weight": 1.0
     },
     {
@@ -41356,7 +41367,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/testing.md",
-      "source_location": "L155",
+      "source_location": "L158",
       "weight": 1.0
     },
     {
@@ -42036,5 +42047,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "215f886fe284ea03f54b876256a1bd6101670dd2"
+  "built_at_commit": "48e3326ca72ba94a5b6c4c68bbadb0a9e3bb0c69"
 }
