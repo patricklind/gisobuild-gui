@@ -782,6 +782,20 @@ text and pass against the fix):
 `test_manual_package_description_names_its_csc_group`. Full suite green
 (382 unit tests, 25 browser tests), ESLint clean.
 
+### The automatic package plan's own "Selected" count was never pluralized (found 2026-09-19, live UI check)
+
+Same live-driving session as the item above. `renderBuildPreview()`'s flow
+diagram always rendered `` `${plan.selected.length} RPMs` `` for its
+"Selected" step - "1 RPMs" for a single package - while every other count
+in the same panel already pluralizes correctly (e.g. "1 compatible RPM
+selected"). Fixed to
+`` `${plan.selected.length} RPM${plan.selected.length === 1 ? '' : 's'}` ``,
+matching the existing pattern. Verified with a new browser test (confirmed
+to fail against the old text - "1 RPMs" - and pass against the fix, then
+re-checked after adding a second package to confirm the plural form still
+renders correctly): `test_automatic_plan_flow_pluralizes_the_selected_rpm_count`.
+Full suite green (382 unit tests, 26 browser tests), ESLint clean.
+
 ### A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16)
 
 Current behavior (before this fix):

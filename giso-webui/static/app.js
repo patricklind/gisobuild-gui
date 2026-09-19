@@ -280,7 +280,7 @@ function applySmuRecommendation(plan) {
     const flow=document.createElement('div'); flow.className='smu-plan-flow';
     [['Base ISO',plan.iso],['Platform',String(plan.platform || '').toUpperCase()],
      ['Engine',profile ? profile.architecture.toUpperCase() : '—'],
-     ['IOS XR',plan.release],['Selected',`${plan.selected.length} RPMs`],
+     ['IOS XR',plan.release],['Selected',`${plan.selected.length} RPM${plan.selected.length === 1 ? '' : 's'}`],
      ['Expected output',expectedOutputText(plan.platform)]].forEach(([label,value],index)=>{
       if (index) { const arrow=document.createElement('span'); arrow.setAttribute('aria-hidden','true'); arrow.textContent='→'; flow.appendChild(arrow); }
       const step=document.createElement('span'); const small=document.createElement('small'); small.textContent=label; const strong=document.createElement('b'); strong.textContent=value;

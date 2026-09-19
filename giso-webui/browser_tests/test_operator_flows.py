@@ -147,6 +147,22 @@ class OperatorFlowTests(unittest.TestCase):
             [rows.nth(index).inner_text() for index in (3, 4, 5)], ["3", "2", "1"]
         )
 
+    def test_automatic_plan_flow_pluralizes_the_selected_rpm_count(self):
+        # The flow diagram's own "Selected" step always said "1 RPMs" -
+        # never pluralized, unlike every other count in the same panel.
+        for name in (self.ISO, self.ROUTING):
+            self.write(name)
+        self.open()
+        expect(self.page.locator("#smu-plan-state")).to_have_text("Calculated")
+        flow = self.page.locator(".smu-plan-flow")
+        expect(flow).to_contain_text("Selected")
+        expect(flow).to_contain_text("1 RPM")
+        expect(flow).not_to_contain_text("1 RPMs")
+
+        self.write(self.BGP)
+        self.page.locator("#refresh-smu-plan").click()
+        expect(flow).to_contain_text("2 RPMs")
+
     def conflicting_isis_identity(self, path):
         # Correctly reconstructs each file's own filename (or
         # rpm_filename_mismatch() excludes it before resolve_component_conflicts()
