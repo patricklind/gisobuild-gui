@@ -1,0 +1,57 @@
+name: Check upstream gisobuild
+
+# Completion criteria item 10 (docs/AI-MASTER-PROMPT.md): "Upstream gisobuild
+# changes are detected automatically." The bundled ios-xr/gisobuild commit
+# (GISOBUILD_COMMIT in docker/selfcontained.Dockerfile) is pinned deliberately
+# and never bumped automatically - see AGENTS.md and
+# docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md for why (pin-and-verify, not
+# track-latest). But until now nothing ever noticed when upstream moved past
+# that pin in the first place, so a bump could go unnoticed indefinitely.
+#
+# This workflow only detects drift; it never bumps the pin, never rewrites
+# any file, and never opens/comments on anything itself - a red run in the
+# Actions tab is the signal. Bumping the pin remains the manual process
+# AGENTS.md already describes: update GISOBUILD_COMMIT and
+# GISOBUILD_SOURCE_SHA256 together and re-run the platform drift tests
+# (test_exr_platform_list_matches_the_pinned_upstream_engine and friends in
+# giso-webui/tests/test_platform_compatibility.py) against the new image.
+
+on:
+  schedule:
+    # Once a week; a new upstream commit is not urgent enough to justify a
+    # tighter interval, and GitHub's own scheduling jitter already keeps
+    # every repo's weekly crons from firing at exactly the same instant.
+    - cron: "17 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare the pinned commit against upstream's current HEAD
+        run: |
+          set -euo pipefail
+          pinned=$(grep -m1 '^ARG GISOBUILD_COMMIT=' docker/selfcontained.Dockerfile | cut -d= -f2)
+          if [[ -z "$pinned" ]]; then
+            echo "Could not read GISOBUILD_COMMIT from docker/selfcontained.Dockerfile" >&2
+            exit 1
+          fi
+          latest=$(git ls-remote https://github.com/ios-xr/gisobuild.git HEAD | cut -f1)
+          if [[ -z "$latest" ]]; then
+            echo "Could not read ios-xr/gisobuild's current HEAD" >&2
+            exit 1
+          fi
+          echo "Pinned:  $pinned"
+          echo "Current: $latest"
+          if [[ "$pinned" != "$latest" ]]; then
+            echo "::error::ios-xr/gisobuild has moved past the pinned commit ($pinned -> $latest)." \
+              "See AGENTS.md for the manual pin-bump process: update GISOBUILD_COMMIT and" \
+              "GISOBUILD_SOURCE_SHA256 in docker/selfcontained.Dockerfile together and re-run" \
+              "the platform drift tests against the new image before merging."
+            exit 1
+          fi
+          echo "Up to date with upstream."

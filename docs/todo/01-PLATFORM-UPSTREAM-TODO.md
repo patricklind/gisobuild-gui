@@ -124,6 +124,44 @@ The application must distinguish:
       if the sync test ever actually fires in practice and a one-line fix
       turns out to be too slow to ship for a given deployment's needs.
 
+## Detecting an upstream commit bump (2026-09-19)
+
+`docs/AI-MASTER-PROMPT.md`'s completion criteria (#10) requires "Upstream
+gisobuild changes are detected automatically." The drift tests above (e.g.
+`test_exr_platform_list_matches_the_pinned_upstream_engine`) prove the local
+code matches *the pinned commit* — they say nothing about whether upstream
+has moved *past* that pin, and nothing anywhere checked for that: the pin
+(`GISOBUILD_COMMIT`/`GISOBUILD_SOURCE_SHA256` in
+`docker/selfcontained.Dockerfile`) could go stale indefinitely with no
+signal to anyone.
+
+- [x] Detect it: added `.github/workflows/check-upstream-gisobuild.yml`,
+      scheduled weekly (plus `workflow_dispatch` for an on-demand run). It
+      compares the pinned `GISOBUILD_COMMIT` against
+      `git ls-remote https://github.com/ios-xr/gisobuild.git HEAD` and fails
+      the run (red in the Actions tab) when they differ, naming both SHAs
+      and pointing at AGENTS.md's existing manual bump process. Deliberately
+      detection-only: it never rewrites the pin, never opens or comments on
+      an issue/PR itself, and has no side effects beyond its own run status
+      — bumping a security-relevant pinned commit should stay a deliberate,
+      reviewed action (update both the commit and the SHA-256 manifest,
+      re-run the platform drift tests against the new image, per AGENTS.md),
+      never something a scheduled job does unattended. `actionlint` clean;
+      the comparison logic verified locally against the real upstream repo
+      both ways - it currently reports the pin as up to date (upstream's
+      real HEAD is `0388af2989bb7022d780a8732dbfbfeb77a70ee7`, identical to
+      the pin) and correctly reports drift when a wrong SHA is substituted
+      for the pinned value.
+- [ ] Not done: automatically opening/updating a tracking issue when drift
+      is detected, instead of only a failed scheduled run. Not implemented
+      here deliberately - creating or updating issues autonomously, on a
+      recurring unattended schedule, is a standing outward-facing action a
+      maintainer should explicitly opt into (the same category of decision
+      as auto-release), not something to add without asking first. A failed
+      Actions run is a real, sufficient signal for a maintainer who checks
+      the Actions tab or has failure notifications configured; add issue
+      creation only if that turns out not to be enough in practice.
+
 ## CLI option compatibility matrix (2026-09-16)
 
 Audited directly against `.gisobuild-tool/src/gisobuild.py`'s `parsecli()` —
