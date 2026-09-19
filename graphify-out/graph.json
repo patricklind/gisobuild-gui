@@ -12250,7 +12250,7 @@
       "node_kind": "heading",
       "norm_label": "`/api/health`",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L395"
+      "source_location": "L397"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_api_ready",
@@ -12262,7 +12262,7 @@
       "node_kind": "heading",
       "norm_label": "`/api/ready`",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L399"
+      "source_location": "L401"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_caching",
@@ -12274,7 +12274,7 @@
       "node_kind": "heading",
       "norm_label": "caching",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L441"
+      "source_location": "L443"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_cisco_secrets",
@@ -12286,7 +12286,7 @@
       "node_kind": "heading",
       "norm_label": "cisco secrets",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L268"
+      "source_location": "L270"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_concurrency",
@@ -12298,7 +12298,7 @@
       "node_kind": "heading",
       "norm_label": "concurrency",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L149"
+      "source_location": "L151"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_error_taxonomy",
@@ -12310,7 +12310,7 @@
       "node_kind": "heading",
       "norm_label": "error taxonomy",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L338"
+      "source_location": "L340"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_health_and_readiness",
@@ -12322,7 +12322,7 @@
       "node_kind": "heading",
       "norm_label": "health and readiness",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L380"
+      "source_location": "L382"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_job_model",
@@ -12334,7 +12334,7 @@
       "node_kind": "heading",
       "norm_label": "job model",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L112"
+      "source_location": "L114"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_path_security",
@@ -12346,7 +12346,7 @@
       "node_kind": "heading",
       "norm_label": "path security",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L189"
+      "source_location": "L191"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_persistent_state",
@@ -12370,7 +12370,7 @@
       "node_kind": "heading",
       "norm_label": "startup self-test",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L417"
+      "source_location": "L419"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_structured_logging",
@@ -12382,7 +12382,7 @@
       "node_kind": "heading",
       "norm_label": "structured logging",
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L296"
+      "source_location": "L298"
     },
     {
       "id": "docs_todo_04_state_security_observability_todo_todo_state_security_observability",
@@ -13006,7 +13006,7 @@
       "node_kind": "heading",
       "norm_label": "acceptance criteria",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L182"
+      "source_location": "L241"
     },
     {
       "id": "docs_todo_00_master_todo_final_operator_workflow",
@@ -13042,7 +13042,7 @@
       "node_kind": "heading",
       "norm_label": "immediate bug-fix priority",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L145"
+      "source_location": "L193"
     },
     {
       "id": "docs_todo_00_master_todo_major_workstreams",
@@ -13066,7 +13066,7 @@
       "node_kind": "heading",
       "norm_label": "suggested implementation order",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L164"
+      "source_location": "L212"
     },
     {
       "id": "gisobuild_guide_1_determine_the_platform_and_install_architecture",
@@ -28871,7 +28871,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L145",
+      "source_location": "L193",
       "weight": 1.0
     },
     {
@@ -28882,7 +28882,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L164",
+      "source_location": "L212",
       "weight": 1.0
     },
     {
@@ -28893,7 +28893,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L182",
+      "source_location": "L241",
       "weight": 1.0
     },
     {
@@ -29454,7 +29454,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L395",
+      "source_location": "L397",
       "weight": 1.0
     },
     {
@@ -29465,7 +29465,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L399",
+      "source_location": "L401",
       "weight": 1.0
     },
     {
@@ -29476,7 +29476,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L112",
+      "source_location": "L114",
       "weight": 1.0
     },
     {
@@ -29487,7 +29487,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L149",
+      "source_location": "L151",
       "weight": 1.0
     },
     {
@@ -29498,7 +29498,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L189",
+      "source_location": "L191",
       "weight": 1.0
     },
     {
@@ -29509,7 +29509,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L268",
+      "source_location": "L270",
       "weight": 1.0
     },
     {
@@ -29520,7 +29520,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L296",
+      "source_location": "L298",
       "weight": 1.0
     },
     {
@@ -29542,7 +29542,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L338",
+      "source_location": "L340",
       "weight": 1.0
     },
     {
@@ -29553,7 +29553,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L380",
+      "source_location": "L382",
       "weight": 1.0
     },
     {
@@ -29564,7 +29564,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L417",
+      "source_location": "L419",
       "weight": 1.0
     },
     {
@@ -29575,7 +29575,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/04-STATE-SECURITY-OBSERVABILITY-TODO.md",
-      "source_location": "L441",
+      "source_location": "L443",
       "weight": 1.0
     },
     {
@@ -42455,5 +42455,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "4d972eb36d69dcbe8ace3f9c6cd035d0fc431171"
+  "built_at_commit": "477706dafa1ccd02e854909cb7c27ad0f6138fd0"
 }

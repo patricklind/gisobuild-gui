@@ -55,8 +55,9 @@ Persist:
       `test_active_job_is_marked_interrupted_after_restart` and
       `test_expired_orphan_partial_upload_is_removed_after_restart` in
       `giso-webui/tests/test_app.py`.
-- [ ] no critical state only in Python globals — uploads fixed, Cisco
-      downloads still open. 2026-09-17: browser upload sessions are persisted
+- [x] no critical state only in Python globals — uploads fixed, Cisco
+      downloads closed as by-design (see the 2026-09-18 investigation below).
+      2026-09-17: browser upload sessions are persisted
       (job store schema version 3, `upload_sessions`) and restored on startup
       with the byte count read from the partial file, so an upload survives a
       restart; `GET /api/uploads/<id>` reports where it stands, and the page
@@ -103,9 +104,10 @@ Persist:
         server-to-server transfer from Cisco's own CDN that has not been
         reported as slow or flaky enough to need it.
 
-      Recommend closing this half of the bullet as "won't do, by design"
-      rather than implementing dict persistence that cannot deliver real
-      resumability. Re-open with a concrete measured pain point (e.g. a large
+      **Closed 2026-09-19** as "won't do, by design" rather than implementing
+      dict persistence that cannot deliver real resumability - the 2026-09-18
+      investigation above was conclusive but had left the checkbox
+      unchecked. Re-open with a concrete measured pain point (e.g. a large
       Cisco image over a slow/unreliable path to Cisco's CDN) if one shows up
       - not purely because the checkbox exists.
 

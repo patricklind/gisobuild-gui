@@ -653,13 +653,34 @@ Status 2026-09-17: for automated merges this is enforced by construction -
 `auto-merge.yml` merges only after the `CI` workflow succeeds, and that
 workflow runs the unit + synthetic integration + platform-fixture suite, the
 browser suite, the production and self-contained image builds and scans.
-Whether a *manual* merge on GitHub is held to the same gate depends on branch
-protection for `main`, a repository setting that could not be read from here
-(`gh` is not authenticated in this environment), so the items stay open until
-someone confirms "require status checks to pass" includes `CI`.
 
-- [ ] unit tests pass
-- [ ] integration tests pass
-- [ ] Docker image builds
-- [ ] regression suite passes
+**Measured 2026-09-19 — the gate does not exist on GitHub's side.** The
+earlier note said branch protection "could not be read from here" because
+`gh` is not authenticated. That was only true of the admin-only
+`/branches/main/protection` endpoint; the ordinary, unauthenticated
+`GET /repos/patricklind/gisobuild-gui/branches/main` reports the answer
+directly and it is unambiguous:
+
+    "protected": false
+    "protection": {"enabled": false,
+                   "required_status_checks": {"enforcement_level": "off",
+                                              "contexts": [], "checks": []}}
+
+So `main` has no branch protection at all: no required status checks, no
+required review. Every gate below genuinely *runs* on every push and pull
+request (CI has been green on each commit), but nothing on GitHub *blocks* a
+direct push or a manual merge when one fails - the policy is enforced only
+for the `auto-merge.yml` path, and by convention everywhere else.
+
+These items stay unchecked because that is the honest state, not because the
+answer is unknown. Closing them is a repository-settings change only the
+owner can make (Settings → Branches → add a rule for `main` → "Require
+status checks to pass" → select `CI`), deliberately not attempted from here:
+it needs authentication this environment does not have, and changing a
+shared repository's merge rules is the owner's call, not an agent's.
+
+- [ ] unit tests pass — runs in CI; not required by branch protection
+- [ ] integration tests pass — runs in CI; not required by branch protection
+- [ ] Docker image builds — runs in CI; not required by branch protection
+- [ ] regression suite passes — runs in CI; not required by branch protection
 - [x] Graphify output is current when the change affects code/architecture

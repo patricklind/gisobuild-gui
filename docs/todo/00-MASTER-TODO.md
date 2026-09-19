@@ -121,12 +121,60 @@ Core principle:
 - [x] GisoBuildRunner abstraction — `GISO_RUNNER` docker/local in
       `build_command()`/`run_job()`/`cancel_job()`, integration-tested for
       both and proven live for local
-- [ ] Persistent state/database
+- [x] Persistent state/database — closed 2026-09-19.
+      `04-STATE-SECURITY-OBSERVABILITY-TODO.md` is 80 items done against 4
+      open, and each of those 4 is an explicit "deliberately not stored"
+      decision rather than missing work: inventory is recomputed live from
+      the filesystem (no cached copy can go stale against what an operator
+      actually uploaded or deleted), a BuildPlan previewed via
+      `/api/build-plan` but never submitted is a stateless preview, artifact
+      metadata is derived from the archive directory on disk, and the
+      inventory revision is recomputed on demand and pinned per-job once a
+      build starts. What *is* persisted is in SQLite behind versioned
+      migrations (`SCHEMA_MIGRATIONS` + `PRAGMA user_version`, 4 versions):
+      jobs with their BuildPlan and plan fingerprint, the activity log, file
+      provenance, browser upload sessions and large-file checksums. A store
+      from a newer release blocks builds instead of being silently rewritten;
+      restart recovery marks any still-active job `interrupted`. Verified
+      live: a copy of this machine's real state volume migrated 0 → 1 with
+      all 4 historic jobs intact, and the checksum cache took the first
+      `/api/inputs` after a restart from 4.98 s to 0.03 s on the real
+      2.2 GiB NCS5500 image.
 - [x] Artifact verification/reporting — byte-for-byte + SHA-256 archive
       verification, `build-report.json`, error taxonomy for failures, stage
       timings and builder provenance in the report
-- [ ] Security hardening
-- [ ] Comprehensive tests
+- [x] Security hardening — closed 2026-09-19. Every security section of
+      `04-STATE-SECURITY-OBSERVABILITY-TODO.md` (path security, Cisco
+      secrets, structured logging and redaction, error taxonomy, health and
+      readiness, startup self-test) is fully checked; all 4 of that file's
+      remaining open items sit in "Persistent state" and are the deliberate
+      design decisions described above. Runtime posture is proven in the
+      default deployment, not just declared: `cap_drop: ALL` with only
+      `SYS_CHROOT` added (the one capability gisobuild's eXR engine needs to
+      chroot into the extracted image, verified against a real NCS5500
+      build), `no-new-privileges`, read-only root filesystem, a size-capped
+      tmpfs for `/tmp`, and no Docker socket mounted at all. Supply-chain and
+      secret checks run in CI on every push: ruff security rules, Trivy image
+      scan, SBOM, `pip-audit`, and gitleaks - the last added this session,
+      after finding nothing had ever scanned this repository for leaked
+      credentials. The residual items in `07-BUG-AUDIT-TODO.md` are a P3
+      DNS-rebinding TOCTOU explicitly deferred with reasoning and a standing
+      conditional trip-wire whose precondition is false today (download URLs
+      come only from Cisco's own authenticated API); its own text says not to
+      treat it as outstanding work.
+- [x] Comprehensive tests — closed 2026-09-19.
+      `05-TESTING-CI-TODO.md` is 100 items done against 4 open, and those 4
+      are not tests at all: they are the GitHub branch-protection setting,
+      measured 2026-09-19 as genuinely off (`"protected": false`,
+      `enforcement_level: "off"`, no required checks), which only the
+      repository owner can change. Every test layer the file calls for
+      exists and runs in Docker in CI on every push: unit, representative
+      platform fixtures, regression, integration, browser/DOM and security
+      tests. Current totals are 382 unit tests and 29 real-browser tests, all
+      green, with ruff, `ruff format --check`, ESLint, actionlint and
+      gitleaks clean - and the browser layer has now caught five real
+      operator-facing defects that no other layer did (see
+      `07-BUG-AUDIT-TODO.md`).
 - [x] CI/CD and image publishing — full pipeline (unit/integration/browser
       tests, lint incl. security rules, Trivy, SBOM, Graphify freshness,
       platform drift) has run on real GitHub Actions for a while; the
@@ -175,9 +223,20 @@ See `07-BUG-AUDIT-TODO.md` for detailed scenarios and required regression tests.
       socket deployment remains available as an explicit opt-in
       (`compose.socket.yaml`, its builder image now pinned by digest) - see
       `03-DOCKER-SELF-CONTAINED-TODO.md`
-- [ ] Phase 8 — persistent state/inventory DB
-- [ ] Phase 9 — UI simplification
-- [ ] Phase 10 — security/observability hardening
+- [x] Phase 8 — persistent state/inventory DB — see "Persistent state/database"
+      under Major workstreams above. The inventory half is deliberately *not*
+      a database: it is recomputed live so no cached copy can go stale
+      against the files an operator actually uploaded or deleted, a decision
+      recorded in `04-STATE-SECURITY-OBSERVABILITY-TODO.md` and reaffirmed
+      when `07-BUG-AUDIT-TODO.md` proposed the opposite.
+- [x] Phase 9 — UI simplification — `06-UI-OPERATOR-TODO.md` is complete: 61
+      items done, none open, covering the normal workflow, automatic-by-
+      default behavior, expert settings, decision explanations, the
+      confidence display and search/filtering. Confirmed against the running
+      application in a real browser, not only in tests - that live checking
+      is what found five operator-facing defects this session.
+- [x] Phase 10 — security/observability hardening — see "Security hardening"
+      under Major workstreams above.
 
 ## Acceptance criteria
 
