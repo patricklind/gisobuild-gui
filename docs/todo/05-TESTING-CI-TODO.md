@@ -506,6 +506,17 @@ Optional:
       (`--ignore-unfixed`): there is nothing to upgrade to.
 - [x] dependency vulnerability scan — `pip-audit -r giso-webui/requirements.txt`
       runs on every CI invocation, not gated behind an opt-in flag.
+- [x] secret scanning — found 2026-09-19: no tool had ever checked this repo
+      for accidentally-committed credentials/tokens. Ran pinned
+      `zricethezav/gitleaks:v8.30.1` against the full tracked working tree
+      (clean) and, as a one-off deeper audit, the complete git history (269
+      commits, also clean) - confirmed via a throwaway container, nothing
+      installed on the host. Added a permanent "Scan for secrets" step to
+      `ci.yml` (working-tree scan only, matching the existing `verify`
+      job's shallow checkout; the one-off full-history audit doesn't need
+      to repeat every run since history is append-only and each new commit
+      is scanned as part of the tree it introduces). `actionlint` and the
+      docker-only check both clean.
 
 ## Graphify CI guard
 
