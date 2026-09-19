@@ -2786,6 +2786,45 @@ class GisoWebTests(unittest.TestCase):
         # No README claim for ncs5500-os: keep the generic advice, never guess.
         self.assertNotIn("prerequisite_smu", by_requirement["ncs5500-os = 1.0.0.1"])
 
+    def test_only_a_full_supersedence_drops_a_fix_a_partial_one_keeps_it(self):
+        # Cisco spells the README field "Supercedes:" and marks every entry
+        # "Full" or "Partial". Only Full means the older fix is redundant: a
+        # Partial supersedence leaves real content in the older SMU, and the
+        # same README often also lists that SMU as a prerequisite - so
+        # treating Partial as Full would silently drop a fix the operator
+        # still needs from the Golden ISO. SUPERSEDENCE_FULL matches only
+        # the Full entries; nothing pinned that until this test.
+        #
+        # Checked against all 10 real NCS5500 25.1.2 SMU READMEs on
+        # 2026-09-19: 17 Full and 6 Partial entries, every Full extracted,
+        # no Partial misread as Full, no match from outside the block.
+        partial = "ncs5500-dpa-1.0.0.5-r2512.CSCtest00011.x86_64.rpm"
+        full = "ncs5500-os-1.0.0.1-r2512.CSCtest00012.x86_64.rpm"
+        newer = "ncs5500-infra-1.0.0.8-r2512.CSCtest00013.x86_64.rpm"
+        self._smu_fix(
+            "ncs5500-25.1.2.CSCtest00011", {partial: b"partial"}, uploaded=[partial]
+        )
+        self._smu_fix("ncs5500-25.1.2.CSCtest00012", {full: b"full"}, uploaded=[full])
+        directory = self._smu_fix(
+            "ncs5500-25.1.2.CSCtest00013", {newer: b"newer"}, uploaded=[newer]
+        )
+        (directory / "ncs5500-25.1.2.CSCtest00013.txt").write_text(
+            self._smu_readme(
+                "ncs5500-25.1.2.CSCtest00013",
+                {newer: hashlib.md5(b"newer", usedforsecurity=False).hexdigest()},
+            )
+            + "\nSupercedes:              \n"
+            "          ncs5500-25.1.2.CSCtest00011   Partial\n"
+            "          ncs5500-25.1.2.CSCtest00012   Full\n\n"
+        )
+
+        active, superseded = module.active_rpm_names()
+
+        self.assertEqual(superseded, {"ncs5500-25.1.2.CSCtest00012"})
+        self.assertIn(partial, active)
+        self.assertIn(newer, active)
+        self.assertNotIn(full, active)
+
     def test_automatic_selection_leaves_out_fixes_that_cannot_install(self):
         a = "ncs5500-routing-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"  # needs dpa 1.0.0.5
         a2 = "ncs5500-infra-1.0.0.2-r2512.CSCtest00001.x86_64.rpm"  # same fix as a

@@ -111,7 +111,22 @@ Core principle:
 - [ ] ISO metadata inspection
 - [x] RPM metadata inspection — header identity, dependencies and signature
       metadata (`02-AUTOMATION-BUILDPLAN-TODO.md` "RPM inspection")
-- [ ] CSC grouping and supersedence model
+- [x] CSC grouping and supersedence model — closed 2026-09-19. Both
+      sections of `02-AUTOMATION-BUILDPLAN-TODO.md` now have no open items.
+      Grouping comes from each Cisco SMU README's own `RPMS:` manifest
+      (members plus MD5), so a fix uploaded without one of its RPMs, or with
+      an altered one, is caught rather than looking like a smaller complete
+      group. Supersedence is decided two ways, both confirmed against real
+      Cisco content: README-declared `Full` entries drop the older fix, and
+      `compare_exr_rpm_labels()` - a port of gisobuild's own exact
+      comparator - resolves same-package conflicts before the build. The
+      last open piece, README `Partial` supersedence, was investigated
+      against all 10 real NCS5500 25.1.2 READMEs and closed as correct by
+      design: `Partial` must *not* drop the older fix (one README lists the
+      same SMU as both a prerequisite and a partial supersedence), which is
+      what ignoring it already achieves, and that safety property is now
+      pinned by
+      `test_only_a_full_supersedence_drops_a_fix_a_partial_one_keeps_it`.
 - [x] Unified automatic/manual selection engine (`02-AUTOMATION-BUILDPLAN-TODO.md`)
 - [x] Immutable BuildPlan
 - [x] Inventory revision + stale-state prevention

@@ -369,7 +369,8 @@ this session was retained afterward per `SECURITY.md`.
 
 Create an explicit supersedence model.
 
-- [ ] bundle metadata - partly. Each SMU README's `RPMS:` manifest (members
+- [x] bundle metadata - closed 2026-09-19 (see the "Partial supersedence"
+      note at the end of this item). Each SMU README's `RPMS:` manifest (members
       + MD5) is used for completeness and integrity (see "CSC grouping"),
       and since 2026-09-17 its `Pre-requisites:` (SMU level and the
       per-package `CSCxxxxx <package> pkg` lines under CONSTITUENT SMU
@@ -383,7 +384,40 @@ Create an explicit supersedence model.
       ncs5500-25.1.2.CSCwu13268 lists as its prerequisite for <package>" -
       the exact five packages that README attributes to CSCwt13701. Test:
       `test_dependency_blocker_names_the_prerequisite_smu_from_the_readme`.
-      README "Partial" supersedence is still not modelled.
+
+      **README "Partial" supersedence, investigated against real content
+      2026-09-19 — ignoring it is the correct model, not a missing one.**
+      Cisco spells the field `Supercedes:` (their own misspelling, which is
+      why searching the READMEs for "supersede" finds nothing) and tags every
+      entry `Full` or `Partial`:
+
+          Supercedes:
+                    ncs5500-25.1.2.CSCws63756   Partial
+                    ncs5500-25.1.2.CSCwt13701   Partial
+                    ncs5500-25.1.2.CSCwt41683   Full
+
+      `SUPERSEDENCE_FULL` in `giso-webui/app.py` matches only the `Full`
+      entries, and that is exactly right: `Full` means the older fix is
+      redundant and can be dropped, while `Partial` means real content is
+      still only in the older SMU - the example above is from
+      `CSCwu13268`, whose README lists `CSCwt13701` as *both* a
+      `Pre-requisite:` and a `Partial` supersedence. Modelling `Partial`
+      explicitly would change no decision, because a partially-superseded
+      fix must be kept, which is what ignoring it already does; it would
+      only add a line of explanation. Treating it as `Full`, by contrast,
+      would silently drop a fix the operator needs out of the Golden ISO.
+
+      Verified by running the shipped regex against all 10 real NCS5500
+      25.1.2 SMU READMEs (read straight out of their tars, nothing written to
+      disk): 17 `Full` entries across the set, every one extracted; 6
+      `Partial` entries across 3 READMEs, none misread as `Full`; and no
+      match from anywhere outside a `Supercedes:` block, despite the regex
+      being applied to the whole README text. That safety property was not
+      pinned by any test - the one fixture containing a `Partial` line
+      asserted nothing about it - so
+      `test_only_a_full_supersedence_drops_a_fix_a_partial_one_keeps_it` now
+      does, confirmed to fail (the partially-superseded fix disappears from
+      `active_rpm_names()`) when the regex is broadened to `(?:Full|Partial)`.
 - [x] RPM metadata - delegated, not reimplemented, and now confirmed the
       right call rather than an open gap. Upstream gisobuild already
       resolves version supersedence among supplied RPMs itself (eXR:
