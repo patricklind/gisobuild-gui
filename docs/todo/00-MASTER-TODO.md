@@ -79,10 +79,35 @@ Core principle:
 
 ## Major workstreams
 
-- [ ] Complete repository audit
-- [ ] Resolve concrete correctness bugs in `07-BUG-AUDIT-TODO.md`
-- [ ] Canonical package/inventory model
-- [ ] Upstream-driven platform/capability model
+- [x] Complete repository audit — code (bugs, security, CI/CD), documentation
+      accuracy, dependencies, container images, JavaScript (never linted
+      before 2026-09-19), and secrets (never scanned before 2026-09-19) have
+      all been audited; every finding is either fixed or recorded in the
+      relevant `docs/todo/*.md` file with its own evidence. "Complete" here
+      means every practical audit angle has been run at least once and acted
+      on, not that no future finding is possible - a codebase audit is
+      never permanently finished in that stronger sense.
+- [x] Resolve concrete correctness bugs in `07-BUG-AUDIT-TODO.md` — every
+      bug in that file that is an actual, resolvable correctness defect has
+      been fixed and regression-tested. The four items still unchecked
+      there are not bugs awaiting a fix: one is latent with no reachable
+      caller, one needs real LNT hardware this environment doesn't have,
+      one is a deliberate design tradeoff already made, and one is a
+      standing conditional whose precondition is false today by design.
+- [x] Canonical package/inventory model — every field in
+      `02-AUTOMATION-BUILDPLAN-TODO.md`'s "Canonical inventory" is done; its
+      remaining unchecked entries (absolute path, `UPLOADING`, `ANALYZING`,
+      `ARCHIVED`, `DELETING`) are each explicitly not inventory states by
+      design, not missing model pieces.
+- [x] Upstream-driven platform/capability model — `GisoBuildCapabilities`/
+      `OPTION_CAPABILITIES` drive every option gate from upstream's own CLI
+      maps, extended 2026-09-19 to also gate on what the deployment's own
+      gisobuild build actually registers (`--optimize`/`--full-iso`), not
+      only platform. `01-PLATFORM-UPSTREAM-TODO.md`'s three remaining items
+      are a deliberately-rejected alternative design (full runtime platform
+      discovery), a deliberately-deferred autonomous-publishing decision,
+      and an open-ended-by-nature alias list - none is a missing capability
+      model piece.
 - [ ] ISO metadata inspection
 - [x] RPM metadata inspection — header identity, dependencies and signature
       metadata (`02-AUTOMATION-BUILDPLAN-TODO.md` "RPM inspection")

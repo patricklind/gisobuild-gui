@@ -429,12 +429,18 @@ TODO:
       dirs - a test-harness fix, not a production-code change (`run_job()`
       is deliberately fire-and-forget in production; the API is
       polling-based by design).
-- [ ] Whether the `test_lnt_build_passes_lnt_only_options_to_the_engine`
+- [x] Whether the `test_lnt_build_passes_lnt_only_options_to_the_engine`
       failure was actually caused by this cross-test race, or is an
-      unrelated, still-latent bug of its own, is not confirmed - 24 local
-      repro attempts (isolated, paired, and full-suite runs) never
-      reproduced it. Left open pending the next real CI run under this fix;
-      re-open with its own investigation if it recurs.
+      unrelated, still-latent bug of its own, was not confirmed by the 24
+      local repro attempts (isolated, paired, and full-suite runs) -
+      resolved by observation instead: "Run tests inside the built
+      container" (the exact step and full 382-test suite that failed in
+      the original CI run) has now passed cleanly on **four consecutive
+      real GitHub Actions runs** since this fix landed
+      (`f765ea2`, `f8616b2`, `656ed21`, and the run that produced the
+      confirmed `v0.1.4` release), with no recurrence. Strong evidence the
+      cross-test race was the real cause, even without a local
+      reproduction of the second symptom specifically.
 
 Verified: full suite green (382 unit/integration tests - the ordering fix's
 own new test, plus one skip added to `LocalRunnerIntegrationTests`'

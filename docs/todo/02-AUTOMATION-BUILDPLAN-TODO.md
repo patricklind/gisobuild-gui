@@ -384,16 +384,50 @@ Create an explicit supersedence model.
       the exact five packages that README attributes to CSCwt13701. Test:
       `test_dependency_blocker_names_the_prerequisite_smu_from_the_readme`.
       README "Partial" supersedence is still not modelled.
-- [ ] RPM metadata - delegated, not reimplemented. Upstream gisobuild
-      already resolves version supersedence among supplied RPMs itself
-      (eXR: `rpm_db.filter_superseded_rpms()` in
+- [x] RPM metadata - delegated, not reimplemented, and now confirmed the
+      right call rather than an open gap. Upstream gisobuild already
+      resolves version supersedence among supplied RPMs itself (eXR:
+      `rpm_db.filter_superseded_rpms()` in
       `.gisobuild-tool/src/exrmod/gisobuild_exr.py:316`; LNT: highest
       version per package in `.gisobuild-tool/src/lnt/builder/_pkgpicker.py`).
-      This app does not duplicate that ordering (see the
-      `_version_satisfies()` rationale); it stays open because no explicit
-      model in this app records the outcome before the build - see the
-      "SMUs that are incompatible with the rest of the selection" item below
-      for the 2026-09-18 correction and the verified comparison approach.
+      This was left open because no explicit model in this app recorded the
+      outcome before the build - closed by the "SMUs that are incompatible
+      with the rest of the selection" item below: `compare_exr_rpm_labels()`
+      ports gisobuild's own exact (non-`rpmvercmp`) comparator, and
+      `resolve_component_conflicts()` applies it before the build, both
+      confirmed against real Cisco RPMs (including the full real gisobuild
+      run, 2026-09-19). Separately checked 2026-09-19 whether the RPM
+      header's own `Obsoletes`/`Conflicts` tags could serve as this model
+      directly: real Cisco RPM headers do carry `Obsoletes` entries, but
+      every RPM in the same real fix (`CSCwu13268`) carries the identical,
+      broad list regardless of which specific component that RPM itself is
+      - a coarse, install-time hint with no per-CSC-fix granularity, not a
+      substitute for the label comparison this app already ports. Confirms
+      the chosen approach (port the real comparator, don't read `Obsoletes`)
+      rather than leaving a second, weaker path half-considered.
+- [x] compatibility metadata - this bullet was never elaborated when the
+      section was created; investigated 2026-09-19 rather than left as an
+      unexplained placeholder. The one genuinely package-level
+      "compatibility" signal in a real RPM header is the `%{GROUP}` tag's
+      `XRRelease`/`XRVersion` fields (`Packagetype`/`Vmtype` come from the
+      same tag) - already read by `exr_package_type_and_vm_type()` and used
+      by `resolve_component_conflicts()`. Release/platform *compatibility*
+      as an upgrade concern (source release N to target release M) is a
+      separate, already-implemented model: `check_upgrade_matrix()` against
+      an operator-supplied compatibility matrix file (`02-AUTOMATION-
+      BUILDPLAN-TODO.md`'s own "Automatic refresh"/`06-UI-OPERATOR-TODO.md`
+      cover it). No further undiscovered "compatibility metadata" source
+      was found in the real RPM headers inspected.
+- [x] gisobuild dependency output - already implemented, just never linked
+      back to this bullet: `parse_missing_dependencies()`
+      (`giso-webui/app.py`) parses gisobuild's own real "Failed
+      dependencies" output after a build attempt into structured
+      `{requirement, required_by}` pairs, surfaced as
+      `job["missing_dependencies"]`. Confirmed working against real gisobuild
+      output multiple times this session, including
+      `test_parse_missing_dependencies_extracts_real_gisobuild_failure_format`
+      and the real dependency-failure build in
+      `test_exr_dependency_failure_is_reported_and_inputs_are_kept`.
 - [x] README metadata — `active_rpm_names()` parses each uploaded SMU's own
       `README.txt`-style file for Cisco's own supersedence notation
       (`<identifier> Full`) and excludes the packages it names. Verified
@@ -403,8 +437,6 @@ Create an explicit supersedence model.
       correctly excluded with reason "Superseded by a newer fix per Cisco
       supersedence notes", exactly matching the real supersedence
       relationships stated in their own bundled README files.
-- [ ] compatibility metadata
-- [ ] gisobuild dependency output
 
 Never silently exclude without a reason.
 
