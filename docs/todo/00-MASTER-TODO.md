@@ -102,7 +102,15 @@ Core principle:
       timings and builder provenance in the report
 - [ ] Security hardening
 - [ ] Comprehensive tests
-- [ ] CI/CD and image publishing
+- [x] CI/CD and image publishing — full pipeline (unit/integration/browser
+      tests, lint incl. security rules, Trivy, SBOM, Graphify freshness,
+      platform drift) has run on real GitHub Actions for a while; the
+      remaining gap was that automatic tagging/publishing was silently a
+      no-op due to a `GITHUB_TOKEN` restriction. Fixed and confirmed
+      end-to-end 2026-09-19 (`05-TESTING-CI-TODO.md` "Release automation"):
+      a real push produced a real `v0.1.4` tag, GitHub Release, and
+      published `linux/amd64`/`linux/arm64` images on GHCR with provenance
+      and SBOM attached, with no manual step.
 
 Current capability progress: the API, expert UI, and server adapter share one
 tested eXR/LNT capability map derived from upstream CLI maps. The workstream

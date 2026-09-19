@@ -13098,7 +13098,7 @@
       "node_kind": "heading",
       "norm_label": "acceptance criteria",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L149"
+      "source_location": "L157"
     },
     {
       "id": "docs_todo_00_master_todo_final_operator_workflow",
@@ -13134,7 +13134,7 @@
       "node_kind": "heading",
       "norm_label": "immediate bug-fix priority",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L112"
+      "source_location": "L120"
     },
     {
       "id": "docs_todo_00_master_todo_major_workstreams",
@@ -13158,7 +13158,7 @@
       "node_kind": "heading",
       "norm_label": "suggested implementation order",
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L131"
+      "source_location": "L139"
     },
     {
       "id": "gisobuild_guide_1_determine_the_platform_and_install_architecture",
@@ -28679,7 +28679,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L112",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
@@ -28690,7 +28690,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L131",
+      "source_location": "L139",
       "weight": 1.0
     },
     {
@@ -28701,7 +28701,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/todo/00-MASTER-TODO.md",
-      "source_location": "L149",
+      "source_location": "L157",
       "weight": 1.0
     },
     {
@@ -42153,5 +42153,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "f8616b2f2c5a236b07b84955fdd97ef17102bf04"
+  "built_at_commit": "5d6a47d388fc97a268405ca1722b35c55e52c9ae"
 }
