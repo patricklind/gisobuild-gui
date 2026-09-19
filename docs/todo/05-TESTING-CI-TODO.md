@@ -515,7 +515,7 @@ Optional:
 
 ## Release automation
 
-- [ ] Automatic release on every green `main` push (raised by the maintainer
+- [x] Automatic release on every green `main` push (raised by the maintainer
       2026-09-18, confirmed after clarifying: automatic tag and release on
       every push, not only on request). Added
       `.github/workflows/auto-release.yml`: triggers on the `CI` workflow's
@@ -616,11 +616,23 @@ Optional:
         (`2026-09-19T08:28:49Z`), correctly computed only ~15 minutes had
         elapsed, and correctly skipped both "Compute the next version" and
         "Dispatch the Release workflow" rather than firing early - the
-        interval gate itself is proven correct against real tag data. The
-        dispatch step itself has not yet had a chance to run (nothing has
-        gone a full hour since `v0.1.3` yet) - left unchecked until a
-        dispatched `release.yml` run is observed for a version this fix
-        computed itself, not just the gate that decides whether to.
+        interval gate itself is proven correct against real tag data.
+
+      **Full end-to-end confirmation, 2026-09-19, same day.** The next push
+      (the cross-test race fix above) triggered the cycle again: CI passed,
+      `auto-release.yml` found the hour had now elapsed since `v0.1.3`,
+      computed `v0.1.4`, and dispatched `release.yml` for real. That run's
+      four jobs - `validate`, `verify` (the full reused CI suite),
+      `create-tag`, `image-and-release` - **all succeeded**. Confirmed
+      directly against the real, live services, not just the workflow's own
+      "success" conclusion: `v0.1.4` exists as a real tag
+      (`GET /repos/.../tags`), a real GitHub Release exists for it, and an
+      anonymous GHCR pull token confirms `ghcr.io/patricklind/gisobuild-gui`
+      actually carries `v0.1.4` and `v0.1.4-socket` image tags. This is the
+      first release this automation has ever produced a working, published
+      image for - every prior tag (`v0.1.1`-`v0.1.3`) was the
+      `GITHUB_TOKEN` bug's silent no-op. Automatic tag-and-release on every
+      green `main` push is now genuinely, verifiably working end to end.
 
 ## Merge policy
 
