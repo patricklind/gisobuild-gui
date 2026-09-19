@@ -79,31 +79,47 @@ Why this isn't a quick pass-through, and wasn't implemented in this pass:
 
 - `isols.py`'s `Image` class extracts and runs `image.py` **from inside the
   uploaded ISO itself** (`gisoutils.extract_image_py_sig()` in
-  `.gisobuild-tool/src/lnt/gisoutils.py`), after signature verification. That
-  needs the full `lnt`/`utils` package environment
-  (`gisoutils`, `lnt_gisoglobals`, whatever `wrappers` module
-  `add_wrappers_to_path()` pulls in) — dependencies that live in the pinned
-  `ciscogisobuild/cisco-xr-gisobuild:2.3.4` build image, not in
-  `giso-webui`'s own lightweight Alpine image (which only has `isoinfo` via
-  `cdrkit`, no Python `lnt` package at all).
-- Running it therefore means a **second, read-only `docker run` against the
-  same pinned build image** (giso-webui already runs this image for real
-  builds via `build_command()`), a genuinely new invocation pattern that
-  needs the same care already applied to `inspect_iso_architecture()`:
-  output size caps, a timeout, no write access to anything but a scratch
-  temp dir, and graceful degradation to filename inference when the image
-  is eXR (this tool is LNT-only), the ISO predates this capability, or the
-  container can't run for any reason — never a new way to block an
-  otherwise-buildable image.
+  `.gisobuild-tool/src/lnt/gisoutils.py`), after signature verification.
 - Only applies to LNT; eXR platform/release detection would still need its
   own investigation (likely `gisobuild_exr_engine.py`/`isotools_exr.py`).
 
-Blocked on test material (2026-09-17): the only real image available to
-this work is the eXR NCS5500 25.1.2 bundle. `isols.py` needs a signed LNT
-ISO - it verifies and runs `image.py` from inside the image - and eXR
-platform profiles report `only_support_pids: false`, so neither the
-prototype nor the picklist can be verified against real content yet. A
-synthetic ISO cannot stand in, because the signature check is the point.
+**Revised 2026-09-19: the "second docker run against a separate pinned
+image" obstacle no longer applies to the default deployment.** This was
+written when the socket deployment (mounting Cisco's own external
+`ciscogisobuild/cisco-xr-gisobuild:2.3.4` image) was the only target: the
+`lnt`/`utils` package environment `isols.py` needs lived only in that
+external image, not in `giso-webui`'s own lightweight Alpine app image.
+Since 2026-09-17 the *default* deployment is the self-contained image
+(`docker/selfcontained.Dockerfile`), which already copies the complete
+`ios-xr/gisobuild` source tree to `/opt/gisobuild` (the same tree
+`gisobuild.py` itself runs from as a child process via `GISOBUILD_PYTHON`)
+and installs the same AlmaLinux/`python3-rpm` runtime upstream's own
+`prep_dependency.sh` calls for. Confirmed directly: the real entry point,
+`.gisobuild-tool/src/lntmod/isols.py` (not `lnt/tools/_isols.py`, which is a
+package-internal module that errors on a bare relative import when invoked
+directly — the wrapper script fixes `sys.path` first), runs with
+`/opt/gisobuild/src/lntmod/isols.py --help` in the real
+`giso-webui-selfcontained` image with **no additional dependency missing**
+and prints its full option list (`--dump-mdata`, `--rpms`,
+`--optional-packages`, `--fixes`, etc.) exactly as upstream documents it. So
+in the default deployment this would be an ordinary local subprocess call
+next to the existing `gisobuild.py` invocation, not a second container - the
+output-cap/timeout/scratch-dir care below is still real, but the "needs its
+own container plumbing" complexity this item was blocked on is gone. The
+socket deployment's own copy of this question is unaffected (its external
+image is still uninspected here).
+
+Still genuinely blocked on test material (2026-09-17, unchanged): the only
+real image available to this work is the eXR NCS5500 25.1.2 bundle.
+`isols.py` needs a signed LNT ISO - it verifies and runs `image.py` from
+inside the image, and that signature check is the entire point of using it
+over filename parsing - so neither the prototype's actual JSON output shape
+nor a real PID picklist can be verified against genuine content yet. A
+synthetic ISO cannot stand in for the same reason a synthetic signature
+couldn't stand in anywhere else in this codebase: the check being verified
+*is* the signature. Do not write the integration against assumed/guessed
+output shape - the `--help` run above only proves the environment is
+sufficient, not what `--dump-mdata --json` actually returns.
 
 TODO:
 
