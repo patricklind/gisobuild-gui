@@ -796,6 +796,47 @@ re-checked after adding a second package to confirm the plural form still
 renders correctly): `test_automatic_plan_flow_pluralizes_the_selected_rpm_count`.
 Full suite green (382 unit tests, 26 browser tests), ESLint clean.
 
+### Every build defaulted to the label "SEC_HARDENING", and YAML-mode submission could silently dead-end (found 2026-09-19, live UI check)
+
+Same live-driving session, two more findings from actually clicking through
+Expert settings and the YAML-mode toggle:
+
+1. `templates/index.html`'s hidden `label` field shipped with a static
+   `value="SEC_HARDENING"` that no JavaScript anywhere ever read or
+   overwrote - grep confirms zero other references to that string in the
+   whole repository. Every build an operator started without explicitly
+   typing their own "Image label" in Expert settings silently got
+   `-SEC_HARDENING` baked into its output filename. `build_command()`
+   already treats an absent/empty label as fully valid - `--label` is only
+   added `if payload.get("label") and not payload.get("no_label")` - so an
+   empty default is correct and was already what the server expected;
+   nothing but the template needed to change.
+2. The same form's hidden `iso` field was marked both `hidden` and
+   `required`. YAML mode never uses this field (gisobuild's own
+   `--yamlfile` supersedes `--iso` entirely - `build_command()` branches on
+   `payload.get("yamlfile")` before ever looking at `iso`), but submitting
+   the form with no ISO auto-detected yet tried to run the browser's native
+   HTML5 validation on this field regardless of mode, which then failed to
+   report itself with a real console error - `An invalid form control with
+   name='iso' is not focusable.` - and silently blocked the request from
+   ever reaching the server. No error, no feedback, nothing: the "Start
+   build" button simply appeared to do nothing. The server already has its
+   own correct, independent check for the equivalent normal-mode case
+   (`raise ValueError("Select an ISO, or provide a YAML file")` when
+   neither `iso` nor `yamlfile` is set), so the client-side `required` was
+   redundant even where it worked, and actively harmful in the one case it
+   didn't.
+
+Fixed by removing the hardcoded `label` default and the `iso` field's
+`required` attribute. Verified with two new browser tests, both confirmed
+to fail against the unfixed template and pass against the fix:
+`test_default_build_does_not_carry_a_hardcoded_label` (checks the field's
+own default value, then that a real build-preview command contains neither
+`SEC_HARDENING` nor `--label` at all) and
+`test_yaml_mode_submits_without_a_client_side_dead_end` (asserts the exact
+console error never fires). Full suite green (382 unit tests, 28 browser
+tests), ruff and `ruff format --check` clean.
+
 ### A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16)
 
 Current behavior (before this fix):

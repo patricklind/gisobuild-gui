@@ -147,6 +147,50 @@ class OperatorFlowTests(unittest.TestCase):
             [rows.nth(index).inner_text() for index in (3, 4, 5)], ["3", "2", "1"]
         )
 
+    def test_default_build_does_not_carry_a_hardcoded_label(self):
+        # The hidden `label` field in templates/index.html shipped with a
+        # static value="SEC_HARDENING" that no JS ever touched - every build
+        # an operator started without typing their own "Image label" in
+        # Expert settings silently got "-SEC_HARDENING" in its output
+        # filename. The server treats an empty/absent label as fully valid
+        # (build_command() only adds --label when payload["label"] is
+        # truthy), so the correct default is empty, not a leftover value.
+        for name in (self.ISO, self.ROUTING):
+            self.write(name)
+        self.open()
+        expect(self.page.locator("[name=label]")).to_have_value("")
+        self.page.locator("#preview-build").click()
+        preview = self.page.locator("#build-preview")
+        expect(preview.locator(".preview-grid")).to_contain_text("READY TO BUILD")
+        preview.locator("summary", has_text="Show the gisobuild command").click()
+        command = preview.locator(".command-preview")
+        expect(command).to_be_visible()
+        expect(command).not_to_contain_text("SEC_HARDENING")
+        expect(command).not_to_contain_text("--label")
+
+    def test_yaml_mode_submits_without_a_client_side_dead_end(self):
+        # The hidden, always-empty `iso` field was marked `required` even
+        # though YAML mode never uses it - submitting with no ISO detected
+        # yet failed the browser's native validation on a field it could not
+        # focus to report ("An invalid form control with name='iso' is not
+        # focusable"), blocking the request before it ever reached the
+        # server, with no visible feedback to the operator at all.
+        self.open()
+        self.page.locator("details.advanced > summary").click()
+        self.page.locator("[name=mode][value=yaml]").check()
+        self.page.locator("[name=yamlfile]").fill("build.yaml")
+        errors = []
+        self.page.on(
+            "console",
+            lambda msg: errors.append(msg.text) if msg.type == "error" else None,
+        )
+        self.page.locator("#build-form button[type=submit]").click()
+        self.page.wait_for_timeout(200)
+        self.assertFalse(
+            [e for e in errors if "not focusable" in e],
+            f"native validation blocked submission client-side: {errors}",
+        )
+
     def test_automatic_plan_flow_pluralizes_the_selected_rpm_count(self):
         # The flow diagram's own "Selected" step always said "1 RPMs" -
         # never pluralized, unlike every other count in the same panel.
