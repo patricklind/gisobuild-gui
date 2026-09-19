@@ -92,6 +92,26 @@ IMAGE = validate_image_reference(
 GISO_RUNNER = os.environ.get("GISO_RUNNER", "docker").strip().lower()
 if GISO_RUNNER not in {"docker", "local"}:
     raise RuntimeError("GISO_RUNNER must be 'docker' or 'local'")
+
+
+def optimize_capable() -> bool:
+    """Whether this deployment's gisobuild build registers --optimize/--full-iso.
+
+    gisobuild.py gates both on one flag, OPTIMIZE_CAPABLE, computed as
+    (Path(__file__).resolve().parents[2] / "exr").is_dir() - two levels above
+    wherever gisobuild.py actually runs from, which is no part of the
+    ios-xr/gisobuild source tree this app pins and copies. In the local
+    runner that resolves to /opt/exr, which docker/selfcontained.Dockerfile
+    never creates - confirmed empirically: "gisobuild.py --help" in that
+    exact image lists neither flag (see platform_validation.
+    RUNNER_GATED_CAPABILITIES). In the docker runner, gisobuild.py runs from
+    the externally supplied Cisco builder image, whose /exr is not inspected
+    here; keep assuming it is present (today's existing, unverified
+    assumption) rather than guessing it away too.
+    """
+    return GISO_RUNNER != "local"
+
+
 GISOBUILD_PYTHON = os.environ.get("GISOBUILD_PYTHON", "/usr/bin/python3")
 if not Path(GISOBUILD_PYTHON).is_absolute():
     raise RuntimeError("GISOBUILD_PYTHON must be an absolute path")
@@ -2501,7 +2521,9 @@ def create_build_plan(payload: dict) -> dict:
                 blockers.append(recommendation["message"])
         try:
             selected = resolve_rpm_identifiers(identifiers)
-            profile = validate_platform_options({**payload, "iso": identity_name})
+            profile = validate_platform_options(
+                {**payload, "iso": identity_name}, optimize_capable=optimize_capable()
+            )
             # A file this automatic pipeline already excluded (with a proven
             # reason: superseded via README, an unmet dependency, or a
             # same-package version conflict resolve_component_conflicts()
@@ -3823,7 +3845,9 @@ def build_command(
             already_excluded = already_excluded | {
                 entry["name"] for entry in package_plan.get("excluded", [])
             }
-        profile = validate_platform_options({**payload, "iso": identity_name})
+        profile = validate_platform_options(
+            {**payload, "iso": identity_name}, optimize_capable=optimize_capable()
+        )
         payload["platform"] = profile["id"]
         selected_rpms = resolve_rpm_identifiers(payload.get("pkglist", []))
         selected_names = [item["basename"] for item in selected_rpms]
@@ -4783,7 +4807,12 @@ def inventory_revision():
 
 @app.get("/api/platforms")
 def platforms():
-    return jsonify([platform_profile(key) for key in PLATFORMS])
+    return jsonify(
+        [
+            platform_profile(key, optimize_capable=optimize_capable())
+            for key in PLATFORMS
+        ]
+    )
 
 
 @app.get("/api/file-preview")

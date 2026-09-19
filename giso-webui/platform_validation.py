@@ -101,6 +101,18 @@ PLATFORM_CAPABILITY_OVERRIDES = {
     "xrv9k": {"full_iso"},
 }
 
+# gisobuild.py gates --optimize and --full-iso on one flag, OPTIMIZE_CAPABLE,
+# computed once at import time as (Path(__file__).resolve().parents[2] / "exr").is_dir()
+# - a directory two levels above wherever gisobuild.py itself runs from, which
+# is no part of the ios-xr/gisobuild source tree gisobuild-webui pins and
+# copies. Both arguments are absent from argparse entirely (not merely
+# rejected) when that directory is missing, confirmed against the real
+# self-contained image (docker/selfcontained.Dockerfile, GISO_RUNNER=local):
+# "gisobuild.py --help" lists neither, and nothing in that Dockerfile ever
+# creates the /opt/exr it would need. The caller passes optimize_capable
+# accordingly (see OPTIMIZE_CAPABLE in app.py).
+RUNNER_GATED_CAPABILITIES = frozenset({"optimize", "full_iso"})
+
 
 @dataclass(frozen=True)
 class GisoBuildCapabilities:
@@ -193,8 +205,15 @@ def normalize_architecture(token: str) -> str | None:
     return ARCH_ALIASES.get(token.strip().lower()) if token else None
 
 
-def capabilities_for_platform(platform: str) -> dict[str, bool]:
-    """Return the UI/adapter capabilities for one normalized platform."""
+def capabilities_for_platform(
+    platform: str, *, optimize_capable: bool = True
+) -> dict[str, bool]:
+    """Return the UI/adapter capabilities for one normalized platform.
+
+    optimize_capable reflects whether *this deployment's* gisobuild build
+    registers --optimize/--full-iso at all (see RUNNER_GATED_CAPABILITIES) -
+    independent of whether the platform itself would otherwise support them.
+    """
     normalized = normalize_platform(platform)
     profile = PLATFORMS[normalized]
     supported = set(
@@ -203,6 +222,8 @@ def capabilities_for_platform(platform: str) -> dict[str, bool]:
     supported.update(PLATFORM_CAPABILITY_OVERRIDES.get(normalized, set()))
     if profile["usb"]:
         supported.add("usb_image")
+    if not optimize_capable:
+        supported -= RUNNER_GATED_CAPABILITIES
     known = (
         COMMON_CAPABILITIES
         | EXR_CAPABILITIES
@@ -216,11 +237,13 @@ def capabilities_for_platform(platform: str) -> dict[str, bool]:
     return GisoBuildCapabilities(frozenset(supported)).as_dict(known)
 
 
-def platform_profile(platform: str) -> dict:
+def platform_profile(platform: str, *, optimize_capable: bool = True) -> dict:
     normalized = normalize_platform(platform)
     profile = {"id": normalized, **PLATFORMS[normalized]}
     profile["engine"] = profile["architecture"]
-    profile["capabilities"] = capabilities_for_platform(normalized)
+    profile["capabilities"] = capabilities_for_platform(
+        normalized, optimize_capable=optimize_capable
+    )
     profile["source"] = "upstream-cli-map-and-local-aliases"
     profile["confidence"] = "INFERRED"
     return profile
@@ -782,7 +805,7 @@ def platforms_supporting(capability: str) -> list[str]:
     )
 
 
-def validate_platform_options(payload: dict) -> dict:
+def validate_platform_options(payload: dict, *, optimize_capable: bool = True) -> dict:
     requested = payload.get("platform", "")
     platform = (
         normalize_platform(requested)
@@ -793,12 +816,29 @@ def validate_platform_options(payload: dict) -> dict:
         raise ValueError(
             "Select the platform family; it could not be inferred from the ISO filename"
         )
-    profile = platform_profile(platform)
+    profile = platform_profile(platform, optimize_capable=optimize_capable)
     architecture = profile["architecture"]
+    # Only computed when needed: which capabilities this platform would have
+    # if the deployment's engine build did register --optimize/--full-iso, to
+    # tell "your platform doesn't support this" apart from "this deployment's
+    # build of gisobuild doesn't support this on any platform".
+    platform_only_capabilities = None
     errors = []
     for option, capability in OPTION_CAPABILITIES.items():
         if not payload.get(option) or profile["capabilities"].get(capability, False):
             continue
+        if capability in RUNNER_GATED_CAPABILITIES and not optimize_capable:
+            if platform_only_capabilities is None:
+                platform_only_capabilities = capabilities_for_platform(
+                    platform, optimize_capable=True
+                )
+            if platform_only_capabilities.get(capability, False):
+                errors.append(
+                    f"{OPTION_LABELS.get(option, option)} needs gisobuild's optional "
+                    "eXR extension, which this deployment's bundled gisobuild build "
+                    "does not include"
+                )
+                continue
         elsewhere = platforms_supporting(capability)
         named, extra = elsewhere[:3], len(elsewhere) - 3
         where = ", ".join(named) + (f" and {extra} more" if extra > 0 else "")

@@ -1465,6 +1465,41 @@ class GisoWebTests(unittest.TestCase):
         self.assertTrue(ncs5500["capabilities"]["optimize"])
         self.assertFalse(ncs5500["capabilities"]["remove_packages"])
 
+    def test_local_runner_platform_matrix_hides_optimize_and_full_iso(self):
+        # docker/selfcontained.Dockerfile never creates /opt/exr, so
+        # gisobuild.py in the local runner never registers --optimize or
+        # --full-iso at all (confirmed against the real image - see
+        # app.optimize_capable()); the API must not offer either there,
+        # even on platforms that would otherwise have them.
+        with patch.object(module, "GISO_RUNNER", "local"):
+            response = self.client.get("/api/platforms").get_json()
+        ncs5500 = next(item for item in response if item["id"] == "ncs5500")
+        xrv9k = next(item for item in response if item["id"] == "xrv9k")
+        self.assertFalse(ncs5500["capabilities"]["optimize"])
+        self.assertFalse(xrv9k["capabilities"]["full_iso"])
+        # Unaffected capabilities on the same platforms still show correctly.
+        self.assertFalse(ncs5500["capabilities"]["remove_packages"])
+
+    def test_local_runner_build_plan_rejects_optimize_with_an_engine_reason(self):
+        (self.data / "ncs5500-x64-25.1.2.iso").write_bytes(b"iso")
+        payload = {
+            "iso": "ncs5500-x64-25.1.2.iso",
+            "platform": "ncs5500",
+            "pkglist": [],
+            "optimize": True,
+            "automatic_smu_selection": True,
+        }
+        with patch.object(module, "GISO_RUNNER", "local"):
+            plan = self.client.post("/api/build-plan", json=payload).get_json()
+        self.assertFalse(plan["ready"])
+        self.assertTrue(
+            any(
+                "needs gisobuild's optional eXR extension" in blocker
+                for blocker in plan["blockers"]
+            ),
+            plan["blockers"],
+        )
+
     def test_compatibility_api_checks_smu_and_uploaded_upgrade_matrix(self):
         matrix = self.data / "compatibility_matrix_test.json"
         matrix.write_text(

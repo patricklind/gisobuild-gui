@@ -10,6 +10,7 @@ from platform_validation import (
     OPTION_CAPABILITIES,
     OPTION_LABELS,
     PLATFORMS,
+    RUNNER_GATED_CAPABILITIES,
     capabilities_for_platform,
     check_upgrade_matrix,
     classify_exclusion,
@@ -18,6 +19,7 @@ from platform_validation import (
     infer_platform,
     infer_platform_pid,
     normalize_platform,
+    platform_profile,
     platforms_supporting,
     recommend_smu_selection,
     validate_platform_options,
@@ -274,6 +276,53 @@ class PlatformCompatibilityTests(unittest.TestCase):
             set(OPTION_CAPABILITIES.values()) - known,
         )
         self.assertEqual(set(OPTION_CAPABILITIES) - set(OPTION_LABELS), set())
+
+    def test_optimize_capable_false_hides_optimize_and_full_iso_everywhere(self):
+        # The self-contained image's gisobuild build never registers
+        # --optimize/--full-iso (confirmed against the real image - see
+        # platform_validation.RUNNER_GATED_CAPABILITIES); a deployment that
+        # knows this must not offer either capability on any platform,
+        # including ones that would otherwise have it.
+        self.assertEqual(RUNNER_GATED_CAPABILITIES, {"optimize", "full_iso"})
+        exr = capabilities_for_platform("ncs5500", optimize_capable=False)
+        xrv9k = capabilities_for_platform("xrv9k", optimize_capable=False)
+        self.assertFalse(exr["optimize"])
+        self.assertFalse(xrv9k["full_iso"])
+        # Unrelated capabilities on the same platforms are unaffected.
+        self.assertTrue(exr["script"])
+        self.assertTrue(xrv9k["x86_only"])
+        # The default keeps today's (unverified-but-assumed) socket behavior.
+        self.assertTrue(capabilities_for_platform("ncs5500")["optimize"])
+        profile = platform_profile("xrv9k", optimize_capable=False)
+        self.assertFalse(profile["capabilities"]["full_iso"])
+
+    def test_optimize_capable_false_gives_an_engine_reason_not_a_platform_reason(self):
+        # ncs5500 would normally support --optimize; when the deployment's
+        # own gisobuild build cannot register it at all, the rejection must
+        # say so, not claim the platform itself does not support it (which
+        # would be false and would send an operator looking in the wrong
+        # place).
+        with self.assertRaisesRegex(
+            ValueError,
+            r"Optimized ISO needs gisobuild's optional eXR extension, which this "
+            r"deployment's bundled gisobuild build does not include",
+        ):
+            validate_platform_options(
+                {"platform": "ncs5500", "optimize": True}, optimize_capable=False
+            )
+        with self.assertRaisesRegex(
+            ValueError,
+            r"Full ISO needs gisobuild's optional eXR extension",
+        ):
+            validate_platform_options(
+                {"platform": "xrv9k", "full_iso": True}, optimize_capable=False
+            )
+        # A platform that never had the capability, regardless of engine
+        # build, still gets the ordinary platform-mismatch message.
+        with self.assertRaisesRegex(ValueError, "is not supported on"):
+            validate_platform_options(
+                {"platform": "ncs5k", "full_iso": True}, optimize_capable=False
+            )
 
     def test_adapter_rejects_exr_only_capability_on_lnt_platform(self):
         # The mirror image of the test above: remove_packages is LNT-only

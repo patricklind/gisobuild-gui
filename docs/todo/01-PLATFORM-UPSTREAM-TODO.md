@@ -154,8 +154,8 @@ against the actual upstream source rather than assumption.
 | `--in_docker` (eXR) | hidden upstream | internal; correctly not exposed |
 | `--x86-only` (eXR) | yes | `BOOL_OPTIONS["x86_only"]` |
 | `--migration` (eXR) | yes | `BOOL_OPTIONS["migration"]`, restricted to ASR9k in `validate_platform_options()` |
-| `--optimize` (eXR) | yes, but see gap below | `BOOL_OPTIONS["optimize"]` |
-| `--full-iso` (eXR) | yes, but see gap below | `BOOL_OPTIONS["full_iso"]`, restricted to xrv9k |
+| `--optimize` (eXR) | yes, gated per deployment — see below | `BOOL_OPTIONS["optimize"]`; hidden and rejected with an engine-specific reason in the default (self-contained) deployment, whose bundled gisobuild never registers it |
+| `--full-iso` (eXR) | yes, gated per deployment — see below | `BOOL_OPTIONS["full_iso"]`, restricted to xrv9k; same default-deployment gating as `--optimize` |
 | `--remove-packages` (LNT) | yes | `LIST_OPTIONS["remove_packages"]` |
 | `--skip-usb-image` (LNT) | yes | `BOOL_OPTIONS["skip_usb_image"]` |
 | `--skip-dep-check` (LNT) | hidden upstream | internal; correctly not exposed |
@@ -203,6 +203,55 @@ here: verifying this needs either running `gisobuild.py --help` once
 against the pinned image and caching which flags it actually registers, or
 Cisco documentation confirming `/exr` is always present in the published
 `cisco-xr-gisobuild` image — neither was available in this pass.
+
+**Fixed for the default deployment, 2026-09-19.** This gap was written when
+the socket deployment (mounting Cisco's own external, opaque
+`cisco-xr-gisobuild` image) was the only target and its filesystem was
+genuinely unknown. Since 2026-09-17 the *default* deployment is the
+self-contained image (`docker/selfcontained.Dockerfile`), which this
+repository builds and fully controls — so the same question is now
+answerable directly instead of staying an open unknown. Ran
+`gisobuild.py --help` against the real `giso-webui-selfcontained` image:
+neither `--optimize` nor `--full-iso` appear anywhere in its output (the
+"EXR only build options" section lists only `--script`, `--x86-only`,
+`--migration`), and `/opt/exr` (`parents[2]` of
+`/opt/gisobuild/src/gisobuild.py`, exactly where `OPTIMIZE_CAPABLE` looks) is
+confirmed missing — nothing in `docker/selfcontained.Dockerfile` ever
+creates it, since `/exr` was never part of the `ios-xr/gisobuild` source tree
+this app pins and copies; it was always meant to come from Cisco's separate
+builder image. So in the default deployment `OPTIMIZE_CAPABLE` is
+deterministically `False`, always, not merely unverified.
+
+Fixed by threading this fact through instead of assuming both options are
+always available: `platform_validation.capabilities_for_platform()`/
+`platform_profile()`/`validate_platform_options()` gained an
+`optimize_capable` keyword (default `True`, preserving today's existing —
+still unverified — assumption for the socket deployment), which strips
+`optimize`/`full_iso` from a platform's reported capabilities when `False`.
+`giso-webui/app.py` computes it as `GISO_RUNNER != "local"`
+(`optimize_capable()`) and passes it at all three real call sites
+(`/api/build-plan`, `POST /api/jobs`'s own re-validation, `/api/platforms`).
+The rejection message distinguishes *why* an option is unavailable — "needs
+gisobuild's optional eXR extension, which this deployment's bundled
+gisobuild build does not include" when the deployment's own engine build
+lacks it (even on a platform, like NCS 5500, that would otherwise support
+it), versus the existing "is not supported on `<platform>`" when the
+platform itself never had the capability regardless of engine build — so an
+operator is pointed at the real cause instead of being told their platform
+doesn't support something it actually does.
+
+Verified: `test_optimize_capable_false_hides_optimize_and_full_iso_everywhere`,
+`test_optimize_capable_false_gives_an_engine_reason_not_a_platform_reason`
+(`giso-webui/tests/test_platform_compatibility.py`),
+`test_local_runner_platform_matrix_hides_optimize_and_full_iso`,
+`test_local_runner_build_plan_rejects_optimize_with_an_engine_reason`
+(`giso-webui/tests/test_app.py`) — full suite green (344 unit/integration
+tests, 24 browser tests, `ruff check` and `ruff format --check` clean,
+Graphify refreshed). The socket deployment's own half of this gap remains
+open exactly as before (Cisco's external image's `/exr` is still not
+inspected here) — see `docs/todo/03-DOCKER-SELF-CONTAINED-TODO.md` for why
+the self-contained image is the recommended default and the socket variant
+the documented fallback.
 
 ### Upstream version detection (fixed 2026-09-16)
 
