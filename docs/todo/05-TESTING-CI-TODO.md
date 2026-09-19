@@ -325,6 +325,29 @@ README prerequisite SMU).
       `cisco_download.py` coverage: 72% -> 92%. Full suite green (362 unit
       tests, up from 344; 24 browser tests unaffected), ruff and
       `ruff format --check` clean.
+- [x] `app.py`'s own `cisco_client()` factory and two file-serving routes —
+      same coverage pass, same day. `cisco_client()` (credential loading,
+      client caching, rebuilding on credential/allowed-host rotation) was
+      never exercised because every `test_app.py` Cisco test patches
+      `app.cisco_client` itself; added
+      `test_cisco_client_is_cached_across_calls`,
+      `test_cisco_client_is_rebuilt_when_credentials_rotate`,
+      `test_cisco_client_is_rebuilt_when_allowed_hosts_change`. Separately,
+      `GET /download/<job_id>/<name>` and `GET /archive/<job_id>/<name>` -
+      real file-serving endpoints, each with its own `OUTPUT`/`ARCHIVE`
+      containment guard - had no test at all, success or failure; the
+      "malicious job/artifact path" bullet in Security tests above cited
+      `test_path_traversal_is_rejected`/`test_archive_delete_rejects_path_traversal`,
+      but those cover `safe_data_path()` and the DELETE endpoint only. Added
+      traversal-rejection and real-file-serving tests for both GET routes.
+      Also added `test_cancel_reports_a_clear_error_when_docker_stop_itself_fails`
+      for the docker-runner cancellation path where `docker stop` itself
+      fails (`subprocess.TimeoutExpired`) - previously untested; confirms
+      the job reverts to `running` (not left claiming `cancelled` while the
+      container may still be alive) and the operator gets a clear 503
+      instead of a silent mismatch. `app.py` coverage: 91% -> 92%. Full
+      suite green (370 unit tests, 24 browser tests), ruff and
+      `ruff format --check` clean.
 
 ## CI pipeline
 

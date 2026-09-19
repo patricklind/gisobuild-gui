@@ -134,6 +134,42 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.get("/api/cisco/config")
         self.assertEqual(response.get_json(), {"enabled": False})
 
+    @patch.dict(os.environ, {"CISCO_CLIENT_ID": "id", "CISCO_CLIENT_SECRET": "secret"})
+    def test_cisco_client_is_cached_across_calls(self):
+        # Every other Cisco test patches app.cisco_client() itself, so the
+        # factory function - and its credential-rotation logic below - had
+        # never run under any test.
+        first = module.cisco_client()
+        second = module.cisco_client()
+        self.assertIs(first, second)
+        self.assertEqual(first.client_id, "id")
+        self.assertEqual(first.client_secret, "secret")
+
+    @patch.dict(os.environ, {"CISCO_CLIENT_ID": "id", "CISCO_CLIENT_SECRET": "secret"})
+    def test_cisco_client_is_rebuilt_when_credentials_rotate(self):
+        first = module.cisco_client()
+        with patch.dict(
+            os.environ, {"CISCO_CLIENT_ID": "id", "CISCO_CLIENT_SECRET": "new-secret"}
+        ):
+            second = module.cisco_client()
+        self.assertIsNot(first, second)
+        self.assertEqual(second.client_secret, "new-secret")
+
+    @patch.dict(os.environ, {"CISCO_CLIENT_ID": "id", "CISCO_CLIENT_SECRET": "secret"})
+    def test_cisco_client_is_rebuilt_when_allowed_hosts_change(self):
+        first = module.cisco_client()
+        with patch.dict(
+            os.environ,
+            {
+                "CISCO_CLIENT_ID": "id",
+                "CISCO_CLIENT_SECRET": "secret",
+                "CISCO_DOWNLOAD_HOSTS": "example.com",
+            },
+        ):
+            second = module.cisco_client()
+        self.assertIsNot(first, second)
+        self.assertEqual(second.allowed_hosts, ("example.com",))
+
     @patch("app.cisco_client")
     def test_cisco_search_returns_safe_normalized_metadata(self, client):
         client.return_value.search.return_value = {
@@ -1092,6 +1128,33 @@ class GisoWebTests(unittest.TestCase):
         run.assert_called_once()
         self.assertIn("giso-build-job", run.call_args.args[0])
         self.assertEqual(module.jobs["job"]["status"], "cancelled")
+
+    @patch("app.subprocess.run", side_effect=subprocess.TimeoutExpired("docker", 20))
+    def test_cancel_reports_a_clear_error_when_docker_stop_itself_fails(self, run):
+        # Never exercised before: if "docker stop" itself cannot be run (the
+        # daemon is unreachable, the CLI errors, etc.), the job must not be
+        # left claiming "cancelled" while the container may still be
+        # running - it goes back to "running" and the operator is told the
+        # container could not be stopped, rather than silently losing track.
+        module.jobs["job"] = {
+            "id": "job",
+            "status": "running",
+            "created": 1,
+            "updated": 1,
+            "log": "",
+            "progress": 50,
+            "phase": "Building",
+            "process_phase": "building",
+        }
+        process = MagicMock()
+        process.poll.return_value = None
+        module.job_processes["job"] = process
+
+        response = self.client.delete("/api/jobs/job")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(module.jobs["job"]["status"], "running")
+        self.assertIn("could not be stopped", response.get_json()["error"])
 
     def test_cleanup_rejects_active_upload(self):
         module.uploads["active"] = {
@@ -5137,6 +5200,37 @@ class GisoWebTests(unittest.TestCase):
         response = self.client.delete("/api/archive/job/../../outside.iso")
         self.assertEqual(response.status_code, 404)
         self.assertTrue(outside.exists())
+
+    def test_download_endpoint_rejects_path_traversal(self):
+        # /download/<job_id>/<name> and /archive/<job_id>/<name> (below) had
+        # no test coverage of their own; only the unrelated safe_data_path()
+        # and the DELETE archive endpoint's traversal guard were tested.
+        outside = Path(self.temp.name) / "outside.txt"
+        outside.write_bytes(b"secret")
+        response = self.client.get("/download/job/../../outside.txt")
+        self.assertEqual(response.status_code, 404)
+
+    def test_archive_download_endpoint_rejects_path_traversal(self):
+        outside = Path(self.temp.name) / "outside.txt"
+        outside.write_bytes(b"secret")
+        response = self.client.get("/archive/job/../../outside.txt")
+        self.assertEqual(response.status_code, 404)
+
+    def test_download_endpoint_serves_a_real_file_within_the_job_output(self):
+        job_dir = module.OUTPUT / "job"
+        job_dir.mkdir()
+        (job_dir / "golden.iso").write_bytes(b"a real giso")
+        response = self.client.get("/download/job/golden.iso")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(), b"a real giso")
+
+    def test_archive_download_endpoint_serves_a_real_archived_file(self):
+        archive_dir = module.ARCHIVE / "job"
+        archive_dir.mkdir()
+        (archive_dir / "golden.iso").write_bytes(b"an archived giso")
+        response = self.client.get("/archive/job/golden.iso")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(), b"an archived giso")
 
     def test_archive_checksums_returns_md5_and_sha256(self):
         archive_dir = module.ARCHIVE / "job"
