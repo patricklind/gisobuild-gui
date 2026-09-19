@@ -3,9 +3,16 @@ import time
 
 from app import enforce_archive_policy
 
-INTERVAL_SECONDS = int(os.environ.get("ARCHIVE_CLEANUP_INTERVAL_SECONDS", "3600"))
-if INTERVAL_SECONDS < 60:
-    raise RuntimeError("ARCHIVE_CLEANUP_INTERVAL_SECONDS must be at least 60")
+
+def validate_cleanup_interval_seconds(value: int) -> int:
+    if value < 60:
+        raise RuntimeError("ARCHIVE_CLEANUP_INTERVAL_SECONDS must be at least 60")
+    return value
+
+
+INTERVAL_SECONDS = validate_cleanup_interval_seconds(
+    int(os.environ.get("ARCHIVE_CLEANUP_INTERVAL_SECONDS", "3600"))
+)
 
 
 def main() -> None:

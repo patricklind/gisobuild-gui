@@ -717,6 +717,77 @@ class PlatformCompatibilityTests(unittest.TestCase):
         result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", selected)
         self.assertEqual(result["missing_bridge_smus"], [required])
 
+    def test_upgrade_matrix_reports_not_permitted_for_a_platform_with_no_entry(self):
+        matrix = {"permitted": {"25.1.2": {"26.1.2": [{"platform": "ncs5500"}]}}}
+        result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5700", [])
+        self.assertFalse(result["permitted"])
+
+    # The compatibility matrix is an operator-uploaded JSON file (see
+    # SECURITY.md's threat model), so its own malformed-input rejections had
+    # never actually been exercised - only ever-valid fixtures were tested.
+    # /api/compatibility (giso-webui/app.py) relies on these raising
+    # TypeError/ValueError specifically so it can turn a bad upload into a
+    # clean 400 instead of a 500.
+
+    def test_upgrade_matrix_rejects_a_non_dict_matrix(self):
+        with self.assertRaises(TypeError):
+            check_upgrade_matrix([], "25.1.2", "26.1.2", "ncs5500", [])
+
+    def test_upgrade_matrix_rejects_a_matrix_missing_permitted(self):
+        with self.assertRaises(TypeError):
+            check_upgrade_matrix({"other": {}}, "25.1.2", "26.1.2", "ncs5500", [])
+
+    def test_upgrade_matrix_rejects_an_invalid_source_release_entry(self):
+        matrix = {"permitted": {"25.1.2": "not-a-dict"}}
+        with self.assertRaises(TypeError):
+            check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", [])
+
+    def test_upgrade_matrix_rejects_an_invalid_target_release_entry(self):
+        matrix = {"permitted": {"25.1.2": {"26.1.2": "not-a-list"}}}
+        with self.assertRaises(TypeError):
+            check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", [])
+
+    def test_upgrade_matrix_rejects_invalid_bridge_smus(self):
+        matrix = {
+            "permitted": {
+                "25.1.2": {"26.1.2": [{"platform": "ncs5500", "bridge_smus": [123]}]}
+            }
+        }
+        with self.assertRaises(ValueError):
+            check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", [])
+
+    def test_upgrade_matrix_rejects_invalid_caveats(self):
+        matrix = {
+            "permitted": {
+                "25.1.2": {
+                    "26.1.2": [
+                        {"platform": "ncs5500", "bridge_smus": [], "caveats": [123]}
+                    ]
+                }
+            }
+        }
+        with self.assertRaises(ValueError):
+            check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", [])
+
+    def test_upgrade_matrix_ignores_a_candidate_entry_with_an_unrecognized_platform(
+        self,
+    ):
+        # matrix_platform()'s own ValueError-swallowing branch: an entry
+        # naming a platform this app doesn't recognize must be skipped, not
+        # crash the whole lookup.
+        matrix = {
+            "permitted": {
+                "25.1.2": {
+                    "26.1.2": [
+                        {"platform": "not-a-real-platform"},
+                        {"platform": "ncs5500", "bridge_smus": [], "caveats": []},
+                    ]
+                }
+            }
+        }
+        result = check_upgrade_matrix(matrix, "25.1.2", "26.1.2", "ncs5500", [])
+        self.assertTrue(result["permitted"])
+
 
 class ExrRpmLabelCompareTests(unittest.TestCase):
     """compare_exr_rpm_labels() vs. the real pinned upstream algorithm.

@@ -1602,6 +1602,27 @@ class GisoWebTests(unittest.TestCase):
             ["bridge-placeholder.rpm"],
         )
 
+    def test_compatibility_api_rejects_a_malformed_matrix_with_a_clean_400(self):
+        # check_upgrade_matrix() raises TypeError/ValueError for a malformed
+        # operator-uploaded matrix; this proves the route actually catches
+        # those (it lists them explicitly) and never lets one through as an
+        # unhandled 500, not just that the exception type is right in theory.
+        matrix = self.data / "bad_matrix.json"
+        matrix.write_text(json.dumps({"permitted": "not-a-dict"}), encoding="utf-8")
+        response = self.client.post(
+            "/api/compatibility",
+            json={
+                "iso": "ncs5500-mini-x-26.1.2.iso",
+                "packages": [],
+                "matrix": matrix.name,
+                "source_release": "25.1.2",
+                "target_release": "26.1.2",
+                "platform": "ncs5500",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.get_json())
+
     def test_smu_recommendation_api_selects_matching_packages_automatically(self):
         (self.data / "ncs5500-mini-x-26.1.2.iso").write_bytes(b"iso")
         matching = "ncs5500-mpls-1.0.0.1-r2612.CSCtest00001.x86_64.rpm"

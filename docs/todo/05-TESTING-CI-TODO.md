@@ -348,6 +348,33 @@ README prerequisite SMU).
       instead of a silent mismatch. `app.py` coverage: 91% -> 92%. Full
       suite green (370 unit tests, 24 browser tests), ruff and
       `ruff format --check` clean.
+- [x] `maintenance.py`'s startup validation and `check_upgrade_matrix()`'s
+      malformed-input rejections — same coverage pass, same day.
+      `maintenance.py`'s `ARCHIVE_CLEANUP_INTERVAL_SECONDS < 60` guard ran at
+      import time with whatever the test environment's env var happened to
+      be, so the rejection path itself was never exercised - exactly the gap
+      `validate_archive_retention_days()`/`validate_max_archive_bytes()`
+      already closed for `app.py`'s own startup validation. Extracted the
+      same way as `validate_cleanup_interval_seconds()`, with
+      `test_interval_below_60_seconds_is_rejected`/
+      `test_interval_of_exactly_60_seconds_is_accepted`.
+      `check_upgrade_matrix()` (`platform_validation.py`) validates an
+      *operator-uploaded* JSON file (`SECURITY.md`'s threat model), but
+      every existing test only ever gave it an already-valid matrix - none
+      of its five malformed-input rejections (non-dict matrix, missing/
+      invalid `permitted`, invalid source/target-release entry, invalid
+      `bridge_smus`, invalid `caveats`) nor `matrix_platform()`'s
+      unrecognized-platform-is-skipped branch had ever run. `/api/compatibility`
+      depends on these raising `TypeError`/`ValueError` specifically so a bad
+      upload becomes a clean 400, not a 500 - a wrong exception type here
+      would have gone undetected. Added 7 unit tests plus
+      `test_compatibility_api_rejects_a_malformed_matrix_with_a_clean_400`
+      proving the real route (not just the function in isolation) handles it
+      correctly. `maintenance.py` coverage: 89% -> 95%;
+      `platform_validation.py`: 94% -> 97%; combined project coverage
+      (`app.py`/`cisco_download.py`/`maintenance.py`/`platform_validation.py`):
+      90% -> 92%. Full suite green (381 unit tests, 24 browser tests), ruff
+      and `ruff format --check` clean.
 
 ## CI pipeline
 

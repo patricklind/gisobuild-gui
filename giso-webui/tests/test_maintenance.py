@@ -5,6 +5,13 @@ import maintenance
 
 
 class MaintenanceTests(unittest.TestCase):
+    def test_interval_below_60_seconds_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "at least 60"):
+            maintenance.validate_cleanup_interval_seconds(59)
+
+    def test_interval_of_exactly_60_seconds_is_accepted(self):
+        self.assertEqual(maintenance.validate_cleanup_interval_seconds(60), 60)
+
     def test_transient_os_error_does_not_crash_the_loop(self):
         stop = RuntimeError("stop the test loop")
         with (
