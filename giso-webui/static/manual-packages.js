@@ -36,7 +36,9 @@
     }
     const reason = options.reason || (file.conflict
       ? 'Blocked: another RPM has the same filename but different content. Remove the unwanted copy.'
-      : 'Compatible RPM without a detected CSC group');
+      : options.csc
+        ? `Compatible RPM in CSC group ${options.csc}`
+        : 'Compatible RPM without a detected CSC group');
     const label = document.createElement('label');
     label.className = `manual-package-option${options.reason || file.conflict ? ' incompatible' : ''}`;
     const box = document.createElement('input');

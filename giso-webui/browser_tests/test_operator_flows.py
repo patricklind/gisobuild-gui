@@ -479,6 +479,27 @@ class OperatorFlowTests(unittest.TestCase):
         group.check()
         expect(summary).to_have_text("3 of 3 RPM packages selected.")
 
+    def test_manual_package_description_names_its_csc_group(self):
+        # appendPackage()'s default reason text always said "without a
+        # detected CSC group", even for a package that manual mode had just
+        # grouped under a real CSC header right above it - self-contradictory
+        # and confusing, never caught because no test read that text.
+        for name in (self.ISO, self.ROUTING, self.BGP):
+            self.write(name)
+        self.open()
+        self.use_manual_mode()
+
+        def option_text(name):
+            option = self.page.locator(
+                ".manual-package-option", has=self.page.locator("b", has_text=name)
+            )
+            return option.locator("small").inner_text()
+
+        for name in (self.ROUTING, self.BGP):
+            text = option_text(name)
+            self.assertIn("Compatible RPM in CSC group CSCTEST00001", text)
+            self.assertNotIn("without a detected CSC group", text)
+
     def test_upload_while_manual_mode_is_open_keeps_the_manual_selection(self):
         for name in (self.ISO, self.ROUTING, self.BGP):
             self.write(name)

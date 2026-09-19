@@ -759,6 +759,29 @@ TODO:
       `test_different_duplicate_rpms_are_rejected`'s backend expectations,
       now confirmed in the actual DOM an operator sees.
 
+### A grouped manual package's own description contradicted its own group header (found 2026-09-19, live UI check)
+
+Found by actually driving the running self-contained app in a browser (a
+fresh isolated instance, synthetic fixtures, never the live deployment) -
+not by reading the source in isolation. `appendPackage()`'s default
+description text was `'Compatible RPM without a detected CSC group'`
+whenever no other reason applied, used unconditionally for *every* manual
+package option including ones `renderManualPackages()` had just rendered
+inside a `<fieldset>` headed `CSCTEST00001 — Single-component fix` - the
+per-package text and the group header it sat directly under said opposite
+things in the same screen. Root cause: the branch that renders a detected
+CSC group's members (`(plan.package_groups || []).forEach(...)`) always
+passes `options.csc`, but `appendPackage()`'s fallback message never
+checked for it - it was only ever accurate for the separate "Other RPM
+packages" section, where no CSC was detected.
+
+Fixed: the fallback now reads `` `Compatible RPM in CSC group ${options.csc}` ``
+when `options.csc` is set, keeping the original wording only when it is
+not. Verified with a new browser test (confirmed to fail against the old
+text and pass against the fix):
+`test_manual_package_description_names_its_csc_group`. Full suite green
+(382 unit tests, 25 browser tests), ESLint clean.
+
 ### A CSC group's "select all" checkbox could never show fully checked when the group had a conflicted duplicate (2026-09-16)
 
 Current behavior (before this fix):
