@@ -301,6 +301,30 @@ README prerequisite SMU).
       yes/no; `test_quoted_artifact_path_with_spaces_is_fully_redacted` and
       `test_build_output_is_redacted_and_written_to_service_log` cover
       filename/command redaction in logs)
+- [x] `CiscoSoftwareClient`'s own request/response handling — found
+      2026-09-19 via a coverage run (`coverage.py` against
+      `giso-webui/tests`, not part of the normal Docker-only suite; a
+      one-off measurement, not a new standing tool). `cisco_download.py` was
+      72% covered: every `test_app.py` test mocks `app.cisco_client()`
+      wholesale, and the existing `test_cisco_download.py` tests only
+      exercised `download()` and URL validation, so `_json_request()` (the
+      method every other API call goes through - headers, the request
+      itself, oversized/malformed/non-object response handling),
+      `_check_errors()`/`_exceptions()`'s JSON-array branch (only the
+      dict-nested branch had ever run), `search()`/`request_download()`/
+      `accept_eula()`/`accept_k9()`'s own payload construction and
+      validation (image-count bounds, the K9 declaration check), the
+      constructor's credential check, and `_access_token()`'s
+      missing-token/malformed-`expires_in` handling had never actually
+      executed under any test - a latent bug in any of them (a wrong
+      exception type, a malformed payload key) would have gone undetected
+      indefinitely, only ever surfacing against Cisco's real API. Added 18
+      tests in `giso-webui/tests/test_cisco_download.py` exercising each
+      directly (mocking `_opener.open`/`_json_request` at the same
+      boundaries the existing tests already used, no real network access).
+      `cisco_download.py` coverage: 72% -> 92%. Full suite green (362 unit
+      tests, up from 344; 24 browser tests unaffected), ruff and
+      `ruff format --check` clean.
 
 ## CI pipeline
 
