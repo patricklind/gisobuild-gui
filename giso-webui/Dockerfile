@@ -1,4 +1,4 @@
-FROM python:3.12-alpine@sha256:b64631e04e4920160c50fbe8d8df828f7f35f06f425cb44aa09bca53e708a35a
+FROM python:3.15-alpine@sha256:0f9552bb28711333da16915ec146f5e6bb44a7fdac9ced15dc17c2e0206346dd
 
 # rpm is used read-only, via `rpm -qp --requires/--provides --nosignature`, to
 # read an uploaded RPM's own dependency metadata for the pre-build dependency
