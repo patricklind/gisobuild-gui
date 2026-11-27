@@ -9,5 +9,5 @@ blinker==1.9.0
 itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
-packaging==26.3
+packaging==26.4
 Werkzeug==3.1.8
